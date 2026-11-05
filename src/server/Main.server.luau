@@ -250,6 +250,26 @@ local function createMonsterModel(monster)
     return model, fill
 end
 
+local function animateMonster(model, offset)
+    if not model or not model.Parent then return end
+    for _, object in ipairs(model:GetDescendants()) do
+        if object:IsA("BasePart") then
+            local original = object.CFrame
+            local moved = original * CFrame.new(offset)
+            TweenService:Create(object, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                CFrame = moved,
+            }):Play()
+            task.delay(0.13, function()
+                if object.Parent then
+                    TweenService:Create(object, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                        CFrame = original,
+                    }):Play()
+                end
+            end)
+        end
+    end
+end
+
 local function updateMonsterHealth(battle)
     if not battle.Model or not battle.Model.Parent then
         return
@@ -413,6 +433,7 @@ R.Attack.OnServerEvent:Connect(withData(function(player, data)
         math.floor((Config.Combat.BaseDamage + data.Power * Config.Combat.PowerDamageScale) * hero.PowerMult * buffMultiplier(player, "Attack"))
     )
     battle.Health = math.max(0, battle.Health - damage)
+    animateMonster(battle.Model, Vector3.new(0, 0, -1.25))
     updateMonsterHealth(battle)
     R.CombatFX:FireClient(player, {
         Kind = "PlayerHit",
@@ -432,6 +453,7 @@ R.Attack.OnServerEvent:Connect(withData(function(player, data)
         local humanoid = getHumanoid(player)
         if humanoid and humanoid.Health > 0 then
             local enemyDamage = math.max(1, battle.Monster.Damage)
+            animateMonster(battle.Model, Vector3.new(0, 0, 1.5))
             humanoid:TakeDamage(enemyDamage)
             R.CombatFX:FireClient(player, { Kind = "EnemyHit", Damage = enemyDamage, PlayerHealth = humanoid.Health, PlayerMaxHealth = humanoid.MaxHealth })
             if humanoid.Health <= 0 then
