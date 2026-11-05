@@ -745,7 +745,7 @@ local function refresh()
     battleCard.Visible = state.BattleActive == true
     if state.BattleActive then
         battleName.Text = "ПРОТИВНИК  ·  " .. tostring(state.BattleMonster or "")
-        battleNumbers.Text = ("%s / %s HP"):format(formatNumber(state.BattleHealth), formatNumber(state.BattleMaxHealth))
+        battleNumbers.Text = ("%s / %s HP  ·  ТЫ %s / %s"):format(formatNumber(state.BattleHealth), formatNumber(state.BattleMaxHealth), formatNumber(state.PlayerHealth), formatNumber(state.PlayerMaxHealth))
         local ratio = math.clamp((state.BattleHealth or 0) / math.max(1, state.BattleMaxHealth or 1), 0, 1)
         animate(battleFill, 0.18, { Size = UDim2.fromScale(ratio, 1) })
         fightButton.Text = "АТАКОВАТЬ"
@@ -792,6 +792,40 @@ end)
 
 Remotes.Notice.OnClientEvent:Connect(notice)
 
+local function pulseAtPlayer(color, maxSize)
+    local character = player.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+
+    local pulsePart = Instance.new("Part")
+    pulsePart.Name = "LocalMagicPulse"
+    pulsePart.Shape = Enum.PartType.Ball
+    pulsePart.Size = Vector3.new(2, 2, 2)
+    pulsePart.CFrame = rootPart.CFrame
+    pulsePart.Anchored = true
+    pulsePart.CanCollide = false
+    pulsePart.CanTouch = false
+    pulsePart.Material = Enum.Material.Neon
+    pulsePart.Color = color
+    pulsePart.Transparency = 0.42
+    pulsePart.Parent = workspace
+
+    local glow = Instance.new("PointLight")
+    glow.Color = color
+    glow.Range = 12
+    glow.Brightness = 1.5
+    glow.Parent = pulsePart
+
+    local tween = TweenService:Create(pulsePart, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = Vector3.new(maxSize or 8, maxSize or 8, maxSize or 8),
+        Transparency = 1,
+    })
+    tween:Play()
+    tween.Completed:Connect(function()
+        if pulsePart.Parent then pulsePart:Destroy() end
+    end)
+end
+
 local function playArcaneBolt()
     local camera = workspace.CurrentCamera
     local activeFolder = workspace:FindFirstChild("ActiveMonsters")
@@ -832,6 +866,7 @@ end
 Remotes.CombatFX.OnClientEvent:Connect(function(data)
     if type(data) ~= "table" then return end
     if data.Kind == "Train" then
+        pulseAtPlayer(COLORS.gold, 5)
         floatingText("+" .. formatNumber(data.Amount) .. " МОЛНИИ", COLORS.gold)
     elseif data.Kind == "Started" then
         notice("Начался бой: " .. tostring(data.Monster))
@@ -850,6 +885,7 @@ Remotes.CombatFX.OnClientEvent:Connect(function(data)
         notice("Противник оказался сильнее. Попробуй ещё раз.")
         flash(COLORS.red, 0.24)
     elseif data.Kind == "Ability" then
+        pulseAtPlayer(COLORS.purple, 11)
         floatingText(tostring(data.Name), COLORS.cyan)
         flash(COLORS.purple, 0.12)
     elseif data.Kind == "Rebirth" then
