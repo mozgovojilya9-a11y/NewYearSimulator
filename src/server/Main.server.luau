@@ -375,6 +375,7 @@ R.Fight.OnServerEvent:Connect(withData(function(player, data)
     local model, healthFill = createMonsterModel(monster)
     local maxHealth = monster.Health
     battles[player] = {
+        Name = monster.Name,
         Monster = monster,
         Model = model,
         HealthFill = healthFill,
