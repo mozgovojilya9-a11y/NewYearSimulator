@@ -175,6 +175,7 @@ Config.GamePasses = {
 Config.DeveloperProducts = {
     WinsStarter = { Id = 0, Name = "Набор побед", Description = "5000 побед", Reward = { Type = "Wins", Amount = 5000 } },
     LightningBoost = { Id = 0, Name = "Усиление молнии", Description = "Временное усиление молнии", Reward = { Type = "LightningBoost", Multiplier = 2, Duration = 900 } },
+    PremiumPet = { Id = 0, Name = "Дракон северного сияния", Description = "Эксклюзивный легендарный питомец", Reward = { Type = "Pet", PetId = "frost_drake" } },
 }
 Config.DeveloperProductById = {}
 for key, product in pairs(Config.DeveloperProducts) do
