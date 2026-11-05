@@ -1,0 +1,48 @@
+name: Rojo build
+
+on:
+  push:
+    branches:
+      - main
+      - feature/**
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Validate Rojo project
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pinned Roblox toolchain
+        uses: paradoxum-games/setup-rokit@v3
+        with:
+          cache: true
+
+      - name: Print Rojo version
+        run: rojo --version
+
+      - name: Build Roblox place
+        run: rojo build -o NewYearSimulator.rbxlx
+
+      - name: Check patch whitespace
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --check "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}"
+          else
+            git diff --check HEAD^ HEAD
+          fi
+
+      - name: Upload built place
+        uses: actions/upload-artifact@v4
+        with:
+          name: NewYearSimulator-rbxlx
+          path: NewYearSimulator.rbxlx
+          if-no-files-found: error
+          retention-days: 7
