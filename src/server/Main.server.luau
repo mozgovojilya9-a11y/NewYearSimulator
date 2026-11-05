@@ -38,7 +38,7 @@ local R = {}
 for _, name in ipairs({
     "RequestState", "Train", "Fight", "Attack", "Rebirth",
     "BuyHero", "EquipHero", "UseAbility", "SellItem",
-    "OpenEgg", "TogglePet", "CraftItem", "EquipItem", "PassChanged", "OpenMenu",
+    "OpenEgg", "TogglePet", "CraftItem", "EquipItem", "PassChanged", "PurchaseChanged", "OpenMenu",
     "State", "Notice", "CombatFX",
 }) do
     R[name] = getRemote(name)
