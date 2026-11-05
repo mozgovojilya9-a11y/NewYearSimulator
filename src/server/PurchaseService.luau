@@ -79,6 +79,9 @@ function PurchaseService.Start(dataService)
         data.GamePasses = data.GamePasses or {}
         data.GamePasses[key] = true
         dataService.Save(player)
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        local refresh = remotes and remotes:FindFirstChild("PassChanged")
+        if refresh then refresh:FireClient(player) end
     end)
 
     MarketplaceService.ProcessReceipt = function(receiptInfo)
@@ -95,7 +98,11 @@ function PurchaseService.Start(dataService)
         data.ProcessedReceipts = data.ProcessedReceipts or {}
         local receiptKey = tostring(receiptInfo.PurchaseId)
         if data.ProcessedReceipts[receiptKey] then
-            return Enum.ProductPurchaseDecision.PurchaseGranted
+            -- A previous attempt may have granted in memory but failed to persist.
+            -- Retry the save before acknowledging the receipt to Roblox.
+            local saved = dataService.Save(player)
+            return saved and Enum.ProductPurchaseDecision.PurchaseGranted
+                or Enum.ProductPurchaseDecision.NotProcessedYet
         end
 
         local entry = Config.DeveloperProductById[receiptInfo.ProductId]
