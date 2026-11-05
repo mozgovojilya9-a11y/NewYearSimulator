@@ -203,7 +203,7 @@ local function createMonsterModel(monster)
         rune.Shape = Enum.PartType.Cylinder
     end
 
-    local aura = makePart(model, "Aura", Vector3.new(8.5, 8.5, 8.5), core.CFrame, monster.Color, Enum.Material.ForceField, Enum.PartType.Ball)
+    local aura = makePart(model, "Aura", Vector3.new(8.5, 8.5, 8.5), core.CFrame, monster.Color, Enum.Material.Glass, Enum.PartType.Ball)
     aura.Transparency = 0.72
     aura.CastShadow = false
     model.PrimaryPart = core
