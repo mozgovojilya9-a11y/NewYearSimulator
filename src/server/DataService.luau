@@ -1,120 +1,163 @@
--- Загрузка, кэш и сохранение данных игроков (DataStore).
--- ВАЖНО: в Studio включите Game Settings → Security → Enable Studio Access to API Services.
-
+-- Player data persistence. Store name and key format are kept compatible with v1.
 local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-
 local store = DataStoreService:GetDataStore("NewYearSim_v1")
 
 local DEFAULT = {
-	Power = 0,
-	Wins = 0,
-	Rebirths = 0,
-	Stage = 1,
-	Zone = 1,
-	OwnedHeroes = { snowman = true },
-	EquippedHero = "snowman",
+    Power = 0,
+    Wins = 0,
+    Rebirths = 0,
+    Stage = 1,
+    Zone = 1,
+    OwnedHeroes = { snowman = true },
+    EquippedHero = "snowman",
+    Inventory = {},
+    TotalKills = 0,
+    HighestStage = 1,
 }
 
 local DataService = {}
 local cache = {}
+local saving = {}
+local started = false
 
 local function deepCopy(value)
-	if type(value) ~= "table" then
-		return value
-	end
-	local copy = {}
-	for k, v in value do
-		copy[k] = deepCopy(v)
-	end
-	return copy
+    if type(value) ~= "table" then
+        return value
+    end
+    local copy = {}
+    for key, child in pairs(value) do
+        copy[key] = deepCopy(child)
+    end
+    return copy
 end
 
-local function withRetry(fn, attempts)
-	for i = 1, attempts do
-		local ok, result = pcall(fn)
-		if ok then
-			return true, result
-		end
-		warn(("DataStore: попытка %d не удалась: %s"):format(i, tostring(result)))
-		task.wait(1)
-	end
-	return false, nil
+local function mergeDefaults(saved)
+    local data = type(saved) == "table" and saved or {}
+    for key, value in pairs(DEFAULT) do
+        if data[key] == nil then
+            data[key] = deepCopy(value)
+        end
+    end
+
+    if type(data.OwnedHeroes) ~= "table" then
+        data.OwnedHeroes = { snowman = true }
+    end
+    if type(data.Inventory) ~= "table" then
+        data.Inventory = {}
+    end
+
+    -- Preserve every saved hero ID. Only repair an invalid equipped ID.
+    if type(data.EquippedHero) ~= "string" or not Config.HeroById[data.EquippedHero] then
+        data.EquippedHero = data.OwnedHeroes.snowman and "snowman" or "snowman"
+        data.OwnedHeroes.snowman = true
+    end
+    data.Power = math.max(0, tonumber(data.Power) or 0)
+    data.Wins = math.max(0, tonumber(data.Wins) or 0)
+    data.Rebirths = math.max(0, math.floor(tonumber(data.Rebirths) or 0))
+    data.Stage = math.max(1, math.floor(tonumber(data.Stage) or 1))
+    data.Zone = math.clamp(math.floor(tonumber(data.Zone) or 1), 1, #Config.Zones)
+    data.TotalKills = math.max(0, math.floor(tonumber(data.TotalKills) or 0))
+    data.HighestStage = math.max(data.Stage, math.floor(tonumber(data.HighestStage) or data.Stage))
+    return data
+end
+
+local function withRetry(callback, attempts)
+    local lastError = nil
+    for attempt = 1, attempts do
+        local ok, result = pcall(callback)
+        if ok then
+            return true, result
+        end
+        lastError = result
+        warn(("[DataService] attempt %d/%d failed: %s"):format(attempt, attempts, tostring(result)))
+        task.wait(attempt)
+    end
+    return false, lastError
 end
 
 function DataService.Load(player)
-	local key = "player_" .. player.UserId
-	local ok, saved = withRetry(function()
-		return store:GetAsync(key)
-	end, 3)
+    local key = "player_" .. player.UserId
+    local ok, saved = withRetry(function()
+        return store:GetAsync(key)
+    end, 3)
 
-	if not ok then
-		-- Не кэшируем и не сохраняем пустые данные, чтобы не затереть прогресс.
-		player:Kick("Не удалось загрузить данные. Зайдите ещё раз.")
-		return nil
-	end
+    if not ok then
+        player:Kick("Не удалось загрузить сохранение. Попробуйте войти ещё раз.")
+        return nil
+    end
 
-	local data = saved or {}
-	for k, v in DEFAULT do
-		if data[k] == nil then
-			data[k] = deepCopy(v)
-		end
-	end
+    if not player.Parent then
+        return nil
+    end
 
-	if not player.Parent then
-		return nil -- игрок вышел, пока грузились данные
-	end
-
-	cache[player] = data
-	return data
+    local data = mergeDefaults(deepCopy(saved))
+    cache[player] = data
+    return data
 end
 
 function DataService.Get(player)
-	return cache[player]
+    return cache[player]
 end
 
 function DataService.Save(player)
-	local data = cache[player]
-	if not data then
-		return
-	end
-	withRetry(function()
-		store:UpdateAsync("player_" .. player.UserId, function()
-			return data
-		end)
-	end, 3)
+    local data = cache[player]
+    if not data then
+        return false
+    end
+    if saving[player] then
+        return false
+    end
+
+    saving[player] = true
+    local snapshot = deepCopy(data)
+    local key = "player_" .. player.UserId
+    local ok = withRetry(function()
+        return store:UpdateAsync(key, function()
+            return snapshot
+        end)
+    end, 3)
+    saving[player] = nil
+    return ok
 end
 
 function DataService.Release(player)
-	DataService.Save(player)
-	cache[player] = nil
+    DataService.Save(player)
+    cache[player] = nil
+    saving[player] = nil
 end
 
 function DataService.Start()
-	task.spawn(function()
-		while true do
-			task.wait(Config.SaveInterval)
-			for player in cache do
-				task.spawn(DataService.Save, player)
-			end
-		end
-	end)
+    if started then
+        return
+    end
+    started = true
 
-	game:BindToClose(function()
-		local pending = 0
-		for player in cache do
-			pending += 1
-			task.spawn(function()
-				DataService.Save(player)
-				pending -= 1
-			end)
-		end
-		while pending > 0 do
-			task.wait()
-		end
-	end)
+    task.spawn(function()
+        while true do
+            task.wait(Config.SaveInterval)
+            for player in pairs(cache) do
+                task.spawn(DataService.Save, player)
+            end
+        end
+    end)
+
+    game:BindToClose(function()
+        local pending = 0
+        for player in pairs(cache) do
+            pending += 1
+            task.spawn(function()
+                DataService.Save(player)
+                pending -= 1
+            end)
+        end
+        local deadline = os.clock() + 25
+        while pending > 0 and os.clock() < deadline do
+            task.wait(0.1)
+        end
+    end)
 end
 
 return DataService
