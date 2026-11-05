@@ -166,10 +166,6 @@ local function updateScale()
     if viewport.X < 700 then scale = math.clamp(viewport.X / 570, 0.68, 0.9) end
     rootScale.Scale = scale
 end
-updateScale()
-if workspace.CurrentCamera then
-    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
-end
 
 -- Soft darkened HUD cards with a restrained gold frame.
 local function makeCard(parent, name, size, position, accent)
@@ -645,9 +641,21 @@ local function updateResponsiveLayout()
             panel.Position = UDim2.fromScale(0.05, 0.15)
             panel.Size = UDim2.fromScale(0.90, 0.68)
         end
-        for _, textObject in ipairs({ brand:FindFirstChildWhichIsA("TextLabel"), stageTitle, stageHint, mentorName, mentorBonus }) do
-            if textObject then textObject.TextSize = math.max(8, math.floor(textObject.TextSize * 0.78)) end
+        local brandLabels = {}
+        for _, child in ipairs(brand:GetChildren()) do
+            if child:IsA("TextLabel") then table.insert(brandLabels, child) end
         end
+        if brandLabels[1] then brandLabels[1].TextSize = 12 end
+        if brandLabels[2] then brandLabels[2].TextSize = 8 end
+        stageTitle.TextSize = 11
+        stageHint.TextSize = 9
+        mentorName.TextSize = 8
+        mentorBonus.TextSize = 8
+        lightningValue.TextSize = 13
+        winsValue.TextSize = 11
+        rebirthValue.TextSize = 9
+        powerTitle.TextSize = 15
+        levelTitle.TextSize = 9
     else
         rootScale.Scale = math.clamp(viewport.X / 1420, 0.84, 1.08)
         brand.Position = UDim2.fromScale(0.018, 0.025)
@@ -671,6 +679,21 @@ local function updateResponsiveLayout()
             nav.Size = UDim2.new(1, -18, 0, 43)
             nav.TextSize = 12
         end
+        local brandLabels = {}
+        for _, child in ipairs(brand:GetChildren()) do
+            if child:IsA("TextLabel") then table.insert(brandLabels, child) end
+        end
+        if brandLabels[1] then brandLabels[1].TextSize = 18 end
+        if brandLabels[2] then brandLabels[2].TextSize = 10 end
+        stageTitle.TextSize = 15
+        stageHint.TextSize = 11
+        mentorName.TextSize = 12
+        mentorBonus.TextSize = 10
+        lightningValue.TextSize = 17
+        winsValue.TextSize = 15
+        rebirthValue.TextSize = 13
+        powerTitle.TextSize = 21
+        levelTitle.TextSize = 12
         for _, child in ipairs(actions:GetChildren()) do
             if child:IsA("TextButton") then
                 child.Size = UDim2.new(0.19, 0, 0.82, 0)
