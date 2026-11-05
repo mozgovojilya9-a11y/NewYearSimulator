@@ -534,6 +534,12 @@ R.Fight.OnServerEvent:Connect(withData(function(player, data)
     if battles[player] then
         return notice(player, "Бой уже идёт. Используй кнопку «Атаковать».")
     end
+    local character = player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or humanoid.Health <= 0 or not rootPart then
+        return notice(player, "Сначала возродись, чтобы начать бой.")
+    end
 
     local required = math.max(0, stageRequirement(data.Stage) * 0.9)
     if data.Power < required then
@@ -578,6 +584,10 @@ R.Attack.OnServerEvent:Connect(withData(function(player, data)
     local character = player.Character
     local rootPart = character and character:FindFirstChild("HumanoidRootPart")
     local monsterPart = battle.Model and battle.Model.PrimaryPart
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then
+        return notice(player, "Нельзя атаковать без сознания. Возродись и попробуй снова.")
+    end
     if not rootPart or not monsterPart or (rootPart.Position - monsterPart.Position).Magnitude > 85 then
         return notice(player, "Ты слишком далеко от противника.")
     end
@@ -618,7 +628,7 @@ R.Attack.OnServerEvent:Connect(withData(function(player, data)
         if humanoid and humanoid.Health > 0 then
             local _, armor = getEquipment(data)
             local defenseMultiplier = math.clamp(1 - (armor and armor.DefenseBonus or 0), 0.1, 1)
-            local enemyDamage = math.max(1, math.floor(battle.Monster.Damage * defenseMultiplier))
+            local enemyDamage = math.max(1, math.floor(battle.Monster.Damage * defenseMultiplier * buffMultiplier(player, "Defense")))
             animateMonster(battle.Model, Vector3.new(0, 0, 1.5))
             humanoid:TakeDamage(enemyDamage)
             R.CombatFX:FireClient(player, { Kind = "EnemyHit", Damage = enemyDamage, PlayerHealth = humanoid.Health, PlayerMaxHealth = humanoid.MaxHealth })
