@@ -3,6 +3,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -348,6 +350,9 @@ local mentorsPanel, mentorsBody = createPanel("Mentors", "НАСТАВНИКИ �
 local worldsPanel, worldsBody = createPanel("Worlds", "МИРЫ И ТРЕНИРОВОЧНЫЕ ЗОНЫ")
 local inventoryPanel, inventoryBody = createPanel("Inventory", "ИНВЕНТАРЬ И ТРОФЕИ")
 local questsPanel, questsBody = createPanel("Quests", "ИСПЫТАНИЯ УЧЕНИКА")
+local petsPanel, petsBody = createPanel("Pets", "ПИТОМЦЫ И МАГИЧЕСКИЕ ЯЙЦА")
+local craftPanel, craftBody = createPanel("Craft", "МАСТЕРСКАЯ АРТЕФАКТОВ")
+local shopPanel, shopBody = createPanel("Shop", "ЛАВКА И ПРЕМИУМ")
 
 local function clearRows(body)
     for _, child in ipairs(body:GetChildren()) do
@@ -508,6 +513,86 @@ addNav("♜  ИСПЫТАНИЯ", COLORS.red, 4, function()
     openPanel("Quests")
 end)
 
+addNav("✧  ПИТОМЦЫ", COLORS.cyan, 5, function()
+    clearRows(petsBody)
+    for eggId, egg in pairs(Config.PetEggs) do
+        local details = "Стоимость: " .. formatNumber(egg.Cost) .. " побед  ·  Вероятности отображаются в описании"
+        makeListRow(petsBody, egg.Name, details, COLORS.cyan, "ОТКРЫТЬ ЯЙЦО", function()
+            Remotes.OpenEgg:FireServer(eggId)
+        end)
+    end
+    makeListRow(petsBody, "МОЯ КОЛЛЕКЦИЯ", "Экипировано: " .. tostring(#((state and state.EquippedPets) or {})) .. " / " .. tostring((state and state.PetSlots) or Config.PetSlots), COLORS.gold, nil, nil)
+    for _, pet in ipairs(Config.Pets) do
+        local owned = state and state.OwnedPets and (tonumber(state.OwnedPets[pet.Id]) or 0) or 0
+        if owned > 0 then
+            local equipped = state and table.find(state.EquippedPets or {}, pet.Id) ~= nil
+            local detail = pet.Rarity .. "  ·  Молния ×" .. tostring(pet.PowerMult) .. "  ·  Победы ×" .. tostring(pet.WinMult) .. "  ·  Количество: " .. tostring(owned)
+            makeListRow(petsBody, pet.Name, detail, Config.RarityColors[pet.Rarity] or pet.Color,
+                equipped and "СНЯТЬ" or "ЭКИПИРОВАТЬ", function()
+                    Remotes.TogglePet:FireServer(pet.Id)
+                end)
+        end
+    end
+    if state then
+        local any = false
+        for _, amount in pairs(state.OwnedPets or {}) do if amount > 0 then any = true end end
+        if not any then
+            makeListRow(petsBody, "Питомцев пока нет", "Открой яйцо, чтобы получить первого компаньона.", COLORS.muted, nil, nil)
+        end
+    end
+    openPanel("Pets")
+end)
+
+addNav("⚒  КРАФТ", COLORS.purple, 6, function()
+    clearRows(craftBody)
+    for recipeId, recipe in pairs(Config.CraftRecipes) do
+        local parts = {}
+        for itemId, amount in pairs(recipe.Ingredients) do
+            local item = Config.Items[itemId]
+            table.insert(parts, (item and item.Name or itemId) .. " ×" .. tostring(amount))
+        end
+        table.sort(parts)
+        makeListRow(craftBody, recipe.Name, "Этап " .. tostring(recipe.MinStage) .. "  ·  Нужно: " .. table.concat(parts, ", "),
+            Config.RarityColors[(Config.Items[recipe.Output] and Config.Items[recipe.Output].Rarity) or "Редкий"],
+            "СОЗДАТЬ", function()
+                Remotes.CraftItem:FireServer(recipeId)
+            end)
+    end
+    local weapon = state and state.Equipment and state.Equipment.Weapon
+    local armor = state and state.Equipment and state.Equipment.Armor
+    local weaponName = weapon and Config.Items[weapon] and Config.Items[weapon].Name or "Не экипировано"
+    local armorName = armor and Config.Items[armor] and Config.Items[armor].Name or "Не экипировано"
+    makeListRow(craftBody, "ТЕКУЩАЯ ЭКИПИРОВКА", "Оружие: " .. weaponName .. "  ·  Броня: " .. armorName, COLORS.gold, nil, nil)
+    openPanel("Craft")
+end)
+
+addNav("✦  МАГАЗИН", COLORS.gold, 7, function()
+    clearRows(shopBody)
+    for passKey, pass in pairs(Config.GamePasses) do
+        local available = pass.Id and pass.Id > 0
+        makeListRow(shopBody, pass.Name, pass.Description .. (available and "" or "  ·  ID ещё не настроен"),
+            COLORS.gold, available and "КУПИТЬ ROBUX" or "НУЖЕН ID", function()
+                if not available then
+                    notice("Добавь ID Game Pass в Config.luau после создания в Creator Dashboard.")
+                    return
+                end
+                MarketplaceService:PromptGamePassPurchase(player, pass.Id)
+            end)
+    end
+    for productKey, product in pairs(Config.DeveloperProducts) do
+        local available = product.Id and product.Id > 0
+        makeListRow(shopBody, product.Name, product.Description .. (available and "" or "  ·  ID ещё не настроен"),
+            COLORS.purple, available and "КУПИТЬ ROBUX" or "НУЖЕН ID", function()
+                if not available then
+                    notice("Добавь ID Developer Product в Config.luau после создания в Creator Dashboard.")
+                    return
+                end
+                MarketplaceService:PromptProductPurchase(player, product.Id)
+            end)
+    end
+    openPanel("Shop")
+end)
+
 -- Toast and animated reward card.
 local toast = makeCard(root, "Toast", UDim2.fromScale(0.42, 0.065), UDim2.fromScale(0.29, 0.16), COLORS.gold)
 toast.Visible = false
@@ -665,7 +750,7 @@ local function updateResponsiveLayout()
         mentorBadge.Position = UDim2.fromScale(0.79, 0.025)
         mentorBadge.Size = UDim2.fromScale(0.19, 0.085)
         navigation.Position = UDim2.fromScale(0.018, 0.23)
-        navigation.Size = UDim2.fromScale(0.16, 0.39)
+        navigation.Size = UDim2.fromScale(0.16, 0.45)
         resources.Position = UDim2.fromScale(0.018, 0.68)
         resources.Size = UDim2.fromScale(0.19, 0.22)
         progress.Position = UDim2.fromScale(0.27, 0.69)
