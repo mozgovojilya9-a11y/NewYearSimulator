@@ -90,6 +90,7 @@ local function makeLabel(parent, text, size, position, color, font, alignment)
         TextXAlignment = alignment or Enum.TextXAlignment.Left,
         TextYAlignment = Enum.TextYAlignment.Center,
         TextWrapped = true,
+        ZIndex = parent and parent:IsA("GuiObject") and (parent.ZIndex + 1) or 1,
         Position = position or UDim2.new(),
         Size = UDim2.new(1, 0, 0, 26),
     }, parent)
