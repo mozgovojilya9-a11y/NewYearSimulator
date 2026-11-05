@@ -289,7 +289,18 @@ local abilityButton = actionButton("СПОСОБНОСТЬ", COLORS.blue, functi
     Remotes.UseAbility:FireServer()
 end, "Ability")
 local rebirthButton = actionButton("ПЕРЕРОЖДЕНИЕ", COLORS.panelLight, function()
-    Remotes.Rebirth:FireServer()
+    clearRows(rebirthBody)
+    local required = state and state.RebirthCost or Config.Rebirth.BaseCost
+    local current = state and state.Rebirths or 0
+    local nextBonus = 1 + (current + 1) * Config.Rebirth.BonusPerRebirth
+    makeListRow(rebirthBody, "Следующее перерождение", "Требуется молния: " .. formatNumber(required), COLORS.gold, nil, nil)
+    makeListRow(rebirthBody, "Постоянное усиление", ("После сброса молния будет умножаться на ×%.2f"):format(nextBonus), COLORS.purple, nil, nil)
+    makeListRow(rebirthBody, "Сохраняется", "Наставники, питомцы, предметы, экипировка и победы останутся с тобой.", COLORS.cyan, nil, nil)
+    makeListRow(rebirthBody, "Подтверждение", "Молния и текущий этап будут сброшены.", COLORS.red, "ПЕРЕРОДИТЬСЯ", function()
+        Remotes.Rebirth:FireServer()
+        openPanel("Rebirth")
+    end)
+    openPanel("Rebirth")
 end, "Rebirth")
 
 -- Modal panel factory.
@@ -350,6 +361,7 @@ local mentorsPanel, mentorsBody = createPanel("Mentors", "НАСТАВНИКИ �
 local worldsPanel, worldsBody = createPanel("Worlds", "МИРЫ И ТРЕНИРОВОЧНЫЕ ЗОНЫ")
 local inventoryPanel, inventoryBody = createPanel("Inventory", "ИНВЕНТАРЬ И ТРОФЕИ")
 local questsPanel, questsBody = createPanel("Quests", "ИСПЫТАНИЯ УЧЕНИКА")
+local rebirthPanel, rebirthBody = createPanel("Rebirth", "ПЕРЕРОЖДЕНИЕ")
 local petsPanel, petsBody = createPanel("Pets", "ПИТОМЦЫ И МАГИЧЕСКИЕ ЯЙЦА")
 local craftPanel, craftBody = createPanel("Craft", "МАСТЕРСКАЯ АРТЕФАКТОВ")
 local shopPanel, shopBody = createPanel("Shop", "ЛАВКА И ПРЕМИУМ")
@@ -571,16 +583,29 @@ addNav("✧  ИНВЕНТАРЬ", COLORS.green, 3, function()
     openPanel("Inventory")
 end)
 
-addNav("♜  ИСПЫТАНИЯ", COLORS.red, 4, function()
+local function rebuildQuestsPanel()
     clearRows(questsBody)
     local kills = state and state.TotalKills or 0
-    local stage = state and state.Stage or 1
-    makeListRow(questsBody, "Первое испытание", "Победи первого монстра. Прогресс: " .. math.min(kills, 1) .. " / 1", COLORS.cyan,
-        kills >= 1 and "ВЫПОЛНЕНО" or "В ПРОЦЕССЕ", function() end)
-    makeListRow(questsBody, "Путь ученика", "Достигни этапа 5. Текущий этап: " .. tostring(stage), COLORS.purple,
-        stage >= 5 and "ВЫПОЛНЕНО" or "В ПРОЦЕССЕ", function() end)
-    makeListRow(questsBody, "Коллекционер трофеев", "Получи 10 предметов. Побед: " .. tostring(kills), COLORS.gold,
-        kills >= 10 and "ВЫПОЛНЕНО" or "В ПРОЦЕССЕ", function() end)
+    local stage = state and state.HighestStage or (state and state.Stage or 1)
+    for _, quest in ipairs(Config.Quests) do
+        local progress = quest.GoalType == "Kills" and kills or (quest.GoalType == "Stage" and stage or 0)
+        local claimed = state and state.ClaimedQuests and state.ClaimedQuests[quest.Id] == true
+        local completed = progress >= quest.Goal
+        local buttonText = claimed and "ПОЛУЧЕНО" or (completed and "ЗАБРАТЬ" or "В ПРОЦЕССЕ")
+        local rewardText = "+" .. tostring(quest.Reward.Wins or 0) .. " побед"
+        for itemId, amount in pairs(quest.Reward.Items or {}) do
+            local item = Config.Items[itemId]
+            rewardText ..= "  ·  " .. (item and item.Name or itemId) .. " ×" .. tostring(amount)
+        end
+        makeListRow(questsBody, quest.Name, quest.Description .. "  ·  " .. tostring(math.min(progress, quest.Goal)) .. "/" .. tostring(quest.Goal) .. "  ·  " .. rewardText,
+            COLORS.gold, buttonText, function()
+                if not claimed and completed then Remotes.ClaimQuest:FireServer(quest.Id) end
+            end)
+    end
+end
+
+addNav("♜  ИСПЫТАНИЯ", COLORS.red, 4, function()
+    rebuildQuestsPanel()
     openPanel("Quests")
 end)
 
@@ -990,6 +1015,8 @@ local function refresh()
         rebuildPetsPanel()
     elseif activePanel == "Craft" then
         rebuildCraftPanel()
+    elseif activePanel == "Quests" then
+        rebuildQuestsPanel()
     end
 end
 
@@ -1115,6 +1142,8 @@ Remotes.CombatFX.OnClientEvent:Connect(function(data)
             Detail = "Молния ×" .. tostring(data.PowerMult) .. "  ·  Новый питомец в коллекции",
         }, "НОВЫЙ ПИТОМЕЦ")
         flash(COLORS.purple, 0.24)
+    elseif data.Kind == "QuestReward" then
+        showReward(data, "ЗАДАНИЕ ВЫПОЛНЕНО")
     elseif data.Kind == "Crafted" then
         showReward({
             ItemName = data.ItemName,
