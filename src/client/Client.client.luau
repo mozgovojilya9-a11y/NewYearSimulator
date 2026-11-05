@@ -1013,6 +1013,9 @@ end)
 Remotes.PassChanged.OnClientEvent:Connect(function()
     Remotes.RequestState:FireServer()
 end)
+Remotes.PurchaseChanged.OnClientEvent:Connect(function()
+    Remotes.RequestState:FireServer()
+end)
 
 local function pulseAtPlayer(color, maxSize)
     local character = player.Character
