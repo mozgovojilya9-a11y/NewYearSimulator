@@ -422,6 +422,103 @@ local function addNav(text, color, order, callback)
     return b
 end
 
+local function rebuildInventoryPanel()
+    clearRows(inventoryBody)
+    local entries = {}
+    for itemId, amount in pairs((state and state.Inventory) or {}) do
+        local item = Config.Items[itemId]
+        if item and tonumber(amount) and amount > 0 then
+            table.insert(entries, { Id = itemId, Item = item, Amount = amount })
+        end
+    end
+    table.sort(entries, function(a, b)
+        return a.Item.Value > b.Item.Value
+    end)
+
+    local equipment = state and state.Equipment or {}
+    makeListRow(inventoryBody, "ЭКИПИРОВКА",
+        "Оружие: " .. ((equipment.Weapon and Config.Items[equipment.Weapon] and Config.Items[equipment.Weapon].Name) or "пусто")
+        .. "  ·  Броня: " .. ((equipment.Armor and Config.Items[equipment.Armor] and Config.Items[equipment.Armor].Name) or "пусто"),
+        COLORS.gold, nil, nil)
+
+    for _, entry in ipairs(entries) do
+        local item = entry.Item
+        local isGear = item.Type == "Weapon" or item.Type == "Armor"
+        local equipped = equipment.Weapon == entry.Id or equipment.Armor == entry.Id
+        local actionText = isGear and (equipped and "ЭКИПИРОВАНО" or "ЭКИПИРОВАТЬ") or "ПРОДАТЬ 1"
+        local detail = item.Rarity .. "  ·  " .. item.Description .. "  ·  Цена: " .. formatNumber(item.Value)
+        makeListRow(inventoryBody, item.Name .. "  ×" .. tostring(entry.Amount), detail,
+            Config.RarityColors[item.Rarity] or COLORS.cyan, actionText, function()
+                if isGear then
+                    Remotes.EquipItem:FireServer(entry.Id)
+                elseif not equipped then
+                    Remotes.SellItem:FireServer(entry.Id, 1)
+                end
+            end)
+    end
+    if #entries == 0 then
+        makeListRow(inventoryBody, "Пока нет трофеев", "Победи монстра, чтобы получить первый предмет.", COLORS.muted, nil, nil)
+    end
+end
+
+local function rebuildPetsPanel()
+    clearRows(petsBody)
+    for eggId, egg in pairs(Config.PetEggs) do
+        local chances = {}
+        for _, drop in ipairs(egg.Drops) do
+            local pet = Config.PetById[drop.Id]
+            if pet then
+                table.insert(chances, pet.Name .. " " .. tostring(math.floor(drop.Weight / 1)) .. " вес")
+            end
+        end
+        makeListRow(petsBody, egg.Name, "Стоимость: " .. formatNumber(egg.Cost) .. " побед  ·  " .. table.concat(chances, "  |  "),
+            COLORS.cyan, "ОТКРЫТЬ", function()
+                Remotes.OpenEgg:FireServer(eggId)
+            end)
+    end
+    makeListRow(petsBody, "МОЯ КОЛЛЕКЦИЯ",
+        "Экипировано: " .. tostring(#((state and state.EquippedPets) or {})) .. " / " .. tostring((state and state.PetSlots) or Config.PetSlots),
+        COLORS.gold, nil, nil)
+    local found = 0
+    for _, pet in ipairs(Config.Pets) do
+        local owned = state and state.OwnedPets and (tonumber(state.OwnedPets[pet.Id]) or 0) or 0
+        if owned > 0 then
+            found += 1
+            local equipped = state and table.find(state.EquippedPets or {}, pet.Id) ~= nil
+            local detail = pet.Rarity .. "  ·  Молния ×" .. tostring(pet.PowerMult) .. "  ·  Победы ×" .. tostring(pet.WinMult) .. "  ·  В наличии: " .. tostring(owned)
+            makeListRow(petsBody, pet.Name, detail, Config.RarityColors[pet.Rarity] or pet.Color,
+                equipped and "СНЯТЬ" or "ЭКИПИРОВАТЬ", function()
+                    Remotes.TogglePet:FireServer(pet.Id)
+                end)
+        end
+    end
+    if found == 0 then
+        makeListRow(petsBody, "Питомцев пока нет", "Открой яйцо, чтобы получить первого компаньона.", COLORS.muted, nil, nil)
+    end
+end
+
+local function rebuildCraftPanel()
+    clearRows(craftBody)
+    for recipeId, recipe in pairs(Config.CraftRecipes) do
+        local parts = {}
+        for itemId, amount in pairs(recipe.Ingredients) do
+            local item = Config.Items[itemId]
+            local current = state and state.Inventory and (tonumber(state.Inventory[itemId]) or 0) or 0
+            table.insert(parts, (item and item.Name or itemId) .. " " .. tostring(current) .. "/" .. tostring(amount))
+        end
+        table.sort(parts)
+        makeListRow(craftBody, recipe.Name, "Этап " .. tostring(recipe.MinStage) .. "  ·  " .. table.concat(parts, ", "),
+            Config.RarityColors[(Config.Items[recipe.Output] and Config.Items[recipe.Output].Rarity) or "Редкий"],
+            "СОЗДАТЬ", function()
+                Remotes.CraftItem:FireServer(recipeId)
+            end)
+    end
+    local equipment = state and state.Equipment or {}
+    local weaponName = equipment.Weapon and Config.Items[equipment.Weapon] and Config.Items[equipment.Weapon].Name or "Не экипировано"
+    local armorName = equipment.Armor and Config.Items[equipment.Armor] and Config.Items[equipment.Armor].Name or "Не экипировано"
+    makeListRow(craftBody, "ТЕКУЩАЯ ЭКИПИРОВКА", "Оружие: " .. weaponName .. "  ·  Броня: " .. armorName, COLORS.gold, nil, nil)
+end
+
 addNav("✦  НАСТАВНИКИ", COLORS.purple, 1, function()
     if state then
         clearRows(mentorsBody)
@@ -465,38 +562,7 @@ addNav("❄  МИРЫ", COLORS.blue, 2, function()
 end)
 
 addNav("✧  ИНВЕНТАРЬ", COLORS.green, 3, function()
-    local function rebuildInventory()
-        clearRows(inventoryBody)
-        local found = 0
-        local entries = {}
-        for itemId, amount in pairs((state and state.Inventory) or {}) do
-            local item = Config.Items[itemId]
-            if item and tonumber(amount) and amount > 0 then
-                table.insert(entries, { Id = itemId, Item = item, Amount = amount })
-            end
-        end
-        table.sort(entries, function(a, b)
-            return a.Item.Value > b.Item.Value
-        end)
-        for _, entry in ipairs(entries) do
-            found += 1
-            makeListRow(inventoryBody, entry.Item.Name .. "  ×" .. tostring(entry.Amount),
-                entry.Item.Rarity .. "  ·  " .. entry.Item.Description .. "  ·  Цена: " .. formatNumber(entry.Item.Value),
-                Config.RarityColors[entry.Item.Rarity] or COLORS.cyan,
-                "ПРОДАТЬ 1",
-                function()
-                    Remotes.SellItem:FireServer(entry.Id, 1)
-                end)
-        end
-        if found == 0 then
-            local empty = create("Frame", { Size = UDim2.new(1, -8, 0, 110), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0 }, inventoryBody)
-            addCorner(empty, 12)
-            makeLabel(empty, "Пока нет трофеев", 18, UDim2.fromScale(0.08, 0.2), COLORS.gold, Enum.Font.GothamBold)
-            local help = makeLabel(empty, "Победи первого монстра, чтобы получить свой первый предмет.", 12, UDim2.fromScale(0.08, 0.5), COLORS.muted, Enum.Font.GothamMedium)
-            help.Size = UDim2.fromScale(0.84, 0.34)
-        end
-    end
-    rebuildInventory()
+    rebuildInventoryPanel()
     openPanel("Inventory")
 end)
 
@@ -514,55 +580,12 @@ addNav("♜  ИСПЫТАНИЯ", COLORS.red, 4, function()
 end)
 
 addNav("✧  ПИТОМЦЫ", COLORS.cyan, 5, function()
-    clearRows(petsBody)
-    for eggId, egg in pairs(Config.PetEggs) do
-        local details = "Стоимость: " .. formatNumber(egg.Cost) .. " побед  ·  Вероятности отображаются в описании"
-        makeListRow(petsBody, egg.Name, details, COLORS.cyan, "ОТКРЫТЬ ЯЙЦО", function()
-            Remotes.OpenEgg:FireServer(eggId)
-        end)
-    end
-    makeListRow(petsBody, "МОЯ КОЛЛЕКЦИЯ", "Экипировано: " .. tostring(#((state and state.EquippedPets) or {})) .. " / " .. tostring((state and state.PetSlots) or Config.PetSlots), COLORS.gold, nil, nil)
-    for _, pet in ipairs(Config.Pets) do
-        local owned = state and state.OwnedPets and (tonumber(state.OwnedPets[pet.Id]) or 0) or 0
-        if owned > 0 then
-            local equipped = state and table.find(state.EquippedPets or {}, pet.Id) ~= nil
-            local detail = pet.Rarity .. "  ·  Молния ×" .. tostring(pet.PowerMult) .. "  ·  Победы ×" .. tostring(pet.WinMult) .. "  ·  Количество: " .. tostring(owned)
-            makeListRow(petsBody, pet.Name, detail, Config.RarityColors[pet.Rarity] or pet.Color,
-                equipped and "СНЯТЬ" or "ЭКИПИРОВАТЬ", function()
-                    Remotes.TogglePet:FireServer(pet.Id)
-                end)
-        end
-    end
-    if state then
-        local any = false
-        for _, amount in pairs(state.OwnedPets or {}) do if amount > 0 then any = true end end
-        if not any then
-            makeListRow(petsBody, "Питомцев пока нет", "Открой яйцо, чтобы получить первого компаньона.", COLORS.muted, nil, nil)
-        end
-    end
+    rebuildPetsPanel()
     openPanel("Pets")
 end)
 
 addNav("⚒  КРАФТ", COLORS.purple, 6, function()
-    clearRows(craftBody)
-    for recipeId, recipe in pairs(Config.CraftRecipes) do
-        local parts = {}
-        for itemId, amount in pairs(recipe.Ingredients) do
-            local item = Config.Items[itemId]
-            table.insert(parts, (item and item.Name or itemId) .. " ×" .. tostring(amount))
-        end
-        table.sort(parts)
-        makeListRow(craftBody, recipe.Name, "Этап " .. tostring(recipe.MinStage) .. "  ·  Нужно: " .. table.concat(parts, ", "),
-            Config.RarityColors[(Config.Items[recipe.Output] and Config.Items[recipe.Output].Rarity) or "Редкий"],
-            "СОЗДАТЬ", function()
-                Remotes.CraftItem:FireServer(recipeId)
-            end)
-    end
-    local weapon = state and state.Equipment and state.Equipment.Weapon
-    local armor = state and state.Equipment and state.Equipment.Armor
-    local weaponName = weapon and Config.Items[weapon] and Config.Items[weapon].Name or "Не экипировано"
-    local armorName = armor and Config.Items[armor] and Config.Items[armor].Name or "Не экипировано"
-    makeListRow(craftBody, "ТЕКУЩАЯ ЭКИПИРОВКА", "Оружие: " .. weaponName .. "  ·  Броня: " .. armorName, COLORS.gold, nil, nil)
+    rebuildCraftPanel()
     openPanel("Craft")
 end)
 
