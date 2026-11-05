@@ -126,6 +126,7 @@ local function pushState(player)
         StageRequirement = stageRequirement(data.Stage),
         RebirthCost = rebirthCost(data.Rebirths),
         HeroPowerMult = hero.PowerMult,
+        HeroWinMult = hero.WinMult,
         HeroName = hero.Name,
         BattleActive = battle ~= nil,
         BattleMonster = battle and battle.Name or nil,
