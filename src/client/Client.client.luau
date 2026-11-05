@@ -522,25 +522,27 @@ local function rebuildCraftPanel()
     makeListRow(craftBody, "ТЕКУЩАЯ ЭКИПИРОВКА", "Оружие: " .. weaponName .. "  ·  Броня: " .. armorName, COLORS.gold, nil, nil)
 end
 
-addNav("✦  НАСТАВНИКИ", COLORS.purple, 1, function()
-    if state then
-        clearRows(mentorsBody)
-        for _, hero in ipairs(Config.Heroes) do
-            local owned = state.Owned and state.Owned[hero.Id] == true
-            local equipped = state.Equipped == hero.Id
-            local color = Config.RarityColors[hero.Rarity] or COLORS.purple
-            local actionText = equipped and "ЭКИПИРОВАН" or (owned and "ВЫБРАТЬ" or ("НАЙМ  ·  " .. formatNumber(hero.Cost)))
-            local detail = hero.Rarity .. "   ·   Молния ×" .. tostring(hero.PowerMult) .. "   ·   Победы ×" .. tostring(hero.WinMult)
-            makeListRow(mentorsBody, hero.Name, detail, color, actionText, function()
-                if equipped then return end
-                if owned then
-                    Remotes.EquipHero:FireServer(hero.Id)
-                else
-                    Remotes.BuyHero:FireServer(hero.Id)
-                end
-            end)
-        end
+local function rebuildMentorsPanel()
+    clearRows(mentorsBody)
+    for _, hero in ipairs(Config.Heroes) do
+        local owned = state and state.Owned and state.Owned[hero.Id] == true
+        local equipped = state and state.Equipped == hero.Id
+        local color = Config.RarityColors[hero.Rarity] or COLORS.purple
+        local actionText = equipped and "ЭКИПИРОВАН" or (owned and "ВЫБРАТЬ" or ("НАЙМ  ·  " .. formatNumber(hero.Cost)))
+        local detail = hero.Rarity .. "  ·  Молния ×" .. tostring(hero.PowerMult) .. "  ·  Победы ×" .. tostring(hero.WinMult) .. "  ·  " .. hero.Ability.Name
+        makeListRow(mentorsBody, hero.Name, detail, color, actionText, function()
+            if equipped then return end
+            if owned then
+                Remotes.EquipHero:FireServer(hero.Id)
+            else
+                Remotes.BuyHero:FireServer(hero.Id)
+            end
+        end)
     end
+end
+
+addNav("✦  НАСТАВНИКИ", COLORS.purple, 1, function()
+    rebuildMentorsPanel()
     openPanel("Mentors")
 end)
 
@@ -999,6 +1001,15 @@ Remotes.State.OnClientEvent:Connect(function(newState)
 end)
 
 Remotes.Notice.OnClientEvent:Connect(notice)
+Remotes.OpenMenu.OnClientEvent:Connect(function(menuName, mentorId)
+    if menuName == "Mentors" then
+        rebuildMentorsPanel()
+        openPanel("Mentors")
+        if mentorId then
+            notice("Наставник: " .. tostring(mentorId))
+        end
+    end
+end)
 Remotes.PassChanged.OnClientEvent:Connect(function()
     Remotes.RequestState:FireServer()
 end)
