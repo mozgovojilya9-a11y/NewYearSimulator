@@ -117,6 +117,9 @@ function PurchaseService.Start(dataService)
             return Enum.ProductPurchaseDecision.NotProcessedYet
         end
 
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        local changed = remotes and remotes:FindFirstChild("PurchaseChanged")
+        if changed then changed:FireClient(player) end
         return Enum.ProductPurchaseDecision.PurchaseGranted
     end
 end
