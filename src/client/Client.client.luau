@@ -605,6 +605,96 @@ local function flash(color, alpha)
     end)
 end
 
+-- Responsive layout: desktop composition is preserved; phones receive a compact, usable arrangement.
+local function updateResponsiveLayout()
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+    local viewport = camera.ViewportSize
+    local mobile = viewport.X < 760
+
+    if mobile then
+        rootScale.Scale = 1
+        brand.Position = UDim2.fromScale(0.02, 0.02)
+        brand.Size = UDim2.fromScale(0.29, 0.075)
+        stageCard.Position = UDim2.fromScale(0.33, 0.02)
+        stageCard.Size = UDim2.fromScale(0.41, 0.075)
+        mentorBadge.Position = UDim2.fromScale(0.76, 0.02)
+        mentorBadge.Size = UDim2.fromScale(0.22, 0.075)
+        navigation.Position = UDim2.fromScale(0.02, 0.20)
+        navigation.Size = UDim2.fromScale(0.27, 0.34)
+        resources.Position = UDim2.fromScale(0.02, 0.68)
+        resources.Size = UDim2.fromScale(0.27, 0.18)
+        progress.Position = UDim2.fromScale(0.31, 0.68)
+        progress.Size = UDim2.fromScale(0.67, 0.14)
+        actions.Position = UDim2.fromScale(0.02, 0.855)
+        actions.Size = UDim2.fromScale(0.96, 0.105)
+        battleCard.Position = UDim2.fromScale(0.06, 0.115)
+        battleCard.Size = UDim2.fromScale(0.88, 0.105)
+        for index, nav in ipairs(navButtons) do
+            nav.Position = UDim2.new(0, 7, 0, 35 + (index - 1) * 43)
+            nav.Size = UDim2.new(1, -14, 0, 37)
+            nav.TextSize = 11
+        end
+        for _, child in ipairs(actions:GetChildren()) do
+            if child:IsA("TextButton") then
+                child.Size = UDim2.new(0.188, 0, 0.82, 0)
+                child.TextSize = 10
+            end
+        end
+        for _, panel in pairs(panels) do
+            panel.Position = UDim2.fromScale(0.05, 0.15)
+            panel.Size = UDim2.fromScale(0.90, 0.68)
+        end
+        for _, textObject in ipairs({ brand:FindFirstChildWhichIsA("TextLabel"), stageTitle, stageHint, mentorName, mentorBonus }) do
+            if textObject then textObject.TextSize = math.max(8, math.floor(textObject.TextSize * 0.78)) end
+        end
+    else
+        rootScale.Scale = math.clamp(viewport.X / 1420, 0.84, 1.08)
+        brand.Position = UDim2.fromScale(0.018, 0.025)
+        brand.Size = UDim2.fromScale(0.205, 0.085)
+        stageCard.Position = UDim2.fromScale(0.33, 0.025)
+        stageCard.Size = UDim2.fromScale(0.34, 0.085)
+        mentorBadge.Position = UDim2.fromScale(0.79, 0.025)
+        mentorBadge.Size = UDim2.fromScale(0.19, 0.085)
+        navigation.Position = UDim2.fromScale(0.018, 0.23)
+        navigation.Size = UDim2.fromScale(0.16, 0.39)
+        resources.Position = UDim2.fromScale(0.018, 0.68)
+        resources.Size = UDim2.fromScale(0.19, 0.22)
+        progress.Position = UDim2.fromScale(0.27, 0.69)
+        progress.Size = UDim2.fromScale(0.46, 0.13)
+        actions.Position = UDim2.fromScale(0.12, 0.855)
+        actions.Size = UDim2.fromScale(0.76, 0.105)
+        battleCard.Position = UDim2.fromScale(0.33, 0.135)
+        battleCard.Size = UDim2.fromScale(0.34, 0.105)
+        for index, nav in ipairs(navButtons) do
+            nav.Position = UDim2.new(0, 9, 0, 38 + (index - 1) * 49)
+            nav.Size = UDim2.new(1, -18, 0, 43)
+            nav.TextSize = 12
+        end
+        for _, child in ipairs(actions:GetChildren()) do
+            if child:IsA("TextButton") then
+                child.Size = UDim2.new(0.19, 0, 0.82, 0)
+                child.TextSize = 13
+            end
+        end
+        for _, panel in pairs(panels) do
+            panel.Position = UDim2.fromScale(0.255, 0.18)
+            panel.Size = UDim2.fromScale(0.49, 0.61)
+        end
+    end
+end
+
+updateResponsiveLayout()
+local function bindViewport()
+    local camera = workspace.CurrentCamera
+    if camera then
+        camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateResponsiveLayout)
+        updateResponsiveLayout()
+    end
+end
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindViewport)
+bindViewport()
+
 -- State refresh updates all persistent labels and progress smoothly.
 local function refresh()
     if not state then return end
