@@ -4,6 +4,8 @@ local Lighting = game:GetService("Lighting")
 
 local old = Workspace:FindFirstChild("WinterAcademy")
 if old then old:Destroy() end
+local baseplate = Workspace:FindFirstChild("Baseplate")
+if baseplate then baseplate:Destroy() end
 
 local world = Instance.new("Folder")
 world.Name = "WinterAcademy"
@@ -141,12 +143,12 @@ for _,pos in ipairs({{-78,-35},{78,-35},{-82,18},{82,18},{-55,55},{55,55},{-105,
 for _,x in {-42,-22,22,42} do
  for _,z in {-5,30,65} do
   part("Lantern post",Vector3.new(0.8,9,0.8),CFrame.new(x,4.5,z),Color3.fromRGB(43,42,67),Enum.Material.Metal)
-  ball("Warm lantern",Vector3.new(3,3,3),CFrame.new(x,9,z),Color3.fromRGB(255,190,105),Enum.Material.Neon)
+  local lantern = ball("Warm lantern",Vector3.new(3,3,3),CFrame.new(x,9,z),Color3.fromRGB(255,190,105),Enum.Material.Neon)
   local light = Instance.new("PointLight")
   light.Color = Color3.fromRGB(255,180,100)
   light.Range = 22
   light.Brightness = 1.8
-  light.Parent = world:FindFirstChild("Warm lantern")
+  light.Parent = lantern
  end
 end
 
