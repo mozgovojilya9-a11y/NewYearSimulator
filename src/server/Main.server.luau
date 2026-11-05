@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local DataService = require(ServerScriptService.DataService)
@@ -37,7 +38,7 @@ local R = {}
 for _, name in ipairs({
     "RequestState", "Train", "Fight", "Attack", "Rebirth",
     "BuyHero", "EquipHero", "UseAbility", "SellItem",
-    "OpenEgg", "TogglePet", "CraftItem", "EquipItem", "PassChanged",
+    "OpenEgg", "TogglePet", "CraftItem", "EquipItem", "PassChanged", "OpenMenu",
     "State", "Notice", "CombatFX",
 }) do
     R[name] = getRemote(name)
@@ -442,6 +443,14 @@ local function finishBattle(player, data, battle, victory)
     pushState(player)
 end
 
+ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
+    if not prompt or not player then return end
+    local menuName = prompt:GetAttribute("OpenMenu")
+    if menuName == "Mentors" then
+        R.OpenMenu:FireClient(player, "Mentors", prompt:GetAttribute("MentorId"))
+    end
+end)
+
 R.RequestState.OnServerEvent:Connect(function(player)
     pushState(player)
 end)
@@ -521,6 +530,12 @@ R.Attack.OnServerEvent:Connect(withData(function(player, data)
     local battle = battles[player]
     if not battle then
         return notice(player, "Сначала начни бой с противником.")
+    end
+    local character = player.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    local monsterPart = battle.Model and battle.Model.PrimaryPart
+    if not rootPart or not monsterPart or (rootPart.Position - monsterPart.Position).Magnitude > 85 then
+        return notice(player, "Ты слишком далеко от противника.")
     end
 
     local now = os.clock()
