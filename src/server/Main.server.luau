@@ -405,11 +405,54 @@ local function rollDrop(stage)
     return available[#available].Id
 end
 
+local function dissolveMonster(model, accent)
+    if not model or not model.Parent then return end
+    local core = model.PrimaryPart
+    if core then
+        local burst = Instance.new("Part")
+        burst.Name = "MonsterDefeatBurst"
+        burst.Shape = Enum.PartType.Ball
+        burst.Size = Vector3.new(2, 2, 2)
+        burst.CFrame = core.CFrame
+        burst.Anchored = true
+        burst.CanCollide = false
+        burst.CanTouch = false
+        burst.Material = Enum.Material.Neon
+        burst.Color = accent or Color3.fromRGB(180, 130, 255)
+        burst.Transparency = 0.18
+        burst.Parent = Workspace
+        local glow = Instance.new("PointLight")
+        glow.Color = burst.Color
+        glow.Range = 16
+        glow.Brightness = 2.4
+        glow.Parent = burst
+        TweenService:Create(burst, TweenInfo.new(0.42, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = Vector3.new(14, 14, 14),
+            Transparency = 1,
+        }):Play()
+        task.delay(0.48, function()
+            if burst.Parent then burst:Destroy() end
+        end)
+    end
+
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            TweenService:Create(part, TweenInfo.new(0.34, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Transparency = 1,
+                Size = part.Size * 0.72,
+            }):Play()
+        end
+    end
+    task.delay(0.4, function()
+        if model.Parent then model:Destroy() end
+    end)
+end
+
 local function finishBattle(player, data, battle, victory)
     battles[player] = nil
     releaseBattleLane(player)
     if battle.Model and battle.Model.Parent then
-        battle.Model:Destroy()
+        dissolveMonster(battle.Model, battle.Monster.Color)
     end
 
     if victory then
@@ -651,7 +694,12 @@ R.UseAbility.OnServerEvent:Connect(withData(function(player, data)
             Expires = now + (hero.Ability.Duration or 8),
         }
     end
-    R.CombatFX:FireClient(player, { Kind = "Ability", Name = hero.Ability.Name, Duration = hero.Ability.Duration or 8 })
+    R.CombatFX:FireClient(player, {
+        Kind = "Ability",
+        Name = hero.Ability.Name,
+        Duration = hero.Ability.Duration or 8,
+        Cooldown = hero.Ability.Cooldown or 30,
+    })
     notice(player, hero.Ability.Name .. " активирована!")
     pushState(player)
 end))
