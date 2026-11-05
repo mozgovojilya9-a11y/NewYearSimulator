@@ -200,8 +200,26 @@ local mentorName = makeLabel(mentorBadge, "НАСТАВНИК: Снежок Хр
 local mentorBonus = makeLabel(mentorBadge, "Молния ×1.00", 10, UDim2.fromScale(0.06, 0.56), COLORS.muted, Enum.Font.GothamMedium)
 
 -- Left navigation. Only sections that actually work are shown.
-local navigation = makeCard(root, "Navigation", UDim2.fromScale(0.16, 0.39), UDim2.fromScale(0.018, 0.23), COLORS.purple)
-makeLabel(navigation, "АКАДЕМИЯ", 11, UDim2.fromScale(0.08, 0.035), COLORS.muted, Enum.Font.GothamBold)
+local navigation = makeCard(root, "Navigation", UDim2.fromScale(0.16, 0.45), UDim2.fromScale(0.018, 0.23), COLORS.purple)
+makeLabel(navigation, "АКАДЕМИЯ", 11, UDim2.fromScale(0.08, 0.025), COLORS.muted, Enum.Font.GothamBold)
+local navigationContent = create("ScrollingFrame", {
+    Name = "NavigationContent",
+    Size = UDim2.new(1, -10, 1, -34),
+    Position = UDim2.fromOffset(5, 30),
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ScrollBarThickness = 3,
+    ScrollBarImageColor3 = COLORS.gold,
+    CanvasSize = UDim2.new(),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+}, navigation)
+local navigationLayout = create("UIListLayout", {
+    Padding = UDim.new(0, 6),
+    SortOrder = Enum.SortOrder.LayoutOrder,
+}, navigationContent)
+navigationLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    navigationContent.CanvasSize = UDim2.fromOffset(0, navigationLayout.AbsoluteContentSize.Y + 8)
+end)
 
 -- Resource card is tall enough for all lines; no stat is placed outside the frame.
 local resources = makeCard(root, "Resources", UDim2.fromScale(0.19, 0.22), UDim2.fromScale(0.018, 0.68), COLORS.gold)
@@ -427,9 +445,10 @@ end
 -- Navigation buttons.
 local navButtons = {}
 local function addNav(text, color, order, callback)
-    local b = makeButton(navigation, text, color, UDim2.new(1, -18, 0, 43), UDim2.new(0, 9, 0, 38 + (order - 1) * 49), callback, {
+    local b = makeButton(navigationContent, text, color, UDim2.new(1, -10, 0, 41), UDim2.new(), callback, {
         TextSize = 12, Radius = 10,
     })
+    b.LayoutOrder = order
     table.insert(navButtons, b)
     return b
 end
@@ -765,11 +784,11 @@ local function updateResponsiveLayout()
         actions.Size = UDim2.fromScale(0.96, 0.105)
         battleCard.Position = UDim2.fromScale(0.06, 0.115)
         battleCard.Size = UDim2.fromScale(0.88, 0.105)
-        for index, nav in ipairs(navButtons) do
-            nav.Position = UDim2.new(0, 7, 0, 35 + (index - 1) * 43)
-            nav.Size = UDim2.new(1, -14, 0, 37)
-            nav.TextSize = 11
+        for _, nav in ipairs(navButtons) do
+            nav.Size = UDim2.new(1, -10, 0, 38)
+            nav.TextSize = 10
         end
+        navigationContent.Size = UDim2.new(1, -10, 1, -34)
         for _, child in ipairs(actions:GetChildren()) do
             if child:IsA("TextButton") then
                 child.Size = UDim2.new(0.188, 0, 0.82, 0)
@@ -813,11 +832,11 @@ local function updateResponsiveLayout()
         actions.Size = UDim2.fromScale(0.76, 0.105)
         battleCard.Position = UDim2.fromScale(0.33, 0.135)
         battleCard.Size = UDim2.fromScale(0.34, 0.105)
-        for index, nav in ipairs(navButtons) do
-            nav.Position = UDim2.new(0, 9, 0, 38 + (index - 1) * 49)
-            nav.Size = UDim2.new(1, -18, 0, 43)
+        for _, nav in ipairs(navButtons) do
+            nav.Size = UDim2.new(1, -10, 0, 41)
             nav.TextSize = 12
         end
+        navigationContent.Size = UDim2.new(1, -10, 1, -34)
         local brandLabels = {}
         for _, child in ipairs(brand:GetChildren()) do
             if child:IsA("TextLabel") then table.insert(brandLabels, child) end
