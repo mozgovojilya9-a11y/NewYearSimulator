@@ -95,8 +95,10 @@ local function mergeDefaults(saved)
         end
     end
     data.EquippedPets = equippedPets
-    data.Equipment.Weapon = type(data.Equipment.Weapon) == "string" and Config.Items[data.Equipment.Weapon] and data.Equipment.Weapon or nil
-    data.Equipment.Armor = type(data.Equipment.Armor) == "string" and Config.Items[data.Equipment.Armor] and data.Equipment.Armor or nil
+    local savedWeapon = type(data.Equipment.Weapon) == "string" and Config.Items[data.Equipment.Weapon] or nil
+    local savedArmor = type(data.Equipment.Armor) == "string" and Config.Items[data.Equipment.Armor] or nil
+    data.Equipment.Weapon = savedWeapon and savedWeapon.Type == "Weapon" and data.Equipment.Weapon or nil
+    data.Equipment.Armor = savedArmor and savedArmor.Type == "Armor" and data.Equipment.Armor or nil
     return data
 end
 
