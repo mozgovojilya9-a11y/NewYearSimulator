@@ -48,6 +48,7 @@ local lastTrain = {}
 local lastAbility = {}
 local buffs = {}
 local battles = {}
+local occupiedBattleLanes = {}
 local activeMonsterModels = Workspace:FindFirstChild("ActiveMonsters")
 if not activeMonsterModels then
     activeMonsterModels = Instance.new("Folder")
@@ -207,6 +208,24 @@ local function withData(handler)
     end
 end
 
+local function allocateBattleLane(player)
+    for lane = -3, 3 do
+        if occupiedBattleLanes[lane] == nil then
+            occupiedBattleLanes[lane] = player
+            return lane * 15
+        end
+    end
+    return nil
+end
+
+local function releaseBattleLane(player)
+    for lane, owner in pairs(occupiedBattleLanes) do
+        if owner == player then
+            occupiedBattleLanes[lane] = nil
+        end
+    end
+end
+
 local function makePart(parent, name, size, cf, color, material, shape)
     local part = Instance.new("Part")
     part.Name = name
@@ -242,7 +261,7 @@ local function monsterStats(stage)
     }
 end
 
-local function createMonsterModel(monster, userId)
+local function createMonsterModel(monster, offsetX, userId)
     local model = Instance.new("Model")
     model.Name = "AcademyMonster_" .. tostring(userId)
     model.Parent = activeMonsterModels
@@ -268,8 +287,6 @@ local function createMonsterModel(monster, userId)
     aura.Transparency = 0.72
     aura.CastShadow = false
     model.PrimaryPart = core
-    local lane = (tonumber(userId) or 0) % 5
-    local offsetX = (lane - 2) * 18
     model:PivotTo(CFrame.new(offsetX, 0, 0))
 
     local billboard = Instance.new("BillboardGui")
@@ -379,6 +396,7 @@ end
 
 local function finishBattle(player, data, battle, victory)
     battles[player] = nil
+    releaseBattleLane(player)
     if battle.Model and battle.Model.Parent then
         battle.Model:Destroy()
     end
@@ -460,8 +478,13 @@ R.Fight.OnServerEvent:Connect(withData(function(player, data)
         return notice(player, ("Для боя нужно %s молнии."):format(tostring(math.floor(required))))
     end
 
+    local offsetX = allocateBattleLane(player)
+    if offsetX == nil then
+        return notice(player, "Арена занята. Подожди, пока освободится место.")
+    end
+
     local monster = monsterStats(data.Stage)
-    local model, healthFill, offsetX = createMonsterModel(monster, player.UserId)
+    local model, healthFill = createMonsterModel(monster, offsetX, player.UserId)
     local maxHealth = monster.Health
     battles[player] = {
         Name = monster.Name,
@@ -782,6 +805,7 @@ Players.PlayerRemoving:Connect(function(player)
     if battle and battle.Model and battle.Model.Parent then
         battle.Model:Destroy()
     end
+    releaseBattleLane(player)
     battles[player] = nil
     DataService.Release(player)
     initialized[player] = nil
