@@ -38,7 +38,7 @@ local R = {}
 for _, name in ipairs({
     "RequestState", "Train", "Fight", "Attack", "Rebirth",
     "BuyHero", "EquipHero", "UseAbility", "SellItem",
-    "OpenEgg", "TogglePet", "CraftItem", "EquipItem", "PassChanged", "PurchaseChanged", "OpenMenu",
+    "OpenEgg", "TogglePet", "CraftItem", "EquipItem", "PassChanged", "PurchaseChanged", "OpenMenu", "ClaimQuest",
     "State", "Notice", "CombatFX",
 }) do
     R[name] = getRemote(name)
@@ -197,6 +197,7 @@ local function pushState(player)
         HighestStage = data.HighestStage,
         StageRequirement = stageRequirement(data.Stage),
         RebirthCost = rebirthCost(data.Rebirths),
+        ClaimedQuests = cloneDictionary(data.ClaimedQuests),
         HeroPowerMult = hero.PowerMult,
         HeroWinMult = hero.WinMult,
         HeroName = hero.Name,
@@ -760,6 +761,46 @@ R.CraftItem.OnServerEvent:Connect(withData(function(player, data, recipeId)
         ItemColor = output and output.Color or Config.RarityColors["Редкий"],
     })
     notice(player, "Создан предмет: " .. recipe.Name)
+    pushState(player)
+end))
+
+R.ClaimQuest.OnServerEvent:Connect(withData(function(player, data, questId)
+    if type(questId) ~= "string" then return end
+    local quest = nil
+    for _, entry in ipairs(Config.Quests) do
+        if entry.Id == questId then quest = entry break end
+    end
+    if not quest then return notice(player, "Такого задания нет.") end
+    data.ClaimedQuests = data.ClaimedQuests or {}
+    if data.ClaimedQuests[questId] then
+        return notice(player, "Награда за это задание уже получена.")
+    end
+
+    local progress = 0
+    if quest.GoalType == "Kills" then
+        progress = data.TotalKills
+    elseif quest.GoalType == "Stage" then
+        progress = data.HighestStage or data.Stage
+    end
+    if progress < quest.Goal then
+        return notice(player, "Задание ещё не выполнено.")
+    end
+
+    data.ClaimedQuests[questId] = true
+    data.Wins += math.max(0, math.floor(tonumber(quest.Reward.Wins) or 0))
+    for itemId, amount in pairs(quest.Reward.Items or {}) do
+        if Config.Items[itemId] then
+            data.Inventory[itemId] = (tonumber(data.Inventory[itemId]) or 0) + math.max(0, math.floor(tonumber(amount) or 0))
+        end
+    end
+    DataService.Save(player)
+    notice(player, "Награда получена: " .. quest.Name)
+    R.CombatFX:FireClient(player, {
+        Kind = "QuestReward",
+        ItemName = quest.Name,
+        Rarity = "Награда",
+        Detail = "+" .. tostring(quest.Reward.Wins or 0) .. " побед и материалы",
+    })
     pushState(player)
 end))
 
