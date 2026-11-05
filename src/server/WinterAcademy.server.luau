@@ -293,9 +293,14 @@ local arena = model(world, "FirstTrialArena")
 makePart(arena, "ArenaBase", Vector3.new(120, 1.2, 48), CFrame.new(0, 0.25, 8), Color3.fromRGB(54, 51, 86), Enum.Material.Slate)
 makePart(arena, "ArenaInset", Vector3.new(112, 0.18, 40), CFrame.new(0, 0.94, 8), Color3.fromRGB(83, 72, 128), Enum.Material.Marble)
 for _, radius in ipairs({ 12, 18 }) do
-    local ring = makePart(arena, "RunicRing", Vector3.new(radius * 2, 0.16, radius * 2), CFrame.new(0, 1.08, 8), Color3.fromRGB(167, 111, 245), Enum.Material.Neon, Enum.PartType.Cylinder)
+    -- Cylinder axis is X; rotate it upright and keep its thickness on Y for a flat glowing floor ring.
+    local ring = makePart(arena, "RunicRing", Vector3.new(0.16, radius * 2, radius * 2), CFrame.new(0, 1.08, 8) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(167, 111, 245), Enum.Material.Neon, Enum.PartType.Cylinder)
     ring.Transparency = 0.48
     ring.CanCollide = false
+    local rotation = TweenService:Create(ring, TweenInfo.new(22, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {
+        CFrame = ring.CFrame * CFrame.Angles(0, math.rad(359), 0),
+    })
+    rotation:Play()
 end
 for _, x in ipairs({ -25, 25 }) do
     makePart(arena, "ArenaPillar", Vector3.new(2.5, 11, 2.5), CFrame.new(x, 5.5, -5), Color3.fromRGB(39, 38, 70), Enum.Material.Slate)
