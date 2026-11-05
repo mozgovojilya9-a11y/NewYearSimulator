@@ -19,6 +19,7 @@ local DEFAULT = {
     Equipment = { Weapon = nil, Armor = nil },
     GamePasses = {},
     ProcessedReceipts = {},
+    PremiumBoosts = {},
     TotalKills = 0,
     HighestStage = 1,
 }
@@ -67,6 +68,9 @@ local function mergeDefaults(saved)
     end
     if type(data.ProcessedReceipts) ~= "table" then
         data.ProcessedReceipts = {}
+    end
+    if type(data.PremiumBoosts) ~= "table" then
+        data.PremiumBoosts = {}
     end
 
     -- Preserve every saved hero ID. Only repair an invalid equipped ID.
@@ -139,7 +143,11 @@ function DataService.Save(player)
     if not data then
         return false
     end
-    if saving[player] then
+    local deadline = os.clock() + 6
+    while saving[player] and cache[player] and os.clock() < deadline do
+        task.wait(0.1)
+    end
+    if saving[player] or not cache[player] then
         return false
     end
 
