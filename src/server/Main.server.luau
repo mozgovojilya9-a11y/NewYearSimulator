@@ -140,6 +140,15 @@ local function getHumanoid(player)
     return character and character:FindFirstChildOfClass("Humanoid")
 end
 
+local function applySavedGear(player, data)
+    local humanoid = getHumanoid(player)
+    if not humanoid then return end
+    local _, armor = getEquipment(data)
+    local targetMax = 100 + (armor and (armor.HealthBonus or 0) or 0)
+    humanoid.MaxHealth = targetMax
+    if humanoid.Health > targetMax then humanoid.Health = targetMax end
+end
+
 local function cloneDictionary(source)
     local result = {}
     for key, value in pairs(source or {}) do
@@ -750,15 +759,7 @@ R.EquipItem.OnServerEvent:Connect(withData(function(player, data, itemId)
     end
     local slot = item.Type
     data.Equipment[slot] = itemId
-    local humanoid = getHumanoid(player)
-    if humanoid and item.Type == "Armor" then
-        local _, armor = getEquipment(data)
-        local oldMax = humanoid.MaxHealth
-        local newMax = 100 + (armor and armor.HealthBonus or 0)
-        local healthRatio = oldMax > 0 and humanoid.Health / oldMax or 1
-        humanoid.MaxHealth = newMax
-        humanoid.Health = math.clamp(newMax * healthRatio, 1, newMax)
-    end
+    applySavedGear(player, data)
     DataService.Save(player)
     notice(player, "Экипировано: " .. item.Name)
     pushState(player)
@@ -786,9 +787,15 @@ local function onPlayerAdded(player)
     end
     initialized[player] = true
     setupLeaderstats(player)
+    player.CharacterAdded:Connect(function()
+        task.wait(0.2)
+        local loaded = DataService.Get(player)
+        if loaded then applySavedGear(player, loaded) end
+    end)
     local data = DataService.Load(player)
     if data then
         PurchaseService.RefreshPasses(player, DataService)
+        applySavedGear(player, data)
         pushState(player)
     else
         initialized[player] = nil
