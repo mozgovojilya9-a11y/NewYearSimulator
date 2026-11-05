@@ -198,6 +198,18 @@ local function buildMentor(hero, index, position)
     makePart(display, "StaffCrystal", Vector3.new(0.95, 0.95, 0.95), staff.CFrame * CFrame.new(0, 2.95, 0), accent, Enum.Material.Neon, Enum.PartType.Ball)
     display.PrimaryPart = torso
 
+    local prompt = Instance.new("ProximityPrompt")
+    prompt.Name = "StudyMentor"
+    prompt.ActionText = "Изучить"
+    prompt.ObjectText = hero.Name
+    prompt.KeyboardKeyCode = Enum.KeyCode.E
+    prompt.HoldDuration = 0.15
+    prompt.MaxActivationDistance = 13
+    prompt.RequiresLineOfSight = false
+    prompt:SetAttribute("OpenMenu", "Mentors")
+    prompt:SetAttribute("MentorId", hero.Id)
+    prompt.Parent = torso
+
     local plate = Instance.new("BillboardGui")
     plate.Name = "MentorNameplate"
     plate.Adornee = head
