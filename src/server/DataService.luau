@@ -20,6 +20,7 @@ local DEFAULT = {
     GamePasses = {},
     ProcessedReceipts = {},
     PremiumBoosts = {},
+    ClaimedQuests = {},
     TotalKills = 0,
     HighestStage = 1,
 }
@@ -71,6 +72,9 @@ local function mergeDefaults(saved)
     end
     if type(data.PremiumBoosts) ~= "table" then
         data.PremiumBoosts = {}
+    end
+    if type(data.ClaimedQuests) ~= "table" then
+        data.ClaimedQuests = {}
     end
 
     -- Preserve every saved hero ID. Only repair an invalid equipped ID.
