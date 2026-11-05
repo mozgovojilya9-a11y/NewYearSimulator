@@ -465,10 +465,13 @@ local function rebuildPetsPanel()
     clearRows(petsBody)
     for eggId, egg in pairs(Config.PetEggs) do
         local chances = {}
+        local totalWeight = 0
+        for _, drop in ipairs(egg.Drops) do totalWeight += drop.Weight end
         for _, drop in ipairs(egg.Drops) do
             local pet = Config.PetById[drop.Id]
-            if pet then
-                table.insert(chances, pet.Name .. " " .. tostring(math.floor(drop.Weight / 1)) .. " вес")
+            if pet and totalWeight > 0 then
+                local percent = (drop.Weight / totalWeight) * 100
+                table.insert(chances, pet.Name .. " " .. string.format("%.1f%%", percent))
             end
         end
         makeListRow(petsBody, egg.Name, "Стоимость: " .. formatNumber(egg.Cost) .. " побед  ·  " .. table.concat(chances, "  |  "),
@@ -953,7 +956,7 @@ local function refresh()
     stageHint.Text = ("Следующий противник: %s"):format(state.BattleMonster or (monster and monster.Name or "Страж"))
 
     mentorName.Text = "НАСТАВНИК: " .. tostring(state.HeroName or "Снежок Хранитель")
-    mentorBonus.Text = ("Молния ×%.2f  ·  Победы ×%.2f"):format(state.HeroPowerMult or 1, state.HeroWinMult or 1)
+    mentorBonus.Text = ("Молния ×%.2f  ·  питомцы ×%.2f"):format(state.HeroPowerMult or 1, state.PetPowerMult or 1)
 
     battleCard.Visible = state.BattleActive == true
     if state.BattleActive then
@@ -996,6 +999,9 @@ Remotes.State.OnClientEvent:Connect(function(newState)
 end)
 
 Remotes.Notice.OnClientEvent:Connect(notice)
+Remotes.PassChanged.OnClientEvent:Connect(function()
+    Remotes.RequestState:FireServer()
+end)
 
 local function pulseAtPlayer(color, maxSize)
     local character = player.Character
