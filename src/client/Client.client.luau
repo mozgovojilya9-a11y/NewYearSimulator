@@ -391,7 +391,10 @@ local function makeListRow(body, title, detail, accent, buttonText, callback)
 end
 
 local function openPanel(name)
-    local nextPanel = activePanel == name and nil or name
+    local nextPanel = nil
+    if activePanel ~= name then
+        nextPanel = name
+    end
     activePanel = nextPanel
     for key, panel in pairs(panels) do
         panel.Visible = key == nextPanel
