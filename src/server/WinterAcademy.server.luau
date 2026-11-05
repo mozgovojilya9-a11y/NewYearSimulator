@@ -91,12 +91,12 @@ end
 
 -- Mentor plinths and original mentor silhouettes
 local mentors = {
- {"Арон Вейл",Color3.fromRGB(63,83,125),Color3.fromRGB(195,160,255)},
- {"Герман Рид",Color3.fromRGB(130,65,75),Color3.fromRGB(255,175,120)},
- {"Луна Грей",Color3.fromRGB(100,110,155),Color3.fromRGB(160,220,255)},
- {"Северус Кроу",Color3.fromRGB(40,48,72),Color3.fromRGB(180,145,235)},
- {"Альбус Рейн",Color3.fromRGB(190,185,205),Color3.fromRGB(255,220,140)},
- {"Волдемар Кейн",Color3.fromRGB(72,65,83),Color3.fromRGB(245,105,130)},
+ {"Терен Вейл",Color3.fromRGB(63,83,125),Color3.fromRGB(195,160,255)},
+ {"Кайрен Рид",Color3.fromRGB(130,65,75),Color3.fromRGB(255,175,120)},
+ {"Лиора Грей",Color3.fromRGB(100,110,155),Color3.fromRGB(160,220,255)},
+ {"Эдрик Нокс",Color3.fromRGB(40,48,72),Color3.fromRGB(180,145,235)},
+ {"Ориан Вельт",Color3.fromRGB(190,185,205),Color3.fromRGB(255,220,140)},
+ {"Малрик Соль",Color3.fromRGB(72,65,83),Color3.fromRGB(245,105,130)},
 }
 for i,m in ipairs(mentors) do
  local x = (i-3.5)*18
