@@ -303,7 +303,9 @@ fightButton = actionButton("НАЧАТЬ БОЙ", COLORS.red, function()
         Remotes.Fight:FireServer()
     end
 end, "Fight")
+local abilityCooldownUntil = 0
 local abilityButton = actionButton("СПОСОБНОСТЬ", COLORS.blue, function()
+    if os.clock() < abilityCooldownUntil then return end
     Remotes.UseAbility:FireServer()
 end, "Ability")
 local rebirthButton = actionButton("ПЕРЕРОЖДЕНИЕ", COLORS.panelLight, function()
@@ -692,12 +694,25 @@ end
 
 local reward = makeCard(root, "RewardPopup", UDim2.fromScale(0.34, 0.28), UDim2.fromScale(0.33, 0.34), COLORS.gold)
 reward.Visible = false
-local rewardTitle = makeLabel(reward, "ПОБЕДА!", 24, UDim2.fromScale(0.08, 0.07), COLORS.gold, Enum.Font.GothamBlack, Enum.TextXAlignment.Center)
-rewardTitle.Size = UDim2.fromScale(0.84, 0.18)
-local rewardItem = makeLabel(reward, "Осколок инея", 20, UDim2.fromScale(0.08, 0.31), COLORS.cream, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
-rewardItem.Size = UDim2.fromScale(0.84, 0.2)
-local rewardDetail = makeLabel(reward, "+8 побед  ·  Обычный", 13, UDim2.fromScale(0.08, 0.54), COLORS.muted, Enum.Font.GothamMedium, Enum.TextXAlignment.Center)
-rewardDetail.Size = UDim2.fromScale(0.84, 0.14)
+local rewardTitle = makeLabel(reward, "ПОБЕДА!", 23, UDim2.fromScale(0.08, 0.045), COLORS.gold, Enum.Font.GothamBlack, Enum.TextXAlignment.Center)
+rewardTitle.Size = UDim2.fromScale(0.84, 0.16)
+local rewardIcon = create("Frame", {
+    Name = "RewardIcon",
+    Size = UDim2.fromOffset(62, 62),
+    Position = UDim2.new(0.5, -31, 0.24, 0),
+    BackgroundColor3 = COLORS.panelSoft,
+    BorderSizePixel = 0,
+    ZIndex = 25,
+}, reward)
+rewardIcon.BackgroundTransparency = 0.08
+addCorner(rewardIcon, 31)
+local rewardIconStroke = addStroke(rewardIcon, COLORS.gold, 2, 0.05)
+local rewardGlyph = makeLabel(rewardIcon, "✧", 36, UDim2.fromScale(0, 0), COLORS.gold, Enum.Font.GothamBlack, Enum.TextXAlignment.Center)
+rewardGlyph.Size = UDim2.fromScale(1, 1)
+local rewardItem = makeLabel(reward, "Осколок инея", 18, UDim2.fromScale(0.06, 0.51), COLORS.cream, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
+rewardItem.Size = UDim2.fromScale(0.88, 0.16)
+local rewardDetail = makeLabel(reward, "+8 побед  ·  Обычный", 12, UDim2.fromScale(0.06, 0.67), COLORS.muted, Enum.Font.GothamMedium, Enum.TextXAlignment.Center)
+rewardDetail.Size = UDim2.fromScale(0.88, 0.12)
 makeButton(reward, "ПРОДОЛЖИТЬ", COLORS.green, UDim2.fromScale(0.58, 0.2), UDim2.fromScale(0.21, 0.74), function()
     reward.Visible = false
 end, { TextSize = 13, ZIndex = 30 })
@@ -711,6 +726,9 @@ local function showReward(data, titleText)
     local accent = data.ItemColor or COLORS.gold
     local outline = reward:FindFirstChildOfClass("UIStroke")
     if outline then outline.Color = accent end
+    rewardIconStroke.Color = accent
+    rewardGlyph.TextColor3 = accent
+    rewardItem.TextColor3 = accent
     reward.Visible = true
     reward.BackgroundTransparency = 0.2
     local scale = reward:FindFirstChildOfClass("UIScale") or create("UIScale", { Scale = 0.8 }, reward)
@@ -964,6 +982,11 @@ local function updatePetVisuals()
 end
 
 RunService.RenderStepped:Connect(function()
+    if abilityCooldownUntil > os.clock() then
+        abilityButton.Text = "СПОСОБНОСТЬ · " .. tostring(math.ceil(abilityCooldownUntil - os.clock())) .. "с"
+    elseif state then
+        abilityButton.Text = "СПОСОБНОСТЬ"
+    end
     if #petVisuals == 0 then return end
     local character = player.Character
     local rootPart = character and character:FindFirstChild("HumanoidRootPart")
@@ -1175,6 +1198,7 @@ Remotes.CombatFX.OnClientEvent:Connect(function(data)
         notice("Противник оказался сильнее. Попробуй ещё раз.")
         flash(COLORS.red, 0.24)
     elseif data.Kind == "Ability" then
+        abilityCooldownUntil = os.clock() + (tonumber(data.Cooldown) or 0)
         pulseAtPlayer(COLORS.purple, 11)
         floatingText(tostring(data.Name), COLORS.cyan)
         flash(COLORS.purple, 0.12)
