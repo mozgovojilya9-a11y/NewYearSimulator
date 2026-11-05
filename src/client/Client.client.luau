@@ -1040,7 +1040,7 @@ end
 local function playArcaneBolt()
     local camera = workspace.CurrentCamera
     local activeFolder = workspace:FindFirstChild("ActiveMonsters")
-    local monster = activeFolder and activeFolder:FindFirstChild("AcademyMonster")
+    local monster = activeFolder and activeFolder:FindFirstChild("AcademyMonster_" .. tostring(player.UserId))
     local target = monster and (monster:FindFirstChild("Core") or monster.PrimaryPart)
     if not camera or not target then return end
 
