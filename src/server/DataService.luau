@@ -165,6 +165,72 @@ function DataService.Save(player)
     return ok
 end
 
+function DataService.ApplyReceipt(player, receiptId, grantCallback)
+    local data = cache[player]
+    if not data or type(receiptId) ~= "string" or type(grantCallback) ~= "function" then
+        return false
+    end
+
+    local deadline = os.clock() + 6
+    while saving[player] and cache[player] and os.clock() < deadline do
+        task.wait(0.1)
+    end
+    if saving[player] or not cache[player] then
+        return false
+    end
+
+    saving[player] = true
+    local snapshot = deepCopy(cache[player])
+    local key = "player_" .. player.UserId
+    local receiptWasAlreadyProcessed = false
+    local receiptWasGranted = false
+
+    local ok, updated = withRetry(function()
+        return store:UpdateAsync(key, function(saved)
+            local stored = mergeDefaults(deepCopy(saved))
+            if stored.ProcessedReceipts[receiptId] then
+                receiptWasAlreadyProcessed = true
+                receiptWasGranted = false
+                return stored
+            end
+
+            receiptWasAlreadyProcessed = false
+            local candidate = mergeDefaults(deepCopy(snapshot))
+            candidate.ProcessedReceipts = candidate.ProcessedReceipts or {}
+            -- Preserve previously recorded receipt IDs from the stored version.
+            for previousId, value in pairs(stored.ProcessedReceipts) do
+                if value then
+                    candidate.ProcessedReceipts[previousId] = true
+                end
+            end
+
+            local granted = grantCallback(candidate)
+            if granted ~= true then
+                receiptWasGranted = false
+                return nil
+            end
+            candidate.ProcessedReceipts[receiptId] = true
+            receiptWasGranted = true
+            return candidate
+        end)
+    end, 3)
+
+    saving[player] = nil
+    if not ok or type(updated) ~= "table" then
+        return false
+    end
+
+    if receiptWasAlreadyProcessed then
+        return true
+    end
+    if not receiptWasGranted then
+        return false
+    end
+
+    cache[player] = mergeDefaults(updated)
+    return true
+end
+
 function DataService.Release(player)
     DataService.Save(player)
     cache[player] = nil
