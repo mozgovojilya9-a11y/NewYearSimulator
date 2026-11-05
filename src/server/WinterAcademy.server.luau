@@ -262,8 +262,8 @@ end
 
 -- Combat arena and portal at the end of the central avenue.
 local arena = model(world, "FirstTrialArena")
-makePart(arena, "ArenaBase", Vector3.new(54, 1.2, 38), CFrame.new(0, 0.25, 8), Color3.fromRGB(54, 51, 86), Enum.Material.Slate)
-makePart(arena, "ArenaInset", Vector3.new(46, 0.18, 30), CFrame.new(0, 0.94, 8), Color3.fromRGB(83, 72, 128), Enum.Material.Marble)
+makePart(arena, "ArenaBase", Vector3.new(120, 1.2, 48), CFrame.new(0, 0.25, 8), Color3.fromRGB(54, 51, 86), Enum.Material.Slate)
+makePart(arena, "ArenaInset", Vector3.new(112, 0.18, 40), CFrame.new(0, 0.94, 8), Color3.fromRGB(83, 72, 128), Enum.Material.Marble)
 for _, radius in ipairs({ 12, 18 }) do
     local ring = makePart(arena, "RunicRing", Vector3.new(radius * 2, 0.16, radius * 2), CFrame.new(0, 1.08, 8), Color3.fromRGB(167, 111, 245), Enum.Material.Neon, Enum.PartType.Cylinder)
     ring.Transparency = 0.48
