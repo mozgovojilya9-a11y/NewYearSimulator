@@ -62,7 +62,7 @@ local function addCorner(object, radius)
 end
 
 local function addStroke(object, color, thickness, transparency)
-    create("UIStroke", {
+    return create("UIStroke", {
         Color = color or COLORS.gold,
         Thickness = thickness or 1.5,
         Transparency = transparency or 0.12,
@@ -981,11 +981,15 @@ local function updatePetVisuals()
     end
 end
 
+local lastAbilityLabel = ""
 RunService.RenderStepped:Connect(function()
+    local abilityLabel = "СПОСОБНОСТЬ"
     if abilityCooldownUntil > os.clock() then
-        abilityButton.Text = "СПОСОБНОСТЬ · " .. tostring(math.ceil(abilityCooldownUntil - os.clock())) .. "с"
-    elseif state then
-        abilityButton.Text = "СПОСОБНОСТЬ"
+        abilityLabel = "СПОСОБНОСТЬ · " .. tostring(math.ceil(abilityCooldownUntil - os.clock())) .. "с"
+    end
+    if abilityLabel ~= lastAbilityLabel then
+        lastAbilityLabel = abilityLabel
+        abilityButton.Text = abilityLabel
     end
     if #petVisuals == 0 then return end
     local character = player.Character
