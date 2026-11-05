@@ -12,6 +12,7 @@ local state = nil
 local selectedZone = 1
 local autoTrain = false
 local activePanel = nil
+local notice
 local toastToken = 0
 local rewardToken = 0
 
@@ -390,23 +391,20 @@ local function makeListRow(body, title, detail, accent, buttonText, callback)
 end
 
 local function openPanel(name)
+    local nextPanel = activePanel == name and nil or name
+    activePanel = nextPanel
     for key, panel in pairs(panels) do
-        local shouldOpen = key == name and activePanel ~= name
-        panel.Visible = shouldOpen
-        if shouldOpen then
-            activePanel = name
-            local scale = panel:FindFirstChildOfClass("UIScale")
-            if scale then
-                scale.Scale = 0.94
-                animate(scale, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
-            end
-            panel.BackgroundTransparency = 0.12
-            animate(panel, 0.16, { BackgroundTransparency = 0 })
-        end
+        panel.Visible = key == nextPanel
     end
-    if activePanel == name then activePanel = nil end
-    if activePanel and panels[activePanel] then
-        panels[activePanel].Visible = true
+    if nextPanel and panels[nextPanel] then
+        local panel = panels[nextPanel]
+        local scale = panel:FindFirstChildOfClass("UIScale")
+        if scale then
+            scale.Scale = 0.94
+            animate(scale, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
+        end
+        panel.BackgroundTransparency = 0.12
+        animate(panel, 0.16, { BackgroundTransparency = 0 })
     end
 end
 
@@ -517,7 +515,7 @@ toast.Visible = false
 local toastText = makeLabel(toast, "", 14, UDim2.fromScale(0.05, 0.05), COLORS.cream, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
 toastText.Size = UDim2.fromScale(0.9, 0.9)
 
-local function notice(text)
+notice = function(text)
     toastToken += 1
     local token = toastToken
     toastText.Text = tostring(text)
@@ -626,7 +624,7 @@ local function refresh()
     stageHint.Text = ("Следующий противник: %s"):format(state.BattleMonster or (monster and monster.Name or "Страж"))
 
     mentorName.Text = "НАСТАВНИК: " .. tostring(state.HeroName or "Снежок Хранитель")
-    mentorBonus.Text = ("Молния ×%.2f  ·  Победы ×%.2f"):format(state.HeroPowerMult or 1, 1)
+    mentorBonus.Text = ("Молния ×%.2f  ·  Победы ×%.2f"):format(state.HeroPowerMult or 1, state.HeroWinMult or 1)
 
     battleCard.Visible = state.BattleActive == true
     if state.BattleActive then
@@ -678,6 +676,43 @@ end)
 
 Remotes.Notice.OnClientEvent:Connect(notice)
 
+local function playArcaneBolt()
+    local camera = workspace.CurrentCamera
+    local activeFolder = workspace:FindFirstChild("ActiveMonsters")
+    local monster = activeFolder and activeFolder:FindFirstChild("AcademyMonster")
+    local target = monster and (monster:FindFirstChild("Core") or monster.PrimaryPart)
+    if not camera or not target then return end
+
+    local origin = camera.CFrame.Position + camera.CFrame.LookVector * 3 + camera.CFrame.RightVector * 0.65 - camera.CFrame.UpVector * 0.45
+    local bolt = Instance.new("Part")
+    bolt.Name = "LocalArcaneBolt"
+    bolt.Shape = Enum.PartType.Ball
+    bolt.Size = Vector3.new(0.7, 0.7, 0.7)
+    bolt.Material = Enum.Material.Neon
+    bolt.Color = COLORS.gold
+    bolt.Anchored = true
+    bolt.CanCollide = false
+    bolt.CanTouch = false
+    bolt.CFrame = CFrame.new(origin)
+    bolt.Parent = workspace
+    local glow = Instance.new("PointLight")
+    glow.Color = COLORS.gold
+    glow.Range = 10
+    glow.Brightness = 2
+    glow.Parent = bolt
+
+    local distance = (target.Position - origin).Magnitude
+    local duration = math.clamp(distance / 110, 0.18, 0.46)
+    local tween = TweenService:Create(bolt, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
+        Position = target.Position,
+        Size = Vector3.new(1.3, 1.3, 1.3),
+    })
+    tween:Play()
+    tween.Completed:Connect(function()
+        if bolt.Parent then bolt:Destroy() end
+    end)
+end
+
 Remotes.CombatFX.OnClientEvent:Connect(function(data)
     if type(data) ~= "table" then return end
     if data.Kind == "Train" then
@@ -686,6 +721,7 @@ Remotes.CombatFX.OnClientEvent:Connect(function(data)
         notice("Начался бой: " .. tostring(data.Monster))
         flash(COLORS.purple, 0.12)
     elseif data.Kind == "PlayerHit" then
+        playArcaneBolt()
         floatingText("-" .. formatNumber(data.Damage), COLORS.gold)
         flash(COLORS.gold, 0.07)
     elseif data.Kind == "EnemyHit" then
