@@ -1,207 +1,719 @@
--- Winter Academy UI: original magical-academy theme, responsive and functional.
+-- Winter Academy client HUD: responsive layout, clear actions and animated panels.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local player = Players.LocalPlayer
+
 local state = nil
 local selectedZone = 1
 local autoTrain = false
-local heroSig = nil
+local activePanel = nil
+local toastToken = 0
+local rewardToken = 0
 
-local C = {
- ink = Color3.fromRGB(24,22,43), panel = Color3.fromRGB(37,34,62),
- panel2 = Color3.fromRGB(54,48,82), gold = Color3.fromRGB(255,195,91),
- cream = Color3.fromRGB(255,239,205), purple = Color3.fromRGB(137,83,190),
- blue = Color3.fromRGB(65,111,184), green = Color3.fromRGB(54,130,92),
- red = Color3.fromRGB(153,55,68), muted = Color3.fromRGB(177,177,204),
+local COLORS = {
+    background = Color3.fromRGB(17, 16, 34),
+    panel = Color3.fromRGB(29, 25, 52),
+    panelSoft = Color3.fromRGB(43, 36, 72),
+    panelLight = Color3.fromRGB(59, 48, 94),
+    gold = Color3.fromRGB(255, 199, 105),
+    goldSoft = Color3.fromRGB(255, 225, 171),
+    cream = Color3.fromRGB(255, 245, 224),
+    muted = Color3.fromRGB(173, 169, 199),
+    purple = Color3.fromRGB(146, 93, 218),
+    blue = Color3.fromRGB(68, 137, 207),
+    cyan = Color3.fromRGB(75, 195, 218),
+    green = Color3.fromRGB(61, 157, 116),
+    red = Color3.fromRGB(190, 70, 94),
 }
-local SUFFIX = {"","K","M","B","T","Qa","Qi","Sx","Sp","Oc","No","Dc"}
-local function fmt(n)
- local i=1
- while n>=1000 and i<#SUFFIX do n/=1000; i+=1 end
- return i==1 and tostring(math.floor(n)) or ("%.2f%s"):format(n,SUFFIX[i])
-end
-local function make(class,props,parent)
- local o=Instance.new(class)
- for k,v in props do o[k]=v end
- o.Parent=parent
- return o
-end
-local function corner(o,r)
- make("UICorner",{CornerRadius=UDim.new(0,r or 12)},o)
-end
-local function stroke(o,color,thick)
- make("UIStroke",{Color=color or C.gold,Thickness=thick or 1.5,Transparency=0.12},o)
-end
-local function label(parent,text,size,pos,font,color)
- return make("TextLabel",{BackgroundTransparency=1,Text=text,TextSize=size,
-  Position=pos or UDim2.new(),Size=UDim2.new(1,0,0,30),Font=font or Enum.Font.GothamBold,
-  TextColor3=color or C.cream,TextXAlignment=Enum.TextXAlignment.Left,
-  TextYAlignment=Enum.TextYAlignment.Center,TextWrapped=true},parent)
-end
-local function button(parent,text,color,size,pos,callback)
- local b=make("TextButton",{Size=size,Position=pos,BackgroundColor3=color,Text=text,
-  TextColor3=C.cream,TextSize=16,Font=Enum.Font.GothamBold,TextWrapped=true,
-  AutoButtonColor=false},parent)
- corner(b,10); stroke(b,C.gold,1.3)
- b.MouseEnter:Connect(function() TweenService:Create(b,TweenInfo.new(.12),{BackgroundColor3=color:Lerp(Color3.new(1,1,1),.12)}):Play() end)
- b.MouseLeave:Connect(function() TweenService:Create(b,TweenInfo.new(.12),{BackgroundColor3=color}):Play() end)
- b.Activated:Connect(callback)
- return b
+
+local SUFFIXES = { "", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc" }
+local function formatNumber(number)
+    number = tonumber(number) or 0
+    local index = 1
+    while number >= 1000 and index < #SUFFIXES do
+        number /= 1000
+        index += 1
+    end
+    if index == 1 then
+        return tostring(math.floor(number))
+    end
+    return ("%.2f%s"):format(number, SUFFIXES[index])
 end
 
-local gui=make("ScreenGui",{Name="WinterAcademyUI",ResetOnSpawn=false,IgnoreGuiInset=true},player:WaitForChild("PlayerGui"))
-local root=make("Frame",{Name="Root",Size=UDim2.fromScale(1,1),BackgroundTransparency=1},gui)
-
--- Header event cards
-local header=make("Frame",{Size=UDim2.fromScale(.42,.085),Position=UDim2.fromScale(.29,.018),BackgroundTransparency=1},root)
-local event1=make("Frame",{Size=UDim2.fromScale(.49,1),BackgroundColor3=C.panel},header); corner(event1,12); stroke(event1,C.purple)
-label(event1,"✦ ТЕНЕВЫЕ ВРАГИ",14,UDim2.fromScale(.08,.08),Enum.Font.GothamBold,C.gold)
-label(event1,"Атака начнётся скоро",11,UDim2.fromScale(.08,.48),Enum.Font.Gotham,C.cream)
-local event2=make("Frame",{Size=UDim2.fromScale(.49,1),Position=UDim2.fromScale(.51,0),BackgroundColor3=C.panel},header); corner(event2,12); stroke(event2,C.red)
-label(event2,"✧ РЕЙД НА БАШНЮ",14,UDim2.fromScale(.08,.08),Enum.Font.GothamBold,C.gold)
-label(event2,"Готовься к испытанию",11,UDim2.fromScale(.08,.48),Enum.Font.Gotham,C.cream)
-
--- Side navigation
-local side=make("Frame",{Size=UDim2.fromScale(.145,.54),Position=UDim2.fromScale(.018,.22),BackgroundTransparency=1},root)
-local sideLayout=make("UIListLayout",{Padding=UDim.new(0,7),SortOrder=Enum.SortOrder.LayoutOrder},side)
-local panels={}
-local function openPanel(name)
- for k,p in panels do p.Visible=(k==name) and not p.Visible end
-end
-local function sideButton(text,color,order,callback)
- local b=button(side,text,color,UDim2.new(1,0,0,52),UDim2.new(),callback)
- b.LayoutOrder=order
- return b
+local function create(className, properties, parent)
+    local object = Instance.new(className)
+    for key, value in pairs(properties or {}) do
+        object[key] = value
+    end
+    object.Parent = parent
+    return object
 end
 
--- Resource panel
-local resources=make("Frame",{Size=UDim2.fromScale(.19,.22),Position=UDim2.fromScale(.02,.68),BackgroundColor3=C.ink,BackgroundTransparency=.12},root)
-corner(resources,14); stroke(resources,C.gold)
-local statsLabel=label(resources,"Загрузка...",17,UDim2.fromScale(.08,.08),Enum.Font.GothamBold,C.gold)
-statsLabel.Size=UDim2.fromScale(.86,.84)
-
--- Right offers
-local offers=make("Frame",{Size=UDim2.fromScale(.15,.22),Position=UDim2.fromScale(.83,.37),BackgroundTransparency=1},root)
-local offer1=button(offers,"2× ПОБЕДЫ\nСкоро в магазине",C.red,UDim2.new(1,0,.45,0),UDim2.new(),function() openPanel("shop") end)
-local offer2=button(offers,"УСИЛЕНИЕ СИЛЫ\nИгровые награды",C.panel2,UDim2.new(1,0,.45,0),UDim2.new(0,.0,.53,0),function() openPanel("shop") end)
-
--- Bottom progress and action bar
-local progress=make("Frame",{Size=UDim2.fromScale(.46,.105),Position=UDim2.fromScale(.27,.73),BackgroundColor3=C.ink,BackgroundTransparency=.08},root)
-corner(progress,12); stroke(progress,C.gold)
-local powerLabel=label(progress,"✦ СИЛА: 0",20,UDim2.fromScale(.04,.02),Enum.Font.GothamBold,C.gold)
-local levelLabel=label(progress,"Уровень 1   •   0 / 100",13,UDim2.fromScale(.04,.42),Enum.Font.Gotham,C.cream)
-local track=make("Frame",{Size=UDim2.fromScale(.92,.16),Position=UDim2.fromScale(.04,.77),BackgroundColor3=C.panel2},progress); corner(track,6)
-local fill=make("Frame",{Size=UDim2.fromScale(0,1),BackgroundColor3=C.gold},track); corner(fill,6)
-
-local actions=make("Frame",{Size=UDim2.fromScale(.62,.12),Position=UDim2.fromScale(.19,.86),BackgroundTransparency=1},root)
-make("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,HorizontalAlignment=Enum.HorizontalAlignment.Center,VerticalAlignment=Enum.VerticalAlignment.Center,Padding=UDim.new(.012,0)},actions)
-local function action(text,color,fn)
- return button(actions,text,color,UDim2.new(.19,0,.82,0),UDim2.new(),fn)
+local function addCorner(object, radius)
+    create("UICorner", { CornerRadius = UDim.new(0, radius or 12) }, object)
 end
 
--- Modal panels
-local function panel(name,titleText)
- local p=make("Frame",{Name=name,Size=UDim2.fromScale(.48,.56),Position=UDim2.fromScale(.26,.2),BackgroundColor3=C.ink,Visible=false},root)
- corner(p,16); stroke(p,C.gold,2)
- local head=make("Frame",{Size=UDim2.new(1,0,0,48),BackgroundColor3=C.panel2},p); corner(head,14)
- label(head,titleText,21,UDim2.fromScale(.04,0),Enum.Font.GothamBold,C.gold)
- button(head,"✕",C.red,UDim2.fromOffset(42,36),UDim2.new(1,-48,0,6),function() p.Visible=false end)
- local body=make("ScrollingFrame",{Name="Body",Size=UDim2.new(1,-20,1,-62),Position=UDim2.fromOffset(10,55),BackgroundTransparency=1,BorderSizePixel=0,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollBarThickness=5},p)
- make("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},body)
- panels[name]=p
- return p,body
+local function addStroke(object, color, thickness, transparency)
+    create("UIStroke", {
+        Color = color or COLORS.gold,
+        Thickness = thickness or 1.5,
+        Transparency = transparency or 0.12,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+    }, object)
 end
-local heroPanel,heroBody=panel("mentors","НАСТАВНИКИ АКАДЕМИИ")
-local shopPanel,shopBody=panel("shop","ЛАВКА АРТЕФАКТОВ")
-local questPanel,questBody=panel("quests","ИСПЫТАНИЯ")
-local worldPanel,worldBody=panel("world","МИРЫ АКАДЕМИИ")
+
+local function addGradient(object, color)
+    create("UIGradient", {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, color:Lerp(Color3.new(1, 1, 1), 0.14)),
+            ColorSequenceKeypoint.new(1, color:Lerp(Color3.new(0, 0, 0), 0.22)),
+        }),
+        Rotation = 90,
+    }, object)
+end
+
+local function makeLabel(parent, text, size, position, color, font, alignment)
+    return create("TextLabel", {
+        BackgroundTransparency = 1,
+        Text = text or "",
+        TextSize = size or 14,
+        TextColor3 = color or COLORS.cream,
+        Font = font or Enum.Font.GothamMedium,
+        TextXAlignment = alignment or Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Center,
+        TextWrapped = true,
+        Position = position or UDim2.new(),
+        Size = UDim2.new(1, 0, 0, 26),
+    }, parent)
+end
+
+local function animate(object, duration, properties, style)
+    local tween = TweenService:Create(
+        object,
+        TweenInfo.new(duration or 0.18, style or Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        properties
+    )
+    tween:Play()
+    return tween
+end
+
+local function makeButton(parent, text, color, size, position, callback, options)
+    options = options or {}
+    local b = create("TextButton", {
+        Name = options.Name or "ActionButton",
+        Size = size,
+        Position = position,
+        BackgroundColor3 = color,
+        BorderSizePixel = 0,
+        Text = text,
+        TextColor3 = options.TextColor or COLORS.cream,
+        TextSize = options.TextSize or 14,
+        TextWrapped = true,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        Font = options.Font or Enum.Font.GothamBold,
+        AutoButtonColor = false,
+        ClipsDescendants = true,
+        ZIndex = options.ZIndex or 4,
+    }, parent)
+    addCorner(b, options.Radius or 11)
+    addStroke(b, options.StrokeColor or COLORS.gold, options.StrokeThickness or 1.2, 0.22)
+    addGradient(b, color)
+
+    local scale = create("UIScale", { Scale = 1 }, b)
+    b.MouseEnter:Connect(function()
+        animate(scale, 0.12, { Scale = 1.035 })
+    end)
+    b.MouseLeave:Connect(function()
+        animate(scale, 0.12, { Scale = 1 })
+    end)
+    b.Activated:Connect(function()
+        animate(scale, 0.07, { Scale = 0.965 })
+        task.delay(0.08, function()
+            if scale.Parent then animate(scale, 0.12, { Scale = 1 }) end
+        end)
+        callback()
+    end)
+    return b
+end
+
+-- Root UI and adaptive scale.
+local gui = create("ScreenGui", {
+    Name = "WinterAcademyUI",
+    ResetOnSpawn = false,
+    IgnoreGuiInset = false,
+    DisplayOrder = 30,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+}, player:WaitForChild("PlayerGui"))
+
+local root = create("Frame", {
+    Name = "Root",
+    Size = UDim2.fromScale(1, 1),
+    BackgroundTransparency = 1,
+}, gui)
+
+local rootScale = create("UIScale", { Scale = 1 }, root)
+local function updateScale()
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+    local viewport = camera.ViewportSize
+    local scale = math.clamp(viewport.X / 1420, 0.72, 1.08)
+    if viewport.X < 700 then scale = math.clamp(viewport.X / 570, 0.68, 0.9) end
+    rootScale.Scale = scale
+end
+updateScale()
+if workspace.CurrentCamera then
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+end
+
+-- Soft darkened HUD cards with a restrained gold frame.
+local function makeCard(parent, name, size, position, accent)
+    local card = create("Frame", {
+        Name = name,
+        Size = size,
+        Position = position,
+        BackgroundColor3 = COLORS.background,
+        BackgroundTransparency = 0.08,
+        BorderSizePixel = 0,
+        ClipsDescendants = true,
+        ZIndex = 2,
+    }, parent)
+    addCorner(card, 14)
+    addStroke(card, accent or COLORS.gold, 1.5, 0.14)
+    return card
+end
+
+-- Header.
+local brand = makeCard(root, "Brand", UDim2.fromScale(0.205, 0.085), UDim2.fromScale(0.018, 0.025), COLORS.purple)
+makeLabel(brand, "✦ ЗИМНЯЯ АКАДЕМИЯ", 18, UDim2.fromScale(0.07, 0.12), COLORS.gold, Enum.Font.GothamBlack)
+makeLabel(brand, "ПУТЬ УЧЕНИКА  ·  ГЛАВА I", 10, UDim2.fromScale(0.08, 0.58), COLORS.muted, Enum.Font.GothamMedium)
+
+local stageCard = makeCard(root, "StageHeader", UDim2.fromScale(0.34, 0.085), UDim2.fromScale(0.33, 0.025), COLORS.blue)
+local stageTitle = makeLabel(stageCard, "ЭТАП 1  ·  СНЕЖНЫЙ ДВОР", 15, UDim2.fromScale(0.05, 0.08), COLORS.gold, Enum.Font.GothamBold)
+local stageHint = makeLabel(stageCard, "Следующая цель: Снежный гоблин", 11, UDim2.fromScale(0.05, 0.53), COLORS.cream, Enum.Font.GothamMedium)
+
+local mentorBadge = makeCard(root, "EquippedMentor", UDim2.fromScale(0.19, 0.085), UDim2.fromScale(0.79, 0.025), COLORS.purple)
+local mentorName = makeLabel(mentorBadge, "НАСТАВНИК: Снежок Хранитель", 12, UDim2.fromScale(0.06, 0.12), COLORS.cream, Enum.Font.GothamBold)
+local mentorBonus = makeLabel(mentorBadge, "Молния ×1.00", 10, UDim2.fromScale(0.06, 0.56), COLORS.muted, Enum.Font.GothamMedium)
+
+-- Left navigation. Only sections that actually work are shown.
+local navigation = makeCard(root, "Navigation", UDim2.fromScale(0.16, 0.39), UDim2.fromScale(0.018, 0.23), COLORS.purple)
+makeLabel(navigation, "АКАДЕМИЯ", 11, UDim2.fromScale(0.08, 0.035), COLORS.muted, Enum.Font.GothamBold)
+
+-- Resource card is tall enough for all lines; no stat is placed outside the frame.
+local resources = makeCard(root, "Resources", UDim2.fromScale(0.19, 0.22), UDim2.fromScale(0.018, 0.68), COLORS.gold)
+makeLabel(resources, "ВАШ ПРОГРЕСС", 10, UDim2.fromScale(0.07, 0.07), COLORS.muted, Enum.Font.GothamBold)
+local lightningValue = makeLabel(resources, "⚡  Молния: 0", 17, UDim2.fromScale(0.07, 0.23), COLORS.gold, Enum.Font.GothamBold)
+local winsValue = makeLabel(resources, "✦  Победы: 0", 15, UDim2.fromScale(0.07, 0.47), COLORS.cream, Enum.Font.GothamBold)
+local rebirthValue = makeLabel(resources, "↻  Перерождения: 0", 13, UDim2.fromScale(0.07, 0.70), COLORS.muted, Enum.Font.GothamMedium)
+
+-- Main progress card.
+local progress = makeCard(root, "PowerProgress", UDim2.fromScale(0.46, 0.13), UDim2.fromScale(0.27, 0.69), COLORS.gold)
+local powerTitle = makeLabel(progress, "⚡  МОЛНИЯ  0", 21, UDim2.fromScale(0.04, 0.04), COLORS.gold, Enum.Font.GothamBlack)
+local levelTitle = makeLabel(progress, "Уровень 1  ·  0 / 100", 12, UDim2.fromScale(0.04, 0.42), COLORS.cream, Enum.Font.GothamMedium)
+local progressTrack = create("Frame", {
+    Size = UDim2.fromScale(0.92, 0.17),
+    Position = UDim2.fromScale(0.04, 0.75),
+    BackgroundColor3 = COLORS.panelSoft,
+    BorderSizePixel = 0,
+}, progress)
+addCorner(progressTrack, 8)
+local progressFill = create("Frame", {
+    Size = UDim2.fromScale(0, 1),
+    BackgroundColor3 = COLORS.gold,
+    BorderSizePixel = 0,
+}, progressTrack)
+addCorner(progressFill, 8)
+addGradient(progressFill, COLORS.gold)
+
+-- Battle status: visible only while a monster is active.
+local battleCard = makeCard(root, "BattleStatus", UDim2.fromScale(0.34, 0.105), UDim2.fromScale(0.33, 0.135), COLORS.red)
+battleCard.Visible = false
+local battleName = makeLabel(battleCard, "ПРОТИВНИК", 14, UDim2.fromScale(0.05, 0.04), COLORS.gold, Enum.Font.GothamBold)
+local battleNumbers = makeLabel(battleCard, "90 / 90 HP", 11, UDim2.fromScale(0.05, 0.4), COLORS.cream, Enum.Font.GothamMedium)
+local battleTrack = create("Frame", {
+    Size = UDim2.fromScale(0.9, 0.15),
+    Position = UDim2.fromScale(0.05, 0.76),
+    BackgroundColor3 = COLORS.panelSoft,
+    BorderSizePixel = 0,
+}, battleCard)
+addCorner(battleTrack, 7)
+local battleFill = create("Frame", {
+    Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = COLORS.red,
+    BorderSizePixel = 0,
+}, battleTrack)
+addCorner(battleFill, 7)
+
+-- Bottom action bar.
+local actions = create("Frame", {
+    Name = "Actions",
+    Size = UDim2.fromScale(0.76, 0.105),
+    Position = UDim2.fromScale(0.12, 0.855),
+    BackgroundTransparency = 1,
+}, root)
+create("UIListLayout", {
+    FillDirection = Enum.FillDirection.Horizontal,
+    HorizontalAlignment = Enum.HorizontalAlignment.Center,
+    VerticalAlignment = Enum.VerticalAlignment.Center,
+    Padding = UDim.new(0.012, 0),
+}, actions)
+
+local function actionButton(text, color, callback, name)
+    return makeButton(actions, text, color, UDim2.new(0.19, 0, 0.82, 0), UDim2.new(), callback, {
+        Name = name, TextSize = 13, Radius = 12,
+    })
+end
+
+local autoButton
+local fightButton
+local trainButton = actionButton("ТРЕНИРОВКА", COLORS.green, function()
+    Remotes.Train:FireServer(selectedZone)
+end, "Train")
+autoButton = actionButton("АВТО: ВЫКЛ", COLORS.purple, function()
+    autoTrain = not autoTrain
+    autoButton.Text = autoTrain and "АВТО: ВКЛ" or "АВТО: ВЫКЛ"
+    notice(autoTrain and "Автотренировка включена" or "Автотренировка выключена")
+end, "AutoTrain")
+fightButton = actionButton("НАЧАТЬ БОЙ", COLORS.red, function()
+    if state and state.BattleActive then
+        Remotes.Attack:FireServer()
+    else
+        Remotes.Fight:FireServer()
+    end
+end, "Fight")
+local abilityButton = actionButton("СПОСОБНОСТЬ", COLORS.blue, function()
+    Remotes.UseAbility:FireServer()
+end, "Ability")
+local rebirthButton = actionButton("ПЕРЕРОЖДЕНИЕ", COLORS.panelLight, function()
+    Remotes.Rebirth:FireServer()
+end, "Rebirth")
+
+-- Modal panel factory.
+local panels = {}
+local panelContents = {}
+local function createPanel(name, title)
+    local panel = create("Frame", {
+        Name = name,
+        Size = UDim2.fromScale(0.49, 0.61),
+        Position = UDim2.fromScale(0.255, 0.18),
+        BackgroundColor3 = COLORS.background,
+        BorderSizePixel = 0,
+        Visible = false,
+        ZIndex = 20,
+        ClipsDescendants = true,
+    }, root)
+    addCorner(panel, 18)
+    addStroke(panel, COLORS.gold, 2, 0.08)
+    local panelScale = create("UIScale", { Scale = 0.92 }, panel)
+    local header = create("Frame", {
+        Size = UDim2.new(1, 0, 0, 54),
+        BackgroundColor3 = COLORS.panelSoft,
+        BorderSizePixel = 0,
+        ZIndex = 21,
+    }, panel)
+    addCorner(header, 16)
+    makeLabel(header, title, 19, UDim2.fromScale(0.04, 0.04), COLORS.gold, Enum.Font.GothamBlack)
+    makeButton(header, "✕", COLORS.red, UDim2.fromOffset(40, 38), UDim2.new(1, -48, 0, 8), function()
+        panel.Visible = false
+        if activePanel == name then activePanel = nil end
+    end, { TextSize = 18, ZIndex = 22, Radius = 10 })
+
+    local body = create("ScrollingFrame", {
+        Name = "Content",
+        Size = UDim2.new(1, -22, 1, -68),
+        Position = UDim2.fromOffset(11, 61),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 5,
+        ScrollBarImageColor3 = COLORS.gold,
+        CanvasSize = UDim2.new(),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        ZIndex = 21,
+    }, panel)
+    create("UIListLayout", {
+        Padding = UDim.new(0, 8),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+    }, body)
+
+    panels[name] = panel
+    panelContents[name] = body
+    panel:SetAttribute("PanelScale", 1)
+    panelScale.Scale = 0.94
+    return panel, body
+end
+
+local mentorsPanel, mentorsBody = createPanel("Mentors", "НАСТАВНИКИ АКАДЕМИИ")
+local worldsPanel, worldsBody = createPanel("Worlds", "МИРЫ И ТРЕНИРОВОЧНЫЕ ЗОНЫ")
+local inventoryPanel, inventoryBody = createPanel("Inventory", "ИНВЕНТАРЬ И ТРОФЕИ")
+local questsPanel, questsBody = createPanel("Quests", "ИСПЫТАНИЯ УЧЕНИКА")
 
 local function clearRows(body)
- for _,c in body:GetChildren() do if c:IsA("Frame") then c:Destroy() end end
+    for _, child in ipairs(body:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
 end
-local function row(body,text,buttonText,color,fn)
- local r=make("Frame",{Size=UDim2.new(1,-8,0,62),BackgroundColor3=C.panel},body); corner(r,10)
- label(r,text,14,UDim2.fromScale(.04,.06),Enum.Font.GothamBold,C.cream).Size=UDim2.fromScale(.62,.88)
- button(r,buttonText,color,UDim2.fromScale(.29,.72),UDim2.fromScale(.68,.14),fn)
- return r
-end
-local function rebuildHeroes()
- clearRows(heroBody)
- if not state then return end
- for _,hero in Config.Heroes do
-  local owned=state.Owned[hero.Id]
-  local equipped=state.Equipped==hero.Id
-  local txt=hero.Name.."  •  "..hero.Rarity.."\nСила ×"..hero.PowerMult.."  |  "..hero.Ability.Name
-  row(heroBody,txt,equipped and "НАДЕТО" or (owned and "НАДЕТЬ" or ("КУПИТЬ "..fmt(hero.Cost))),equipped and C.green or C.purple,function()
-   if equipped then return end
-   if owned then Remotes.EquipHero:FireServer(hero.Id) else Remotes.BuyHero:FireServer(hero.Id) end
-  end)
- end
-end
-for i,z in Config.Zones do
- row(worldBody,z.Name.."\nТребуется сила: "..fmt(z.Requirement),i==1 and "ВЫБРАНО" or "ВЫБРАТЬ",C.blue,function()
-  selectedZone=i
-  openPanel("world")
- end)
-end
-row(shopBody,"Зелье северного сияния\nВременный бонус к силе","СКОРО",C.purple,function() end)
-row(shopBody,"Сундук древних рун\nНаграды за победы","СКОРО",C.purple,function() end)
-row(questBody,"Испытание ученика\nПотренируйся и усили силу","ПОНЯТНО",C.green,function() questPanel.Visible=false end)
-row(questBody,"Защитник двора\nПобеди на следующем этапе","ПОНЯТНО",C.green,function() questPanel.Visible=false end)
 
-sideButton("✧ ЛАВКА",C.panel2,1,function() openPanel("shop") end)
-sideButton("❄ МИРЫ",C.blue,2,function() openPanel("world") end)
-sideButton("✦ НАСТАВНИКИ",C.purple,3,function() rebuildHeroes(); openPanel("mentors") end)
-sideButton("♜ ИСПЫТАНИЯ",C.green,4,function() openPanel("quests") end)
-sideButton("🎁 НАГРАДЫ",C.red,5,function() openPanel("quests") end)
+local function makeListRow(body, title, detail, accent, buttonText, callback)
+    local row = create("Frame", {
+        Size = UDim2.new(1, -6, 0, 76),
+        BackgroundColor3 = COLORS.panel,
+        BorderSizePixel = 0,
+        ZIndex = 22,
+    }, body)
+    addCorner(row, 11)
+    addStroke(row, accent or COLORS.purple, 1.1, 0.32)
 
-local trainButton=action("ТРЕНИРОВКА",C.green,function() Remotes.Train:FireServer(selectedZone) end)
-local autoButton
-autoButton=action("АВТО: ВЫКЛ",C.purple,function()
- autoTrain=not autoTrain
- autoButton.Text=autoTrain and "АВТО: ВКЛ" or "АВТО: ВЫКЛ"
+    local marker = create("Frame", {
+        Size = UDim2.new(0, 4, 1, -14),
+        Position = UDim2.fromOffset(7, 7),
+        BackgroundColor3 = accent or COLORS.gold,
+        BorderSizePixel = 0,
+        ZIndex = 23,
+    }, row)
+    addCorner(marker, 3)
+
+    makeLabel(row, title, 14, UDim2.fromOffset(20, 8), COLORS.cream, Enum.Font.GothamBold).Size = UDim2.new(0.61, 0, 0, 25)
+    local detailLabel = makeLabel(row, detail, 11, UDim2.fromOffset(20, 36), COLORS.muted, Enum.Font.GothamMedium)
+    detailLabel.Size = UDim2.new(0.61, 0, 0, 28)
+
+    if buttonText and callback then
+        makeButton(row, buttonText, accent or COLORS.purple, UDim2.new(0.29, 0, 0, 42), UDim2.new(0.68, 0, 0.5, -21), callback, {
+            TextSize = 12, ZIndex = 24, Radius = 9,
+        })
+    end
+    return row
+end
+
+local function openPanel(name)
+    for key, panel in pairs(panels) do
+        local shouldOpen = key == name and activePanel ~= name
+        panel.Visible = shouldOpen
+        if shouldOpen then
+            activePanel = name
+            local scale = panel:FindFirstChildOfClass("UIScale")
+            if scale then
+                scale.Scale = 0.94
+                animate(scale, 0.22, { Scale = 1 }, Enum.EasingStyle.Back)
+            end
+            panel.BackgroundTransparency = 0.12
+            animate(panel, 0.16, { BackgroundTransparency = 0 })
+        end
+    end
+    if activePanel == name then activePanel = nil end
+    if activePanel and panels[activePanel] then
+        panels[activePanel].Visible = true
+    end
+end
+
+-- Navigation buttons.
+local navButtons = {}
+local function addNav(text, color, order, callback)
+    local b = makeButton(navigation, text, color, UDim2.new(1, -18, 0, 43), UDim2.new(0, 9, 0, 38 + (order - 1) * 49), callback, {
+        TextSize = 12, Radius = 10,
+    })
+    table.insert(navButtons, b)
+    return b
+end
+
+addNav("✦  НАСТАВНИКИ", COLORS.purple, 1, function()
+    if state then
+        clearRows(mentorsBody)
+        for _, hero in ipairs(Config.Heroes) do
+            local owned = state.Owned and state.Owned[hero.Id] == true
+            local equipped = state.Equipped == hero.Id
+            local color = Config.RarityColors[hero.Rarity] or COLORS.purple
+            local actionText = equipped and "ЭКИПИРОВАН" or (owned and "ВЫБРАТЬ" or ("НАЙМ  ·  " .. formatNumber(hero.Cost)))
+            local detail = hero.Rarity .. "   ·   Молния ×" .. tostring(hero.PowerMult) .. "   ·   Победы ×" .. tostring(hero.WinMult)
+            makeListRow(mentorsBody, hero.Name, detail, color, actionText, function()
+                if equipped then return end
+                if owned then
+                    Remotes.EquipHero:FireServer(hero.Id)
+                else
+                    Remotes.BuyHero:FireServer(hero.Id)
+                end
+            end)
+        end
+    end
+    openPanel("Mentors")
 end)
-local fightButton=action("ДУЭЛЬ",C.red,function() Remotes.Fight:FireServer() end)
-local rebirthButton=action("ВОЗРОЖДЕНИЕ",C.panel2,function() Remotes.Rebirth:FireServer() end)
-local abilityButton=action("ЧАРА",C.blue,function() Remotes.UseAbility:FireServer() end)
 
-local notice=label(root,"",18,UDim2.fromScale(.28,.16),Enum.Font.GothamBold,C.gold)
-notice.Size=UDim2.fromScale(.44,.05)
-notice.TextXAlignment=Enum.TextXAlignment.Center
-notice.Visible=false
-local noticeToken=0
-Remotes.Notice.OnClientEvent:Connect(function(msg)
- noticeToken+=1
- local token=noticeToken
- notice.Text=msg; notice.Visible=true
- task.delay(2.8,function() if token==noticeToken then notice.Visible=false end end)
+addNav("❄  МИРЫ", COLORS.blue, 2, function()
+    clearRows(worldsBody)
+    for index, zone in ipairs(Config.Zones) do
+        local unlocked = state and state.Power >= zone.Requirement
+        makeListRow(worldsBody, zone.Name, "Требуется молния: " .. formatNumber(zone.Requirement) .. "  ·  Множитель тренировки ×" .. tostring(zone.Multiplier),
+            unlocked and COLORS.cyan or COLORS.panelLight,
+            selectedZone == index and "ВЫБРАНО" or (unlocked and "ВЫБРАТЬ" or "ЗАКРЫТО"),
+            function()
+                if not unlocked then
+                    notice("Для этой зоны пока недостаточно молнии.")
+                    return
+                end
+                selectedZone = index
+                notice("Выбрана зона: " .. zone.Name)
+                openPanel("Worlds")
+            end)
+    end
+    openPanel("Worlds")
 end)
 
+addNav("✧  ИНВЕНТАРЬ", COLORS.green, 3, function()
+    local function rebuildInventory()
+        clearRows(inventoryBody)
+        local found = 0
+        local entries = {}
+        for itemId, amount in pairs((state and state.Inventory) or {}) do
+            local item = Config.Items[itemId]
+            if item and tonumber(amount) and amount > 0 then
+                table.insert(entries, { Id = itemId, Item = item, Amount = amount })
+            end
+        end
+        table.sort(entries, function(a, b)
+            return a.Item.Value > b.Item.Value
+        end)
+        for _, entry in ipairs(entries) do
+            found += 1
+            makeListRow(inventoryBody, entry.Item.Name .. "  ×" .. tostring(entry.Amount),
+                entry.Item.Rarity .. "  ·  " .. entry.Item.Description .. "  ·  Цена: " .. formatNumber(entry.Item.Value),
+                Config.RarityColors[entry.Item.Rarity] or COLORS.cyan,
+                "ПРОДАТЬ 1",
+                function()
+                    Remotes.SellItem:FireServer(entry.Id, 1)
+                end)
+        end
+        if found == 0 then
+            local empty = create("Frame", { Size = UDim2.new(1, -8, 0, 110), BackgroundColor3 = COLORS.panel, BorderSizePixel = 0 }, inventoryBody)
+            addCorner(empty, 12)
+            makeLabel(empty, "Пока нет трофеев", 18, UDim2.fromScale(0.08, 0.2), COLORS.gold, Enum.Font.GothamBold)
+            local help = makeLabel(empty, "Победи первого монстра, чтобы получить свой первый предмет.", 12, UDim2.fromScale(0.08, 0.5), COLORS.muted, Enum.Font.GothamMedium)
+            help.Size = UDim2.fromScale(0.84, 0.34)
+        end
+    end
+    rebuildInventory()
+    openPanel("Inventory")
+end)
+
+addNav("♜  ИСПЫТАНИЯ", COLORS.red, 4, function()
+    clearRows(questsBody)
+    local kills = state and state.TotalKills or 0
+    local stage = state and state.Stage or 1
+    makeListRow(questsBody, "Первое испытание", "Победи первого монстра. Прогресс: " .. math.min(kills, 1) .. " / 1", COLORS.cyan,
+        kills >= 1 and "ВЫПОЛНЕНО" or "В ПРОЦЕССЕ", function() end)
+    makeListRow(questsBody, "Путь ученика", "Достигни этапа 5. Текущий этап: " .. tostring(stage), COLORS.purple,
+        stage >= 5 and "ВЫПОЛНЕНО" or "В ПРОЦЕССЕ", function() end)
+    makeListRow(questsBody, "Коллекционер трофеев", "Получи 10 предметов. Побед: " .. tostring(kills), COLORS.gold,
+        kills >= 10 and "ВЫПОЛНЕНО" or "В ПРОЦЕССЕ", function() end)
+    openPanel("Quests")
+end)
+
+-- Toast and animated reward card.
+local toast = makeCard(root, "Toast", UDim2.fromScale(0.42, 0.065), UDim2.fromScale(0.29, 0.16), COLORS.gold)
+toast.Visible = false
+local toastText = makeLabel(toast, "", 14, UDim2.fromScale(0.05, 0.05), COLORS.cream, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
+toastText.Size = UDim2.fromScale(0.9, 0.9)
+
+local function notice(text)
+    toastToken += 1
+    local token = toastToken
+    toastText.Text = tostring(text)
+    toast.Visible = true
+    toast.BackgroundTransparency = 0.35
+    local scale = toast:FindFirstChildOfClass("UIScale") or create("UIScale", { Scale = 0.94 }, toast)
+    scale.Scale = 0.94
+    animate(scale, 0.18, { Scale = 1 }, Enum.EasingStyle.Back)
+    task.delay(2.6, function()
+        if token == toastToken and toast.Parent then
+            animate(toast, 0.18, { BackgroundTransparency = 1 })
+            task.delay(0.2, function()
+                if token == toastToken then toast.Visible = false; toast.BackgroundTransparency = 0.08 end
+            end)
+        end
+    end)
+end
+
+local reward = makeCard(root, "RewardPopup", UDim2.fromScale(0.34, 0.28), UDim2.fromScale(0.33, 0.34), COLORS.gold)
+reward.Visible = false
+local rewardTitle = makeLabel(reward, "ПОБЕДА!", 24, UDim2.fromScale(0.08, 0.07), COLORS.gold, Enum.Font.GothamBlack, Enum.TextXAlignment.Center)
+rewardTitle.Size = UDim2.fromScale(0.84, 0.18)
+local rewardItem = makeLabel(reward, "Осколок инея", 20, UDim2.fromScale(0.08, 0.31), COLORS.cream, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
+rewardItem.Size = UDim2.fromScale(0.84, 0.2)
+local rewardDetail = makeLabel(reward, "+8 побед  ·  Обычный", 13, UDim2.fromScale(0.08, 0.54), COLORS.muted, Enum.Font.GothamMedium, Enum.TextXAlignment.Center)
+rewardDetail.Size = UDim2.fromScale(0.84, 0.14)
+makeButton(reward, "ПРОДОЛЖИТЬ", COLORS.green, UDim2.fromScale(0.58, 0.2), UDim2.fromScale(0.21, 0.74), function()
+    reward.Visible = false
+end, { TextSize = 13, ZIndex = 30 })
+
+local function showReward(data)
+    rewardToken += 1
+    local token = rewardToken
+    rewardItem.Text = tostring(data.ItemName or "Предмет")
+    rewardDetail.Text = ("+%s побед  ·  %s  ·  ×%s"):format(formatNumber(data.Wins or 0), tostring(data.Rarity or ""), tostring(data.Quantity or 1))
+    local accent = data.ItemColor or COLORS.gold
+    local outline = reward:FindFirstChildOfClass("UIStroke")
+    if outline then outline.Color = accent end
+    reward.Visible = true
+    reward.BackgroundTransparency = 0.2
+    local scale = reward:FindFirstChildOfClass("UIScale") or create("UIScale", { Scale = 0.8 }, reward)
+    scale.Scale = 0.8
+    animate(scale, 0.32, { Scale = 1 }, Enum.EasingStyle.Back)
+    task.delay(5, function()
+        if token == rewardToken and reward.Parent then
+            animate(scale, 0.18, { Scale = 0.94 })
+            task.delay(0.2, function()
+                if token == rewardToken then reward.Visible = false; scale.Scale = 1 end
+            end)
+        end
+    end)
+end
+
+-- Floating feedback text and screen pulse.
+local function floatingText(text, color)
+    local item = makeLabel(root, text, 22, UDim2.fromScale(0.42, 0.45), color or COLORS.gold, Enum.Font.GothamBlack, Enum.TextXAlignment.Center)
+    item.Size = UDim2.fromScale(0.16, 0.06)
+    item.ZIndex = 40
+    animate(item, 0.62, {
+        Position = UDim2.fromScale(0.42, 0.34),
+        TextTransparency = 1,
+        TextStrokeTransparency = 1,
+    }, Enum.EasingStyle.Quad)
+    task.delay(0.7, function()
+        if item.Parent then item:Destroy() end
+    end)
+end
+
+local pulse = create("Frame", {
+    Name = "CombatPulse",
+    Size = UDim2.fromScale(1, 1),
+    BackgroundColor3 = COLORS.red,
+    BackgroundTransparency = 1,
+    BorderSizePixel = 0,
+    ZIndex = 45,
+}, root)
+
+local function flash(color, alpha)
+    pulse.BackgroundColor3 = color
+    pulse.BackgroundTransparency = 1
+    animate(pulse, 0.12, { BackgroundTransparency = 1 - (alpha or 0.24) })
+    task.delay(0.12, function()
+        if pulse.Parent then animate(pulse, 0.32, { BackgroundTransparency = 1 }) end
+    end)
+end
+
+-- State refresh updates all persistent labels and progress smoothly.
 local function refresh()
- if not state then return end
- statsLabel.Text=("⚡ Сила: %s\n✧ Победы: %s\n♜ Возрождения: %d"):format(fmt(state.Power),fmt(state.Wins),state.Rebirths)
- powerLabel.Text="✦ СИЛА: "..fmt(state.Power)
- local req=state.StageRequirement
- local pct=math.clamp(state.Power/math.max(req,1),0,1)
- levelLabel.Text=("Уровень %d   •   %s / %s  (%d%%)"):format(state.Stage,fmt(state.Power),fmt(req),math.floor(pct*100))
- fill.Size=UDim2.fromScale(pct,1)
- rebirthButton.Text="ВОЗРОЖДЕНИЕ"
- if heroPanel.Visible then rebuildHeroes() end
-end
-Remotes.State.OnClientEvent:Connect(function(s)
- if not state then selectedZone=s.Zone end
- state=s
- refresh()
-end)
-Remotes.RequestState:FireServer()
+    if not state then return end
 
-task.spawn(function()
- while true do
-  if autoTrain then Remotes.Train:FireServer(selectedZone) end
-  task.wait(Config.TrainCooldown+.03)
- end
+    lightningValue.Text = "⚡  Молния: " .. formatNumber(state.Power)
+    winsValue.Text = "✦  Победы: " .. formatNumber(state.Wins)
+    rebirthValue.Text = "↻  Перерождения: " .. tostring(state.Rebirths)
+    powerTitle.Text = "⚡  МОЛНИЯ  " .. formatNumber(state.Power)
+
+    local requirement = math.max(1, state.StageRequirement or 100)
+    local progressRatio = math.clamp((state.Power or 0) / requirement, 0, 1)
+    levelTitle.Text = ("Этап %d  ·  %s / %s  ·  %d%%"):format(
+        state.Stage or 1, formatNumber(state.Power), formatNumber(requirement), math.floor(progressRatio * 100)
+    )
+    animate(progressFill, 0.24, { Size = UDim2.fromScale(progressRatio, 1) })
+
+    stageTitle.Text = ("ЭТАП %d  ·  %s"):format(state.Stage or 1, Config.Zones[selectedZone] and Config.Zones[selectedZone].Name or "АКАДЕМИЯ")
+    local monsterIndex = math.min(state.Stage or 1, #Config.Monsters)
+    local monster = Config.Monsters[monsterIndex]
+    stageHint.Text = ("Следующий противник: %s"):format(state.BattleMonster or (monster and monster.Name or "Страж"))
+
+    mentorName.Text = "НАСТАВНИК: " .. tostring(state.HeroName or "Снежок Хранитель")
+    mentorBonus.Text = ("Молния ×%.2f  ·  Победы ×%.2f"):format(state.HeroPowerMult or 1, 1)
+
+    battleCard.Visible = state.BattleActive == true
+    if state.BattleActive then
+        battleName.Text = "ПРОТИВНИК  ·  " .. tostring(state.BattleMonster or "")
+        battleNumbers.Text = ("%s / %s HP"):format(formatNumber(state.BattleHealth), formatNumber(state.BattleMaxHealth))
+        local ratio = math.clamp((state.BattleHealth or 0) / math.max(1, state.BattleMaxHealth or 1), 0, 1)
+        animate(battleFill, 0.18, { Size = UDim2.fromScale(ratio, 1) })
+        fightButton.Text = "АТАКОВАТЬ"
+        fightButton.BackgroundColor3 = COLORS.red
+    else
+        fightButton.Text = "НАЧАТЬ БОЙ"
+        fightButton.BackgroundColor3 = COLORS.red
+    end
+
+    if activePanel == "Mentors" then
+        -- Rebuild when owned/equipped state changes, so labels never show stale costs.
+        clearRows(mentorsBody)
+        for _, hero in ipairs(Config.Heroes) do
+            local owned = state.Owned and state.Owned[hero.Id] == true
+            local equipped = state.Equipped == hero.Id
+            local detail = hero.Rarity .. "  ·  Молния ×" .. tostring(hero.PowerMult) .. "  ·  " .. hero.Ability.Name
+            makeListRow(mentorsBody, hero.Name, detail, Config.RarityColors[hero.Rarity], equipped and "ЭКИПИРОВАН" or (owned and "ВЫБРАТЬ" or ("НАЙМ " .. formatNumber(hero.Cost))), function()
+                if owned then Remotes.EquipHero:FireServer(hero.Id) else Remotes.BuyHero:FireServer(hero.Id) end
+            end)
+        end
+    elseif activePanel == "Inventory" then
+        clearRows(inventoryBody)
+        local count = 0
+        for itemId, amount in pairs(state.Inventory or {}) do
+            local item = Config.Items[itemId]
+            if item and amount > 0 then
+                count += 1
+                makeListRow(inventoryBody, item.Name .. " ×" .. tostring(amount),
+                    item.Rarity .. "  ·  Цена " .. formatNumber(item.Value), Config.RarityColors[item.Rarity],
+                    "ПРОДАТЬ 1", function() Remotes.SellItem:FireServer(itemId, 1) end)
+            end
+        end
+        if count == 0 then
+            makeListRow(inventoryBody, "Инвентарь пока пуст", "Победи монстра, чтобы получить первый трофей.", COLORS.muted, nil, nil)
+        end
+    end
+end
+
+Remotes.State.OnClientEvent:Connect(function(newState)
+    state = newState
+    if state.Zone then selectedZone = math.clamp(state.Zone, 1, #Config.Zones) end
+    refresh()
 end)
+
+Remotes.Notice.OnClientEvent:Connect(notice)
+
+Remotes.CombatFX.OnClientEvent:Connect(function(data)
+    if type(data) ~= "table" then return end
+    if data.Kind == "Train" then
+        floatingText("+" .. formatNumber(data.Amount) .. " МОЛНИИ", COLORS.gold)
+    elseif data.Kind == "Started" then
+        notice("Начался бой: " .. tostring(data.Monster))
+        flash(COLORS.purple, 0.12)
+    elseif data.Kind == "PlayerHit" then
+        floatingText("-" .. formatNumber(data.Damage), COLORS.gold)
+        flash(COLORS.gold, 0.07)
+    elseif data.Kind == "EnemyHit" then
+        floatingText("-" .. formatNumber(data.Damage) .. " ЗДОРОВЬЯ", COLORS.red)
+        flash(COLORS.red, 0.18)
+    elseif data.Kind == "Victory" then
+        showReward(data)
+        flash(COLORS.gold, 0.2)
+    elseif data.Kind == "Defeat" then
+        notice("Противник оказался сильнее. Попробуй ещё раз.")
+        flash(COLORS.red, 0.24)
+    elseif data.Kind == "Ability" then
+        floatingText(tostring(data.Name), COLORS.cyan)
+        flash(COLORS.purple, 0.12)
+    elseif data.Kind == "Rebirth" then
+        floatingText("ВОЗРОЖДЕНИЕ", COLORS.purple)
+        flash(COLORS.purple, 0.2)
+    end
+end)
+
+-- Auto training uses the server cooldown and never spams requests faster than allowed.
+task.spawn(function()
+    while gui.Parent do
+        if autoTrain then
+            Remotes.Train:FireServer(selectedZone)
+        end
+        task.wait(Config.TrainCooldown + 0.08)
+    end
+end)
+
+Remotes.RequestState:FireServer()
