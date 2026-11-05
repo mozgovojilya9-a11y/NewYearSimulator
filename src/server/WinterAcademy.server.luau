@@ -2,6 +2,7 @@
 -- with intentionally separated mentor plinths, training court and combat arena.
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -195,7 +196,15 @@ local function buildMentor(hero, index, position)
 
     local cape = makePart(display, "Cape", Vector3.new(3.7, 3.8, 0.35), torso.CFrame * CFrame.new(0, -0.05, 1.02), hero.Color:Lerp(Color3.new(0, 0, 0), 0.24), Enum.Material.Fabric)
     local staff = makePart(display, "ArcaneStaff", Vector3.new(0.22, 5.6, 0.22), pivot * CFrame.new(2.7, 2.8, 0.25) * CFrame.Angles(0, 0, math.rad(-7)), Color3.fromRGB(100, 68, 48), Enum.Material.Wood)
-    makePart(display, "StaffCrystal", Vector3.new(0.95, 0.95, 0.95), staff.CFrame * CFrame.new(0, 2.95, 0), accent, Enum.Material.Neon, Enum.PartType.Ball)
+    local staffCrystal = makePart(display, "StaffCrystal", Vector3.new(0.95, 0.95, 0.95), staff.CFrame * CFrame.new(0, 2.95, 0), accent, Enum.Material.Neon, Enum.PartType.Ball)
+    light(staffCrystal, accent, 11, 0.65)
+    local staffSparkles = Instance.new("Sparkles")
+    staffSparkles.SparkleColor = accent
+    staffSparkles.Parent = staffCrystal
+    local staffFloat = TweenService:Create(staffCrystal, TweenInfo.new(1.8 + (index % 3) * 0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        CFrame = staffCrystal.CFrame * CFrame.new(0, 0.28, 0),
+    })
+    staffFloat:Play()
     display.PrimaryPart = torso
 
     local prompt = Instance.new("ProximityPrompt")
@@ -270,6 +279,13 @@ for index, color in ipairs({
     makePart(training, "FocusRune", Vector3.new(6.5, 0.18, 6.5), plinth.CFrame * CFrame.new(0, 0.68, 0), color, Enum.Material.Neon)
     local crystal = makePart(training, "FocusCrystal", Vector3.new(2.4, 4, 2.4), CFrame.new(x, 3.6, -2), color, Enum.Material.Neon, Enum.PartType.Ball)
     light(crystal, color, 18, 1)
+    local sparks = Instance.new("Sparkles")
+    sparks.SparkleColor = color
+    sparks.Parent = crystal
+    local float = TweenService:Create(crystal, TweenInfo.new(1.9 + index * 0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        CFrame = crystal.CFrame * CFrame.new(0, 0.7, 0) * CFrame.Angles(0, math.rad(35), 0),
+    })
+    float:Play()
 end
 
 -- Combat arena and portal at the end of the central avenue.
@@ -296,6 +312,9 @@ for _, x in ipairs({ -58, -39, 39, 58 }) do
         makePart(world, "LanternPost", Vector3.new(0.75, 8, 0.75), CFrame.new(x, 4, z), Color3.fromRGB(38, 36, 61), Enum.Material.Metal)
         local housing = makePart(world, "LanternHousing", Vector3.new(2.1, 2.1, 2.1), CFrame.new(x, 8.4, z), Color3.fromRGB(255, 202, 119), Enum.Material.Neon, Enum.PartType.Ball)
         light(housing, Color3.fromRGB(255, 182, 99), 19, 0.75)
+        local shimmer = Instance.new("Sparkles")
+        shimmer.SparkleColor = Color3.fromRGB(255, 220, 157)
+        shimmer.Parent = housing
     end
 end
 
