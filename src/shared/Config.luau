@@ -101,6 +101,8 @@ Config.Items = {
     frost_core = { Name = "Ядро стража", Rarity = "Редкий", Value = 75, Description = "Сердце ледяного защитника.", Color = Color3.fromRGB(105, 185, 255) },
     shadow_essence = { Name = "Сумрачная эссенция", Rarity = "Эпический", Value = 180, Description = "Редкая эссенция теневого существа.", Color = Color3.fromRGB(210, 115, 255) },
     aurora_fragment = { Name = "Фрагмент авроры", Rarity = "Легендарный", Value = 420, Description = "Осколок северного сияния.", Color = Color3.fromRGB(255, 199, 105) },
+    frost_staff = { Name = "Посох инея", Rarity = "Редкий", Value = 260, Description = "Усиливает молнию и магические атаки.", Color = Color3.fromRGB(110, 190, 255), Type = "Weapon", PowerBonus = 0.22, DamageBonus = 0.25 },
+    warden_robe = { Name = "Мантия хранителя", Rarity = "Эпический", Value = 460, Description = "Защищает ученика от атак монстров.", Color = Color3.fromRGB(184, 113, 255), Type = "Armor", DefenseBonus = 0.2, HealthBonus = 25 },
 }
 
 Config.DropPools = {
@@ -110,6 +112,76 @@ Config.DropPools = {
     { Id = "shadow_essence", Weight = 10, MinStage = 6 },
     { Id = "aurora_fragment", Weight = 4, MinStage = 10 },
 }
+
+Config.Pets = {
+    { Id = "aurora_fox", Name = "Лисёнок Авроры", Rarity = "Редкий", PowerMult = 1.12, WinMult = 1.05, Color = Color3.fromRGB(105, 205, 255), Kind = "Fox" },
+    { Id = "rune_owl", Name = "Сова рун", Rarity = "Эпический", PowerMult = 1.22, WinMult = 1.12, Color = Color3.fromRGB(183, 126, 255), Kind = "Owl" },
+    { Id = "glacial_wolf", Name = "Полярный волчонок", Rarity = "Эпический", PowerMult = 1.3, WinMult = 1.1, Color = Color3.fromRGB(145, 204, 255), Kind = "Wolf" },
+    { Id = "frost_drake", Name = "Дракон инея", Rarity = "Легендарный", PowerMult = 1.55, WinMult = 1.25, Color = Color3.fromRGB(255, 190, 108), Kind = "Drake" },
+    { Id = "star_lynx", Name = "Звёздная рысь", Rarity = "Мифический", PowerMult = 1.9, WinMult = 1.45, Color = Color3.fromRGB(255, 117, 174), Kind = "Lynx" },
+}
+Config.PetById = {}
+for _, pet in ipairs(Config.Pets) do
+    Config.PetById[pet.Id] = pet
+end
+
+Config.PetSlots = 2
+Config.PetEggs = {
+    snow_egg = {
+        Name = "Яйцо снежного двора",
+        Cost = 150,
+        Drops = {
+            { Id = "aurora_fox", Weight = 58 },
+            { Id = "rune_owl", Weight = 25 },
+            { Id = "glacial_wolf", Weight = 14 },
+            { Id = "frost_drake", Weight = 3 },
+        },
+    },
+    aurora_egg = {
+        Name = "Яйцо северного сияния",
+        Cost = 1800,
+        Drops = {
+            { Id = "aurora_fox", Weight = 30 },
+            { Id = "rune_owl", Weight = 28 },
+            { Id = "glacial_wolf", Weight = 24 },
+            { Id = "frost_drake", Weight = 15 },
+            { Id = "star_lynx", Weight = 3 },
+        },
+    },
+}
+
+Config.CraftRecipes = {
+    frost_staff = {
+        Name = "Посох инея",
+        Output = "frost_staff",
+        MinStage = 2,
+        Ingredients = { ice_shard = 5, rune_dust = 2 },
+    },
+    warden_robe = {
+        Name = "Мантия хранителя",
+        Output = "warden_robe",
+        MinStage = 4,
+        Ingredients = { rune_dust = 4, frost_core = 2 },
+    },
+}
+
+-- Set real IDs in Roblox Creator Dashboard before enabling purchases.
+-- An ID of 0 is intentionally treated as unavailable by the UI and server.
+Config.GamePasses = {
+    DoubleLightning = { Id = 0, Name = "Двойная молния", Description = "Удваивает награду за тренировку." },
+    ExtraPetSlot = { Id = 0, Name = "Дополнительный слот питомца", Description = "Позволяет экипировать ещё одного питомца." },
+}
+
+Config.DeveloperProducts = {
+    WinsStarter = { Id = 0, Name = "Набор побед", Description = "5000 побед", Reward = { Type = "Wins", Amount = 5000 } },
+    LightningBoost = { Id = 0, Name = "Усиление молнии", Description = "Временное усиление молнии", Reward = { Type = "LightningBoost", Multiplier = 2, Duration = 900 } },
+}
+Config.DeveloperProductById = {}
+for key, product in pairs(Config.DeveloperProducts) do
+    if product.Id and product.Id > 0 then
+        Config.DeveloperProductById[product.Id] = { Key = key, Product = product }
+    end
+end
 
 Config.RarityColors = {
     ["Обычный"] = Color3.fromRGB(180, 190, 208),
