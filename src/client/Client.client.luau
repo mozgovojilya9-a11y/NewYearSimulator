@@ -653,11 +653,12 @@ makeButton(reward, "ПРОДОЛЖИТЬ", COLORS.green, UDim2.fromScale(0.58, 0
     reward.Visible = false
 end, { TextSize = 13, ZIndex = 30 })
 
-local function showReward(data)
+local function showReward(data, titleText)
     rewardToken += 1
     local token = rewardToken
+    rewardTitle.Text = titleText or "НАГРАДА"
     rewardItem.Text = tostring(data.ItemName or "Предмет")
-    rewardDetail.Text = ("+%s побед  ·  %s  ·  ×%s"):format(formatNumber(data.Wins or 0), tostring(data.Rarity or ""), tostring(data.Quantity or 1))
+    rewardDetail.Text = data.Detail or ("+%s побед  ·  %s  ·  ×%s"):format(formatNumber(data.Wins or 0), tostring(data.Rarity or ""), tostring(data.Quantity or 1))
     local accent = data.ItemColor or COLORS.gold
     local outline = reward:FindFirstChildOfClass("UIStroke")
     if outline then outline.Color = accent end
@@ -826,6 +827,110 @@ end
 workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindViewport)
 bindViewport()
 
+-- Local-only companion models. They are cosmetic; all bonuses are calculated by the server.
+local localPetFolder = Instance.new("Folder")
+localPetFolder.Name = "LocalPetCompanions"
+localPetFolder.Parent = workspace
+local petVisuals = {}
+local petVisualSignature = ""
+
+local function makePetPart(parent, name, size, offset, color, shape, material)
+    local part = Instance.new("Part")
+    part.Name = name
+    part.Size = size
+    part.CFrame = CFrame.new(offset)
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanTouch = false
+    part.CanQuery = false
+    part.Massless = true
+    part.Color = color
+    part.Material = material or Enum.Material.SmoothPlastic
+    if shape then part.Shape = shape end
+    part.Parent = parent
+    return part
+end
+
+local function createPetVisual(pet)
+    local model = Instance.new("Model")
+    model.Name = "Companion_" .. pet.Id
+    model.Parent = localPetFolder
+    local body = makePetPart(model, "Body", Vector3.new(1.65, 1.35, 1.8), Vector3.new(0, 0, 0), pet.Color, Enum.PartType.Ball)
+    local head = makePetPart(model, "Head", Vector3.new(1.15, 1.1, 1.05), Vector3.new(0, 0.65, -0.55), pet.Color:Lerp(Color3.new(1, 1, 1), 0.12), Enum.PartType.Ball)
+    makePetPart(model, "EyeLeft", Vector3.new(0.14, 0.18, 0.09), Vector3.new(-0.23, 0.68, -1.03), Color3.fromRGB(24, 24, 38), Enum.PartType.Ball, Enum.Material.Neon)
+    makePetPart(model, "EyeRight", Vector3.new(0.14, 0.18, 0.09), Vector3.new(0.23, 0.68, -1.03), Color3.fromRGB(24, 24, 38), Enum.PartType.Ball, Enum.Material.Neon)
+    makePetPart(model, "Tail", Vector3.new(0.75, 0.75, 0.75), Vector3.new(0, 0.1, 0.95), pet.Color, Enum.PartType.Ball)
+    if pet.Kind == "Fox" or pet.Kind == "Wolf" or pet.Kind == "Lynx" then
+        makePetPart(model, "EarLeft", Vector3.new(0.35, 0.75, 0.35), Vector3.new(-0.35, 1.25, -0.58), pet.Color, Enum.PartType.Ball)
+        makePetPart(model, "EarRight", Vector3.new(0.35, 0.75, 0.35), Vector3.new(0.35, 1.25, -0.58), pet.Color, Enum.PartType.Ball)
+    elseif pet.Kind == "Owl" or pet.Kind == "Drake" then
+        local leftWing = Instance.new("WedgePart")
+        leftWing.Name = "LeftWing"
+        leftWing.Size = Vector3.new(0.45, 1.05, 1.25)
+        leftWing.CFrame = CFrame.new(-1.0, 0.1, 0.1)
+        leftWing.Anchored = true
+        leftWing.CanCollide = false
+        leftWing.Color = pet.Color:Lerp(Color3.new(0, 0, 0), 0.15)
+        leftWing.Parent = model
+        local rightWing = leftWing:Clone()
+        rightWing.Name = "RightWing"
+        rightWing.CFrame = CFrame.new(1.0, 0.1, 0.1)
+        rightWing.Parent = model
+    end
+    local glow = makePetPart(model, "Glow", Vector3.new(2.2, 2.2, 2.2), Vector3.new(0, 0.15, 0), pet.Color, Enum.PartType.Ball, Enum.Material.Neon)
+    glow.Transparency = 0.82
+    model.PrimaryPart = body
+    local title = Instance.new("BillboardGui")
+    title.Name = "PetName"
+    title.Adornee = head
+    title.Size = UDim2.fromOffset(120, 24)
+    title.StudsOffset = Vector3.new(0, 1.25, 0)
+    title.MaxDistance = 45
+    title.Parent = model
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.fromScale(1, 1)
+    text.BackgroundTransparency = 1
+    text.Font = Enum.Font.GothamBold
+    text.TextSize = 11
+    text.Text = pet.Name
+    text.TextColor3 = COLORS.cream
+    text.TextStrokeTransparency = 0.35
+    text.Parent = title
+    return model
+end
+
+local function updatePetVisuals()
+    local equipped = state and state.EquippedPets or {}
+    local signature = table.concat(equipped, "|")
+    if signature == petVisualSignature then return end
+    petVisualSignature = signature
+    for _, child in ipairs(localPetFolder:GetChildren()) do child:Destroy() end
+    table.clear(petVisuals)
+    for _, petId in ipairs(equipped) do
+        local pet = Config.PetById[petId]
+        if pet then
+            table.insert(petVisuals, createPetVisual(pet))
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if #petVisuals == 0 then return end
+    local character = player.Character
+    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    local now = os.clock()
+    local count = #petVisuals
+    for index, petModel in ipairs(petVisuals) do
+        if petModel.Parent then
+            local horizontal = (index - (count + 1) / 2) * 2.15
+            local bob = math.sin(now * 2.5 + index * 1.4) * 0.2
+            local target = rootPart.CFrame * CFrame.new(horizontal, 1.7 + bob, 3.4 + (index - 1) * 0.35)
+            petModel:PivotTo(petModel:GetPivot():Lerp(target, 0.18))
+        end
+    end
+end)
+
 -- State refresh updates all persistent labels and progress smoothly.
 local function refresh()
     if not state then return end
@@ -896,6 +1001,7 @@ Remotes.State.OnClientEvent:Connect(function(newState)
     state = newState
     if state.Zone then selectedZone = math.clamp(state.Zone, 1, #Config.Zones) end
     refresh()
+    updatePetVisuals()
 end)
 
 Remotes.Notice.OnClientEvent:Connect(notice)
@@ -987,8 +1093,25 @@ Remotes.CombatFX.OnClientEvent:Connect(function(data)
         floatingText("-" .. formatNumber(data.Damage) .. " ЗДОРОВЬЯ", COLORS.red)
         flash(COLORS.red, 0.18)
     elseif data.Kind == "Victory" then
-        showReward(data)
+        showReward(data, "ПОБЕДА!")
         flash(COLORS.gold, 0.2)
+    elseif data.Kind == "EggReveal" then
+        showReward({
+            ItemName = data.PetName,
+            Rarity = data.Rarity,
+            Quantity = 1,
+            ItemColor = data.PetColor,
+            Detail = "Молния ×" .. tostring(data.PowerMult) .. "  ·  Новый питомец в коллекции",
+        }, "НОВЫЙ ПИТОМЕЦ")
+        flash(COLORS.purple, 0.24)
+    elseif data.Kind == "Crafted" then
+        showReward({
+            ItemName = data.ItemName,
+            Rarity = data.Rarity,
+            Quantity = 1,
+            ItemColor = data.ItemColor,
+            Detail = "Предмет создан и добавлен в инвентарь",
+        }, "СОЗДАНО")
     elseif data.Kind == "Defeat" then
         notice("Противник оказался сильнее. Попробуй ещё раз.")
         flash(COLORS.red, 0.24)
