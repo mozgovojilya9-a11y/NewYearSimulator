@@ -189,7 +189,7 @@ local function buildMentor(hero, index, position)
         local arm = makePart(display, "RobeSleeve", Vector3.new(0.95, 3.1, 1.05), torso.CFrame * CFrame.new(side * 2.03, 0.05, 0), hero.Color, Enum.Material.Fabric)
         arm.CFrame *= CFrame.Angles(0, 0, side * math.rad(7))
         makePart(display, "Glove", Vector3.new(0.82, 0.82, 0.82), arm.CFrame * CFrame.new(0, -1.55, 0), skin, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
-        local boot = makePart(display, "Boot", Vector3.new(1.05, 1.5, 1.35), pivot * CFrame.new(side * 0.82, 0.2, -0.12), Color3.fromRGB(31, 31, 52), Enum.Material.Leather)
+        local boot = makePart(display, "Boot", Vector3.new(1.05, 1.5, 1.35), pivot * CFrame.new(side * 0.82, 0.2, -0.12), Color3.fromRGB(31, 31, 52), Enum.Material.SmoothPlastic)
         boot.CanCollide = false
     end
 
