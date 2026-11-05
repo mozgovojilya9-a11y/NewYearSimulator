@@ -184,6 +184,13 @@ for key, product in pairs(Config.DeveloperProducts) do
     end
 end
 
+Config.Quests = {
+    { Id = "first_victory", Name = "Первое испытание", Description = "Победи одного монстра.", GoalType = "Kills", Goal = 1, Reward = { Wins = 60, Items = { rune_dust = 1 } } },
+    { Id = "apprentice_path", Name = "Путь ученика", Description = "Дойди до пятого этапа.", GoalType = "Stage", Goal = 5, Reward = { Wins = 250, Items = { frost_core = 1 } } },
+    { Id = "monster_hunter", Name = "Охотник на чудовищ", Description = "Победи десять монстров.", GoalType = "Kills", Goal = 10, Reward = { Wins = 600, Items = { shadow_essence = 1 } } },
+    { Id = "academy_veteran", Name = "Ветеран академии", Description = "Дойди до десятого этапа.", GoalType = "Stage", Goal = 10, Reward = { Wins = 1500, Items = { aurora_fragment = 1 } } },
+}
+
 Config.RarityColors = {
     ["Обычный"] = Color3.fromRGB(180, 190, 208),
     ["Необычный"] = Color3.fromRGB(104, 211, 155),
