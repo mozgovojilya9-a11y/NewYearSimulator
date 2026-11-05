@@ -60,6 +60,18 @@ local function grantProduct(data, product)
             Expires = os.time() + math.max(1, math.floor(tonumber(reward.Duration) or 60)),
         })
         return true
+    elseif reward.Type == "Pet" then
+        local petId = reward.PetId
+        if type(petId) ~= "string" or not Config.PetById[petId] then
+            return false
+        end
+        data.OwnedPets = data.OwnedPets or {}
+        data.EquippedPets = data.EquippedPets or {}
+        data.OwnedPets[petId] = (tonumber(data.OwnedPets[petId]) or 0) + 1
+        if not table.find(data.EquippedPets, petId) and #data.EquippedPets < Config.PetSlots then
+            table.insert(data.EquippedPets, petId)
+        end
+        return true
     end
     return false
 end
