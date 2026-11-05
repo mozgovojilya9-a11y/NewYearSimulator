@@ -102,36 +102,18 @@ function PurchaseService.Start(dataService)
             return Enum.ProductPurchaseDecision.NotProcessedYet
         end
 
-        local data = dataService.Get(player)
-        if not data then
-            return Enum.ProductPurchaseDecision.NotProcessedYet
-        end
-
-        data.ProcessedReceipts = data.ProcessedReceipts or {}
-        local receiptKey = tostring(receiptInfo.PurchaseId)
-        if data.ProcessedReceipts[receiptKey] then
-            -- A previous attempt may have granted in memory but failed to persist.
-            -- Retry the save before acknowledging the receipt to Roblox.
-            local saved = dataService.Save(player)
-            return saved and Enum.ProductPurchaseDecision.PurchaseGranted
-                or Enum.ProductPurchaseDecision.NotProcessedYet
-        end
-
         local entry = Config.DeveloperProductById[receiptInfo.ProductId]
         if not entry then
             warn(("[PurchaseService] Product ID %s is not configured. Receipt will remain pending."):format(tostring(receiptInfo.ProductId)))
             return Enum.ProductPurchaseDecision.NotProcessedYet
         end
 
-        if not grantProduct(data, entry.Product) then
-            warn("[PurchaseService] Unsupported reward type for product " .. tostring(entry.Key))
-            return Enum.ProductPurchaseDecision.NotProcessedYet
-        end
+        local receiptKey = tostring(receiptInfo.PurchaseId)
+        local granted = dataService.ApplyReceipt(player, receiptKey, function(data)
+            return grantProduct(data, entry.Product)
+        end)
 
-        data.ProcessedReceipts[receiptKey] = true
-        local saved = dataService.Save(player)
-        if not saved then
-            -- Roblox will retry ProcessReceipt; the receipt marker makes the grant idempotent.
+        if not granted then
             return Enum.ProductPurchaseDecision.NotProcessedYet
         end
 
