@@ -7,8 +7,10 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local DataService = require(ServerScriptService.DataService)
+local PurchaseService = require(ServerScriptService.PurchaseService)
 
 DataService.Start()
+PurchaseService.Start(DataService)
 
 local remoteFolder = ReplicatedStorage:FindFirstChild("Remotes")
 if not remoteFolder then
@@ -35,6 +37,7 @@ local R = {}
 for _, name in ipairs({
     "RequestState", "Train", "Fight", "Attack", "Rebirth",
     "BuyHero", "EquipHero", "UseAbility", "SellItem",
+    "OpenEgg", "TogglePet", "CraftItem", "EquipItem",
     "State", "Notice", "CombatFX",
 }) do
     R[name] = getRemote(name)
@@ -80,6 +83,57 @@ local function buffMultiplier(player, key)
     return 1
 end
 
+local function getPetMultipliers(data)
+    local powerMultiplier = 1
+    local winMultiplier = 1
+    for _, petId in ipairs(data.EquippedPets or {}) do
+        local pet = Config.PetById[petId]
+        if pet then
+            powerMultiplier *= pet.PowerMult
+            winMultiplier *= pet.WinMult
+        end
+    end
+    return powerMultiplier, winMultiplier
+end
+
+local function getEquipment(data)
+    local weapon = data.Equipment and Config.Items[data.Equipment.Weapon]
+    local armor = data.Equipment and Config.Items[data.Equipment.Armor]
+    return weapon, armor
+end
+
+local function petSlotLimit(data)
+    return Config.PetSlots + (data.GamePasses and data.GamePasses.ExtraPetSlot == true and 1 or 0)
+end
+
+local function premiumPowerMultiplier(data)
+    local now = os.time()
+    local multiplier = 1
+    local remaining = {}
+    for _, boost in ipairs(data.PremiumBoosts or {}) do
+        if type(boost) == "table" and (tonumber(boost.Expires) or 0) > now then
+            multiplier *= math.clamp(tonumber(boost.Multiplier) or 1, 1, 10)
+            table.insert(remaining, boost)
+        end
+    end
+    data.PremiumBoosts = remaining
+    return multiplier
+end
+
+local function rollWeighted(entries)
+    local total = 0
+    for _, entry in ipairs(entries) do
+        total += math.max(0, tonumber(entry.Weight) or 0)
+    end
+    if total <= 0 then return nil end
+    local pick = math.random() * total
+    for _, entry in ipairs(entries) do
+        pick -= math.max(0, tonumber(entry.Weight) or 0)
+        if pick <= 0 then return entry.Id end
+    end
+    return entries[#entries] and entries[#entries].Id or nil
+end
+
 local function getHumanoid(player)
     local character = player.Character
     return character and character:FindFirstChildOfClass("Humanoid")
@@ -121,6 +175,13 @@ local function pushState(player)
         Owned = cloneDictionary(data.OwnedHeroes),
         Equipped = data.EquippedHero,
         Inventory = cloneDictionary(data.Inventory),
+        OwnedPets = cloneDictionary(data.OwnedPets),
+        EquippedPets = table.clone(data.EquippedPets or {}),
+        PetSlots = petSlotLimit(data),
+        GamePasses = cloneDictionary(data.GamePasses),
+        Equipment = cloneDictionary(data.Equipment),
+        PetPowerMult = select(1, getPetMultipliers(data)),
+        PetWinMult = select(2, getPetMultipliers(data)),
         TotalKills = data.TotalKills,
         HighestStage = data.HighestStage,
         StageRequirement = stageRequirement(data.Stage),
@@ -322,7 +383,8 @@ local function finishBattle(player, data, battle, victory)
     if victory then
         local monster = battle.Monster
         local hero = equippedHero(data)
-        local reward = math.max(1, math.floor(monster.Reward * hero.WinMult * buffMultiplier(player, "Wins")))
+        local _, petWinMultiplier = getPetMultipliers(data)
+        local reward = math.max(1, math.floor(monster.Reward * hero.WinMult * petWinMultiplier * buffMultiplier(player, "Wins")))
         local itemId = rollDrop(data.Stage)
         local item = Config.Items[itemId]
         data.Wins += reward
@@ -374,7 +436,11 @@ R.Train.OnServerEvent:Connect(withData(function(player, data, zoneIndex)
     lastTrain[player] = now
 
     local hero = equippedHero(data)
-    local amount = zone.Multiplier * hero.PowerMult * rebirthMultiplier(data) * buffMultiplier(player, "Power")
+    local petPowerMultiplier = select(1, getPetMultipliers(data))
+    local weapon = getEquipment(data)
+    local gearPowerMultiplier = 1 + (weapon and weapon.PowerBonus or 0)
+    local passMultiplier = data.GamePasses and data.GamePasses.DoubleLightning == true and 2 or 1
+    local amount = zone.Multiplier * hero.PowerMult * petPowerMultiplier * gearPowerMultiplier * rebirthMultiplier(data) * buffMultiplier(player, "Power") * passMultiplier * premiumPowerMultiplier(data)
     data.Power += amount
     data.Zone = index
     pushState(player)
@@ -428,9 +494,12 @@ R.Attack.OnServerEvent:Connect(withData(function(player, data)
     battle.NextPlayerAttack = now + Config.Combat.AttackCooldown
 
     local hero = equippedHero(data)
+    local petPowerMultiplier = select(1, getPetMultipliers(data))
+    local weapon, armor = getEquipment(data)
+    local gearDamageMultiplier = 1 + (weapon and weapon.DamageBonus or 0)
     local damage = math.max(
         Config.Combat.MinimumDamage,
-        math.floor((Config.Combat.BaseDamage + data.Power * Config.Combat.PowerDamageScale) * hero.PowerMult * buffMultiplier(player, "Attack"))
+        math.floor((Config.Combat.BaseDamage + data.Power * Config.Combat.PowerDamageScale) * hero.PowerMult * petPowerMultiplier * gearDamageMultiplier * buffMultiplier(player, "Attack"))
     )
     battle.Health = math.max(0, battle.Health - damage)
     animateMonster(battle.Model, Vector3.new(0, 0, -1.25))
@@ -452,7 +521,9 @@ R.Attack.OnServerEvent:Connect(withData(function(player, data)
         battle.NextEnemyAttack = now + Config.Combat.EnemyAttackInterval
         local humanoid = getHumanoid(player)
         if humanoid and humanoid.Health > 0 then
-            local enemyDamage = math.max(1, battle.Monster.Damage)
+            local _, armor = getEquipment(data)
+            local defenseMultiplier = math.clamp(1 - (armor and armor.DefenseBonus or 0), 0.1, 1)
+            local enemyDamage = math.max(1, math.floor(battle.Monster.Damage * defenseMultiplier))
             animateMonster(battle.Model, Vector3.new(0, 0, 1.5))
             humanoid:TakeDamage(enemyDamage)
             R.CombatFX:FireClient(player, { Kind = "EnemyHit", Damage = enemyDamage, PlayerHealth = humanoid.Health, PlayerMaxHealth = humanoid.MaxHealth })
@@ -544,6 +615,9 @@ R.SellItem.OnServerEvent:Connect(withData(function(player, data, itemId, amount)
         return notice(player, "Недостаточно предметов для продажи.")
     end
 
+    if data.Equipment and (data.Equipment.Weapon == itemId or data.Equipment.Armor == itemId) then
+        return notice(player, "Сначала сними экипированный предмет.")
+    end
     data.Inventory[itemId] = owned - quantity
     if data.Inventory[itemId] <= 0 then
         data.Inventory[itemId] = nil
@@ -552,6 +626,114 @@ R.SellItem.OnServerEvent:Connect(withData(function(player, data, itemId, amount)
     data.Wins += payout
     DataService.Save(player)
     notice(player, ("Продано: %s ×%d. +%d побед"):format(item.Name, quantity, payout))
+    pushState(player)
+end))
+
+R.OpenEgg.OnServerEvent:Connect(withData(function(player, data, eggId)
+    if type(eggId) ~= "string" then return end
+    local egg = Config.PetEggs[eggId]
+    if not egg then return notice(player, "Такого яйца не существует.") end
+    if data.Wins < egg.Cost then
+        return notice(player, "Недостаточно побед для открытия яйца.")
+    end
+
+    local petId = rollWeighted(egg.Drops)
+    local pet = petId and Config.PetById[petId]
+    if not pet then return notice(player, "Не удалось определить награду яйца.") end
+
+    data.Wins -= egg.Cost
+    data.OwnedPets[petId] = (tonumber(data.OwnedPets[petId]) or 0) + 1
+    local alreadyEquipped = table.find(data.EquippedPets, petId) ~= nil
+    if not alreadyEquipped and #data.EquippedPets < petSlotLimit(data) then
+        table.insert(data.EquippedPets, petId)
+    end
+    DataService.Save(player)
+    R.CombatFX:FireClient(player, {
+        Kind = "EggReveal",
+        PetId = petId,
+        PetName = pet.Name,
+        Rarity = pet.Rarity,
+        PetColor = pet.Color,
+        PowerMult = pet.PowerMult,
+    })
+    notice(player, "Из яйца появился питомец: " .. pet.Name)
+    pushState(player)
+end))
+
+R.TogglePet.OnServerEvent:Connect(withData(function(player, data, petId)
+    if type(petId) ~= "string" or not Config.PetById[petId] then return end
+    if (tonumber(data.OwnedPets[petId]) or 0) <= 0 then
+        return notice(player, "Сначала получи этого питомца.")
+    end
+
+    local index = table.find(data.EquippedPets, petId)
+    if index then
+        table.remove(data.EquippedPets, index)
+        notice(player, "Питомец снят.")
+    else
+        if #data.EquippedPets >= petSlotLimit(data) then
+            return notice(player, "Все слоты питомцев заняты.")
+        end
+        table.insert(data.EquippedPets, petId)
+        notice(player, "Питомец экипирован: " .. Config.PetById[petId].Name)
+    end
+    DataService.Save(player)
+    pushState(player)
+end))
+
+R.CraftItem.OnServerEvent:Connect(withData(function(player, data, recipeId)
+    if type(recipeId) ~= "string" then return end
+    local recipe = Config.CraftRecipes[recipeId]
+    if not recipe then return notice(player, "Такого рецепта нет.") end
+    if data.Stage < recipe.MinStage then
+        return notice(player, "Нужен этап " .. tostring(recipe.MinStage) .. " для этого рецепта.")
+    end
+    for ingredientId, required in pairs(recipe.Ingredients) do
+        if (tonumber(data.Inventory[ingredientId]) or 0) < required then
+            local ingredient = Config.Items[ingredientId]
+            return notice(player, "Не хватает: " .. (ingredient and ingredient.Name or ingredientId) .. " ×" .. tostring(required))
+        end
+    end
+    for ingredientId, required in pairs(recipe.Ingredients) do
+        data.Inventory[ingredientId] -= required
+        if data.Inventory[ingredientId] <= 0 then data.Inventory[ingredientId] = nil end
+    end
+    data.Inventory[recipe.Output] = (tonumber(data.Inventory[recipe.Output]) or 0) + 1
+    DataService.Save(player)
+    local output = Config.Items[recipe.Output]
+    R.CombatFX:FireClient(player, {
+        Kind = "Crafted",
+        ItemId = recipe.Output,
+        ItemName = output and output.Name or recipe.Name,
+        Rarity = output and output.Rarity or "",
+        ItemColor = output and output.Color or Config.RarityColors["Редкий"],
+    })
+    notice(player, "Создан предмет: " .. recipe.Name)
+    pushState(player)
+end))
+
+R.EquipItem.OnServerEvent:Connect(withData(function(player, data, itemId)
+    if type(itemId) ~= "string" then return end
+    local item = Config.Items[itemId]
+    if not item or (tonumber(data.Inventory[itemId]) or 0) <= 0 then
+        return notice(player, "Этого предмета нет в инвентаре.")
+    end
+    if item.Type ~= "Weapon" and item.Type ~= "Armor" then
+        return notice(player, "Этот предмет нельзя экипировать.")
+    end
+    local slot = item.Type
+    data.Equipment[slot] = itemId
+    local humanoid = getHumanoid(player)
+    if humanoid and item.Type == "Armor" then
+        local _, armor = getEquipment(data)
+        local oldMax = humanoid.MaxHealth
+        local newMax = 100 + (armor and armor.HealthBonus or 0)
+        local healthRatio = oldMax > 0 and humanoid.Health / oldMax or 1
+        humanoid.MaxHealth = newMax
+        humanoid.Health = math.clamp(newMax * healthRatio, 1, newMax)
+    end
+    DataService.Save(player)
+    notice(player, "Экипировано: " .. item.Name)
     pushState(player)
 end))
 
@@ -579,6 +761,7 @@ local function onPlayerAdded(player)
     setupLeaderstats(player)
     local data = DataService.Load(player)
     if data then
+        PurchaseService.RefreshPasses(player, DataService)
         pushState(player)
     else
         initialized[player] = nil
