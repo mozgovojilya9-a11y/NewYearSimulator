@@ -68,7 +68,8 @@ local function grantProduct(data, product)
         data.OwnedPets = data.OwnedPets or {}
         data.EquippedPets = data.EquippedPets or {}
         data.OwnedPets[petId] = (tonumber(data.OwnedPets[petId]) or 0) + 1
-        if not table.find(data.EquippedPets, petId) and #data.EquippedPets < Config.PetSlots then
+        local slotLimit = Config.PetSlots + (data.GamePasses and data.GamePasses.ExtraPetSlot == true and 1 or 0)
+        if not table.find(data.EquippedPets, petId) and #data.EquippedPets < slotLimit then
             table.insert(data.EquippedPets, petId)
         end
         return true
