@@ -1,175 +1,371 @@
--- Procedural Winter Academy world. All names and designs are original.
+-- Original low-poly Winter Academy environment. Built as coherent Roblox models,
+-- with intentionally separated mentor plinths, training court and combat arena.
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local old = Workspace:FindFirstChild("WinterAcademy")
 if old then old:Destroy() end
-local baseplate = Workspace:FindFirstChild("Baseplate")
-if baseplate then baseplate:Destroy() end
+
+local oldBaseplate = Workspace:FindFirstChild("Baseplate")
+if oldBaseplate then oldBaseplate:Destroy() end
 
 local world = Instance.new("Folder")
 world.Name = "WinterAcademy"
 world.Parent = Workspace
 
-local function part(name, size, cf, color, material, parent)
- local p = Instance.new("Part")
- p.Name = name
- p.Size = size
- p.CFrame = cf
- p.Anchored = true
- p.Color = color
- p.Material = material or Enum.Material.SmoothPlastic
- p.TopSurface = Enum.SurfaceType.Smooth
- p.BottomSurface = Enum.SurfaceType.Smooth
- p.Parent = parent or world
- return p
+local function makePart(parent, name, size, cf, color, material, shape, anchored)
+    local p = Instance.new("Part")
+    p.Name = name
+    p.Size = size
+    p.CFrame = cf
+    p.Anchored = anchored ~= false
+    p.Color = color
+    p.Material = material or Enum.Material.SmoothPlastic
+    p.TopSurface = Enum.SurfaceType.Smooth
+    p.BottomSurface = Enum.SurfaceType.Smooth
+    p.CastShadow = true
+    if shape then p.Shape = shape end
+    p.Parent = parent
+    return p
 end
 
-local function ball(name, size, cf, color, material)
- local p = part(name,size,cf,color,material)
- p.Shape = Enum.PartType.Ball
- return p
+local function model(parent, name)
+    local m = Instance.new("Model")
+    m.Name = name
+    m.Parent = parent
+    return m
 end
 
-local function neon(name,size,cf,color)
- return part(name,size,cf,color,Enum.Material.Neon)
+local function light(part, color, range, brightness)
+    local point = Instance.new("PointLight")
+    point.Color = color
+    point.Range = range
+    point.Brightness = brightness
+    point.Shadows = true
+    point.Parent = part
+    return point
 end
 
-Lighting.ClockTime = 18.4
-Lighting.Brightness = 2
-Lighting.Ambient = Color3.fromRGB(105,115,155)
-Lighting.OutdoorAmbient = Color3.fromRGB(90,105,145)
-Lighting.FogColor = Color3.fromRGB(100,115,165)
-Lighting.FogEnd = 850
+local function trim(parent, name, size, cf, color)
+    return makePart(parent, name, size, cf, color, Enum.Material.Metal)
+end
+
+-- Lighting: twilight, cold sky and warm windows.
+Lighting.ClockTime = 18.2
+Lighting.Brightness = 2.1
+Lighting.ExposureCompensation = 0.12
+Lighting.Ambient = Color3.fromRGB(88, 96, 142)
+Lighting.OutdoorAmbient = Color3.fromRGB(83, 94, 139)
+Lighting.FogColor = Color3.fromRGB(85, 99, 151)
+Lighting.FogStart = 100
+Lighting.FogEnd = 420
+Lighting.EnvironmentDiffuseScale = 0.35
+Lighting.EnvironmentSpecularScale = 0.55
 
 local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
-atmosphere.Density = 0.28
-atmosphere.Offset = 0.1
-atmosphere.Color = Color3.fromRGB(180,195,255)
-atmosphere.Decay = Color3.fromRGB(70,75,125)
+atmosphere.Density = 0.24
+atmosphere.Offset = 0.12
+atmosphere.Color = Color3.fromRGB(171, 190, 255)
+atmosphere.Decay = Color3.fromRGB(64, 72, 122)
+atmosphere.Glare = 0.22
+atmosphere.Haze = 1.6
 atmosphere.Parent = Lighting
 
-local bloom = Lighting:FindFirstChild("WinterBloom") or Instance.new("BloomEffect")
-bloom.Name = "WinterBloom"
-bloom.Intensity = 0.45
-bloom.Size = 28
-bloom.Threshold = 1.4
+local bloom = Lighting:FindFirstChild("AcademyBloom") or Instance.new("BloomEffect")
+bloom.Name = "AcademyBloom"
+bloom.Intensity = 0.38
+bloom.Size = 24
+bloom.Threshold = 1.35
 bloom.Parent = Lighting
 
--- Snowy courtyard and stone walkways
-part("Snow courtyard",Vector3.new(300,2,300),CFrame.new(0,-1,0),Color3.fromRGB(222,232,255),Enum.Material.Snow)
-part("Main stone avenue",Vector3.new(34,0.35,190),CFrame.new(0,0.15,5),Color3.fromRGB(105,112,145),Enum.Material.Cobblestone)
-part("Central plaza",Vector3.new(112,0.45,78),CFrame.new(0,0.2,-15),Color3.fromRGB(126,132,165),Enum.Material.Slate)
+local colorCorrection = Lighting:FindFirstChild("AcademyColor") or Instance.new("ColorCorrectionEffect")
+colorCorrection.Name = "AcademyColor"
+colorCorrection.TintColor = Color3.fromRGB(218, 224, 255)
+colorCorrection.Contrast = 0.12
+colorCorrection.Saturation = 0.08
+colorCorrection.Brightness = -0.02
+colorCorrection.Parent = Lighting
 
--- Academy facade, wings and towers
-part("Academy central hall",Vector3.new(100,48,22),CFrame.new(0,24,-92),Color3.fromRGB(54,57,91),Enum.Material.Slate)
-part("Hall roof",Vector3.new(110,4,28),CFrame.new(0,50,-92),Color3.fromRGB(35,39,72),Enum.Material.Slate)
-for _,x in {-58,58} do
- part("Academy wing",Vector3.new(28,34,24),CFrame.new(x,17,-83),Color3.fromRGB(65,66,104),Enum.Material.Slate)
- for y=10,34,12 do
-  for z=-94,-73,10 do
-   part("Glowing window",Vector3.new(3,6,0.5),CFrame.new(x,y,z),Color3.fromRGB(255,190,105),Enum.Material.Neon)
-  end
- end
-end
-for _,x in {-68,-34,34,68} do
- part("Tower",Vector3.new(16,66,16),CFrame.new(x,33,-92),Color3.fromRGB(49,53,88),Enum.Material.Slate)
- local roof = part("Tower spire",Vector3.new(19,3,19),CFrame.new(x,67,-92),Color3.fromRGB(120,74,130),Enum.Material.Metal)
- roof.Shape = Enum.PartType.Cylinder
- part("Spire tip",Vector3.new(2,12,2),CFrame.new(x,75,-92),Color3.fromRGB(245,190,105),Enum.Material.Neon)
- for y=20,48,14 do
-  part("Tower window",Vector3.new(4,7,0.5),CFrame.new(x,y,-83.7),Color3.fromRGB(255,188,100),Enum.Material.Neon)
- end
-end
-part("Academy crest backing",Vector3.new(18,15,1),CFrame.new(0,36,-79),Color3.fromRGB(115,70,130),Enum.Material.Metal)
-part("Academy crest",Vector3.new(8,8,1.2),CFrame.new(0,36,-77.8),Color3.fromRGB(255,197,92),Enum.Material.Neon)
+-- Ground, stone avenue and central square.
+makePart(world, "Snowfield", Vector3.new(320, 2, 320), CFrame.new(0, -1.2, 0), Color3.fromRGB(202, 218, 248), Enum.Material.Snow)
+makePart(world, "AcademyApproach", Vector3.new(30, 0.5, 164), CFrame.new(0, 0.05, 21), Color3.fromRGB(78, 82, 119), Enum.Material.Cobblestone)
+makePart(world, "CentralCourtyard", Vector3.new(116, 0.65, 82), CFrame.new(0, 0.2, -29), Color3.fromRGB(106, 107, 145), Enum.Material.Slate)
+makePart(world, "CourtyardBorderNorth", Vector3.new(118, 0.6, 2), CFrame.new(0, 0.58, -71), Color3.fromRGB(193, 206, 237), Enum.Material.Marble)
+makePart(world, "CourtyardBorderSouth", Vector3.new(118, 0.6, 2), CFrame.new(0, 0.58, 13), Color3.fromRGB(193, 206, 237), Enum.Material.Marble)
 
--- Grand staircase
-for i=1,7 do
- part("Entrance stair "..i,Vector3.new(44,1.2,4),CFrame.new(0,i*1.1,-62+(i*3)),Color3.fromRGB(130,139,174),Enum.Material.Slate)
+-- Decorative inlaid path lines.
+for _, x in ipairs({ -54, -36, 36, 54 }) do
+    trim(world, "PathInlay", Vector3.new(0.22, 0.12, 72), CFrame.new(x, 0.62, -29), Color3.fromRGB(171, 134, 239))
 end
 
--- Mentor plinths and original mentor silhouettes
-local mentors = {
- {"Терен Вейл",Color3.fromRGB(63,83,125),Color3.fromRGB(195,160,255)},
- {"Кайрен Рид",Color3.fromRGB(130,65,75),Color3.fromRGB(255,175,120)},
- {"Лиора Грей",Color3.fromRGB(100,110,155),Color3.fromRGB(160,220,255)},
- {"Эдрик Нокс",Color3.fromRGB(40,48,72),Color3.fromRGB(180,145,235)},
- {"Ориан Вельт",Color3.fromRGB(190,185,205),Color3.fromRGB(255,220,140)},
- {"Малрик Соль",Color3.fromRGB(72,65,83),Color3.fromRGB(245,105,130)},
+-- Main academy: central keep, two side wings and four towers.
+local castle = model(world, "TheWinterAcademy")
+makePart(castle, "CentralKeep", Vector3.new(76, 44, 25), CFrame.new(0, 22, -105), Color3.fromRGB(48, 48, 82), Enum.Material.Slate)
+makePart(castle, "KeepFoundation", Vector3.new(84, 4, 31), CFrame.new(0, 2, -105), Color3.fromRGB(83, 79, 119), Enum.Material.Marble)
+makePart(castle, "KeepUpperCornice", Vector3.new(81, 2, 28), CFrame.new(0, 44.5, -105), Color3.fromRGB(111, 83, 153), Enum.Material.Metal)
+makePart(castle, "SnowRoof", Vector3.new(82, 3, 29), CFrame.new(0, 47, -105), Color3.fromRGB(214, 226, 250), Enum.Material.Snow)
+
+for _, side in ipairs({ -1, 1 }) do
+    local x = side * 53
+    makePart(castle, "EastWestWing", Vector3.new(29, 31, 24), CFrame.new(x, 16.5, -95), Color3.fromRGB(58, 56, 92), Enum.Material.Slate)
+    makePart(castle, "WingRoof", Vector3.new(33, 2, 28), CFrame.new(x, 33, -95), Color3.fromRGB(196, 207, 236), Enum.Material.Snow)
+    for y = 10, 27, 10 do
+        makePart(castle, "WingWindowFrame", Vector3.new(5.2, 7.2, 0.55), CFrame.new(x, y, -82.7), Color3.fromRGB(28, 31, 58), Enum.Material.Metal)
+        local window = makePart(castle, "WarmWingWindow", Vector3.new(3.6, 5.6, 0.3), CFrame.new(x, y, -82.3), Color3.fromRGB(255, 197, 105), Enum.Material.Neon)
+        light(window, Color3.fromRGB(255, 182, 100), 13, 0.7)
+    end
+end
+
+local function makeTower(x, z, height, name)
+    local tower = model(castle, name)
+    local baseY = height / 2
+    makePart(tower, "TowerBody", Vector3.new(17, height, 17), CFrame.new(x, baseY, z), Color3.fromRGB(43, 44, 79), Enum.Material.Slate)
+    makePart(tower, "TowerLowerRing", Vector3.new(19, 2, 19), CFrame.new(x, 4, z), Color3.fromRGB(111, 81, 148), Enum.Material.Metal)
+    makePart(tower, "TowerUpperRing", Vector3.new(19, 2, 19), CFrame.new(x, height - 2, z), Color3.fromRGB(111, 81, 148), Enum.Material.Metal)
+    local dome = makePart(tower, "DomeRoof", Vector3.new(21, 13, 21), CFrame.new(x, height + 5, z), Color3.fromRGB(66, 46, 111), Enum.Material.Slate, Enum.PartType.Ball)
+    dome.CanCollide = false
+    local tip = makePart(tower, "AuroraSpire", Vector3.new(1.5, 8, 1.5), CFrame.new(x, height + 15, z), Color3.fromRGB(255, 202, 111), Enum.Material.Neon)
+    light(tip, Color3.fromRGB(255, 192, 100), 18, 1.1)
+
+    for y = 17, height - 10, 13 do
+        makePart(tower, "WindowFrame", Vector3.new(5.2, 7.6, 0.65), CFrame.new(x, y, z - 8.7), Color3.fromRGB(24, 25, 50), Enum.Material.Metal)
+        local window = makePart(tower, "GlowingWindow", Vector3.new(3.7, 6, 0.3), CFrame.new(x, y, z - 8.3), Color3.fromRGB(255, 202, 115), Enum.Material.Neon)
+        light(window, Color3.fromRGB(255, 183, 105), 15, 0.65)
+    end
+end
+
+makeTower(-43, -105, 59, "WestTower")
+makeTower(43, -105, 59, "EastTower")
+makeTower(-77, -92, 48, "FarWestTower")
+makeTower(77, -92, 48, "FarEastTower")
+
+-- Main entrance, pillars, arched-looking layered portal and banners.
+for _, x in ipairs({ -24, -12, 12, 24 }) do
+    makePart(castle, "EntryPillar", Vector3.new(3, 25, 3), CFrame.new(x, 12.5, -88), Color3.fromRGB(103, 84, 144), Enum.Material.Marble)
+    makePart(castle, "PillarCapital", Vector3.new(5, 1.7, 5), CFrame.new(x, 25.5, -88), Color3.fromRGB(255, 198, 111), Enum.Material.Metal)
+end
+makePart(castle, "MainDoorFrame", Vector3.new(25, 28, 2), CFrame.new(0, 14, -82), Color3.fromRGB(119, 83, 164), Enum.Material.Metal)
+makePart(castle, "MainDoor", Vector3.new(18, 23, 1), CFrame.new(0, 12, -80.7), Color3.fromRGB(32, 27, 58), Enum.Material.Wood)
+makePart(castle, "DoorRune", Vector3.new(8, 8, 0.35), CFrame.new(0, 13, -80), Color3.fromRGB(178, 119, 255), Enum.Material.Neon)
+for _, x in ipairs({ -31, 31 }) do
+    makePart(castle, "AcademyBannerPole", Vector3.new(0.7, 17, 0.7), CFrame.new(x, 26, -83), Color3.fromRGB(219, 174, 95), Enum.Material.Metal)
+    makePart(castle, "AcademyBanner", Vector3.new(7, 12, 0.5), CFrame.new(x, 28, -82.5), x < 0 and Color3.fromRGB(107, 56, 164) or Color3.fromRGB(43, 92, 153), Enum.Material.Fabric)
+    makePart(castle, "BannerSigil", Vector3.new(2.8, 2.8, 0.65), CFrame.new(x, 30, -82), Color3.fromRGB(255, 207, 119), Enum.Material.Neon)
+end
+
+-- Wide ceremonial stairs from the plaza to the academy.
+for i = 1, 9 do
+    makePart(world, "CeremonialStep", Vector3.new(54, 1.15, 3.4), CFrame.new(0, i * 0.85, -77 + i * 3.2), Color3.fromRGB(130, 129, 168), Enum.Material.Marble)
+    makePart(world, "StepGoldEdge", Vector3.new(54, 0.16, 0.22), CFrame.new(0, i * 0.85 + 0.58, -75.3 + i * 3.2), Color3.fromRGB(255, 196, 111), Enum.Material.Metal)
+end
+
+-- Mentor gallery: individually spaced pedestals and readable nameplates.
+local mentorPositions = {
+    Vector3.new(-50, 0, -42), Vector3.new(-34, 0, -53), Vector3.new(-17, 0, -61),
+    Vector3.new(0, 0, -64), Vector3.new(17, 0, -61), Vector3.new(34, 0, -53), Vector3.new(50, 0, -42),
 }
-for i,m in ipairs(mentors) do
- local x = (i-3.5)*18
- local z = -43
- part("Mentor plinth "..i,Vector3.new(12,1,10),CFrame.new(x,1,z),Color3.fromRGB(73,67,115),Enum.Material.Marble)
- neon("Mentor rune "..i,Vector3.new(9,0.18,7),CFrame.new(x,1.65,z),m[3])
- local model = Instance.new("Model")
- model.Name = "Mentor - "..m[1]
- model.Parent = world
- local torso = part("Robe",Vector3.new(4,5,2),CFrame.new(x,5,z),m[2],Enum.Material.Fabric,model)
- local head = ball("Head",Vector3.new(2.5,2.5,2.5),CFrame.new(x,8.7,z),Color3.fromRGB(235,205,180),Enum.Material.SmoothPlastic)
- head.Parent = model
- local hair = ball("Hair",Vector3.new(2.7,1.2,2.7),CFrame.new(x,9.7,z),m[2],Enum.Material.Fabric)
- hair.Parent = model
- local badge = part("Mentor insignia",Vector3.new(0.8,1.1,0.25),CFrame.new(x,6,z-1.12),m[3],Enum.Material.Neon,model)
- local title = Instance.new("BillboardGui")
- title.Name = "MentorName"
- title.Size = UDim2.fromOffset(180,48)
- title.StudsOffset = Vector3.new(0,5.4,0)
- title.AlwaysOnTop = true
- title.Parent = torso
- local text = Instance.new("TextLabel")
- text.Size = UDim2.fromScale(1,1)
- text.BackgroundColor3 = Color3.fromRGB(24,22,44)
- text.BackgroundTransparency = 0.12
- text.TextColor3 = Color3.fromRGB(255,224,155)
- text.TextStrokeTransparency = 0.3
- text.Font = Enum.Font.GothamBold
- text.TextScaled = true
- text.Text = m[1]
- text.Parent = title
+local skin = Color3.fromRGB(236, 205, 176)
+
+local function buildMentor(hero, index, position)
+    local display = model(world, "Mentor_" .. hero.Id)
+    local x, z = position.X, position.Z
+    local accent = hero.Color or Color3.fromRGB(192, 156, 255)
+
+    makePart(world, "MentorPedestal_" .. hero.Id, Vector3.new(11, 1.35, 9), CFrame.new(x, 0.9, z), Color3.fromRGB(57, 48, 91), Enum.Material.Marble)
+    makePart(world, "MentorPedestalTrim_" .. hero.Id, Vector3.new(10.3, 0.2, 8.3), CFrame.new(x, 1.67, z), accent, Enum.Material.Neon)
+
+    local pivot = CFrame.new(x, 2, z)
+    local torso = makePart(display, "RobeBody", Vector3.new(3.2, 4.1, 1.8), pivot * CFrame.new(0, 2.9, 0), hero.Color, Enum.Material.Fabric)
+    local robeHem = makePart(display, "RobeHem", Vector3.new(4.1, 1.2, 2.3), pivot * CFrame.new(0, 0.85, 0), hero.Color:Lerp(Color3.new(0, 0, 0), 0.18), Enum.Material.Fabric)
+    local head = makePart(display, "Head", Vector3.new(1.85, 1.85, 1.75), pivot * CFrame.new(0, 5.45, -0.03), skin, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+    makePart(display, "HairCap", Vector3.new(2, 0.85, 1.9), head.CFrame * CFrame.new(0, 0.73, 0.08), hero.Color:Lerp(Color3.new(0.08, 0.07, 0.14), 0.35), Enum.Material.Fabric, Enum.PartType.Ball)
+    makePart(display, "Collar", Vector3.new(2, 0.48, 2), torso.CFrame * CFrame.new(0, 1.65, -0.08), accent, Enum.Material.Neon)
+    makePart(display, "Belt", Vector3.new(3.25, 0.25, 1.9), torso.CFrame * CFrame.new(0, -0.55, -0.02), Color3.fromRGB(221, 178, 98), Enum.Material.Metal)
+
+    for _, side in ipairs({ -1, 1 }) do
+        local arm = makePart(display, "RobeSleeve", Vector3.new(0.95, 3.1, 1.05), torso.CFrame * CFrame.new(side * 2.03, 0.05, 0), hero.Color, Enum.Material.Fabric)
+        arm.CFrame *= CFrame.Angles(0, 0, side * math.rad(7))
+        makePart(display, "Glove", Vector3.new(0.82, 0.82, 0.82), arm.CFrame * CFrame.new(0, -1.55, 0), skin, Enum.Material.SmoothPlastic, Enum.PartType.Ball)
+        local boot = makePart(display, "Boot", Vector3.new(1.05, 1.5, 1.35), pivot * CFrame.new(side * 0.82, 0.2, -0.12), Color3.fromRGB(31, 31, 52), Enum.Material.SmoothPlastic)
+        boot.CanCollide = false
+    end
+
+    local cape = makePart(display, "Cape", Vector3.new(3.7, 3.8, 0.35), torso.CFrame * CFrame.new(0, -0.05, 1.02), hero.Color:Lerp(Color3.new(0, 0, 0), 0.24), Enum.Material.Fabric)
+    local staff = makePart(display, "ArcaneStaff", Vector3.new(0.22, 5.6, 0.22), pivot * CFrame.new(2.7, 2.8, 0.25) * CFrame.Angles(0, 0, math.rad(-7)), Color3.fromRGB(100, 68, 48), Enum.Material.Wood)
+    local staffCrystal = makePart(display, "StaffCrystal", Vector3.new(0.95, 0.95, 0.95), staff.CFrame * CFrame.new(0, 2.95, 0), accent, Enum.Material.Neon, Enum.PartType.Ball)
+    light(staffCrystal, accent, 11, 0.65)
+    local staffSparkles = Instance.new("Sparkles")
+    staffSparkles.SparkleColor = accent
+    staffSparkles.Parent = staffCrystal
+    local staffFloat = TweenService:Create(staffCrystal, TweenInfo.new(1.8 + (index % 3) * 0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        CFrame = staffCrystal.CFrame * CFrame.new(0, 0.28, 0),
+    })
+    staffFloat:Play()
+    display.PrimaryPart = torso
+
+    local prompt = Instance.new("ProximityPrompt")
+    prompt.Name = "StudyMentor"
+    prompt.ActionText = "Изучить"
+    prompt.ObjectText = hero.Name
+    prompt.KeyboardKeyCode = Enum.KeyCode.E
+    prompt.HoldDuration = 0.15
+    prompt.MaxActivationDistance = 13
+    prompt.RequiresLineOfSight = false
+    prompt:SetAttribute("OpenMenu", "Mentors")
+    prompt:SetAttribute("MentorId", hero.Id)
+    prompt.Parent = torso
+
+    local plate = Instance.new("BillboardGui")
+    plate.Name = "MentorNameplate"
+    plate.Adornee = head
+    plate.Size = UDim2.fromOffset(148, 52)
+    plate.StudsOffset = Vector3.new(0, 3.2, 0)
+    plate.MaxDistance = 82
+    plate.AlwaysOnTop = false
+    plate.Parent = display
+
+    local backing = Instance.new("Frame")
+    backing.Size = UDim2.fromScale(1, 1)
+    backing.BackgroundColor3 = Color3.fromRGB(21, 18, 39)
+    backing.BackgroundTransparency = 0.08
+    backing.BorderSizePixel = 0
+    backing.Parent = plate
+    local rounded = Instance.new("UICorner")
+    rounded.CornerRadius = UDim.new(0, 8)
+    rounded.Parent = backing
+    local outline = Instance.new("UIStroke")
+    outline.Color = accent
+    outline.Thickness = 1.5
+    outline.Parent = backing
+    local title = Instance.new("TextLabel")
+    title.BackgroundTransparency = 1
+    title.Position = UDim2.fromOffset(5, 3)
+    title.Size = UDim2.new(1, -10, 0, 22)
+    title.Font = Enum.Font.GothamBold
+    title.Text = hero.Name
+    title.TextSize = 12
+    title.TextColor3 = Color3.fromRGB(255, 235, 204)
+    title.TextTruncate = Enum.TextTruncate.AtEnd
+    title.Parent = backing
+    local detail = Instance.new("TextLabel")
+    detail.BackgroundTransparency = 1
+    detail.Position = UDim2.fromOffset(5, 27)
+    detail.Size = UDim2.new(1, -10, 0, 18)
+    detail.Font = Enum.Font.GothamMedium
+    detail.Text = hero.Rarity .. "  ·  ×" .. tostring(hero.PowerMult)
+    detail.TextSize = 10
+    detail.TextColor3 = accent
+    detail.TextTruncate = Enum.TextTruncate.AtEnd
+    detail.Parent = backing
 end
 
--- Snow-covered fir trees and warm lanterns
-local function tree(x,z,s)
- local trunk = part("Fir trunk",Vector3.new(2*s,5*s,2*s),CFrame.new(x,2.5*s,z),Color3.fromRGB(92,63,53),Enum.Material.Wood)
- for i=1,3 do
-  local foliage = ball("Snowy fir",Vector3.new((10-i*1.6)*s,7*s,(10-i*1.6)*s),CFrame.new(x,(5+i*3)*s,z),Color3.fromRGB(37,78,79),Enum.Material.Grass)
-  local snow = ball("Snow cap",Vector3.new((8-i)*s,2*s,(8-i)*s),CFrame.new(x,(8+i*3)*s,z-0.3*s),Color3.fromRGB(226,237,255),Enum.Material.Snow)
- end
-end
-for _,pos in ipairs({{-78,-35},{78,-35},{-82,18},{82,18},{-55,55},{55,55},{-105,-85},{105,-85}}) do tree(pos[1],pos[2],1.2) end
-
-for _,x in {-42,-22,22,42} do
- for _,z in {-5,30,65} do
-  part("Lantern post",Vector3.new(0.8,9,0.8),CFrame.new(x,4.5,z),Color3.fromRGB(43,42,67),Enum.Material.Metal)
-  local lantern = ball("Warm lantern",Vector3.new(3,3,3),CFrame.new(x,9,z),Color3.fromRGB(255,190,105),Enum.Material.Neon)
-  local light = Instance.new("PointLight")
-  light.Color = Color3.fromRGB(255,180,100)
-  light.Range = 22
-  light.Brightness = 1.8
-  light.Parent = lantern
- end
+for index, hero in ipairs(Config.Heroes) do
+    local position = mentorPositions[index] or Vector3.new((index - 4) * 16, 0, -45)
+    buildMentor(hero, index, position)
 end
 
--- Seasonal trees and gift clusters
-for _,x in {-95,95} do
- for _,z in {-12,12,36} do
-  local gift = part("Wrapped gift",Vector3.new(5,4,5),CFrame.new(x,2,z),Color3.fromRGB(150,48,88),Enum.Material.SmoothPlastic)
-  part("Gift ribbon",Vector3.new(5.2,0.5,0.8),gift.CFrame,Color3.fromRGB(255,205,105),Enum.Material.Neon)
- end
+-- Training court, with distinct runic targets.
+local training = model(world, "TrainingCourt")
+makePart(training, "TrainingFloor", Vector3.new(48, 0.7, 40), CFrame.new(-82, 0.1, 4), Color3.fromRGB(67, 75, 113), Enum.Material.Slate)
+for index, color in ipairs({
+    Color3.fromRGB(87, 202, 255), Color3.fromRGB(177, 111, 255), Color3.fromRGB(255, 189, 94),
+}) do
+    local x = -96 + index * 14
+    local plinth = makePart(training, "FocusPlinth", Vector3.new(8, 1.1, 8), CFrame.new(x, 1, 0), Color3.fromRGB(40, 40, 72), Enum.Material.Marble)
+    makePart(training, "FocusRune", Vector3.new(6.5, 0.18, 6.5), plinth.CFrame * CFrame.new(0, 0.68, 0), color, Enum.Material.Neon)
+    local crystal = makePart(training, "FocusCrystal", Vector3.new(2.4, 4, 2.4), CFrame.new(x, 3.6, -2), color, Enum.Material.Neon, Enum.PartType.Ball)
+    light(crystal, color, 18, 1)
+    local sparks = Instance.new("Sparkles")
+    sparks.SparkleColor = color
+    sparks.Parent = crystal
+    local float = TweenService:Create(crystal, TweenInfo.new(1.9 + index * 0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        CFrame = crystal.CFrame * CFrame.new(0, 0.7, 0) * CFrame.Angles(0, math.rad(35), 0),
+    })
+    float:Play()
 end
 
--- Spawn point
+-- Combat arena and portal at the end of the central avenue.
+local arena = model(world, "FirstTrialArena")
+makePart(arena, "ArenaBase", Vector3.new(120, 1.2, 48), CFrame.new(0, 0.25, 8), Color3.fromRGB(54, 51, 86), Enum.Material.Slate)
+makePart(arena, "ArenaInset", Vector3.new(112, 0.18, 40), CFrame.new(0, 0.94, 8), Color3.fromRGB(83, 72, 128), Enum.Material.Marble)
+for _, radius in ipairs({ 12, 18 }) do
+    -- A short Y-axis cylinder forms a flat glowing circle on the arena floor.
+    local ring = makePart(arena, "RunicRing", Vector3.new(radius * 2, 0.16, radius * 2), CFrame.new(0, 1.08, 8), Color3.fromRGB(167, 111, 245), Enum.Material.Neon, Enum.PartType.Cylinder)
+    ring.Transparency = 0.48
+    ring.CanCollide = false
+    local rotation = TweenService:Create(ring, TweenInfo.new(22, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {
+        CFrame = ring.CFrame * CFrame.Angles(0, math.rad(359), 0),
+    })
+    rotation:Play()
+end
+for _, x in ipairs({ -25, 25 }) do
+    makePart(arena, "ArenaPillar", Vector3.new(2.5, 11, 2.5), CFrame.new(x, 5.5, -5), Color3.fromRGB(39, 38, 70), Enum.Material.Slate)
+    local flame = makePart(arena, "ArenaFlame", Vector3.new(2.1, 2.1, 2.1), CFrame.new(x, 11.8, -5), Color3.fromRGB(180, 123, 255), Enum.Material.Neon, Enum.PartType.Ball)
+    light(flame, Color3.fromRGB(153, 112, 255), 22, 1.2)
+end
+local combatSpawn = makePart(arena, "CombatStart", Vector3.new(5, 0.2, 5), CFrame.new(0, 1.2, 29), Color3.fromRGB(255, 195, 92), Enum.Material.Neon)
+combatSpawn.Transparency = 1
+combatSpawn.CanCollide = false
+
+-- Warm lantern rows with restrained lighting for performance.
+for _, x in ipairs({ -58, -39, 39, 58 }) do
+    for _, z in ipairs({ -8, -35, -65 }) do
+        makePart(world, "LanternPost", Vector3.new(0.75, 8, 0.75), CFrame.new(x, 4, z), Color3.fromRGB(38, 36, 61), Enum.Material.Metal)
+        local housing = makePart(world, "LanternHousing", Vector3.new(2.1, 2.1, 2.1), CFrame.new(x, 8.4, z), Color3.fromRGB(255, 202, 119), Enum.Material.Neon, Enum.PartType.Ball)
+        light(housing, Color3.fromRGB(255, 182, 99), 19, 0.75)
+        local shimmer = Instance.new("Sparkles")
+        shimmer.SparkleColor = Color3.fromRGB(255, 220, 157)
+        shimmer.Parent = housing
+    end
+end
+
+-- Low-poly snow firs: tiered foliage, snow caps, trunk and tiny baubles.
+local function makeFir(x, z, scale)
+    local tree = model(world, "SnowFir")
+    makePart(tree, "Trunk", Vector3.new(1.6 * scale, 4 * scale, 1.6 * scale), CFrame.new(x, 2 * scale, z), Color3.fromRGB(93, 64, 55), Enum.Material.Wood)
+    for tier = 1, 4 do
+        local y = (3.2 + tier * 2.2) * scale
+        local width = (9 - tier * 1.45) * scale
+        local foliage = makePart(tree, "FirTier", Vector3.new(width, 4.3 * scale, width), CFrame.new(x, y, z), Color3.fromRGB(27, 78 + tier * 5, 76), Enum.Material.Grass, Enum.PartType.Ball)
+        foliage.CanCollide = false
+        local snow = makePart(tree, "SnowCap", Vector3.new(width * 0.88, 1.05 * scale, width * 0.88), foliage.CFrame * CFrame.new(0, 1.6 * scale, 0), Color3.fromRGB(229, 239, 255), Enum.Material.Snow, Enum.PartType.Ball)
+        snow.CanCollide = false
+    end
+    local ornament = makePart(tree, "AuroraBauble", Vector3.new(0.65, 0.65, 0.65), CFrame.new(x + 1.5 * scale, 7 * scale, z - 2 * scale), Color3.fromRGB(255, 182, 99), Enum.Material.Neon, Enum.PartType.Ball)
+    ornament.CanCollide = false
+end
+
+for _, entry in ipairs({
+    { -110, -58, 1.5 }, { 110, -58, 1.5 }, { -104, 8, 1.25 }, { 104, 8, 1.25 },
+    { -72, 48, 1.1 }, { 72, 48, 1.1 }, { -126, -108, 1.6 }, { 126, -108, 1.6 },
+    { -90, 87, 1.35 }, { 90, 87, 1.35 },
+}) do
+    makeFir(entry[1], entry[2], entry[3])
+end
+
+-- Gift clusters and decorative academy standards.
+for _, x in ipairs({ -112, 112 }) do
+    for index, z in ipairs({ -18, 2, 22 }) do
+        local gift = makePart(world, "WinterGift", Vector3.new(4.5, 3.4, 4.5), CFrame.new(x, 1.8, z), index % 2 == 0 and Color3.fromRGB(153, 61, 111) or Color3.fromRGB(55, 112, 159), Enum.Material.SmoothPlastic)
+        makePart(world, "GiftGoldBand", Vector3.new(4.7, 0.35, 0.8), gift.CFrame, Color3.fromRGB(255, 207, 117), Enum.Material.Neon)
+        makePart(world, "GiftTopBand", Vector3.new(0.8, 0.3, 4.7), gift.CFrame * CFrame.new(0, 1.85, 0), Color3.fromRGB(255, 207, 117), Enum.Material.Neon)
+    end
+end
+
+-- The spawn is aligned with the main avenue and the combat arena is ahead.
 local spawn = Workspace:FindFirstChildOfClass("SpawnLocation")
 if not spawn then
- spawn = Instance.new("SpawnLocation")
- spawn.Parent = Workspace
+    spawn = Instance.new("SpawnLocation")
+    spawn.Parent = Workspace
 end
 spawn.Name = "AcademySpawn"
-spawn.Size = Vector3.new(8,1,8)
-spawn.CFrame = CFrame.new(0,2,58)
-spawn.Color = Color3.fromRGB(125,92,160)
+spawn.Size = Vector3.new(8, 1, 8)
+spawn.CFrame = CFrame.new(0, 1.2, 70)
+spawn.Color = Color3.fromRGB(126, 93, 173)
 spawn.Material = Enum.Material.Neon
 spawn.Neutral = true
 spawn.Anchored = true
