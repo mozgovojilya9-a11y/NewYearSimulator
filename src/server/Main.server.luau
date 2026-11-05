@@ -242,9 +242,9 @@ local function monsterStats(stage)
     }
 end
 
-local function createMonsterModel(monster)
+local function createMonsterModel(monster, userId)
     local model = Instance.new("Model")
-    model.Name = "AcademyMonster"
+    model.Name = "AcademyMonster_" .. tostring(userId)
     model.Parent = activeMonsterModels
 
     local core = makePart(model, "Core", Vector3.new(5.3, 6.2, 3.8), CFrame.new(0, 4.2, 8), monster.Color, Enum.Material.Neon)
@@ -268,6 +268,9 @@ local function createMonsterModel(monster)
     aura.Transparency = 0.72
     aura.CastShadow = false
     model.PrimaryPart = core
+    local lane = (tonumber(userId) or 0) % 5
+    local offsetX = (lane - 2) * 18
+    model:PivotTo(CFrame.new(offsetX, 0, 0))
 
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "MonsterStatus"
@@ -308,7 +311,7 @@ local function createMonsterModel(monster)
     fillCorner.CornerRadius = UDim.new(1, 0)
     fillCorner.Parent = fill
 
-    return model, fill
+    return model, fill, offsetX
 end
 
 local function animateMonster(model, offset)
@@ -458,7 +461,7 @@ R.Fight.OnServerEvent:Connect(withData(function(player, data)
     end
 
     local monster = monsterStats(data.Stage)
-    local model, healthFill = createMonsterModel(monster)
+    local model, healthFill, offsetX = createMonsterModel(monster, player.UserId)
     local maxHealth = monster.Health
     battles[player] = {
         Name = monster.Name,
@@ -470,11 +473,12 @@ R.Fight.OnServerEvent:Connect(withData(function(player, data)
         NextPlayerAttack = 0,
         NextEnemyAttack = os.clock() + Config.Combat.EnemyAttackInterval,
         StartedAt = os.clock(),
+        OffsetX = offsetX,
     }
 
     local character = player.Character
     if character and character.Parent then
-        character:PivotTo(CFrame.lookAt(Vector3.new(0, 3, 34), Vector3.new(0, 3, 8)))
+        character:PivotTo(CFrame.lookAt(Vector3.new(offsetX, 3, 34), Vector3.new(offsetX, 3, 8)))
     end
 
     R.CombatFX:FireClient(player, { Kind = "Started", Monster = monster.Name, MaxHealth = maxHealth, Stage = data.Stage })
