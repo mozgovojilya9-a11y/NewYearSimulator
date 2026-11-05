@@ -726,7 +726,7 @@ local function updateResponsiveLayout()
         mentorBadge.Position = UDim2.fromScale(0.76, 0.02)
         mentorBadge.Size = UDim2.fromScale(0.22, 0.075)
         navigation.Position = UDim2.fromScale(0.02, 0.20)
-        navigation.Size = UDim2.fromScale(0.27, 0.34)
+        navigation.Size = UDim2.fromScale(0.27, 0.46)
         resources.Position = UDim2.fromScale(0.02, 0.68)
         resources.Size = UDim2.fromScale(0.27, 0.18)
         progress.Position = UDim2.fromScale(0.31, 0.68)
@@ -980,20 +980,11 @@ local function refresh()
             end)
         end
     elseif activePanel == "Inventory" then
-        clearRows(inventoryBody)
-        local count = 0
-        for itemId, amount in pairs(state.Inventory or {}) do
-            local item = Config.Items[itemId]
-            if item and amount > 0 then
-                count += 1
-                makeListRow(inventoryBody, item.Name .. " ×" .. tostring(amount),
-                    item.Rarity .. "  ·  Цена " .. formatNumber(item.Value), Config.RarityColors[item.Rarity],
-                    "ПРОДАТЬ 1", function() Remotes.SellItem:FireServer(itemId, 1) end)
-            end
-        end
-        if count == 0 then
-            makeListRow(inventoryBody, "Инвентарь пока пуст", "Победи монстра, чтобы получить первый трофей.", COLORS.muted, nil, nil)
-        end
+        rebuildInventoryPanel()
+    elseif activePanel == "Pets" then
+        rebuildPetsPanel()
+    elseif activePanel == "Craft" then
+        rebuildCraftPanel()
     end
 end
 
