@@ -1,5 +1,5 @@
 {
-  "name": "NewYearSimulator",
+  "name": "AuraClicker",
   "tree": {
     "$className": "DataModel",
     "ReplicatedStorage": {
