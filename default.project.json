@@ -10,6 +10,9 @@
     "ServerScriptService": {
       "$path": "src/server"
     },
+    "StarterGui": {
+      "$className": "StarterGui"
+    },
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "StarterPlayerScripts": {
