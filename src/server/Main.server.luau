@@ -11,17 +11,19 @@ local DataService = require(script.Parent.DataService)
 local PlayerState = require(script.Parent.PlayerState)
 local Remotes = require(script.Parent.Remotes)
 local ClickService = require(script.Parent.ClickService)
-local MobService = require(script.Parent.MobService)
+local DungeonService = require(script.Parent.DungeonService)
 local ShopService = require(script.Parent.ShopService)
 local RebirthService = require(script.Parent.RebirthService)
+local TravelService = require(script.Parent.TravelService)
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 
 -- Create every RemoteEvent before any client can look for it.
 Remotes.Init()
-ClickService.Init()
-MobService.Init()
+DungeonService.Init()
+ClickService.Init(nil)
 ShopService.Init()
 RebirthService.Init()
+TravelService.Init()
 
 local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)
 
@@ -49,6 +51,11 @@ local function onPlayerAdded(player)
 	rebirths.Name = "Rebirths"
 	rebirths.Value = data.Rebirths
 	rebirths.Parent = leaderstats
+
+	local room = Instance.new("IntValue")
+	room.Name = "Room"
+	room.Value = data.RoomReached
+	room.Parent = leaderstats
 
 	-- Keep the cached data table in sync whenever Aura changes, from
 	-- wherever it changes (clicks, mobs, backpacks, rebirth).

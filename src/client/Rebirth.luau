@@ -1,40 +1,26 @@
 --[[
 	Rebirth.luau
-	Day 6: rebirth window. Shows cost, current/next multiplier and what
-	gets reset. The button needs two presses ("Точно?") so nobody resets
-	by accident. The server does the actual rebirth.
+	Rebirth confirmation window. It opens when the player triggers the
+	altar's ProximityPrompt in the hub (prompt attribute
+	Action = "RebirthAltar"). The button needs two presses ("Точно?").
+	The server re-checks the requirement and does the reset.
 ]]
 
 local Players = game:GetService("Players")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local Format = require(ReplicatedStorage.Shared.Format)
 local Panels = require(script.Parent.Panels)
 local Ui = require(script.Parent.Ui)
 
 local player = Players.LocalPlayer
 local rebirthRequest = ReplicatedStorage:WaitForChild("RebirthRequest")
-local aura = player:WaitForChild("leaderstats"):WaitForChild("Aura")
 
 local Rebirth = {}
 
-local window = Panels.Create("Ребёрт")
+local window = Panels.Create("Алтарь ребёрта")
 local content = window.Content
-
-local function textLine(order, size, color, font)
-	local label = Instance.new("TextLabel")
-	label.LayoutOrder = order
-	label.Size = UDim2.new(1, 0, 0, size + 8)
-	label.BackgroundTransparency = 1
-	label.Font = font or Enum.Font.GothamBold
-	label.TextSize = size
-	label.TextColor3 = color
-	label.TextWrapped = true
-	label.AutomaticSize = Enum.AutomaticSize.Y
-	label.Parent = content
-	return label
-end
 
 local layout = Instance.new("UIListLayout")
 layout.Padding = UDim.new(0, 8)
@@ -42,11 +28,25 @@ layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 layout.Parent = content
 
+local function textLine(order, size, color, font)
+	local label = Instance.new("TextLabel")
+	label.LayoutOrder = order
+	label.Size = UDim2.new(1, 0, 0, size + 8)
+	label.AutomaticSize = Enum.AutomaticSize.Y
+	label.BackgroundTransparency = 1
+	label.Font = font or Enum.Font.GothamBold
+	label.TextSize = size
+	label.TextColor3 = color
+	label.TextWrapped = true
+	label.Parent = content
+	return label
+end
+
 local countLabel = textLine(1, 20, Ui.Colors.Text)
 local multiplierLabel = textLine(2, 26, Ui.Colors.Crit, Enum.Font.GothamBlack)
-local costLabel = textLine(3, 20, Ui.Colors.Aura)
+local requirementLabel = textLine(3, 20, Ui.Colors.Aura)
 local infoLabel = textLine(4, 15, Ui.Colors.Muted, Enum.Font.Gotham)
-infoLabel.Text = "Сбросится: Аура, оружие и ранцы.\nОстанутся: 💎, питомцы и множитель ребёрта (навсегда)."
+infoLabel.Text = "Сбросится: Аура, оружие, ранцы и прогресс данжа.\nОстанутся: питомцы и множитель ребёрта (навсегда)."
 
 local button = Instance.new("TextButton")
 button.LayoutOrder = 5
@@ -71,28 +71,32 @@ progressFill.Parent = progress
 Ui.Corner(progressFill, UDim.new(0.5, 0))
 
 local confirming = false
+local required = Config.RebirthRequirement
+
+local function canRebirth()
+	return (player:GetAttribute("RoomReached") or 0) >= required
+end
 
 local function refresh()
 	local rebirths = player:GetAttribute("Rebirths") or 0
-	local cost = Config.RebirthCost(rebirths)
-	local affordable = aura.Value >= cost
+	local reached = player:GetAttribute("RoomReached") or 0
 
 	countLabel.Text = "Ребёртов: " .. rebirths
-	multiplierLabel.Text = ("Множитель: x%s → x%s"):format(
+	multiplierLabel.Text = ("Множитель Ауры: x%s → x%s"):format(
 		tostring(Config.RebirthMultiplier(rebirths)),
 		tostring(Config.RebirthMultiplier(rebirths + 1))
 	)
-	costLabel.Text = "Цена: " .. Format.Number(cost) .. " ✨"
-	progressFill.Size = UDim2.fromScale(math.clamp(aura.Value / cost, 0, 1), 1)
+	requirementLabel.Text = ("Условие: пройти комнату %d (сейчас %d/%d)"):format(required, reached, required)
+	progressFill.Size = UDim2.fromScale(math.clamp(reached / required, 0, 1), 1)
 
 	if confirming then
 		button.Text = "Точно? Нажми ещё раз"
 		button.BackgroundColor3 = Ui.Colors.Crit
-	elseif affordable then
+	elseif canRebirth() then
 		button.Text = "Сделать ребёрт"
 		button.BackgroundColor3 = Ui.Colors.Good
 	else
-		button.Text = "Не хватает Ауры"
+		button.Text = "Условие не выполнено"
 		button.BackgroundColor3 = Color3.fromRGB(120, 60, 70)
 	end
 end
@@ -112,22 +116,26 @@ local function flash()
 end
 
 local busy = false
+local confirmToken = 0
 button.Activated:Connect(function()
 	if busy then
 		return
 	end
-	local cost = Config.RebirthCost(player:GetAttribute("Rebirths") or 0)
-	if aura.Value < cost then
-		Ui.Toast("Нужно " .. Format.Number(cost) .. " Ауры", Ui.Colors.Bad)
+	if not canRebirth() then
+		Ui.Toast(("Сначала пройди комнату %d"):format(required), Ui.Colors.Bad)
 		return
 	end
 
 	if not confirming then
 		confirming = true
+		confirmToken += 1
+		local token = confirmToken
 		refresh()
 		task.delay(3, function()
-			confirming = false
-			refresh()
+			if token == confirmToken then
+				confirming = false
+				refresh()
+			end
 		end)
 		return
 	end
@@ -147,25 +155,22 @@ button.Activated:Connect(function()
 	refresh()
 end)
 
--- One-time hint when a rebirth becomes affordable.
-local notified = false
-aura.Changed:Connect(function()
-	if window.Frame.Visible then
-		refresh()
-	end
-	local cost = Config.RebirthCost(player:GetAttribute("Rebirths") or 0)
-	if not notified and aura.Value >= cost then
-		notified = true
-		Ui.Toast("🔁 Доступен ребёрт! Открой меню «Ребёрт»", Ui.Colors.Crit)
-	end
-end)
-player:GetAttributeChangedSignal("Rebirths"):Connect(function()
-	notified = false
-	refresh()
-end)
+player:GetAttributeChangedSignal("Rebirths"):Connect(refresh)
+player:GetAttributeChangedSignal("RoomReached"):Connect(refresh)
 window.OnOpen = refresh
 refresh()
 
-Panels.AddMenuButton("🔁", "Ребёрт", Color3.fromRGB(150, 80, 220), window)
+function Rebirth.Open()
+	if not window.Frame.Visible then
+		window.Open()
+	end
+end
+
+-- The altar in the hub opens this window.
+ProximityPromptService.PromptTriggered:Connect(function(prompt)
+	if prompt:GetAttribute("Action") == "RebirthAltar" then
+		Rebirth.Open()
+	end
+end)
 
 return Rebirth

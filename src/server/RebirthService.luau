@@ -1,16 +1,16 @@
 --[[
 	RebirthService.luau
-	Day 6: RebirthRequest:InvokeServer() -> (ok, message).
+	RebirthRequest:InvokeServer() -> (ok, message). Opened from the hub
+	altar, but the server re-checks everything.
 
-	Spends the rebirth cost, then resets Aura, weapons and backpacks.
-	Gems, pets and the rebirth count are kept; the new rebirth count
-	raises the permanent Aura multiplier (see Config.RebirthMultiplier).
+	Requirement: RoomReached >= Config.RebirthRequirement.
+	Resets Aura, weapons, backpacks and dungeon progress; keeps pets.
+	Rebirths + 1 -> permanent multiplier Config.RebirthMultiplier(n).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local Format = require(ReplicatedStorage.Shared.Format)
 local DataService = require(script.Parent.DataService)
 local Effects = require(script.Parent.Effects)
 local PlayerState = require(script.Parent.PlayerState)
@@ -24,10 +24,8 @@ local function rebirth(player)
 	if not data or not PlayerState.IsReady(player) then
 		return false, "Данные ещё загружаются"
 	end
-
-	local cost = Config.RebirthCost(data.Rebirths)
-	if PlayerState.GetAura(player) < cost then
-		return false, "Нужно " .. Format.Number(cost) .. " Ауры"
+	if data.RoomReached < Config.RebirthRequirement then
+		return false, ("Сначала пройди комнату %d (сейчас: %d)"):format(Config.RebirthRequirement, data.RoomReached)
 	end
 
 	data.Rebirths += 1
@@ -36,6 +34,7 @@ local function rebirth(player)
 	data.EquippedWeapon = "Stick"
 	data.OwnedBackpacks = {}
 	data.EquippedBackpack = ""
+	data.RoomReached = 0
 	PlayerState.Sync(player)
 	task.spawn(DataService.Save, player) -- big moment: don't wait for the autosave
 
@@ -44,9 +43,9 @@ local function rebirth(player)
 		Effects.Burst(root.Position, Color3.fromRGB(200, 140, 255), 120, 40, 1.6)
 	end
 
-	return true, ("Ребёрт %d! Аура теперь x%s"):format(
+	return true, ("Ребёрт %d! Аура навсегда x%s"):format(
 		data.Rebirths,
-		tostring(PlayerState.AuraMultiplier(player))
+		tostring(Config.RebirthMultiplier(data.Rebirths))
 	)
 end
 

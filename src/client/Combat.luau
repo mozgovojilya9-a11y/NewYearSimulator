@@ -1,9 +1,10 @@
 --[[
 	Combat.luau
-	Day 3: click (or tap) a mob in the world to hit it. The client only
-	reports *which* mob was clicked; the server checks range/cooldown,
-	rolls damage and answers with "Hit" / "Kill" events which we turn
-	into popups, flashes and sounds here.
+	Click (or tap) a dungeon mob or a hub trainer to hit it. The client
+	only reports WHICH model was clicked (ClickHit:FireServer(model));
+	the server checks range/cooldown/room access, rolls damage and
+	answers with "Hit" / "Kill" / "Train", which we turn into popups,
+	flashes and sounds here.
 ]]
 
 local Players = game:GetService("Players")
@@ -19,27 +20,37 @@ local player = Players.LocalPlayer
 
 local Combat = {}
 
-local mobHit = ReplicatedStorage:WaitForChild("MobHit")
-local mobsFolder = Workspace:WaitForChild("AuraZone"):WaitForChild("Mobs")
+local clickHit = ReplicatedStorage:WaitForChild("ClickHit")
+local mobsFolder = Workspace:WaitForChild("Dungeon"):WaitForChild("Mobs")
+local trainersFolder = Workspace:WaitForChild("Hub", 10)
+trainersFolder = trainersFolder and trainersFolder:WaitForChild("Trainers", 10)
 
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Include
-rayParams.FilterDescendantsInstances = { mobsFolder }
+rayParams.FilterDescendantsInstances = if trainersFolder then { mobsFolder, trainersFolder } else { mobsFolder }
 
 local lastSent = 0
+local lastHint = 0
 
-local function mobFromPart(part)
+local function targetFromPart(part)
 	local model = part and part:FindFirstAncestorOfClass("Model")
-	if model and model.Parent == mobsFolder then
+	if model and (model.Parent == mobsFolder or (trainersFolder and model.Parent == trainersFolder)) then
 		return model
 	end
 	return nil
 end
 
+local function hint(text)
+	if os.clock() - lastHint > 1.5 then
+		lastHint = os.clock()
+		Ui.Toast(text, Ui.Colors.Muted)
+	end
+end
+
 local function tryHitAt(ray: Ray)
 	local result = Workspace:Raycast(ray.Origin, ray.Direction * 500, rayParams)
-	local model = result and mobFromPart(result.Instance)
-	if not model then
+	local target = result and targetFromPart(result.Instance)
+	if not target then
 		return
 	end
 
@@ -47,16 +58,21 @@ local function tryHitAt(ray: Ray)
 	if now - lastSent < Config.Click.Cooldown then
 		return
 	end
-	lastSent = now
 
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if root and (root.Position - model:GetPivot().Position).Magnitude > Config.Zone.HitDistance then
-		Ui.Toast("Подойди ближе к мобу!", Ui.Colors.Muted)
+	if root and (root.Position - target:GetPivot().Position).Magnitude > Config.Click.Range then
+		hint("Подойди ближе!")
+		return
+	end
+	local room = target:GetAttribute("Room")
+	if room and (player:GetAttribute("RoomReached") or 0) < room - 1 then
+		hint(("Сначала пройди комнату %d"):format(room - 1))
 		return
 	end
 
-	mobHit:FireServer(model)
+	lastSent = now
+	clickHit:FireServer(target)
 end
 
 UserInputService.InputBegan:Connect(function(input, processed)
@@ -72,7 +88,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	end
 end)
 
--- Brief white flash on the mob that was hit.
+-- Brief flash on the model that was hit.
 local function flash(model, isCrit)
 	local highlight = Instance.new("Highlight")
 	highlight.FillColor = if isCrit then Ui.Colors.Crit else Color3.new(1, 1, 1)
@@ -87,29 +103,40 @@ local function flash(model, isCrit)
 	end)
 end
 
-mobHit.OnClientEvent:Connect(function(kind, ...)
+local function topOf(model)
+	return model:GetPivot().Position + Vector3.new(0, model:GetExtentsSize().Y / 2, 0)
+end
+
+clickHit.OnClientEvent:Connect(function(kind, ...)
 	if kind == "Hit" then
 		local model, damage, isCrit = ...
 		if not model or not model.Parent then
 			return
 		end
-		local top = model:GetPivot().Position + Vector3.new(0, model:GetExtentsSize().Y / 2, 0)
 		Ui.WorldPopup(
-			top,
+			topOf(model),
 			(if isCrit then "КРИТ! -" else "-") .. Format.Number(damage),
 			if isCrit then Ui.Colors.Crit else Ui.Colors.Text,
 			if isCrit then 36 else 26
 		)
 		flash(model, isCrit)
 		Ui.PlaySound(Config.Sounds.Hit, if isCrit then 0.8 else 1 + (math.random() - 0.5) * 0.2, 0.4)
-	elseif kind == "Kill" then
-		local position, aura, gems = ...
-		Ui.WorldPopup(position + Vector3.new(0, 2, 0), "+" .. Format.Number(aura) .. " ✨", Ui.Colors.Aura, 32)
-		if gems > 0 then
-			task.delay(0.15, function()
-				Ui.WorldPopup(position + Vector3.new(0, 4, 0), "+" .. gems .. " 💎", Ui.Colors.Gems, 32)
-			end)
+	elseif kind == "Train" then
+		local model, aura, isCrit = ...
+		if not model or not model.Parent then
+			return
 		end
+		Ui.WorldPopup(
+			topOf(model),
+			(if isCrit then "КРИТ! +" else "+") .. Format.Number(aura) .. " ✨",
+			if isCrit then Ui.Colors.Crit else Ui.Colors.Aura,
+			if isCrit then 34 else 24
+		)
+		flash(model, isCrit)
+		Ui.PlaySound(Config.Sounds.Click, if isCrit then 0.7 else 1 + (math.random() - 0.5) * 0.15, 0.5)
+	elseif kind == "Kill" then
+		local position, aura = ...
+		Ui.WorldPopup(position + Vector3.new(0, 2, 0), "+" .. Format.Number(aura) .. " ✨", Ui.Colors.Aura, 32)
 		Ui.PlaySound(Config.Sounds.Click, 1.4, 0.6)
 	end
 end)

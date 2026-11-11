@@ -22,14 +22,6 @@ local aura = player:WaitForChild("leaderstats"):WaitForChild("Aura")
 
 local Shop = {}
 
-local CURRENCY_ICON = { Aura = "✨", Gems = "💎" }
-
-local function balance(currency)
-	if currency == "Gems" then
-		return player:GetAttribute("Gems") or 0
-	end
-	return aura.Value
-end
 
 local function ownedSet(category)
 	local set = {}
@@ -129,10 +121,15 @@ local function makeRow(parent, category, item, order)
 			button.Text = "Надеть"
 			button.BackgroundColor3 = Color3.fromRGB(70, 130, 230)
 			button.AutoButtonColor = true
+		elseif item.Unique then
+			state = "stand"
+			button.Text = "Стенд в хабе"
+			button.BackgroundColor3 = Color3.fromRGB(80, 80, 95)
+			button.AutoButtonColor = false
 		else
 			state = "buy"
-			button.Text = Format.Number(item.Cost) .. " " .. CURRENCY_ICON[shop.Currency]
-			local affordable = balance(shop.Currency) >= item.Cost
+			button.Text = Format.Number(item.Cost) .. " ✨"
+			local affordable = aura.Value >= item.Cost
 			button.BackgroundColor3 = if affordable then Ui.Colors.Good else Color3.fromRGB(120, 60, 70)
 			button.AutoButtonColor = affordable
 		end
@@ -216,7 +213,6 @@ function Shop.MakeWindow(title: string, icon: string, color: Color3, categories:
 		player:GetAttributeChangedSignal("Owned" .. category):Connect(refresh)
 		player:GetAttributeChangedSignal("Equipped" .. category):Connect(refresh)
 	end
-	player:GetAttributeChangedSignal("Gems"):Connect(refresh)
 	aura.Changed:Connect(function()
 		if window.Frame.Visible then
 			refresh()

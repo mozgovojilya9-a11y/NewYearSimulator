@@ -26,8 +26,7 @@ function PlayerState.IsReady(player): boolean
 	return DataService.Get(player) ~= nil and auraValue(player) ~= nil
 end
 
--- Damage of one click before crit. Used both for the click button and
--- for hitting mobs.
+-- Damage of one click before crit (mobs and trainers).
 function PlayerState.ClickPower(player): number
 	local data = DataService.Get(player)
 	local weapon = data and Config.ItemById.Weapon[data.EquippedWeapon]
@@ -95,22 +94,33 @@ function PlayerState.SpendAura(player, cost: number): boolean
 	return true
 end
 
-function PlayerState.AddGems(player, amount: number)
+function PlayerState.GetRoomReached(player): number
 	local data = DataService.Get(player)
-	if not data then
-		return
-	end
-	data.Gems += amount
-	player:SetAttribute("Gems", data.Gems)
+	return if data then data.RoomReached else 0
 end
 
-function PlayerState.SpendGems(player, cost: number): boolean
+-- Records that the player cleared a room. Returns true if it is a new record.
+function PlayerState.ReachRoom(player, room: number): boolean
 	local data = DataService.Get(player)
-	if not data or data.Gems < cost then
+	if not data or data.RoomReached >= room then
 		return false
 	end
-	data.Gems -= cost
-	player:SetAttribute("Gems", data.Gems)
+	data.RoomReached = room
+	PlayerState.Sync(player)
+	return true
+end
+
+-- Gives a pet if the player doesn't own it yet. Returns true if given.
+function PlayerState.GrantPet(player, petId: string): boolean
+	local data = DataService.Get(player)
+	if not data or data.OwnedPets[petId] or not Config.ItemById.Pet[petId] then
+		return false
+	end
+	data.OwnedPets[petId] = true
+	if data.EquippedPet == "" then
+		data.EquippedPet = petId
+	end
+	PlayerState.Sync(player)
 	return true
 end
 
@@ -121,14 +131,14 @@ function PlayerState.Sync(player)
 	if not data then
 		return
 	end
-	player:SetAttribute("Gems", data.Gems)
 	player:SetAttribute("Rebirths", data.Rebirths)
+	player:SetAttribute("RoomReached", data.RoomReached)
 	player:SetAttribute("ClickPower", PlayerState.ClickPower(player))
 
 	local leaderstats = player:FindFirstChild("leaderstats")
-	local rebirths = leaderstats and leaderstats:FindFirstChild("Rebirths")
-	if rebirths then
-		rebirths.Value = data.Rebirths
+	if leaderstats then
+		leaderstats.Rebirths.Value = data.Rebirths
+		leaderstats.Room.Value = data.RoomReached
 	end
 
 	-- Shop state per category: "EquippedWeapon" = "IronSword",
@@ -151,3 +161,4 @@ function PlayerState.Sync(player)
 end
 
 return PlayerState
+

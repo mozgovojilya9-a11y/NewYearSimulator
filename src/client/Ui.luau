@@ -20,7 +20,6 @@ Ui.Colors = {
 	Muted = Color3.fromRGB(200, 200, 215),
 	Crit = Color3.fromRGB(255, 205, 70),
 	Aura = Color3.fromRGB(205, 160, 255),
-	Gems = Color3.fromRGB(110, 230, 255),
 	Accent = Color3.fromRGB(150, 90, 255),
 	Panel = Color3.fromRGB(28, 22, 42),
 	PanelLight = Color3.fromRGB(45, 36, 66),
@@ -156,5 +155,18 @@ function Ui.Toast(text: string, color: Color3?)
 		label:Destroy()
 	end)
 end
+
+-- Server -> client toasts (room cleared, pet drop, stand purchase...).
+local KIND_COLORS = {
+	good = Ui.Colors.Good,
+	bad = Ui.Colors.Bad,
+	gold = Ui.Colors.Crit,
+}
+task.spawn(function()
+	local notify = game:GetService("ReplicatedStorage"):WaitForChild("Notify")
+	notify.OnClientEvent:Connect(function(text, kind)
+		Ui.Toast(tostring(text), KIND_COLORS[kind])
+	end)
+end)
 
 return Ui

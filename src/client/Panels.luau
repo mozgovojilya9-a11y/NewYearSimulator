@@ -18,7 +18,7 @@ local menu = Instance.new("Frame")
 menu.Name = "Menu"
 menu.AnchorPoint = Vector2.new(0, 0.5)
 menu.Position = UDim2.new(0, 12, 0.5, 0)
-menu.Size = UDim2.fromOffset(84, 300)
+menu.Size = UDim2.fromOffset(84, 400)
 menu.BackgroundTransparency = 1
 menu.Parent = Ui.Gui
 local menuLayout = Instance.new("UIListLayout")
@@ -118,7 +118,7 @@ function Panels.Create(title: string)
 end
 
 local menuOrder = 0
-function Panels.AddMenuButton(icon: string, label: string, color: Color3, window)
+function Panels.AddMenuButton(icon: string, label: string, color: Color3, target)
 	menuOrder += 1
 
 	local button = Instance.new("TextButton")
@@ -151,7 +151,12 @@ function Panels.AddMenuButton(icon: string, label: string, color: Color3, window
 	textLabel.Parent = button
 	Ui.Stroke(textLabel, 1.5)
 
-	button.Activated:Connect(window.Open)
+	-- target: a window from Panels.Create, or a plain function.
+	if type(target) == "function" then
+		button.Activated:Connect(target)
+	else
+		button.Activated:Connect(target.Open)
+	end
 	return button
 end
 

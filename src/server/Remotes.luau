@@ -23,6 +23,11 @@ function Remotes.Get(name)
 	return remote
 end
 
+-- Shows a toast on one player's screen. kind: "good" | "bad" | "gold" | nil
+function Remotes.Notify(player, text: string, kind: string?)
+	Remotes.Get("Notify"):FireClient(player, text, kind)
+end
+
 function Remotes.Init()
 	for name in pairs(Config.Remotes) do
 		Remotes.Get(name)

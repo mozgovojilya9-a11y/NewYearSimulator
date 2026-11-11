@@ -1,13 +1,13 @@
 --[[
 	TopBar.luau
-	Slim bar at the top: Aura (smoothly counts up), Gems and online
-	count. Reads leaderstats.Aura and the "Gems" player attribute, so it
-	stays correct whatever system changes them.
+	Slim bar at the top: Aura (smoothly counts up), dungeon progress and
+	online count, plus a stats line (damage, income, multiplier).
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Ui = require(script.Parent.Ui)
 
@@ -39,13 +39,13 @@ local function makeLabel(name, xScale, xOffset, width, align, font, size, color)
 end
 
 local auraLabel = makeLabel("AuraLabel", 0, 12, 0.4, Enum.TextXAlignment.Left, Enum.Font.GothamBold, 20, Ui.Colors.Text)
-local gemsLabel = makeLabel("GemsLabel", 0.4, 0, 0.25, Enum.TextXAlignment.Left, Enum.Font.GothamBold, 18, Ui.Colors.Gems)
+local roomLabel = makeLabel("RoomLabel", 0.4, 0, 0.25, Enum.TextXAlignment.Left, Enum.Font.GothamBold, 18, Ui.Colors.Crit)
 local onlineLabel = makeLabel("OnlineLabel", 0.65, 0, 0.35, Enum.TextXAlignment.Right, Enum.Font.Gotham, 16, Ui.Colors.Muted)
 
 local auraScale = Instance.new("UIScale")
 auraScale.Parent = auraLabel
-local gemsScale = Instance.new("UIScale")
-gemsScale.Parent = gemsLabel
+local roomScale = Instance.new("UIScale")
+roomScale.Parent = roomLabel
 
 -- Online
 local function updateOnline()
@@ -55,16 +55,16 @@ Players.PlayerAdded:Connect(updateOnline)
 Players.PlayerRemoving:Connect(updateOnline)
 updateOnline()
 
--- Gems
-local function updateGems()
-	gemsLabel.Text = "💎 " .. Format.Number(player:GetAttribute("Gems") or 0)
+-- Dungeon progress
+local function updateRoom()
+	roomLabel.Text = ("🏰 Комнаты: %d/%d"):format(player:GetAttribute("RoomReached") or 0, Config.Dungeon.Rooms)
 end
-player:GetAttributeChangedSignal("Gems"):Connect(function()
-	updateGems()
-	gemsScale.Scale = 1.25
-	Ui.Tween(gemsScale, 0.25, { Scale = 1 })
+player:GetAttributeChangedSignal("RoomReached"):Connect(function()
+	updateRoom()
+	roomScale.Scale = 1.25
+	Ui.Tween(roomScale, 0.25, { Scale = 1 })
 end)
-updateGems()
+updateRoom()
 
 -- Stats line under the bar: damage, passive income, multiplier.
 local statsLabel = Instance.new("TextLabel")
