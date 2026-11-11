@@ -101,6 +101,13 @@ Config.Dungeon = {
 	},
 }
 
+-- The player in combat. Health regenerates only when nothing hit the
+-- player for RegenDelay seconds (the default Roblox regen is disabled).
+Config.Player = {
+	RegenDelay = 4,
+	RegenPerSecond = 6,
+}
+
 function Config.IsBossRoom(room: number): boolean
 	return room % Config.Dungeon.BossEvery == 0
 end

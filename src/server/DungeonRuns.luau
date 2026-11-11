@@ -95,6 +95,19 @@ local function roomBarrierText(room, alive, total)
 	end
 end
 
+-- The barrier is private, so its "Рекомендуемый урон" line can be
+-- colored for this player: green when their damage is enough.
+local function refreshRecommended(run, room)
+	if not room or not room.Barrier then
+		return
+	end
+	local label = room.Barrier:FindFirstChild("Text") and room.Barrier.Text:FindFirstChild("Recommended")
+	if label then
+		local enough = PlayerState.ClickPower(run.player) >= Config.RecommendedDamage(room.Index)
+		label.TextColor3 = if enough then Config.Theme.Green else Config.Theme.Red
+	end
+end
+
 local function openBarrier(room)
 	local barrier = room.Barrier
 	if not barrier then
@@ -130,6 +143,7 @@ local function ensureRoom(run, index)
 		end
 	end
 	run.rooms[index] = room
+	refreshRecommended(run, room)
 end
 
 local function destroyRoom(run, index)
@@ -415,6 +429,16 @@ function DungeonRuns.Hit(player, model)
 	end
 end
 
+-- Weapon changed mid-run: recolor the hint on the rooms that exist.
+function DungeonRuns.RefreshHints(player)
+	local run = runs[player]
+	if run then
+		for _, room in pairs(run.rooms) do
+			refreshRecommended(run, room)
+		end
+	end
+end
+
 -- For MobAI: the run a mob belongs to.
 function DungeonRuns.RunOf(model)
 	local info = mobInfo[model]
@@ -440,6 +464,12 @@ function DungeonRuns.Init()
 	for _, player in ipairs(Players:GetPlayers()) do
 		watch(player)
 	end
+	-- Hint colors follow the equipped weapon.
+	Players.PlayerAdded:Connect(function(player)
+		player:GetAttributeChangedSignal("ClickPower"):Connect(function()
+			DungeonRuns.RefreshHints(player)
+		end)
+	end)
 end
 
 return DungeonRuns

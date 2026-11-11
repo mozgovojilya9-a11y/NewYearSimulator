@@ -43,8 +43,7 @@
         "$path": "src/client"
       },
       "StarterCharacterScripts": {
-        "$className": "StarterCharacterScripts",
-        "$ignoreUnknownInstances": false
+        "$path": "src/character"
       }
     }
   }

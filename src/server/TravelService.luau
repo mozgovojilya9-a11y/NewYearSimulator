@@ -10,7 +10,6 @@
 ]]
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local PlayerState = require(script.Parent.PlayerState)

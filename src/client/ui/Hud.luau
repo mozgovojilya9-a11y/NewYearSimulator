@@ -34,6 +34,30 @@ local objective = Style.Label(Style.Gui, "", 30, Style.Colors.Text, {
 local objectiveScale = Instance.new("UIScale")
 objectiveScale.Parent = objective
 
+-- Second line: recommended damage for the room you are in.
+local hintLabel = Style.Label(Style.Gui, "", 20, Style.Colors.Text, {
+	Name = "Hint",
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, Config.Hud.TopLeftReserved.Y + 46),
+	Size = UDim2.fromOffset(600, 26),
+	ZIndex = 5,
+})
+hintLabel.Visible = false
+
+local hintRoom = nil
+local function refreshHint()
+	if not hintRoom then
+		hintLabel.Visible = false
+		return
+	end
+	local recommended = Config.RecommendedDamage(hintRoom)
+	local mine = player:GetAttribute("ClickPower") or 1
+	hintLabel.Text = Config.DungeonLayout.Texts.Recommended:format(Format.Number(recommended)) .. ("  (у тебя %s)"):format(Format.Number(mine))
+	hintLabel.TextColor3 = if mine >= recommended then Style.Colors.Green else Style.Colors.Red
+	hintLabel.Visible = true
+end
+player:GetAttributeChangedSignal("ClickPower"):Connect(refreshHint)
+
 local currentRoomAlive = nil -- alive count in the room the player is in (nil = unknown)
 local function setObjective(text)
 	if objective.Text ~= text then
@@ -61,6 +85,8 @@ local roomAlive = {} -- [room] = alive
 function Hud.SetCurrentRoom(room: number?)
 	currentRoom = room
 	currentRoomAlive = if room then roomAlive[room] else nil
+	hintRoom = room
+	refreshHint()
 	refreshObjective()
 end
 roomState.OnClientEvent:Connect(function(room, alive)
