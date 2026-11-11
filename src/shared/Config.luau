@@ -173,6 +173,23 @@ Config.Hub = {
 	StandRotationMinutes = 30, -- the unique-weapon stand swaps its weapon this often
 }
 
+-- Equipment on the character (visual only). Grip = offset of the weapon
+-- Handle from the hand part; Back = offset of the backpack Body from the
+-- torso. Swing: shoulder Motor6D rotation per rig type and timing.
+Config.Equipment = {
+	GripR6 = CFrame.new(0, -1, -0.6) * CFrame.Angles(math.rad(-90), 0, 0),
+	GripR15 = CFrame.new(0, -0.3, -0.6) * CFrame.Angles(math.rad(-90), 0, 0),
+	BackR6 = CFrame.new(0, 0.2, 0.9),
+	BackR15 = CFrame.new(0, 0.1, 0.9),
+	Swing = {
+		RaiseR6 = CFrame.Angles(0, 0, math.rad(110)),
+		RaiseR15 = CFrame.Angles(math.rad(-110), 0, 0),
+		UpSeconds = 0.06,
+		DownSeconds = 0.1,
+		TrailLifetime = 0.25,
+	},
+}
+
 -- Leaderboards (OrderedDataStore). Scores are written on every save.
 Config.Leaderboards = {
 	AuraStore = "AuraClicker_TopAura_v1",

@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Popups = require(script.Parent.Parent.Popups)
+local Preview = require(script.Parent.Parent.Preview)
 local Style = require(script.Parent.Parent.Style)
 local Window = require(script.Parent.Window)
 
@@ -74,15 +75,18 @@ local function makeCard(parent, category, item, order)
 		Style.Rainbow(stroke)
 	end
 
-	local swatch = Instance.new("Frame")
-	swatch.Position = UDim2.fromOffset(10, 10)
-	swatch.Size = UDim2.fromOffset(52, 52)
-	swatch.BackgroundColor3 = item.Color
-	swatch.ZIndex = 34
-	swatch.Parent = card
-	Style.Corner(swatch, UDim.new(0, 12))
-	Style.Stroke(swatch, 2.5)
-	Style.Gradient(swatch, item.Color)
+	-- Rotating model preview; pets fall back to a color swatch.
+	if not Preview.Create(card, category, item, UDim2.fromOffset(52, 52), UDim2.fromOffset(10, 10)) then
+		local swatch = Instance.new("Frame")
+		swatch.Position = UDim2.fromOffset(10, 10)
+		swatch.Size = UDim2.fromOffset(52, 52)
+		swatch.BackgroundColor3 = item.Color
+		swatch.ZIndex = 34
+		swatch.Parent = card
+		Style.Corner(swatch, UDim.new(0, 12))
+		Style.Stroke(swatch, 2.5)
+		Style.Gradient(swatch, item.Color)
+	end
 
 	Style.Label(card, item.Name, 20, Style.Colors.Outline, {
 		Position = UDim2.fromOffset(72, 8), Size = UDim2.new(1, -230, 0, 24),

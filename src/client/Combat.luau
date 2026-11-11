@@ -17,6 +17,7 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local HubFx = require(script.Parent.HubFx)
 local Popups = require(script.Parent.ui.Popups)
 local Style = require(script.Parent.ui.Style)
+local Swing = require(script.Parent.Swing)
 
 local player = Players.LocalPlayer
 
@@ -79,6 +80,7 @@ local function tryHitAt(ray: Ray)
 		end
 	end
 	lastSent = now
+	Swing.Local()
 	clickHit:FireServer(target)
 end
 

@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local DungeonService = require(script.Parent.DungeonService)
+local EquipmentService = require(script.Parent.EquipmentService)
 local HubService = require(script.Parent.HubService)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
@@ -57,6 +58,7 @@ function ClickService.Init(trainers: Folder?)
 			return
 		end
 
+		EquipmentService.Swing(player)
 		if mob then
 			DungeonService.Hit(player, target)
 		else
