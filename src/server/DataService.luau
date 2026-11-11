@@ -3,17 +3,31 @@
 	Server-only module. Owns loading, caching and saving each player's
 	persistent data. Nothing outside ServerScriptService should touch
 	the DataStore directly -- go through this module instead.
+
+	Safety rules (Day 7):
+	- Loads are retried. If the DataStore still fails, the player plays
+	  on default data but that data is NEVER saved, so a temporary
+	  Roblox outage can't overwrite real progress with zeros.
+	- Saves are retried.
+	- If the player leaves while their data is still loading, the
+	  result is discarded instead of being cached forever.
+	- On server shutdown every loaded player is saved (BindToClose).
 ]]
 
 local DataStoreService = game:GetService("DataStoreService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 
 local DataService = {}
 
+local RETRIES = 3
+local RETRY_DELAY = 2
+
 local store = DataStoreService:GetDataStore(Config.DataStoreName)
 local cache = {} -- [userId] = data table
+local noSave = {} -- [userId] = true when load failed
 
 local function deepCopy(original)
 	local copy = {}
@@ -27,18 +41,40 @@ local function deepCopy(original)
 	return copy
 end
 
--- Loads (or initializes) a player's data and stores it in the cache.
--- Safe to call once per PlayerAdded.
-function DataService.Load(player)
-	local key = "player_" .. player.UserId
-	local data
+local function keyFor(player)
+	return "player_" .. player.UserId
+end
 
-	local ok, err = pcall(function()
-		data = store:GetAsync(key)
+-- Runs fn up to RETRIES times. Returns ok, result.
+local function withRetries(label, player, fn)
+	local lastError
+	for attempt = 1, RETRIES do
+		local ok, result = pcall(fn)
+		if ok then
+			return true, result
+		end
+		lastError = result
+		warn(("[DataService] %s failed for %s (attempt %d/%d): %s"):format(
+			label, player.Name, attempt, RETRIES, tostring(result)
+		))
+		if attempt < RETRIES then
+			task.wait(RETRY_DELAY)
+		end
+	end
+	return false, lastError
+end
+
+-- Loads (or initializes) a player's data and stores it in the cache.
+-- Returns nil if the player left before loading finished.
+function DataService.Load(player)
+	local key = keyFor(player)
+	local ok, data = withRetries("GetAsync", player, function()
+		return store:GetAsync(key)
 	end)
 
 	if not ok then
-		warn(("[DataService] GetAsync failed for %s: %s"):format(player.Name, tostring(err)))
+		noSave[player.UserId] = true
+		warn(("[DataService] Could not load %s; progress this session will NOT be saved."):format(player.Name))
 	end
 
 	if type(data) ~= "table" then
@@ -46,12 +82,17 @@ function DataService.Load(player)
 	else
 		-- Backfill any fields added to StartingData since this player's
 		-- last save, without clobbering their existing progress.
-		for key2, defaultValue in pairs(Config.StartingData) do
-			if data[key2] == nil then
+		for field, defaultValue in pairs(Config.StartingData) do
+			if data[field] == nil then
 				-- copy tables so players never share one default table
-				data[key2] = if type(defaultValue) == "table" then deepCopy(defaultValue) else defaultValue
+				data[field] = if type(defaultValue) == "table" then deepCopy(defaultValue) else defaultValue
 			end
 		end
+	end
+
+	if player.Parent == nil then
+		noSave[player.UserId] = nil
+		return nil -- left during the load
 	end
 
 	cache[player.UserId] = data
@@ -66,24 +107,40 @@ end
 -- Persists the cached data table for a player to the DataStore.
 function DataService.Save(player)
 	local data = cache[player.UserId]
-	if not data then
+	if not data or noSave[player.UserId] then
 		return
 	end
 
-	local key = "player_" .. player.UserId
-	local ok, err = pcall(function()
-		store:SetAsync(key, data)
+	local key = keyFor(player)
+	withRetries("SetAsync", player, function()
+		store:SetAsync(key, data, { player.UserId })
 	end)
-
-	if not ok then
-		warn(("[DataService] SetAsync failed for %s: %s"):format(player.Name, tostring(err)))
-	end
 end
 
 -- Saves and clears a player's cache entry. Call on PlayerRemoving.
 function DataService.Release(player)
 	DataService.Save(player)
 	cache[player.UserId] = nil
+	noSave[player.UserId] = nil
 end
+
+-- Server shutdown: save everyone in parallel and wait (Roblox gives
+-- BindToClose up to 30 seconds).
+game:BindToClose(function()
+	local pending = 0
+	for _, player in ipairs(Players:GetPlayers()) do
+		if cache[player.UserId] then
+			pending += 1
+			task.spawn(function()
+				DataService.Save(player)
+				pending -= 1
+			end)
+		end
+	end
+	local started = os.clock()
+	while pending > 0 and os.clock() - started < 25 do
+		task.wait(0.1)
+	end
+end)
 
 return DataService

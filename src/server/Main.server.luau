@@ -23,8 +23,18 @@ MobService.Init()
 ShopService.Init()
 RebirthService.Init()
 
+local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)
+
 local function onPlayerAdded(player)
+	if started[player] then
+		return
+	end
+	started[player] = true
+
 	local data = DataService.Load(player)
+	if not data then
+		return -- left while loading
+	end
 
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
@@ -41,7 +51,7 @@ local function onPlayerAdded(player)
 	rebirths.Parent = leaderstats
 
 	-- Keep the cached data table in sync whenever Aura changes, from
-	-- wherever it changes (ClickService, later mobs/pets/rebirth).
+	-- wherever it changes (clicks, mobs, backpacks, rebirth).
 	aura.Changed:Connect(function(newValue)
 		data.Aura = newValue
 	end)
@@ -50,6 +60,7 @@ local function onPlayerAdded(player)
 end
 
 local function onPlayerRemoving(player)
+	started[player] = nil
 	DataService.Release(player)
 end
 

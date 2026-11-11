@@ -37,11 +37,6 @@ Config.Click = {
 	Cooldown = 0.1, -- minimum seconds between accepted clicks per player
 }
 
--- Name of the RemoteEvent the server creates in ReplicatedStorage.
--- Client -> Server: FireServer() asks for a click.
--- Server -> Client: FireClient(player, amount, isCrit) confirms it.
-Config.ClickRemoteName = "ClickHit"
-
 -- Built-in Roblox client sounds, so no uploaded asset is needed.
 -- Swap for your own rbxassetid:// later if you want.
 Config.Sounds = {
@@ -106,7 +101,7 @@ Config.Remotes = {
 --   multiplier = 1 + Rebirths * MultiplierPerRebirth
 --   cost       = BaseCost * CostGrowth ^ Rebirths
 Config.Rebirth = {
-	BaseCost = 25000,
+	BaseCost = 50000, -- Day 7 balance: first rebirth after ~10-15 min
 	CostGrowth = 3,
 	MultiplierPerRebirth = 1,
 }
