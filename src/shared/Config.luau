@@ -17,6 +17,7 @@ Config.StartingData = {
 	EquippedWeapon = "Stick",
 	Rebirths = 0,
 	Gems = 0, -- Day 3: second currency, dropped by mobs
+	OwnedWeapons = { Stick = true }, -- Day 4
 }
 
 -- Autosave interval (seconds) as a safety net in addition to
@@ -42,6 +43,7 @@ Config.ClickRemoteName = "ClickHit"
 Config.Sounds = {
 	Click = "rbxasset://sounds/electronicpingshort.wav",
 	Hit = "rbxasset://sounds/swordslash.wav",
+	Buy = "rbxasset://sounds/electronicpingshort.wav", -- played at a higher pitch
 }
 
 -- Day 3: the first zone and its mobs.
@@ -90,6 +92,40 @@ end
 Config.Remotes = {
 	ClickHit = "RemoteEvent",
 	MobHit = "RemoteEvent",
+	ShopRequest = "RemoteFunction", -- Day 4: (action, category, id) -> ok, message
 }
+
+-- Day 4: weapons. Damage multiplies click power (button and mobs).
+-- IDs are saved in player data: never rename them.
+Config.Weapons = {
+	{ Id = "Stick", Name = "Палка", Damage = 1, Cost = 0, Color = Color3.fromRGB(150, 110, 70) },
+	{ Id = "WoodSword", Name = "Деревянный меч", Damage = 3, Cost = 100, Color = Color3.fromRGB(200, 150, 90) },
+	{ Id = "IronSword", Name = "Железный меч", Damage = 10, Cost = 1200, Color = Color3.fromRGB(190, 200, 215) },
+	{ Id = "AuraKatana", Name = "Катана Ауры", Damage = 35, Cost = 12000, Color = Color3.fromRGB(190, 110, 255) },
+}
+
+-- Shop categories. Each one says where the list lives, which save
+-- fields hold owned/equipped items, the currency and how to describe
+-- an item's stat in the UI.
+Config.Shop = {
+	Weapon = {
+		Title = "Оружие",
+		Items = Config.Weapons,
+		OwnedKey = "OwnedWeapons",
+		EquippedKey = "EquippedWeapon",
+		Currency = "Aura",
+		Describe = function(item)
+			return "Урон x" .. item.Damage
+		end,
+	},
+}
+
+Config.ItemById = {} -- [category][id] = item
+for category, shop in pairs(Config.Shop) do
+	Config.ItemById[category] = {}
+	for _, item in ipairs(shop.Items) do
+		Config.ItemById[category][item.Id] = item
+	end
+end
 
 return Config

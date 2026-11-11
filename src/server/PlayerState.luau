@@ -28,8 +28,11 @@ end
 
 -- Damage of one click before crit. Used both for the click button and
 -- for hitting mobs.
-function PlayerState.ClickPower(_player): number
-	return Config.Click.BaseDamage
+function PlayerState.ClickPower(player): number
+	local data = DataService.Get(player)
+	local weapon = data and Config.ItemById.Weapon[data.EquippedWeapon]
+	local weaponDamage = if weapon then weapon.Damage else 1
+	return Config.Click.BaseDamage * weaponDamage
 end
 
 -- Multiplier applied to every Aura gain (clicks, kills, passive income).
@@ -106,6 +109,19 @@ function PlayerState.Sync(player)
 	end
 	player:SetAttribute("Gems", data.Gems)
 	player:SetAttribute("ClickPower", PlayerState.ClickPower(player))
+
+	-- Shop state per category: "EquippedWeapon" = "IronSword",
+	-- "OwnedWeapon" = "Stick,WoodSword,IronSword".
+	for category, shop in pairs(Config.Shop) do
+		local owned = {}
+		for _, item in ipairs(shop.Items) do
+			if data[shop.OwnedKey][item.Id] then
+				table.insert(owned, item.Id)
+			end
+		end
+		player:SetAttribute("Owned" .. category, table.concat(owned, ","))
+		player:SetAttribute("Equipped" .. category, data[shop.EquippedKey] or "")
+	end
 	player:SetAttribute("AuraMultiplier", PlayerState.AuraMultiplier(player))
 end
 

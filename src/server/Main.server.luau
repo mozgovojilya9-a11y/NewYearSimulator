@@ -12,12 +12,14 @@ local PlayerState = require(script.Parent.PlayerState)
 local Remotes = require(script.Parent.Remotes)
 local ClickService = require(script.Parent.ClickService)
 local MobService = require(script.Parent.MobService)
+local ShopService = require(script.Parent.ShopService)
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 
 -- Create every RemoteEvent before any client can look for it.
 Remotes.Init()
 ClickService.Init()
 MobService.Init()
+ShopService.Init()
 
 local function onPlayerAdded(player)
 	local data = DataService.Load(player)

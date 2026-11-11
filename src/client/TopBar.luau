@@ -66,6 +66,42 @@ player:GetAttributeChangedSignal("Gems"):Connect(function()
 end)
 updateGems()
 
+-- Stats line under the bar: damage, passive income, multiplier.
+local statsLabel = Instance.new("TextLabel")
+statsLabel.Name = "Stats"
+statsLabel.AnchorPoint = Vector2.new(0.5, 0)
+statsLabel.Position = UDim2.new(0.5, 0, 0, 48)
+statsLabel.AutomaticSize = Enum.AutomaticSize.X
+statsLabel.Size = UDim2.fromOffset(0, 26)
+statsLabel.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+statsLabel.BackgroundTransparency = 0.3
+statsLabel.Font = Enum.Font.GothamBold
+statsLabel.TextSize = 15
+statsLabel.TextColor3 = Ui.Colors.Muted
+statsLabel.Parent = Ui.Gui
+Ui.Corner(statsLabel, UDim.new(0, 8))
+local statsPadding = Instance.new("UIPadding")
+statsPadding.PaddingLeft = UDim.new(0, 12)
+statsPadding.PaddingRight = UDim.new(0, 12)
+statsPadding.Parent = statsLabel
+
+local function updateStats()
+	local parts = {
+		"⚔ Урон: " .. Format.Number(player:GetAttribute("ClickPower") or 1),
+	}
+	local perSecond = player:GetAttribute("AuraPerSecond") or 0
+	if perSecond > 0 then
+		table.insert(parts, "🎒 +" .. Format.Number(perSecond) .. "/сек")
+	end
+	local multiplier = player:GetAttribute("AuraMultiplier") or 1
+	table.insert(parts, "✖ Аура x" .. (math.floor(multiplier * 100 + 0.5) / 100))
+	statsLabel.Text = table.concat(parts, "   ")
+end
+for _, attribute in ipairs({ "ClickPower", "AuraPerSecond", "AuraMultiplier" }) do
+	player:GetAttributeChangedSignal(attribute):Connect(updateStats)
+end
+updateStats()
+
 -- Aura: animate the shown number towards the real value.
 local aura = player:WaitForChild("leaderstats"):WaitForChild("Aura")
 

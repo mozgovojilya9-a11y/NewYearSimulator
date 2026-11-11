@@ -13,14 +13,14 @@ multipliers.
 - `src/client/Client.client.luau` — top bar UI (Aura + online), click button, floating numbers, crit effect and click sound.
 - `default.project.json` — Rojo DataModel mapping.
 
-## Current status (Day 3 of 7)
+## Current status (Day 4 of 7)
 
 - [x] Rojo project structure
 - [x] Player data persistence (Aura, Zone, EquippedWeapon, Rebirths)
 - [x] Top bar UI (Aura + online count)
 - [x] Click mechanic: +1 Aura per click, 10% crit x5, server-side cooldown (Day 2)
 - [x] Zone "Поляна Ауры" with 4 mob types (incl. boss), click damage, respawn, Aura + 💎 Gem drops (Day 3)
-- [ ] Weapons and shop (Day 4)
+- [x] Shop with 4 weapons (Палка → Катана Ауры), buy/equip, damage multiplier (Day 4)
 - [ ] Backpacks and pets (Day 5)
 - [ ] Rebirth system (Day 6)
 - [ ] Balance pass and release (Day 7)
