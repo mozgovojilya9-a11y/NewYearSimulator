@@ -59,20 +59,42 @@ Config.Dungeon = {
 	MobsMin = 3,
 	MobsMax = 5,
 
-	-- Normal mob HP in room r = BaseHealth * HealthGrowth^(r-1).
-	BaseHealth = 6,
-	HealthGrowth = 1.45,
+	-- Difficulty curve. "Recommended damage" for room r grows faster than
+	-- a single run can pay for, so the loop is: run -> stuck -> trainers /
+	-- weapons -> deeper run. Mob HP = RecommendedDamage(r) x ClicksToKill.
+	RecommendedBase = 2,
+	RecommendedGrowth = 1.42, -- r1 = 2, r5 ~ 8, r10 ~ 47, r15 ~ 280, r20 ~ 1650
+	ClicksToKill = 8, -- normal mob dies in ~8 clicks at recommended damage
+	BossClicksToKill = 50,
 	RewardPerHealth = 2, -- Aura per kill = HP x this
-	BossHealthMultiplier = 15,
 	BossRewardMultiplier = 1.5,
 
-	RoomRespawnDelay = 6, -- seconds after a room is cleared before its mobs return
-	BossRespawnDelay = 20,
+	-- Personal runs: every portal entry starts a new run from room 1 in
+	-- the player's own lane; only the current and next rooms exist.
+	Lanes = { Max = 16, Spacing = 260 },
+	RoomsAhead = 1,
+	DropLifetime = 25, -- seconds an Aura crystal waits before auto-collect
 
-	DropLifetime = 25, -- seconds an Aura crystal waits to be picked up before auto-collect
+	-- Mob behaviour (stage 5): aggro, walking, telegraphed melee hits and
+	-- the boss ground slam. Damage to the player grows per room.
+	Mob = {
+		AggroRange = 40,
+		AttackRange = 4.5,
+		WalkSpeed = 10,
+		BossWalkSpeed = 7,
+		AttackCooldown = 1.6,
+		TelegraphSeconds = 0.5,
+		DamageBase = 8,
+		DamageGrowth = 1.12, -- r20 ~ 70 per hit (player HP 100)
+		BossDamageMultiplier = 2.5,
+		BossSlamEvery = 6,
+		BossSlamRadius = 12,
+		BossSlamWarning = 1, -- seconds the red circle shows before the hit
+		BossSlamDamageMultiplier = 4,
+	},
 
 	-- Every boss kill rolls these in order; the first unowned pet that
-	-- hits is given to each player who damaged the boss.
+	-- hits is given to the player.
 	BossPetDrops = {
 		{ PetId = "Spark", Chance = 0.25 },
 		{ PetId = "Dragon", Chance = 0.05 },
@@ -83,13 +105,15 @@ function Config.IsBossRoom(room: number): boolean
 	return room % Config.Dungeon.BossEvery == 0
 end
 
+-- Damage per click a player "should" have for a room (barrier hint).
+function Config.RecommendedDamage(room: number): number
+	local d = Config.Dungeon
+	return math.max(1, math.floor(d.RecommendedBase * d.RecommendedGrowth ^ (room - 1)))
+end
+
 function Config.MobHealth(room: number, isBoss: boolean): number
 	local d = Config.Dungeon
-	local health = d.BaseHealth * d.HealthGrowth ^ (room - 1)
-	if isBoss then
-		health *= d.BossHealthMultiplier
-	end
-	return math.floor(health)
+	return Config.RecommendedDamage(room) * (if isBoss then d.BossClicksToKill else d.ClicksToKill)
 end
 
 function Config.MobReward(room: number, isBoss: boolean): number
@@ -101,10 +125,13 @@ function Config.MobReward(room: number, isBoss: boolean): number
 	return math.floor(reward)
 end
 
--- Damage per click a player "should" have for a room (shown on the
--- barrier as a hint): enough to kill a normal mob in ~5 clicks.
-function Config.RecommendedDamage(room: number): number
-	return math.max(1, math.floor(Config.MobHealth(room, false) / 5))
+function Config.MobDamage(room: number, isBoss: boolean): number
+	local m = Config.Dungeon.Mob
+	local damage = m.DamageBase * m.DamageGrowth ^ (room - 1)
+	if isBoss then
+		damage *= m.BossDamageMultiplier
+	end
+	return math.floor(damage)
 end
 
 -- Weapons: Damage multiplies click power. Unique weapons are bought
@@ -224,7 +251,8 @@ Config.Remotes = {
 	Travel = "RemoteFunction", -- ("Hub") | ("Room", n) -> ok, message
 	Notify = "RemoteEvent", -- S->C (text, kind) toast
 	AutoClick = "RemoteEvent", -- C->S (enabled: boolean)
-	RoomState = "RemoteEvent", -- S->C (room, alive, total) for barrier counters
+	RoomState = "RemoteEvent", -- S->C (room, alive, total) for the player's own run
+	RunEnded = "RemoteEvent", -- S->C (reason, room, auraEarned, record, isNewRecord)
 }
 
 ---------------------------------------------------------------------
@@ -413,8 +441,12 @@ Config.DungeonLayout = {
 		Recommended = "Рекомендуемый урон: %s",
 		Boss = "БИТВА С БОССОМ",
 		Cleared = "Пройдено!",
-		Locked = "Пройди комнату %d",
 		Entrance = "ЭТАП %d",
+		RunDied = "Ты пал в бою",
+		RunLeft = "Забег завершён",
+		RunWon = "Подземелье пройдено!",
+		RunSummary = "Дошёл до этапа %d  •  заработано %s Ауры  •  рекорд %d",
+		NewRecord = "Новый рекорд этапа!",
 	},
 }
 

@@ -7,9 +7,9 @@
 	  - the player's character is within Config.Click.Range,
 	  - the per-player cooldown (Config.Click.Cooldown, anti-macro),
 	then rolls damage/crit itself and replies to that client:
-	  ("Hit", mob, damage, isCrit)        -- DungeonService
-	  ("Kill", position, isBoss)          -- DungeonService
-	  ("Pickup", position, auraGained)    -- DungeonService (crystal collected)
+	  ("Hit", mob, damage, isCrit)        -- DungeonRuns
+	  ("Kill", position, isBoss)          -- DungeonRuns
+	  ("Pickup", position, auraGained)    -- DungeonRuns (crystal collected)
 	  ("Train", trainer, aura, isCrit)    -- trainers
 	Numbers sent by the client are never used.
 ]]
@@ -17,7 +17,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local DungeonService = require(script.Parent.DungeonService)
+local DungeonRuns = require(script.Parent.DungeonRuns)
 local EquipmentService = require(script.Parent.EquipmentService)
 local HubService = require(script.Parent.HubService)
 local PlayerState = require(script.Parent.PlayerState)
@@ -41,7 +41,7 @@ function ClickService.Init(trainers: Folder?)
 		if typeof(target) ~= "Instance" or not target:IsA("Model") then
 			return
 		end
-		local mob = DungeonService.IsMob(target)
+		local mob = DungeonRuns.IsMob(target)
 		if not mob and not isTrainer(target) then
 			return
 		end
@@ -60,7 +60,7 @@ function ClickService.Init(trainers: Folder?)
 
 		EquipmentService.Swing(player)
 		if mob then
-			DungeonService.Hit(player, target)
+			DungeonRuns.Hit(player, target)
 		else
 			-- Trainer: must be unlocked and the player must stand on it.
 			local index = HubService.TrainerIndexOf(target)

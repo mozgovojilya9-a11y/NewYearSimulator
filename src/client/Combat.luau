@@ -24,20 +24,28 @@ local player = Players.LocalPlayer
 local Combat = {}
 
 local clickHit = ReplicatedStorage:WaitForChild("ClickHit")
-local mobsFolder = Workspace:WaitForChild("Dungeon"):WaitForChild("Mobs")
+local lanesFolder = Workspace:WaitForChild("Dungeon"):WaitForChild("Lanes")
 local trainersFolder = Workspace:WaitForChild("Hub"):WaitForChild("Trainers")
 
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Include
-rayParams.FilterDescendantsInstances = { mobsFolder, trainersFolder }
+rayParams.FilterDescendantsInstances = { lanesFolder, trainersFolder }
 
 local lastSent = 0
 local lastHint = 0
 
+-- A mob is a Model with a Humanoid inside a room model; a trainer is a
+-- direct child of Hub.Trainers.
 local function targetFromPart(part)
 	local model = part and part:FindFirstAncestorOfClass("Model")
-	if model and (model.Parent == mobsFolder or model.Parent == trainersFolder) then
-		return model
+	while model do
+		if model.Parent == trainersFolder then
+			return model
+		end
+		if model:FindFirstChildOfClass("Humanoid") and model:GetAttribute("Reward") then
+			return model
+		end
+		model = model.Parent and model.Parent:FindFirstAncestorOfClass("Model")
 	end
 	return nil
 end
@@ -63,11 +71,6 @@ local function tryHitAt(ray: Ray)
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if root and (root.Position - target:GetPivot().Position).Magnitude > Config.Click.Range then
 		hint("Подойди ближе!")
-		return
-	end
-	local room = target:GetAttribute("Room")
-	if room and (player:GetAttribute("RoomReached") or 0) < room - 1 then
-		hint(("Сначала пройди этап %d"):format(room - 1))
 		return
 	end
 	-- Trainers: you have to stand on the platform.

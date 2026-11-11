@@ -31,6 +31,7 @@ require(windows:WaitForChild("Shop")) -- waits for leaderstats
 require(windows:WaitForChild("Rebirth"))
 require(windows:WaitForChild("Reward"))
 require(windows:WaitForChild("Settings"))
+require(windows:WaitForChild("RunSummary"))
 require(ui:WaitForChild("Buttons"))
 require(ui:WaitForChild("Hud"))
 require(modules:WaitForChild("HubFx"))

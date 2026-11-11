@@ -2,11 +2,11 @@
 	Zone.luau
 	Everything that depends on where this player is:
 	- Lighting preset (Config.Lighting.Hub / .Dungeon) tweened when the
-	  "Zone" attribute changes, plus a screen fade on teleport.
-	- Which dungeon room the player stands in (for the objective text).
-	- Barriers: the exit barrier of every room this player has cleared
-	  dissolves locally ("Пройдено!"); barriers stay solid on the server
-	  and for players who haven't cleared that room.
+	  "Zone" attribute changes, plus a screen fade on teleport; haze color
+	  follows the biome of the room the player stands in.
+	- Which dungeon room the player stands in (objective text, hint line).
+	Barriers are private per run and opened by the server, so nothing is
+	faked locally any more.
 ]]
 
 local Lighting = game:GetService("Lighting")
@@ -21,9 +21,7 @@ local Style = require(script.Parent.ui.Style)
 
 local player = Players.LocalPlayer
 local dungeonFolder = Workspace:WaitForChild("Dungeon")
-local geometry = dungeonFolder:WaitForChild("Geometry")
-local barriers = dungeonFolder:WaitForChild("Barriers")
-local roomState = ReplicatedStorage:WaitForChild("RoomState")
+local lanes = dungeonFolder:WaitForChild("Lanes")
 
 local Zone = {}
 
@@ -50,7 +48,6 @@ local function applyLighting(presetName: string)
 	end
 end
 
--- Haze takes the color of the biome the player is in.
 local function applyBiome(room: number?)
 	if not atmosphere or not room then
 		return
@@ -78,21 +75,8 @@ player:GetAttributeChangedSignal("Zone"):Connect(onZone)
 onZone()
 
 ---------------------------------------------------------------------
--- Current room
+-- Current room (scans every lane's room models)
 ---------------------------------------------------------------------
-
-local rooms = {} -- { model, index, zFront, zBack }
-local function indexRooms()
-	rooms = {}
-	for _, model in ipairs(geometry:GetChildren()) do
-		local index = model:GetAttribute("Room")
-		if index then
-			table.insert(rooms, { index = index, zFront = model:GetAttribute("ZFront"), zBack = model:GetAttribute("ZBack") })
-		end
-	end
-end
-indexRooms()
-geometry.ChildAdded:Connect(indexRooms)
 
 local currentRoom = nil
 task.spawn(function()
@@ -101,10 +85,20 @@ task.spawn(function()
 		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 		local found = nil
 		if root and player:GetAttribute("Zone") == "Dungeon" then
-			local z = root.Position.Z
-			for _, room in ipairs(rooms) do
-				if z <= room.zFront + 2 and z >= room.zBack - 2 then
-					found = room.index
+			local p = root.Position
+			for _, lane in ipairs(lanes:GetChildren()) do
+				for _, model in ipairs(lane:GetChildren()) do
+					local index = model:GetAttribute("Room")
+					if index then
+						local x = model:GetAttribute("X")
+						local size = model:GetAttribute("Size")
+						if math.abs(p.X - x) <= size / 2 + 3 and p.Z <= model:GetAttribute("ZFront") + 2 and p.Z >= model:GetAttribute("ZBack") - 2 then
+							found = index
+							break
+						end
+					end
+				end
+				if found then
 					break
 				end
 			end
@@ -113,85 +107,6 @@ task.spawn(function()
 			currentRoom = found
 			Hud.SetCurrentRoom(found)
 			applyBiome(found)
-		end
-	end
-end)
-
----------------------------------------------------------------------
--- Barriers
----------------------------------------------------------------------
-
-local function setBarrier(barrier: BasePart, open: boolean)
-	barrier.CanCollide = not open
-	Style.Tween(barrier, 0.6, { Transparency = if open then 1 else 0.4 })
-	local gui = barrier:FindFirstChild("Text")
-	if gui then
-		for _, label in ipairs(gui:GetChildren()) do
-			if label:IsA("TextLabel") then
-				if open then
-					label.Visible = label.Name == "Enemies"
-				else
-					label.Visible = true
-				end
-			end
-		end
-		local enemies = gui:FindFirstChild("Enemies")
-		if enemies and open then
-			enemies.Text = Config.DungeonLayout.Texts.Cleared
-			enemies.TextColor3 = Style.Colors.Green
-		end
-	end
-end
-
-local initialized = false
-local function refreshBarriers()
-	local reached = player:GetAttribute("RoomReached") or 0
-	for _, barrier in ipairs(barriers:GetChildren()) do
-		local room = barrier:GetAttribute("Room")
-		if room then
-			local open = reached >= room
-			if barrier:GetAttribute("OpenLocally") ~= open then
-				barrier:SetAttribute("OpenLocally", open) -- local-only marker
-				if open and initialized then
-					Style.PlaySound(Config.Sounds.Barrier, 1, 0.6)
-				end
-				setBarrier(barrier, open)
-			end
-		end
-	end
-	initialized = true
-end
-player:GetAttributeChangedSignal("RoomReached"):Connect(refreshBarriers)
-barriers.ChildAdded:Connect(function()
-	task.defer(refreshBarriers)
-end)
-refreshBarriers()
-
--- Keep "Пройдено!" on cleared barriers even after the server rewrites
--- the counter text on respawn.
-roomState.OnClientEvent:Connect(function(room)
-	local reached = player:GetAttribute("RoomReached") or 0
-	if reached >= room then
-		for _, barrier in ipairs(barriers:GetChildren()) do
-			if barrier:GetAttribute("Room") == room then
-				local enemies = barrier:FindFirstChild("Text") and barrier.Text:FindFirstChild("Enemies")
-				if enemies then
-					enemies.Text = Config.DungeonLayout.Texts.Cleared
-					enemies.TextColor3 = Style.Colors.Green
-				end
-			end
-		end
-	end
-end)
-
--- Barrier counters animate: pulse the number when it changes.
-roomState.OnClientEvent:Connect(function(room, alive, total)
-	for _, barrier in ipairs(barriers:GetChildren()) do
-		if barrier:GetAttribute("Room") == room and not barrier:GetAttribute("OpenLocally") then
-			local enemies = barrier:FindFirstChild("Text") and barrier.Text:FindFirstChild("Enemies")
-			if enemies then
-				enemies.Text = Config.DungeonLayout.Texts.Enemies:format(total - alive, total)
-			end
 		end
 	end
 end)

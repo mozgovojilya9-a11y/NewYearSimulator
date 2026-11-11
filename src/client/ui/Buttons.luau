@@ -157,7 +157,7 @@ local back = Style.Button(Style.Gui, {
 })
 back.Visible = false
 back.Activated:Connect(function()
-	go("Hub")
+	go("Hub") -- ends the current run
 end)
 
 local function refreshZone()

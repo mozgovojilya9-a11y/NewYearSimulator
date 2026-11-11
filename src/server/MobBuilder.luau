@@ -4,7 +4,7 @@
 	HumanoidRootPart + Humanoid (R6-like, anchored, no animation).
 	Looks come from Config.MobLooks. Faces are the built-in Roblox face
 	texture (rbxasset://textures/face.png) or small glowing Parts.
-	Pure construction; health/rewards are set by DungeonService.
+	Pure construction; health/rewards are set by DungeonRuns.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
