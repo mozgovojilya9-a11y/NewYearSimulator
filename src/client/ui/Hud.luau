@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local Popups = require(script.Parent.Popups)
 local Shop = require(script.Parent.Windows.Shop)
 local Style = require(script.Parent.Style)
 
@@ -81,7 +82,7 @@ local counters = Instance.new("Frame")
 counters.Name = "Counters"
 counters.AnchorPoint = Vector2.new(0, 1)
 counters.Position = UDim2.new(0, 16, 1, -16)
-counters.Size = UDim2.fromOffset(230, 150)
+counters.Size = UDim2.fromOffset(230, 210)
 counters.BackgroundTransparency = 1
 counters.Parent = Style.Gui
 local countersLayout = Instance.new("UIListLayout")
@@ -103,6 +104,24 @@ end
 local auraValue, auraScale = counter(1, "✨", Style.Colors.Gold)
 local rebirthValue = counter(2, "🔁", Style.Colors.Purple)
 local petValue = counter(3, "🐾", Style.Colors.Magenta)
+
+-- Auto-click toggle (works only while standing on a trainer platform).
+local autoClickRemote = ReplicatedStorage:WaitForChild("AutoClick")
+local autoButton, setAutoColor = Style.Button(counters, { Size = UDim2.new(1, 0, 0, 44), Color = Style.Colors.Red, Text = "⚡ Авто-клик: ВЫКЛ", TextSize = 18, LayoutOrder = 0, Shadow = false })
+local autoOn = false
+local function renderAuto()
+	autoButton.Text = "⚡ Авто-клик: " .. (if autoOn then "ВКЛ" else "ВЫКЛ")
+	setAutoColor(if autoOn then Style.Colors.Green else Style.Colors.Red)
+end
+autoButton.Activated:Connect(function()
+	autoOn = not autoOn
+	autoClickRemote:FireServer(autoOn)
+	renderAuto()
+	if autoOn then
+		Popups.Toast("Авто-клик работает на платформе тренажёра", "gold")
+	end
+end)
+renderAuto()
 
 local displayed = Instance.new("NumberValue")
 displayed.Value = aura.Value

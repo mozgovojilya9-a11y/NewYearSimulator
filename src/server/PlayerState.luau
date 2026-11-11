@@ -72,6 +72,11 @@ function PlayerState.GiveAura(player, baseAmount: number): number
 	return amount
 end
 
+function PlayerState.GetAura(player): number
+	local aura = auraValue(player)
+	return if aura then aura.Value else 0
+end
+
 function PlayerState.SetAura(player, amount: number)
 	local aura = auraValue(player)
 	if aura then
@@ -128,6 +133,11 @@ function PlayerState.Sync(player)
 	end
 	player:SetAttribute("Rebirths", data.Rebirths)
 	player:SetAttribute("RoomReached", data.RoomReached)
+	local unlocked = {}
+	for index in pairs(data.TrainersUnlocked) do
+		table.insert(unlocked, index)
+	end
+	player:SetAttribute("TrainersUnlocked", table.concat(unlocked, ","))
 	player:SetAttribute("ClickPower", PlayerState.ClickPower(player))
 
 	local leaderstats = player:FindFirstChild("leaderstats")

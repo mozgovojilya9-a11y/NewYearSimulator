@@ -25,6 +25,7 @@ Config.StartingData = {
 	OwnedPets = {},
 	EquippedPet = "",
 	RoomReached = 0, -- highest dungeon room cleared (0 = none, 20 = all)
+	TrainersUnlocked = { ["1"] = true }, -- hub platforms unlocked by Aura (permanent)
 	LastSeen = 0, -- os.time() of the last save, used for offline income
 }
 
@@ -150,11 +151,34 @@ function Config.RebirthMultiplier(rebirths: number): number
 	return 1 + rebirths * Config.Rebirth.MultiplierPerRebirth
 end
 
--- Hub trainers: clicking one gives ClickPower x TrainerRate x the
--- trainer's own multiplier (left -> right). Immortal, no dungeon needed.
+-- Hub trainers: standing on a platform and clicking its object gives
+-- ClickPower x TrainerRate x the platform multiplier. Platforms unlock
+-- by Aura (early) or rebirths (late). Auto-click repeats a trainer
+-- click every AutoClickInterval seconds while the toggle is on and the
+-- player stands on an unlocked platform (the AFK progression loop).
 Config.Hub = {
 	TrainerRate = 0.25,
-	TrainerMultipliers = { 1, 3, 6 },
+	TrainerMultipliers = { 1, 3, 6, 12, 25, 50, 100, 250 },
+	TrainerRequirements = {
+		{},
+		{ Aura = 500 },
+		{ Aura = 5000 },
+		{ Aura = 50000 },
+		{ Rebirths = 1 },
+		{ Rebirths = 2 },
+		{ Rebirths = 3 },
+		{ Rebirths = 5 },
+	},
+	AutoClickInterval = 0.5,
+	StandRotationMinutes = 30, -- the unique-weapon stand swaps its weapon this often
+}
+
+-- Leaderboards (OrderedDataStore). Scores are written on every save.
+Config.Leaderboards = {
+	AuraStore = "AuraClicker_TopAura_v1",
+	RoomStore = "AuraClicker_TopRoom_v1",
+	RefreshSeconds = 60,
+	Top = 10,
 }
 
 -- Shop categories (what is owned / equipped and how to describe it).
@@ -182,6 +206,7 @@ Config.Remotes = {
 	RebirthRequest = "RemoteFunction", -- () -> ok, message
 	Travel = "RemoteFunction", -- ("Hub") | ("Room", n) -> ok, message
 	Notify = "RemoteEvent", -- S->C (text, kind) toast
+	AutoClick = "RemoteEvent", -- C->S (enabled: boolean)
 	RoomState = "RemoteEvent", -- S->C (room, alive, total) for barrier counters
 }
 
@@ -256,7 +281,7 @@ Config.Lighting = {
 
 Config.HubLayout = {
 	Name = "Цитадель Ауры",
-	Size = 128, -- courtyard side (square)
+	Size = 176, -- courtyard side (square)
 	TileSize = 8,
 	WallHeight = 14,
 	WallThickness = 4,
@@ -267,33 +292,67 @@ Config.HubLayout = {
 	PathWidth = 14,
 	ChevronSpacing = 9,
 
-	Portal = { Offset = Vector3.new(0, 0, -58), Radius = 7, ArchWidth = 22, ArchHeight = 20, SpinSeconds = 6 },
-	Trainers = { -- rings left of the path
-		{ Offset = Vector3.new(-30, 0, -6), Color = Color3.fromRGB(90, 230, 110) },
-		{ Offset = Vector3.new(-30, 0, 10), Color = Color3.fromRGB(70, 140, 255) },
-		{ Offset = Vector3.new(-30, 0, 26), Color = Color3.fromRGB(150, 80, 255) },
+	Portal = { Offset = Vector3.new(0, 0, -80), Radius = 7, ArchWidth = 22, ArchHeight = 20, SpinSeconds = 6 },
+
+	-- Trainer row, left of the path, front to back (index 1 nearest the spawn).
+	TrainerRow = { X = -30, ZStart = 36, Spacing = -11 },
+	TrainerPlatformRadius = 4.5,
+	-- Looks: platform color + the object on it (built by TrainerBuilder).
+	Trainers = {
+		{ Kind = "Dummy", Name = "Манекен", Color = Color3.fromRGB(90, 230, 110) },
+		{ Kind = "Boulder", Name = "Валун", Color = Color3.fromRGB(70, 140, 255) },
+		{ Kind = "IceCube", Name = "Ледяной куб", Color = Color3.fromRGB(46, 230, 255) },
+		{ Kind = "Mimic", Name = "Сундук-мимик", Color = Color3.fromRGB(255, 150, 50) },
+		{ Kind = "Skull", Name = "Гигантский череп", Color = Color3.fromRGB(230, 230, 240) },
+		{ Kind = "Pumpkin", Name = "Тыква-монстр", Color = Color3.fromRGB(255, 120, 30) },
+		{ Kind = "Golem", Name = "Кристальный голем", Color = Color3.fromRGB(150, 80, 255) },
+		{ Kind = "Core", Name = "Аура-ядро", Color = Color3.fromRGB(255, 61, 184) },
 	},
-	TrainerRingRadius = 5,
-	Stand = { Offset = Vector3.new(30, 0, 4), Spacing = 12, SpinSeconds = 4, FloatHeight = 0.8, FloatSeconds = 1.6 }, -- 3 pedestals in a row along Z
-	Altar = { Offset = Vector3.new(-40, 0, 48) },
-	Shop = { Offset = Vector3.new(0, 0, 50) }, -- stall near the back wall
-	Egg = { Offset = Vector3.new(40, 0, 48) },
-	Trees = { Vector3.new(-50, 0, -40), Vector3.new(50, 0, -40), Vector3.new(52, 0, 20) },
-	TorchesAlongPath = 4,
+
+	-- Weapon alley (right of the path): 4 shop weapons + 1 rotating unique.
+	WeaponRow = { X = 30, ZStart = 36, Spacing = -12 },
+	-- Backpack alley further right.
+	BackpackRow = { X = 50, ZStart = 36, Spacing = -12 },
+	Stand = { SpinSeconds = 4, FloatHeight = 0.8, FloatSeconds = 1.6 },
+
+	-- Back of the courtyard (+Z).
+	Altar = { Offset = Vector3.new(-56, 0, 66) },
+	Shop = { Offset = Vector3.new(-18, 0, 70) },
+	Wheel = { Offset = Vector3.new(18, 0, 70) },
+	Egg = { Offset = Vector3.new(56, 0, 66) },
+	Fountain = { Offset = Vector3.new(0, 0, 34), Radius = 7 },
+	Leaderboards = { -- on the inner face of the back wall
+		{ Offset = Vector3.new(-40, 0, 85), Kind = "Aura", Title = "Топ Ауры" },
+		{ Offset = Vector3.new(40, 0, 85), Kind = "Room", Title = "Глубже всех в данже" },
+	},
+	Npc = { Offset = Vector3.new(14, 0, -66) },
+	Trees = { Vector3.new(-70, 0, -60), Vector3.new(70, 0, -60), Vector3.new(72, 0, 10), Vector3.new(-72, 0, 10) },
+	Bushes = { Vector3.new(-62, 0, 40), Vector3.new(62, 0, 40), Vector3.new(-12, 0, 46), Vector3.new(12, 0, 46), Vector3.new(-66, 0, -20), Vector3.new(66, 0, -20) },
+	TorchesAlongPath = 5,
 
 	Texts = {
 		Portal = "ПОДЗЕМЕЛЬЕ",
 		Trainer = "x%s Мощность",
+		TrainerLockedAura = "Нужно %s Ауры",
+		TrainerLockedRebirth = "Открывается: Перерождение %d",
 		Stand = "Лимитированное!",
+		StandTimer = "Смена через %s",
 		Altar = "АЛТАРЬ ПЕРЕРОЖДЕНИЯ",
 		Shop = "МАСТЕРСКАЯ",
+		Wheel = "КОЛЕСО УДАЧИ",
+		WheelFree = "Бесплатное вращение!",
 		Egg = "Новинка!",
+		Npc = "Подземелье →",
+		Backpack = "+%s Ауры/сек",
 	},
 	Prompts = {
 		Rebirth = "Переродиться",
 		Shop = "Открыть",
 		Egg = "Открыть",
+		Wheel = "Крутить",
 		Buy = "Купить",
+		Equip = "Надеть",
+		Equipped = "Надето ✓",
 		Collect = "Собрать",
 	},
 }

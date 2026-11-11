@@ -19,6 +19,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local LeaderboardService = require(script.Parent.LeaderboardService)
 
 local DataService = {}
 
@@ -113,9 +114,12 @@ function DataService.Save(player)
 
 	data.LastSeen = os.time() -- for offline income on the next join
 	local key = keyFor(player)
-	withRetries("SetAsync", player, function()
+	local ok = withRetries("SetAsync", player, function()
 		store:SetAsync(key, data, { player.UserId })
 	end)
+	if ok then
+		LeaderboardService.Record(player.UserId, data)
+	end
 end
 
 -- Saves and clears a player's cache entry. Call on PlayerRemoving.

@@ -14,6 +14,7 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local HubFx = require(script.Parent.HubFx)
 local Popups = require(script.Parent.ui.Popups)
 local Style = require(script.Parent.ui.Style)
 
@@ -67,6 +68,15 @@ local function tryHitAt(ray: Ray)
 	if room and (player:GetAttribute("RoomReached") or 0) < room - 1 then
 		hint(("Сначала пройди этап %d"):format(room - 1))
 		return
+	end
+	-- Trainers: you have to stand on the platform.
+	local center = target:GetAttribute("Center")
+	if center and root then
+		local flat = Vector3.new(root.Position.X - center.X, 0, root.Position.Z - center.Z)
+		if flat.Magnitude > (target:GetAttribute("Radius") or 5) + 1 then
+			hint("Встань на платформу тренажёра")
+			return
+		end
 	end
 	lastSent = now
 	clickHit:FireServer(target)
@@ -193,8 +203,11 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 		if not model or not model.Parent then
 			return
 		end
-		Popups.World(topOf(model), "+" .. Format.Number(aura) .. " ✨", if isCrit then Style.Colors.Gold else Style.Colors.Cyan, if isCrit then 40 else 28, isCrit)
-		flash(model, isCrit)
+		local object = model:FindFirstChild("Object") or model
+		local height = object:GetAttribute("Height") or 6
+		Popups.World(object:GetPivot().Position + Vector3.new(0, height + 1, 0), "+" .. Format.Number(aura) .. " ✨", if isCrit then Style.Colors.Gold else Style.Colors.Cyan, if isCrit then 40 else 28, isCrit)
+		flash(object, isCrit)
+		HubFx.Squash(model)
 		Style.PlaySound(Config.Sounds.Click, if isCrit then 0.7 else 1 + (math.random() - 0.5) * 0.15, 0.5)
 		if isCrit then
 			Popups.Shake(Config.Hud.ShakeCrit.Amplitude, Config.Hud.ShakeCrit.Seconds)

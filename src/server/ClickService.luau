@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local DungeonService = require(script.Parent.DungeonService)
+local HubService = require(script.Parent.HubService)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
 local Remotes = require(script.Parent.Remotes)
@@ -59,10 +60,15 @@ function ClickService.Init(trainers: Folder?)
 		if mob then
 			DungeonService.Hit(player, target)
 		else
-			local multiplier = target:GetAttribute("Multiplier") or 1
-			local amount, isCrit = PlayerState.RollCrit(PlayerState.ClickPower(player) * Config.Hub.TrainerRate * multiplier)
-			local gained = PlayerState.GiveAura(player, amount)
-			remote:FireClient(player, "Train", target, gained, isCrit)
+			-- Trainer: must be unlocked and the player must stand on it.
+			local index = HubService.TrainerIndexOf(target)
+			if not index or HubService.TrainerUnderPlayer(player) ~= index then
+				return
+			end
+			local gained, isCrit = HubService.TrainerClick(player, index)
+			if gained then
+				remote:FireClient(player, "Train", target, gained, isCrit)
+			end
 		end
 	end)
 end
