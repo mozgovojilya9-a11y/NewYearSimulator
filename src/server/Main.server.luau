@@ -17,6 +17,7 @@ local ShopService = require(script.Parent.ShopService)
 local RebirthService = require(script.Parent.RebirthService)
 local TravelService = require(script.Parent.TravelService)
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+local Format = require(game:GetService("ReplicatedStorage").Shared.Format)
 
 -- Create every RemoteEvent before any client can look for it.
 Remotes.Init()
@@ -26,6 +27,28 @@ ClickService.Init(hub.Trainers)
 ShopService.Init()
 RebirthService.Init()
 TravelService.Init()
+
+-- Backpack income for the time the player was away (Config.Offline).
+local function giveOfflineIncome(player, data)
+	local now = os.time()
+	local lastSeen = data.LastSeen
+	data.LastSeen = now
+	if lastSeen <= 0 then
+		return
+	end
+	local away = math.min(now - lastSeen, Config.Offline.MaxHours * 3600)
+	local perSecond = PlayerState.BasePerSecond(player)
+	if away < Config.Offline.MinSeconds or perSecond <= 0 then
+		return
+	end
+	local gained = PlayerState.GiveAura(player, perSecond * away * Config.Offline.Efficiency)
+	-- Give the client a moment to build its UI before the toast.
+	task.delay(4, function()
+		if player.Parent then
+			Remotes.Notify(player, ("🎒 Пока тебя не было (%d мин): +%s Ауры"):format(math.floor(away / 60), Format.Number(gained)), "gold")
+		end
+	end)
+end
 
 local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)
 
@@ -66,6 +89,7 @@ local function onPlayerAdded(player)
 	end)
 
 	PlayerState.Sync(player)
+	giveOfflineIncome(player, data)
 end
 
 local function onPlayerRemoving(player)
@@ -81,7 +105,7 @@ for _, player in ipairs(Players:GetPlayers()) do
 	task.spawn(onPlayerAdded, player)
 end
 
--- Day 5: passive income from backpacks, once per second.
+-- Passive income from backpacks, once per second while online.
 task.spawn(function()
 	while true do
 		task.wait(1)

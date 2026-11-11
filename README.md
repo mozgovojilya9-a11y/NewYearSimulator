@@ -1,64 +1,34 @@
 # Aura Clicker
 
-Roblox "+1" clicker simulator, managed with Rojo 7. Click to gain Aura,
-fight mobs, buy weapons/backpacks/pets, rebirth for permanent
-multipliers.
+Roblox clicker simulator with a dungeon, managed with Rojo 7. Click
+mobs to earn **Aura**, upgrade weapons/backpacks/pets, push through 20
+dungeon rooms (a boss every 5 rooms) and rebirth for a permanent
+multiplier.
+
+## Systems (all implemented)
+
+| System | What it does | Code |
+|---|---|---|
+| Click | One `ClickHit(target)` remote for mobs and trainers. Server checks target, range (60 studs) and cooldown (0.1 s), rolls damage + 10% crit x5. Client shows popups, flash, sound. | `ClickService`, client `Combat` |
+| Hub (room 0) | 3 immortal trainers (Aura = damage x0.25), stand with 3 spinning unique weapons (ProximityPrompt "Купить"), rebirth altar (ProximityPrompt → confirm window). | `HubGenerator`, `HubService` |
+| Dungeon | 20 rooms built from Parts at server start (seeded, same every server). Rooms 5/10/15/20 are boss rooms. 3–5 mobs per normal room, HP grows each room. Mobs are Models with a Humanoid. Exit door opens (for you) when the room is cleared. Progress saved as `RoomReached`. | `DungeonGenerator`, `DungeonService`, client `Dungeon` |
+| Travel | Menu buttons 🏠 Хаб / ⚔ Данж teleport to the hub or the furthest unlocked room. | `TravelService` |
+| Shop | 4 regular weapons, 4 backpacks, 2 pets for Aura; one active weapon. Unique weapons only at the hub stand. | `ShopService`, client `Shop` |
+| Backpacks | Passive Aura/sec while online + offline income on next join (50%, up to 8 h). | `Main.server`, `PlayerState` |
+| Pets | +25% / +75% to all Aura. Bought for Aura or dropped by bosses. Shown floating next to the player. | `DungeonService`, client `Cosmetics` |
+| Rebirth | At the altar, needs room 20 cleared. Resets Aura, weapons, backpacks, dungeon progress; keeps pets. Multiplier = 1 + Rebirths x 0.1. | `RebirthService`, client `Rebirth` |
+| Saving | DataStore `AuraClicker_v1`, retries, never saves after a failed load, saves on leave and server shutdown. | `DataService` |
+
+The server is the source of truth for every number. The client only
+sends intents ("I clicked this", "buy that", "rebirth") and displays
+results. All balance numbers live in `src/shared/Config.luau`.
 
 ## Project structure
 
-**Shared** (`ReplicatedStorage.Shared`)
-- `src/shared/Config.luau` — all balance numbers: click/crit, zone & mobs, weapons, backpacks, pets, rebirth, sounds, remote names, default player data.
-- `src/shared/Format.luau` — number formatting (`1.25K`, `3.4M`).
-
-**Server** (`ServerScriptService`)
-- `Main.server.luau` — entry point: starts services, leaderstats (Aura, Rebirths), passive income tick, autosave.
-- `DataService.luau` — DataStore `AuraClicker_v1`: retries, never saves after a failed load, save on leave and on shutdown.
-- `PlayerState.luau` — the economy: click power, Aura multiplier, income, spending currencies, syncing state to Player attributes.
-- `ClickService.luau` — the КЛИК button (`ClickHit`).
-- `MobService.luau` — builds `Workspace.AuraZone` at runtime, mobs, damage, rewards, respawn (`MobHit`).
-- `ShopService.luau` — buy/equip weapons, backpacks, pets (`ShopRequest`).
-- `RebirthService.luau` — rebirth (`RebirthRequest`).
-- `Effects.luau`, `Remotes.luau`, `RateLimit.luau` — helpers.
-
-**Client** (`StarterPlayerScripts`)
-- `Client.client.luau` — entry point, requires the modules below.
-- `Ui` (shared helpers, popups, toasts), `TopBar`, `ClickButton`, `Combat`, `Panels` (side menu + windows), `Shop`, `Cosmetics` (backpacks/pets on characters), `Rebirth`.
-
-`default.project.json` — Rojo mapping. `StarterGui` is fully owned by Rojo (empty);
-`Workspace` is not managed by Rojo: the zone and mobs are created by the server at runtime.
-
-The server is the source of truth for every number: the client only asks
-("I clicked", "I hit this mob", "buy this"), and the server checks
-cooldowns, range, prices and ownership.
-
-## Status — all 7 days done
-
-- [x] Day 1 — Rojo structure, persistent data, top bar UI
-- [x] Day 2 — click: +1 Aura, 10% crit x5, server cooldown, popups and sound
-- [x] Day 3 — zone "Поляна Ауры", 4 mob types incl. boss, click damage, respawn, Aura + 💎 drops
-- [x] Day 4 — shop with 4 weapons, buy/equip, damage multiplier
-- [x] Day 5 — 3 backpacks (passive Aura/sec), 2 pets for 💎, visible on characters
-- [x] Day 6 — rebirth (permanent multiplier), particles, sounds
-- [x] Day 7 — data-safety fixes, balance pass, release checklist
-
-## Balance (edit in `Config.luau`)
-
-| | Item | Effect | Cost |
-|---|---|---|---|
-| Weapon | Палка / Деревянный меч / Железный меч / Катана Ауры | damage x1 / x3 / x10 / x35 | free / 100 / 1.2K / 12K Aura |
-| Backpack | Мешочек / Ранец / Ранец Ауры | +2 / +10 / +50 Aura per sec | 300 / 3K / 25K Aura |
-| Pet | Искорка / Дракончик Ауры | +50% / +150% all Aura | 10 / 60 💎 |
-| Rebirth | — | Aura multiplier = 1 + rebirths | 50K × 3^rebirths Aura |
-
-| Mob | HP | Aura | 💎 | Respawn |
-|---|---|---|---|---|
-| Слизень ×4 | 8 | 15 | 5% → 1 | 3 s |
-| Гоблин ×3 | 40 | 80 | 15% → 1 | 4 s |
-| Тень ×2 | 200 | 450 | 40% → 2 | 6 s |
-| Страж Ауры (boss) | 2.5K | 6K | 100% → 5 | 45 s |
-
-Every Aura gain (click, kill, backpack) is multiplied by pet × rebirth.
-Everyone who hit a mob gets the full reward when it dies.
+- `src/shared/` — `Config` (all balance and layout), `Format` (1.2K / 3.4M).
+- `src/server/` — `Main.server` (startup, leaderstats Aura/Rebirths/Room, income, autosave), services listed above, `PlayerState` (the economy math), `WorldKit` (part/sign helpers for the generators), `Effects`, `Remotes`, `RateLimit`.
+- `src/client/` — `Client.client` requires the modules: `Ui`, `Combat`, `TopBar`, `Shop`, `Cosmetics`, `Rebirth`, `Dungeon`, `Panels`.
+- `default.project.json` — Rojo mapping. `StarterGui` is owned by Rojo and stays empty (UI is built at runtime in PlayerGui). `Workspace` is not managed by Rojo; `Workspace.Hub` and `Workspace.Dungeon` are generated by the server at start.
 
 ## Run locally
 
@@ -67,37 +37,40 @@ rokit install
 rojo serve
 ```
 
-Keep the terminal running while Roblox Studio is connected. In Studio,
-open the Rojo plugin and connect to the local server.
+In Studio, open the Rojo plugin and connect. For saving in Studio:
+Game Settings → Security → **Enable Studio Access to API Services**.
 
-To build a place file without starting the live server:
+## Test in Studio (acceptance)
 
-```bash
-rojo build -o /tmp/AuraClicker.rbxlx
-```
+1. **Play → hub.** No red errors in Output. Around the spawn: "AURA CLICKER" sign, 3 trainers (+X side), 3 spinning weapons on pedestals (−X side), purple altar behind the spawn, "⚔ ДАНЖ ⚔" gate ahead (−Z). Left menu: Магазин, Питомцы, Хаб, Данж.
+2. **Trainers.** Click a trainer: `+1 ✨`, sometimes golden crit; Aura grows.
+3. **Shop.** Buy Деревянный меч (100) → stats line `Урон: 3`.
+4. **Dungeon.** Walk through the gate into Комната 1, click mobs: `-N` popups, HP bars, `+✨` on kill. Kill all → toast "Комната 1 пройдена!", the red door ahead fades. Mobs return after 6 s.
+5. **Locked room.** Clicking a mob two rooms ahead shows "Сначала пройди комнату N" and does nothing.
+6. **First boss** (room 5, "Каменный Голем"): big HP bar, crown; kill → big burst, reward, ~25% chance of "Выпал питомец: Искорка".
+7. **Travel.** Menu 🏠 Хаб → you are at spawn; ⚔ Данж → you appear at the furthest unlocked room.
+8. **Unique weapon.** With 60K Aura, stand at the Клинок Бури pedestal and hold E → toast "Куплено", damage x120. Shop shows unique weapons as "Стенд в хабе" until bought.
+9. **Backpack + offline.** Buy Мешочек → `+2/сек`. Stop, wait 1+ min, Play → toast "Пока тебя не было…".
+10. **Rebirth.** Hold E at the altar → window "Условие: пройти комнату 20", button refuses. For a quick full test, temporarily set `Config.Rebirth.RequiredRoom = 1`, clear room 1, press the button twice: purple flash, Aura/weapons/backpacks/rooms reset, pet kept, multiplier x1.1. Set it back to 20 afterwards.
+11. **Save.** Stop → Play: Aura, room progress, items, pet and rebirths restored.
 
-## Full playtest (acceptance)
+## Balance to verify by hand before release
 
-Studio → Game Settings → Security → **Studio Access to API Services** must be on for saving.
+All in `Config.luau`:
 
-1. Play. Output has no red errors. Top bar shows Aura / 💎 / online, a stats line shows damage and multiplier, left menu has Магазин / Питомцы / Ребёрт.
-2. **Click button** (bottom middle): +1, ~10% golden `КРИТ! +5`, sound.
-3. **Zone**: walk forward (~70 studs) to the purple disc "Поляна Ауры". Click a Слизень: `-1` popup, white flash, HP bar drops. Kill it: particles, `+15 ✨`, sometimes `+1 💎`. It respawns in 3 s.
-4. Too far away (> 80 studs) → toast "Подойди ближе к мобу!"; nothing happens server-side.
-5. **Shop**: buy Деревянный меч for 100 → equipped automatically, stats line shows `Урон: 3`, Слизень dies in 3 clicks. Equip Палка again → damage back to 1.
-6. **Backpack**: buy Мешочек (300) → stats line shows `+2/сек`, Aura grows by itself; a box appears on your back.
-7. **Pets**: farm 10 💎, buy Искорка → glowing pet follows you, multiplier shows `x1.5`.
-8. **Rebirth** at 50K Aura: toast "Доступен ребёрт!", press the button twice → purple flash, Aura 0, weapons/backpacks reset, 💎 and pet kept, multiplier x2 (x3 with Искорка), Rebirths = 1 in the leaderboard.
-9. Stop, Play again → Aura, 💎, items, pet, rebirths all restored.
-10. Two players (Test → Clients and Servers → 2 players): both see each other's pets/backpacks; both hit one Гоблин → both get the reward.
+- `Dungeon.BaseHealth = 6`, `HealthGrowth = 1.45` → normal mob HP ≈ 6 (room 1), 170 (room 10), 4.8K (room 19); bosses x15 (room 5 ≈ 400, room 10 ≈ 2.5K, room 15 ≈ 16K, room 20 ≈ 105K).
+- `RewardPerHealth = 2`, `BossRewardMultiplier = 1.5` — Aura per kill.
+- Weapon damage/cost curve vs that HP: Катана (x35) around room 10, Клинок Бури (x120, 60K) for 11–15, Коса (x450, 300K) for 16–19, Меч Звёздной Ауры (x1600, 1.5M) for the room-20 boss.
+- `Hub.TrainerRate = 0.25` — trainers should stay clearly worse than room-1 mobs.
+- `Offline.Efficiency = 0.5`, `MaxHours = 8`.
+- `Rebirth.MultiplierPerRebirth = 0.1` — small; consider resetting less or raising it if rebirths feel unrewarding.
+- `BossPetDrops` chances (25% Искорка, 5% Дракончик).
 
 ## Release checklist
 
-1. In Studio: **File → Publish to Roblox** (the place connected via Rojo).
-2. Creator Dashboard → the experience → **Configure**: name "Aura Clicker", description, icon (512×512) and at least one thumbnail.
-3. Game Settings → Security: **Enable Studio Access to API Services** (only needed for Studio tests; live servers always have DataStores).
-4. Permissions → **Public**. Set max players (e.g. 12).
-5. Join the live game from the website once and repeat steps 1–9 of the playtest.
+1. Studio: **File → Publish to Roblox**.
+2. Creator Dashboard → experience → name, description, icon (512×512), thumbnails.
+3. Permissions → **Public**; set max players.
+4. Join the live game once and repeat the acceptance test.
 
-Sounds use built-in `rbxasset://sounds/...` files; replace the IDs in
-`Config.Sounds` with your own `rbxassetid://` uploads if you prefer.
+Sounds use built-in `rbxasset://sounds/...` files; replace them in `Config.Sounds` if you want your own.

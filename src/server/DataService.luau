@@ -111,6 +111,7 @@ function DataService.Save(player)
 		return
 	end
 
+	data.LastSeen = os.time() -- for offline income on the next join
 	local key = keyFor(player)
 	withRetries("SetAsync", player, function()
 		store:SetAsync(key, data, { player.UserId })
