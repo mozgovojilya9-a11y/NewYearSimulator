@@ -73,7 +73,7 @@ Config.Dungeon = {
 	-- the player's own lane; only the current and next rooms exist.
 	Lanes = { Max = 16, Spacing = 260 },
 	RoomsAhead = 1,
-	DropLifetime = 25, -- seconds an Aura crystal waits before auto-collect
+	DropLifetime = 60, -- seconds an Aura crystal waits for "E · Собрать" before vanishing unpaid
 
 	-- Mob behaviour (stage 5): aggro, walking, telegraphed melee hits and
 	-- the boss ground slam. Damage to the player grows per room.

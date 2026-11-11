@@ -6,8 +6,9 @@
 
 	Run ends on: death, "Назад"/leaving, clearing room 20. The best room
 	is kept in RoomReached (record for the leaderboard and rebirth).
-	Kills drop an Aura crystal (touch or E to collect, auto-collect after
-	Config.Dungeon.DropLifetime). Mob AI / player damage: see MobAI.
+	Kills drop an Aura crystal that must be collected with "E · Собрать"
+	within Config.Dungeon.DropLifetime; uncollected crystals are lost
+	(also when the run ends or the player leaves). Mob AI: see MobAI.
 ]]
 
 local Players = game:GetService("Players")
@@ -196,7 +197,7 @@ local function spawnDrop(player, position: Vector3, amount: number)
 		Color = look.Color,
 		Material = Enum.Material.Neon,
 		CanCollide = false,
-		CanTouch = true,
+		CanTouch = false,
 	})
 	crystal:SetAttribute("Owner", player.UserId)
 	crystal:SetAttribute("Amount", amount)
@@ -223,26 +224,30 @@ local function spawnDrop(player, position: Vector3, amount: number)
 	stroke.Color = Config.Theme.Outline
 	stroke.Parent = label
 
-	local prompt = WorldKit.Prompt(crystal, Config.HubLayout.Prompts.Collect, "Аура", { Action = "Collect" }, 10)
+	-- Manual pickup only: "E · Собрать" with no hold. No touch pickup,
+	-- no auto-collect; after DropLifetime the crystal fades away unpaid.
+	local prompt = WorldKit.Prompt(crystal, Config.HubLayout.Prompts.Collect, "Аура", { Action = "Collect" }, 10, 0)
 	prompt.Triggered:Connect(function(who)
 		if who == player then
 			collect(crystal)
 		end
 	end)
-	crystal.Touched:Connect(function(hit)
-		local character = player.Character
-		if character and hit:IsDescendantOf(character) then
-			collect(crystal)
+	drops[crystal] = { player = player, amount = amount }
+	task.delay(D.DropLifetime, function()
+		if drops[crystal] then
+			drops[crystal] = nil
+			TweenService:Create(crystal, TweenInfo.new(0.5), { Transparency = 1 }):Play()
+			task.delay(0.5, crystal.Destroy, crystal)
 		end
 	end)
-	drops[crystal] = { player = player, amount = amount }
-	task.delay(D.DropLifetime, collect, crystal)
 end
 
-local function collectAll(player)
+-- Uncollected crystals are lost when the run ends (nothing is credited).
+local function discardAll(player)
 	for part, drop in pairs(drops) do
 		if drop.player == player then
-			collect(part)
+			drops[part] = nil
+			part:Destroy()
 		end
 	end
 end
@@ -270,7 +275,7 @@ local function endRun(player, reason: string)
 	if run.diedConnection then
 		run.diedConnection:Disconnect()
 	end
-	collectAll(player)
+	discardAll(player)
 	for index in pairs(run.rooms) do
 		destroyRoom(run, index)
 	end

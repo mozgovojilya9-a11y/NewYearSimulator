@@ -319,11 +319,11 @@ function WorldKit.UpdateHealth(body: BasePart, health: number, maxHealth: number
 end
 
 -- Styled ProximityPrompt. The client draws it (Style = Custom).
-function WorldKit.Prompt(parent: Instance, actionText: string, objectText: string, attributes: { [string]: any }?, distance: number?)
+function WorldKit.Prompt(parent: Instance, actionText: string, objectText: string, attributes: { [string]: any }?, distance: number?, holdDuration: number?)
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = actionText
 	prompt.ObjectText = objectText
-	prompt.HoldDuration = 0.3
+	prompt.HoldDuration = holdDuration or 0.3
 	prompt.MaxActivationDistance = distance or 12
 	prompt.RequiresLineOfSight = false
 	prompt.Style = Enum.ProximityPromptStyle.Custom
