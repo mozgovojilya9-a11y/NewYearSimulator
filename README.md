@@ -9,15 +9,16 @@ multipliers.
 - `src/shared/Config.luau` — shared tuning values and default player data.
 - `src/server/DataService.luau` — loads/saves each player's data via DataStore (`AuraClicker_v1`).
 - `src/server/Main.server.luau` — wires player join/leave into DataService and leaderstats.
-- `src/client/Client.client.luau` — top bar UI showing Aura and online count.
+- `src/server/ClickService.luau` — server-authoritative click handling: `ClickHit` RemoteEvent, per-player cooldown, crit roll, Aura award.
+- `src/client/Client.client.luau` — top bar UI (Aura + online), click button, floating numbers, crit effect and click sound.
 - `default.project.json` — Rojo DataModel mapping.
 
-## Current status (Day 1 of 7)
+## Current status (Day 2 of 7)
 
 - [x] Rojo project structure
 - [x] Player data persistence (Aura, Zone, EquippedWeapon, Rebirths)
 - [x] Top bar UI (Aura + online count)
-- [ ] Click mechanic (Day 2)
+- [x] Click mechanic: +1 Aura per click, 10% crit x5, server-side cooldown (Day 2)
 - [ ] Mobs and combat (Day 3)
 - [ ] Weapons and shop (Day 4)
 - [ ] Backpacks and pets (Day 5)
@@ -39,6 +40,17 @@ To build a place file without starting the live server:
 ```bash
 rojo build -o /tmp/AuraClicker.rbxlx
 ```
+
+## Acceptance test (Day 2)
+
+1. Connect Rojo in Studio and press Play.
+2. A round purple **КЛИК!** button is in the lower middle of the screen.
+3. Click it: the button squishes, a `+1` floats up, a click sound plays, and "Аура" in the top bar counts up by 1.
+4. Keep clicking: roughly 1 in 10 clicks shows a golden `КРИТ! +5`, a gold ring, a button shake and a lower-pitched sound; Aura grows by 5.
+5. Autoclick / spam as fast as possible: Aura grows by at most ~10 clicks per second (server cooldown 0.1s).
+6. Cheat check: switch the Command Bar to **Client** and run `game.ReplicatedStorage.ClickHit:FireServer(999999)` — Aura still grows only by 1 or 5 (arguments from the client are ignored).
+7. Stop, Play again — Aura is restored from the DataStore (requires Studio Access to API Services).
+8. Output has no errors.
 
 ## Acceptance test (Day 1)
 

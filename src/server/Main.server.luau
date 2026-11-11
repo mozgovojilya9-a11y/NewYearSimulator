@@ -8,7 +8,11 @@
 local Players = game:GetService("Players")
 
 local DataService = require(script.Parent.DataService)
+local ClickService = require(script.Parent.ClickService)
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+
+-- Create the ClickHit RemoteEvent before any client can look for it.
+ClickService.Init()
 
 local function onPlayerAdded(player)
 	local data = DataService.Load(player)
@@ -23,7 +27,7 @@ local function onPlayerAdded(player)
 	aura.Parent = leaderstats
 
 	-- Keep the cached data table in sync whenever Aura changes, from
-	-- wherever it changes (click handler lands in Day 2).
+	-- wherever it changes (ClickService, later mobs/pets/rebirth).
 	aura.Changed:Connect(function(newValue)
 		data.Aura = newValue
 	end)
@@ -35,6 +39,11 @@ end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
+
+-- In Studio the local player can join before this script connects.
+for _, player in ipairs(Players:GetPlayers()) do
+	task.spawn(onPlayerAdded, player)
+end
 
 -- Safety-net autosave loop in case of a crash before PlayerRemoving fires.
 task.spawn(function()

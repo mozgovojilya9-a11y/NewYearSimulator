@@ -22,4 +22,24 @@ Config.StartingData = {
 -- save-on-leave.
 Config.AutosaveInterval = 120
 
+-- Click mechanic (Day 2). The server is the source of truth for every
+-- number here; the client only reads them for visuals/throttling.
+Config.Click = {
+	BaseDamage = 1, -- Aura gained per normal click
+	CritChance = 0.1, -- 10% chance per click
+	CritMultiplier = 5, -- crit click = BaseDamage * CritMultiplier
+	Cooldown = 0.1, -- minimum seconds between accepted clicks per player
+}
+
+-- Name of the RemoteEvent the server creates in ReplicatedStorage.
+-- Client -> Server: FireServer() asks for a click.
+-- Server -> Client: FireClient(player, amount, isCrit) confirms it.
+Config.ClickRemoteName = "ClickHit"
+
+-- Built-in Roblox client sounds, so no uploaded asset is needed.
+-- Swap for your own rbxassetid:// later if you want.
+Config.Sounds = {
+	Click = "rbxasset://sounds/electronicpingshort.wav",
+}
+
 return Config
