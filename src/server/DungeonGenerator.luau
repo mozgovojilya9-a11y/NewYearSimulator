@@ -1,88 +1,34 @@
 --[[
 	DungeonGenerator.luau
-	Builds the 20-room dungeon out of Parts at server start
-	(Workspace.Dungeon) and builds mob models on request. Pure
-	construction: all gameplay rules live in DungeonService.
+	Builds the 20-room dungeon far from the hub (Workspace.Dungeon) at
+	server start. Pure construction: all gameplay rules live in
+	DungeonService.
 
-	Layout: a gate near the hub, then corridor -> room -> corridor ->
-	room ... in a straight line towards -Z. Room sizes, mob counts,
-	mob spots and mob looks are random but seeded (Config.Dungeon.Seed),
-	so every server builds the same dungeon.
-
-	Every room except the last has an exit Door part (attribute Room=r).
-	The server keeps doors solid; each client opens the doors of rooms
-	that player has cleared (see client Dungeon.luau).
+	Layout: corridor -> room -> corridor -> room ... in a straight line
+	towards -Z from Config.DungeonLayout.Origin. Room sizes, mob counts
+	and spots are random but seeded (Config.Dungeon.Seed), so every
+	server builds the same dungeon. Rooms are open-topped brick boxes
+	with tiled floors; the exit is a translucent Barrier part carrying
+	a SurfaceGui with the enemy counter.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Format = require(ReplicatedStorage.Shared.Format)
 local WorldKit = require(script.Parent.WorldKit)
 
 local DungeonGenerator = {}
 
+local L = Config.DungeonLayout
 local D = Config.Dungeon
-local WALL = 2 -- wall thickness
+local Texts = L.Texts
 
 local folders = {}
 
-local function themeFor(room: number)
-	return D.Themes[math.min(#D.Themes, math.ceil(room / D.BossEvery))]
-end
-
-local function wall(parent, theme, size: Vector3, position: Vector3)
-	return WorldKit.Part(parent, {
-		Name = "Wall",
-		Size = size,
-		Position = position,
-		Color = theme.Wall,
-		Material = theme.Material,
-	})
-end
-
--- A wall across the X axis at z, with an optional doorway in the middle.
-local function crossWall(parent, theme, centerX, width, z, groundY, withDoorway)
-	local h = D.WallHeight
-	if not withDoorway then
-		wall(parent, theme, Vector3.new(width, h, WALL), Vector3.new(centerX, groundY + h / 2, z))
-		return
-	end
-	local side = (width - D.DoorWidth) / 2
-	for _, dir in ipairs({ -1, 1 }) do
-		wall(parent, theme, Vector3.new(side, h, WALL), Vector3.new(centerX + dir * (D.DoorWidth / 2 + side / 2), groundY + h / 2, z))
-	end
-	local lintel = h - D.DoorHeight
-	wall(parent, theme, Vector3.new(D.DoorWidth, lintel, WALL), Vector3.new(centerX, groundY + D.DoorHeight + lintel / 2, z))
-end
-
-local function corridor(parent, theme, x, zStart, groundY)
-	local length = D.CorridorLength
-	local width = D.DoorWidth + 4
-	local z = zStart - length / 2
-	WorldKit.Part(parent, {
-		Name = "CorridorFloor",
-		Size = Vector3.new(width, 1, length),
-		Position = Vector3.new(x, groundY - 0.3, z),
-		Color = theme.Floor,
-		Material = theme.Material,
-	})
-	local h = D.DoorHeight + 2
-	for _, dir in ipairs({ -1, 1 }) do
-		wall(parent, theme, Vector3.new(WALL, h, length), Vector3.new(x + dir * (width / 2 + WALL / 2), groundY + h / 2, z))
-	end
-end
-
-local function torch(parent, theme, position)
-	local flame = WorldKit.Part(parent, {
-		Name = "Torch",
-		Size = Vector3.new(1, 1.6, 1),
-		Position = position,
-		Color = theme.Light,
-		Material = Enum.Material.Neon,
-		CanCollide = false,
-	})
-	WorldKit.Light(flame, theme.Light, 22, 1.4)
+local function biomeFor(room: number)
+	return L.Biomes[math.min(#L.Biomes, math.ceil(room / D.BossEvery))]
 end
 
 local function pickMobSpots(rng: Random, center: Vector3, size: number, count: number)
@@ -91,7 +37,7 @@ local function pickMobSpots(rng: Random, center: Vector3, size: number, count: n
 	for _ = 1, count do
 		local chosen
 		for _ = 1, 25 do
-			local candidate = center + Vector3.new(rng:NextNumber(-half, half), 0, rng:NextNumber(-half, half * 0.6))
+			local candidate = center + Vector3.new(rng:NextNumber(-half, half), 0, rng:NextNumber(-half * 0.7, half * 0.5))
 			local ok = true
 			for _, other in ipairs(spots) do
 				if (other.Position - candidate).Magnitude < 9 then
@@ -104,191 +50,204 @@ local function pickMobSpots(rng: Random, center: Vector3, size: number, count: n
 				break
 			end
 		end
-		table.insert(spots, { Position = chosen, Kind = rng:NextInteger(1, #D.MobKinds) })
+		table.insert(spots, { Position = chosen, Kind = rng:NextInteger(1, #Config.MobLooks.Kinds) })
 	end
 	return spots
 end
 
+local function corridor(parent, biome, x, zStart, groundY)
+	local length = L.CorridorLength
+	local width = L.DoorWidth + 4
+	local z = zStart - length / 2
+	WorldKit.TiledFloor(parent, Vector3.new(x, groundY, z), width, length, L.TileSize, biome.Floor, biome.FloorB, 12)
+	local h = L.DoorHeight + 2
+	for _, dir in ipairs({ -1, 1 }) do
+		local wx = x + dir * (width / 2 + L.WallThickness / 2)
+		WorldKit.CastleWall(parent, Vector3.new(wx, groundY, zStart), Vector3.new(wx, groundY, zStart - length), h, L.WallThickness, biome.StoneA, biome.StoneB, 0)
+	end
+end
+
+-- Barrier text: enemies counter, stage, recommended damage (+ boss line).
+local function barrierLines(index, isBoss, total)
+	local lines = {
+		{ Name = "Enemies", Text = Texts.Enemies:format(0, total), Size = 90 },
+		{ Text = Texts.Stage:format(index), Size = 44, Transparency = 0.35 },
+		{ Text = Texts.Recommended:format(Format.Number(Config.RecommendedDamage(index))), Size = 26, Transparency = 0.2 },
+	}
+	if isBoss then
+		table.insert(lines, 1, { Text = Texts.Boss, Size = 60, Color = Config.Theme.Magenta })
+	end
+	return lines
+end
+
 local function buildRoom(parent, rng, index, x, zFront, groundY)
-	local theme = themeFor(index)
+	local biome = biomeFor(index)
 	local isBoss = Config.IsBossRoom(index)
-	local size = if isBoss then D.RoomSizeMax else rng:NextInteger(D.RoomSizeMin, D.RoomSizeMax)
+	local size = if isBoss then math.floor(L.RoomSizeMax * L.BossRoomScale) else rng:NextInteger(L.RoomSizeMin, L.RoomSizeMax)
 	local center = Vector3.new(x, groundY, zFront - size / 2)
 	local zBack = zFront - size
+	local h = L.WallHeight
+	local t = L.WallThickness
 
 	local model = Instance.new("Model")
 	model.Name = ("Room%02d"):format(index)
 	model.Parent = parent
 
-	WorldKit.Part(model, {
-		Name = "Floor",
-		Size = Vector3.new(size, 1, size),
-		Position = Vector3.new(x, groundY - 0.3, center.Z),
-		Color = theme.Floor,
-		Material = theme.Material,
-	})
+	-- Floor: tiles (capped so the whole room stays under the part budget).
+	WorldKit.TiledFloor(model, center, size, size, L.TileSize, biome.Floor, biome.FloorB, 64)
 
-	local h = D.WallHeight
-	for _, dir in ipairs({ -1, 1 }) do
-		wall(model, theme, Vector3.new(WALL, h, size + WALL * 2), Vector3.new(x + dir * (size / 2 + WALL / 2), groundY + h / 2, center.Z))
-	end
-	crossWall(model, theme, x, size + WALL * 2, zFront + WALL / 2, groundY, true)
-
+	-- Walls with merlons. Front/back have doorways.
+	local half = size / 2 + t / 2
+	WorldKit.CastleWall(model, Vector3.new(x - half, groundY, zFront), Vector3.new(x - half, groundY, zBack), h, t, biome.StoneA, biome.StoneB, L.MerlonSize)
+	WorldKit.CastleWall(model, Vector3.new(x + half, groundY, zFront), Vector3.new(x + half, groundY, zBack), h, t, biome.StoneA, biome.StoneB, L.MerlonSize)
+	local gap = { Center = half, Width = L.DoorWidth }
+	WorldKit.CastleWall(model, Vector3.new(x - half, groundY, zFront + t / 2), Vector3.new(x + half, groundY, zFront + t / 2), h, t, biome.StoneA, biome.StoneB, L.MerlonSize, gap)
 	local isLast = index == D.Rooms
-	crossWall(model, theme, x, size + WALL * 2, zBack - WALL / 2, groundY, not isLast)
-
-	local door
+	WorldKit.CastleWall(model, Vector3.new(x - half, groundY, zBack - t / 2), Vector3.new(x + half, groundY, zBack - t / 2), h, t, biome.StoneA, biome.StoneB, L.MerlonSize, if isLast then nil else gap)
+	-- Lintels above the doorways.
+	local frontLintel = WorldKit.Brick(model, Vector3.new(L.DoorWidth, h - L.DoorHeight, t), CFrame.new(x, groundY + L.DoorHeight + (h - L.DoorHeight) / 2, zFront + t / 2), biome.StoneB, "Lintel")
+	-- Stage number over the entrance, readable from the corridor (+Z side).
+	WorldKit.SurfaceText(frontLintel, Enum.NormalId.Back, { { Text = Texts.Entrance:format(index), Size = 56, Color = biome.Accent } }, 30)
 	if not isLast then
-		door = WorldKit.Part(folders.Doors, {
-			Name = "Door" .. index,
-			Size = Vector3.new(D.DoorWidth, D.DoorHeight, 1.5),
-			Position = Vector3.new(x, groundY + D.DoorHeight / 2, zBack - WALL / 2),
-			Color = theme.Light,
-			Material = Enum.Material.Neon,
-			Transparency = 0.35,
-		})
-		door:SetAttribute("Room", index)
-		-- The sign lives inside the door so the client hides both together.
-		WorldKit.Sign(door, door.Position + Vector3.new(0, 0, 1.5), "🔒 Убей всех мобов", Color3.fromRGB(255, 120, 120), 260)
+		WorldKit.Brick(model, Vector3.new(L.DoorWidth, h - L.DoorHeight, t), CFrame.new(x, groundY + L.DoorHeight + (h - L.DoorHeight) / 2, zBack - t / 2), biome.StoneB, "Lintel")
 	end
 
-	-- Corner torches.
+
+	-- Corner lights in the biome color + neon trim strips on the walls.
 	for _, dx in ipairs({ -1, 1 }) do
 		for _, dz in ipairs({ -1, 1 }) do
-			torch(model, theme, Vector3.new(x + dx * (size / 2 - 1.5), groundY + 8, center.Z + dz * (size / 2 - 1.5)))
+			local lamp = WorldKit.Part(model, {
+				Name = "Lamp",
+				Size = Vector3.new(1.2, 1.2, 1.2),
+				Position = Vector3.new(x + dx * (size / 2 - 1.5), groundY + h - 2, center.Z + dz * (size / 2 - 1.5)),
+				Color = biome.Light,
+				Material = Enum.Material.Neon,
+				CanCollide = false,
+			})
+			WorldKit.Light(lamp, biome.Light, size * 0.9, 1.6)
 		end
-	end
-
-	local title = if isBoss
-		then ("Комната %d — БОСС"):format(index)
-		else ("Комната %d • %s"):format(index, theme.Name)
-	WorldKit.Sign(model, Vector3.new(x, groundY + h + 4, zFront + 2), title, if isBoss then Color3.fromRGB(255, 205, 70) else nil, 360)
-
-	local spots
-	if isBoss then
 		WorldKit.Part(model, {
-			Name = "BossCircle",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(0.2, 26, 26),
-			CFrame = CFrame.new(x, groundY + 0.25, center.Z - size * 0.12) * CFrame.Angles(0, 0, math.rad(90)),
-			Color = theme.Light,
+			Name = "Trim",
+			Size = Vector3.new(0.3, 0.4, size),
+			Position = Vector3.new(x + dx * (size / 2 - 0.1), groundY + 2.2, center.Z),
+			Color = biome.Accent,
 			Material = Enum.Material.Neon,
-			Transparency = 0.4,
 			CanCollide = false,
 			CanQuery = false,
 		})
-		spots = { { Position = Vector3.new(x, groundY, center.Z - size * 0.12) } }
+	end
+
+	local spots
+	if isBoss then
+		-- Round arena in the middle.
+		local arenaR = size * 0.28
+		WorldKit.Part(model, {
+			Name = "Arena",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1, arenaR * 2, arenaR * 2),
+			CFrame = CFrame.new(center + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = biome.StoneA,
+			Material = Enum.Material.Plastic,
+			TopSurface = Enum.SurfaceType.Studs,
+		})
+		WorldKit.Part(model, {
+			Name = "ArenaRing",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.4, arenaR * 2 + 2, arenaR * 2 + 2),
+			CFrame = CFrame.new(center + Vector3.new(0, 0.8, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = L.BossBarrierColor,
+			Material = Enum.Material.Neon,
+			Transparency = 0.3,
+			CanCollide = false,
+			CanQuery = false,
+		})
+		for i = 0, 5 do
+			local angle = i * math.pi / 3
+			WorldKit.Brick(model, Vector3.new(2.5, 9, 2.5), CFrame.new(center + Vector3.new(math.cos(angle) * (arenaR + 4), 4.5, math.sin(angle) * (arenaR + 4))), biome.StoneB, "Pillar")
+		end
+		spots = { { Position = center + Vector3.new(0, 1, 0) } }
 	else
 		spots = pickMobSpots(rng, center, size, rng:NextInteger(D.MobsMin, D.MobsMax))
 	end
+
+	-- Exit barrier (none after the last room).
+	local barrier
+	if not isLast then
+		barrier = WorldKit.Part(folders.Barriers, {
+			Name = "Barrier" .. index,
+			Size = Vector3.new(L.DoorWidth, L.DoorHeight, 1),
+			Position = Vector3.new(x, groundY + L.DoorHeight / 2, zBack - t / 2),
+			Color = if isBoss then L.BossBarrierColor else biome.Accent,
+			Material = Enum.Material.ForceField,
+			Transparency = 0.4,
+		})
+		barrier:SetAttribute("Room", index)
+		barrier:SetAttribute("Boss", isBoss)
+		barrier:SetAttribute("Total", #spots)
+		barrier:SetAttribute("Alive", #spots)
+		-- Players approach from +Z, i.e. the part's Back face.
+		WorldKit.SurfaceText(barrier, Enum.NormalId.Back, barrierLines(index, isBoss, #spots), 28)
+	end
+
+	model:SetAttribute("Room", index)
+	model:SetAttribute("Boss", isBoss)
+	model:SetAttribute("ZFront", zFront)
+	model:SetAttribute("ZBack", zBack)
 
 	local entryPosition = Vector3.new(x, groundY + 3, zFront - 6)
 	return {
 		Index = index,
 		IsBoss = isBoss,
+		Biome = biome,
 		Center = center,
 		Size = size,
 		Entry = CFrame.lookAt(entryPosition, Vector3.new(x, groundY + 3, center.Z)),
-		Door = door,
+		Barrier = barrier,
 		MobSpots = spots,
 	}
 end
 
--- Builds the whole dungeon. Returns { Folder, Mobs, Rooms = { [i] = room } }.
+-- Builds the whole dungeon. Returns { Folder, Mobs, Drops, Rooms = { [i] = room } }.
 function DungeonGenerator.Build()
 	local root = Instance.new("Folder")
 	root.Name = "Dungeon"
-	for _, name in ipairs({ "Geometry", "Doors", "Mobs" }) do
+	for _, name in ipairs({ "Geometry", "Barriers", "Mobs", "Drops" }) do
 		local folder = Instance.new("Folder")
 		folder.Name = name
 		folder.Parent = root
 		folders[name] = folder
 	end
 
+	local origin = L.Origin
 	local spawn = Workspace:FindFirstChildWhichIsA("SpawnLocation", true)
-	local origin = if spawn then spawn.Position else Vector3.zero
-	local groundY = if spawn then spawn.Position.Y - spawn.Size.Y / 2 else 0
+	local groundY = if spawn then spawn.Position.Y + spawn.Size.Y / 2 else 0
+	-- A big dark slab under the whole dungeon so nothing falls through
+	-- and the Baseplate colour never shows.
+	local totalLength = D.Rooms * (L.CorridorLength + L.RoomSizeMax * L.BossRoomScale) + 40
+	WorldKit.Part(folders.Geometry, {
+		Name = "Bedrock",
+		Size = Vector3.new(L.RoomSizeMax * L.BossRoomScale + 60, 4, totalLength),
+		Position = Vector3.new(origin.X, groundY - 2.6, origin.Z - totalLength / 2 + 20),
+		Color = Color3.fromRGB(20, 14, 32),
+		Material = Enum.Material.Slate,
+	})
 
 	local rng = Random.new(D.Seed)
 	local x = origin.X
-	local z = origin.Z - D.StartOffset
-
-	-- Gate from the hub.
-	local gateTheme = D.Themes[1]
-	crossWall(folders.Geometry, gateTheme, x, D.DoorWidth + 12, z, groundY, true)
-	WorldKit.Sign(folders.Geometry, Vector3.new(x, groundY + D.WallHeight + 4, z + 2), "⚔ ДАНЖ ⚔", Color3.fromRGB(255, 120, 90), 260)
-	torch(folders.Geometry, gateTheme, Vector3.new(x - D.DoorWidth / 2 - 2, groundY + 8, z + 2))
-	torch(folders.Geometry, gateTheme, Vector3.new(x + D.DoorWidth / 2 + 2, groundY + 8, z + 2))
+	local z = origin.Z
 
 	local rooms = {}
 	for index = 1, D.Rooms do
-		corridor(folders.Geometry, themeFor(index), x, z, groundY)
-		z -= D.CorridorLength
+		corridor(folders.Geometry, biomeFor(index), x, z, groundY)
+		z -= L.CorridorLength
 		local room = buildRoom(folders.Geometry, rng, index, x, z, groundY)
 		rooms[index] = room
 		z -= room.Size
 	end
 
+	root:SetAttribute("GateZ", origin.Z)
 	root.Parent = Workspace
-	return { Folder = root, Mobs = folders.Mobs, Rooms = rooms }
-end
-
--- Builds one mob for a room spot and parents it to Dungeon.Mobs.
--- Health lives in its Humanoid; attributes carry Room/Boss/Reward.
-function DungeonGenerator.BuildMob(room, spot)
-	local isBoss = room.IsBoss
-	local look = if isBoss then D.Bosses[room.Index] else D.MobKinds[spot.Kind]
-	local size = look.Size * (if isBoss then D.BossScale else 1)
-	local health = Config.MobHealth(room.Index, isBoss)
-
-	local position = spot.Position + Vector3.new(0, size.Y / 2 + 0.2, 0)
-	local facing = Vector3.new(room.Entry.Position.X, position.Y, room.Entry.Position.Z)
-
-	local model = Instance.new("Model")
-	model.Name = look.Name
-
-	local body = WorldKit.Part(model, {
-		Name = "HumanoidRootPart",
-		Size = size,
-		CFrame = CFrame.lookAt(position, facing),
-		Color = look.Color,
-	})
-	if look.Shape == "Ball" then
-		body.Shape = Enum.PartType.Ball
-	end
-	model.PrimaryPart = body
-	WorldKit.Eyes(model, body)
-
-	if isBoss then
-		local crown = WorldKit.Part(model, {
-			Name = "Crown",
-			Size = Vector3.new(size.X * 0.6, size.Y * 0.15, size.Z * 0.6),
-			CFrame = body.CFrame * CFrame.new(0, size.Y / 2 + size.Y * 0.075, 0),
-			Color = Color3.fromRGB(255, 205, 70),
-			Material = Enum.Material.Neon,
-			CanCollide = false,
-		})
-		WorldKit.Light(crown, look.Color, 30, 2)
-	end
-
-	local humanoid = Instance.new("Humanoid")
-	humanoid.MaxHealth = health
-	humanoid.Health = health
-	humanoid.WalkSpeed = 0
-	humanoid.BreakJointsOnDeath = false
-	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
-	humanoid.Parent = model
-
-	model:SetAttribute("Room", room.Index)
-	model:SetAttribute("Boss", isBoss)
-	model:SetAttribute("Reward", Config.MobReward(room.Index, isBoss))
-
-	WorldKit.HealthGui(body, if isBoss then "БОСС: " .. look.Name else look.Name, size.Y, isBoss)
-	WorldKit.UpdateHealth(body, health, health)
-
-	model.Parent = folders.Mobs
-	return model
+	return { Folder = root, Mobs = folders.Mobs, Drops = folders.Drops, Rooms = rooms }
 end
 
 return DungeonGenerator
