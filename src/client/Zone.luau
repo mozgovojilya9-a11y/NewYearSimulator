@@ -33,17 +33,31 @@ local Zone = {}
 
 local bloom = Lighting:WaitForChild("Bloom", 10)
 local cc = Lighting:WaitForChild("ColorCorrection", 10)
+local atmosphere = Lighting:WaitForChild("Atmosphere", 10)
 
 local function applyLighting(presetName: string)
 	local p = Config.Lighting[presetName]
 	local t = Config.Lighting.TransitionSeconds
-	Style.Tween(Lighting, t, { ClockTime = p.ClockTime, Brightness = p.Brightness, ExposureCompensation = p.ExposureCompensation, Ambient = p.Ambient, OutdoorAmbient = p.OutdoorAmbient, FogColor = p.FogColor, FogEnd = p.FogEnd })
+	Style.Tween(Lighting, t, { ClockTime = p.ClockTime, Brightness = p.Brightness, ExposureCompensation = p.ExposureCompensation, Ambient = p.Ambient, OutdoorAmbient = p.OutdoorAmbient })
 	if bloom then
 		Style.Tween(bloom, t, { Intensity = p.Bloom })
 	end
 	if cc then
 		Style.Tween(cc, t, { Saturation = p.Saturation, Contrast = p.Contrast, TintColor = p.Tint })
 	end
+	if atmosphere then
+		Style.Tween(atmosphere, t, { Density = p.Atmosphere.Density, Color = p.Atmosphere.Color, Decay = p.Atmosphere.Decay, Glare = p.Atmosphere.Glare, Haze = p.Atmosphere.Haze })
+	end
+end
+
+-- Haze takes the color of the biome the player is in.
+local function applyBiome(room: number?)
+	if not atmosphere or not room then
+		return
+	end
+	local biomes = Config.DungeonLayout.Biomes
+	local biome = biomes[math.min(#biomes, math.ceil(room / Config.Dungeon.BossEvery))]
+	Style.Tween(atmosphere, Config.Lighting.TransitionSeconds, { Color = biome.Atmosphere.Color, Decay = biome.Atmosphere.Decay })
 end
 
 local lastZone = nil
@@ -98,6 +112,7 @@ task.spawn(function()
 		if found ~= currentRoom then
 			currentRoom = found
 			Hud.SetCurrentRoom(found)
+			applyBiome(found)
 		end
 	end
 end)

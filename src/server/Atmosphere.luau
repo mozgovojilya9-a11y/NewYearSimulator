@@ -1,7 +1,8 @@
 --[[
 	Atmosphere.luau
-	Base look of the world from Config.Lighting.Hub: bright day, soft
-	bloom and color correction. The client (Zone.luau) tweens the same
+	Base look of the world from Config.Lighting.Hub: clear day, blue
+	sky, light haze (Atmosphere), tiny bloom (only neon glows) and a
+	gentle color correction. No fog: Atmosphere does the depth. The client (Zone.luau) tweens the same
 	properties to the Dungeon preset when the player is in the dungeon.
 ]]
 
@@ -37,14 +38,24 @@ function Atmosphere.Init()
 	Lighting.ExposureCompensation = hub.ExposureCompensation
 	Lighting.Ambient = hub.Ambient
 	Lighting.OutdoorAmbient = hub.OutdoorAmbient
-	Lighting.FogColor = hub.FogColor
-	Lighting.FogEnd = hub.FogEnd
 	Lighting.GlobalShadows = true
+
+	local sky = ensure("Sky", "Sky")
+	sky.StarCount = 1500
+	sky.SunAngularSize = 14
+	sky.MoonAngularSize = 8
+
+	local atmosphere = ensure("Atmosphere", "Atmosphere")
+	atmosphere.Density = hub.Atmosphere.Density
+	atmosphere.Color = hub.Atmosphere.Color
+	atmosphere.Decay = hub.Atmosphere.Decay
+	atmosphere.Glare = hub.Atmosphere.Glare
+	atmosphere.Haze = hub.Atmosphere.Haze
 
 	local bloom = ensure("BloomEffect", "Bloom")
 	bloom.Intensity = hub.Bloom
-	bloom.Size = 24
-	bloom.Threshold = 1.1
+	bloom.Size = Config.Lighting.BloomSize
+	bloom.Threshold = Config.Lighting.BloomThreshold
 
 	local cc = ensure("ColorCorrectionEffect", "ColorCorrection")
 	cc.Saturation = hub.Saturation

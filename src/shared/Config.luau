@@ -207,12 +207,16 @@ Config.Theme = {
 	Panel = Color3.fromRGB(250, 246, 255), -- window body (light)
 	PanelDark = Color3.fromRGB(40, 28, 70), -- HUD plates
 	-- Stone: two close tints alternate in 4x4 / 8x8 blocks for a tile look.
-	StoneA = Color3.fromRGB(225, 214, 245),
-	StoneB = Color3.fromRGB(208, 194, 235),
-	StoneDark = Color3.fromRGB(150, 130, 190),
-	Path = Color3.fromRGB(120, 60, 220), -- player's path
+	StoneA = Color3.fromRGB(140, 123, 214), -- #8C7BD6 walls
+	StoneB = Color3.fromRGB(110, 95, 192), -- #6E5FC0 walls (alternate)
+	StoneLight = Color3.fromRGB(190, 178, 240), -- merlons / caps
+	StoneDark = Color3.fromRGB(78, 64, 150), -- pedestals, towers
+	TileA = Color3.fromRGB(226, 220, 245), -- courtyard tiles (light)
+	TileB = Color3.fromRGB(165, 150, 220), -- courtyard tiles (dark)
+	Path = Color3.fromRGB(112, 40, 210), -- player's path (saturated purple)
 	Chevron = Color3.fromRGB(255, 220, 70),
-	Grass = Color3.fromRGB(120, 210, 90),
+	Grass = Color3.fromRGB(96, 190, 80),
+	Sky = Color3.fromRGB(120, 190, 255),
 }
 
 -- Rarity colors, identical in the shop, on pedestals and pets.
@@ -229,17 +233,20 @@ Config.Rarity = {
 -- between presets when the player's "Zone" attribute changes.
 Config.Lighting = {
 	TransitionSeconds = 1,
+	BloomSize = 24,
+	BloomThreshold = 0.95, -- only neon/very bright pixels glow
 	Hub = {
-		ClockTime = 14, Brightness = 2.2, ExposureCompensation = 0.1,
-		Ambient = Color3.fromRGB(150, 140, 170), OutdoorAmbient = Color3.fromRGB(170, 160, 200),
-		Saturation = 0.15, Contrast = 0.05, Tint = Color3.fromRGB(255, 252, 248), Bloom = 0.35,
-		FogColor = Color3.fromRGB(205, 190, 255), FogEnd = 900,
+		ClockTime = 14, Brightness = 1.8, ExposureCompensation = 0,
+		Ambient = Color3.fromRGB(120, 115, 150), OutdoorAmbient = Color3.fromRGB(135, 130, 175),
+		Saturation = 0.15, Contrast = 0.05, Tint = Color3.fromRGB(255, 252, 248), Bloom = 0.1,
+		Atmosphere = { Density = 0.28, Color = Color3.fromRGB(190, 205, 255), Decay = Color3.fromRGB(120, 150, 230), Glare = 0.1, Haze = 0.8 },
 	},
 	Dungeon = {
-		ClockTime = 1, Brightness = 1, ExposureCompensation = 0.05,
-		Ambient = Color3.fromRGB(70, 60, 95), OutdoorAmbient = Color3.fromRGB(60, 50, 85),
-		Saturation = 0.2, Contrast = 0.1, Tint = Color3.fromRGB(235, 230, 255), Bloom = 0.6,
-		FogColor = Color3.fromRGB(25, 15, 40), FogEnd = 320,
+		ClockTime = 2, Brightness = 1.2, ExposureCompensation = 0,
+		Ambient = Color3.fromRGB(105, 100, 130), OutdoorAmbient = Color3.fromRGB(95, 90, 125),
+		Saturation = 0.1, Contrast = 0.08, Tint = Color3.fromRGB(245, 242, 255), Bloom = 0.12,
+		-- Atmosphere color/decay come from the biome the player stands in.
+		Atmosphere = { Density = 0.35, Color = Color3.fromRGB(90, 80, 120), Decay = Color3.fromRGB(50, 40, 80), Glare = 0, Haze = 1.2 },
 	},
 }
 
@@ -311,10 +318,16 @@ Config.DungeonLayout = {
 
 	-- One biome per 5 rooms.
 	Biomes = {
-		{ Name = "Неоновые катакомбы", StoneA = Color3.fromRGB(60, 58, 72), StoneB = Color3.fromRGB(48, 46, 60), Floor = Color3.fromRGB(70, 68, 84), FloorB = Color3.fromRGB(58, 56, 70), Accent = Color3.fromRGB(100, 255, 90), Light = Color3.fromRGB(110, 255, 100) },
-		{ Name = "Ледяной грот", StoneA = Color3.fromRGB(150, 205, 240), StoneB = Color3.fromRGB(125, 185, 230), Floor = Color3.fromRGB(170, 220, 245), FloorB = Color3.fromRGB(150, 205, 238), Accent = Color3.fromRGB(46, 230, 255), Light = Color3.fromRGB(80, 220, 255) },
-		{ Name = "Лавовая кузня", StoneA = Color3.fromRGB(120, 40, 40), StoneB = Color3.fromRGB(95, 30, 32), Floor = Color3.fromRGB(70, 30, 30), FloorB = Color3.fromRGB(58, 24, 24), Accent = Color3.fromRGB(255, 140, 40), Light = Color3.fromRGB(255, 120, 40) },
-		{ Name = "Бездна ауры", StoneA = Color3.fromRGB(95, 60, 160), StoneB = Color3.fromRGB(75, 45, 135), Floor = Color3.fromRGB(60, 35, 110), FloorB = Color3.fromRGB(50, 28, 95), Accent = Color3.fromRGB(255, 201, 60), Light = Color3.fromRGB(200, 140, 255) },
+		-- Walls (StoneA/B) are clearly lighter than the floor (Floor/FloorB),
+		-- so edges read at a glance. Atmosphere tints the haze per biome.
+		{ Name = "Неоновые катакомбы", StoneA = Color3.fromRGB(120, 118, 140), StoneB = Color3.fromRGB(100, 98, 122), Floor = Color3.fromRGB(58, 56, 72), FloorB = Color3.fromRGB(46, 44, 58), Accent = Color3.fromRGB(100, 255, 90), Light = Color3.fromRGB(150, 255, 140),
+			Atmosphere = { Color = Color3.fromRGB(90, 110, 90), Decay = Color3.fromRGB(40, 70, 40) } },
+		{ Name = "Ледяной грот", StoneA = Color3.fromRGB(175, 215, 245), StoneB = Color3.fromRGB(150, 195, 235), Floor = Color3.fromRGB(80, 125, 175), FloorB = Color3.fromRGB(65, 105, 155), Accent = Color3.fromRGB(46, 230, 255), Light = Color3.fromRGB(140, 230, 255),
+			Atmosphere = { Color = Color3.fromRGB(120, 170, 220), Decay = Color3.fromRGB(60, 100, 160) } },
+		{ Name = "Лавовая кузня", StoneA = Color3.fromRGB(165, 75, 60), StoneB = Color3.fromRGB(140, 60, 50), Floor = Color3.fromRGB(75, 30, 30), FloorB = Color3.fromRGB(60, 22, 24), Accent = Color3.fromRGB(255, 140, 40), Light = Color3.fromRGB(255, 160, 80),
+			Atmosphere = { Color = Color3.fromRGB(150, 80, 50), Decay = Color3.fromRGB(90, 30, 20) } },
+		{ Name = "Бездна ауры", StoneA = Color3.fromRGB(140, 105, 210), StoneB = Color3.fromRGB(118, 85, 185), Floor = Color3.fromRGB(55, 32, 100), FloorB = Color3.fromRGB(44, 25, 85), Accent = Color3.fromRGB(255, 201, 60), Light = Color3.fromRGB(215, 170, 255),
+			Atmosphere = { Color = Color3.fromRGB(120, 80, 180), Decay = Color3.fromRGB(60, 30, 110) } },
 	},
 	BossBarrierColor = Color3.fromRGB(255, 61, 184),
 

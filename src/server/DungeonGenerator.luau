@@ -118,17 +118,17 @@ local function buildRoom(parent, rng, index, x, zFront, groundY)
 		for _, dz in ipairs({ -1, 1 }) do
 			local lamp = WorldKit.Part(model, {
 				Name = "Lamp",
-				Size = Vector3.new(1.2, 1.2, 1.2),
-				Position = Vector3.new(x + dx * (size / 2 - 1.5), groundY + h - 2, center.Z + dz * (size / 2 - 1.5)),
+				Size = Vector3.new(1, 1, 1),
+				Position = Vector3.new(x + dx * (size / 2 - 1.5), groundY + h * 0.6, center.Z + dz * (size / 2 - 1.5)),
 				Color = biome.Light,
 				Material = Enum.Material.Neon,
 				CanCollide = false,
 			})
-			WorldKit.Light(lamp, biome.Light, size * 0.9, 1.6)
+			WorldKit.Light(lamp, biome.Light, size * 0.8, 1.2)
 		end
 		WorldKit.Part(model, {
 			Name = "Trim",
-			Size = Vector3.new(0.3, 0.4, size),
+			Size = Vector3.new(0.25, 0.25, size),
 			Position = Vector3.new(x + dx * (size / 2 - 0.1), groundY + 2.2, center.Z),
 			Color = biome.Accent,
 			Material = Enum.Material.Neon,

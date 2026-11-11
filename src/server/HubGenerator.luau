@@ -39,7 +39,7 @@ end
 local function buildCourtyard()
 	local half = L.Size / 2
 	-- Tiles sit 0.05 below the spawn pad so the two tops don't z-fight.
-	WorldKit.TiledFloor(root, base - Vector3.new(0, 0.05, 0), L.Size, L.Size, L.TileSize, T.StoneA, T.StoneB, 144)
+	WorldKit.TiledFloor(root, base - Vector3.new(0, 0.05, 0), L.Size, L.Size, L.TileSize, T.TileA, T.TileB, 144)
 
 	-- Grass apron around the citadel so the Baseplate doesn't show grey.
 	WorldKit.Part(root, {
@@ -61,7 +61,7 @@ local function buildCourtyard()
 		if i == 1 then -- front wall: gate for the portal arch
 			gap = { Center = half, Width = L.Portal.ArchWidth + 2 }
 		end
-		WorldKit.CastleWall(root, a, b, L.WallHeight, L.WallThickness, T.StoneA, T.StoneB, L.MerlonSize, gap)
+		WorldKit.CastleWall(root, a, b, L.WallHeight, L.WallThickness, T.StoneA, T.StoneB, L.MerlonSize, gap, T.StoneLight)
 	end
 
 	-- Towers with flags.
@@ -71,10 +71,10 @@ local function buildCourtyard()
 		tower.Parent = root
 		local pos = at(c)
 		WorldKit.Brick(tower, Vector3.new(L.TowerSize, L.TowerHeight, L.TowerSize), CFrame.new(pos + Vector3.new(0, L.TowerHeight / 2, 0)), T.StoneB)
-		WorldKit.Brick(tower, Vector3.new(L.TowerSize + 2, 2, L.TowerSize + 2), CFrame.new(pos + Vector3.new(0, L.TowerHeight + 1, 0)), T.StoneA, "Cap")
+		WorldKit.Brick(tower, Vector3.new(L.TowerSize + 2, 2, L.TowerSize + 2), CFrame.new(pos + Vector3.new(0, L.TowerHeight + 1, 0)), T.StoneLight, "Cap")
 		for _, dx in ipairs({ -1, 1 }) do
 			for _, dz in ipairs({ -1, 1 }) do
-				WorldKit.Brick(tower, Vector3.new(2, 2, 2), CFrame.new(pos + Vector3.new(dx * (L.TowerSize / 2), L.TowerHeight + 3, dz * (L.TowerSize / 2))), T.StoneDark, "Merlon")
+				WorldKit.Brick(tower, Vector3.new(2, 2, 2), CFrame.new(pos + Vector3.new(dx * (L.TowerSize / 2), L.TowerHeight + 3, dz * (L.TowerSize / 2))), T.StoneLight, "Merlon")
 			end
 		end
 		WorldKit.Part(tower, { Name = "Pole", Size = Vector3.new(0.4, 10, 0.4), Position = pos + Vector3.new(0, L.TowerHeight + 7, 0), Color = T.StoneDark })
@@ -140,7 +140,7 @@ local function buildPortal()
 	for _, side in ipairs({ -1, 1 }) do
 		WorldKit.Brick(model, Vector3.new(pillarW, P.ArchHeight, 6), CFrame.new(pos + Vector3.new(side * (P.ArchWidth / 2 - pillarW / 2), P.ArchHeight / 2, 0)), T.StoneDark)
 	end
-	local lintel = WorldKit.Brick(model, Vector3.new(P.ArchWidth, 5, 6), CFrame.new(pos + Vector3.new(0, P.ArchHeight + 2.5, 0)), T.StoneA, "Lintel")
+	local lintel = WorldKit.Brick(model, Vector3.new(P.ArchWidth, 5, 6), CFrame.new(pos + Vector3.new(0, P.ArchHeight + 2.5, 0)), T.StoneLight, "Lintel")
 	WorldKit.SurfaceText(lintel, Enum.NormalId.Back, { { Text = Texts.Portal, Size = 70, Color = T.Gold } }, 24)
 	for _, side in ipairs({ -1, 1 }) do
 		WorldKit.Brick(model, Vector3.new(2, 2, 2), CFrame.new(pos + Vector3.new(side * (P.ArchWidth / 2 - 1), P.ArchHeight + 6, 0)), T.Magenta, "Merlon")
@@ -319,7 +319,7 @@ local function buildAltar(parent)
 	model.Name = "Altar"
 	model.Parent = parent
 	WorldKit.Brick(model, Vector3.new(14, 2, 14), CFrame.new(pos + Vector3.new(0, 1, 0)), T.StoneDark, "Base")
-	WorldKit.Brick(model, Vector3.new(10, 1.5, 10), CFrame.new(pos + Vector3.new(0, 2.75, 0)), T.StoneA, "Step")
+	WorldKit.Brick(model, Vector3.new(10, 1.5, 10), CFrame.new(pos + Vector3.new(0, 2.75, 0)), T.StoneLight, "Step")
 	local crystal = WorldKit.Part(model, {
 		Name = "Crystal",
 		Size = Vector3.new(3.5, 9, 3.5),

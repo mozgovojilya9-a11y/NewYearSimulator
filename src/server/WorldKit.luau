@@ -83,7 +83,7 @@ end
 
 -- Wall built from big bricks of two alternating tints, with merlons
 -- (battlements) along the top. axis: "X" (runs along X) or "Z".
-function WorldKit.CastleWall(parent: Instance, from: Vector3, to: Vector3, height: number, thickness: number, colorA: Color3, colorB: Color3, merlon: number?, gap: { Center: number, Width: number }?)
+function WorldKit.CastleWall(parent: Instance, from: Vector3, to: Vector3, height: number, thickness: number, colorA: Color3, colorB: Color3, merlon: number?, gap: { Center: number, Width: number }?, merlonColor: Color3?)
 	local model = Instance.new("Model")
 	model.Name = "Wall"
 	model.Parent = parent
@@ -111,7 +111,7 @@ function WorldKit.CastleWall(parent: Instance, from: Vector3, to: Vector3, heigh
 			local s = i * merlon * 2 + merlon / 2
 			if s < length and not (gap and math.abs(s - gap.Center) < gap.Width / 2) then
 				local pos = from + dir * s + Vector3.new(0, height + merlon / 2, 0)
-				WorldKit.Brick(model, Vector3.new(merlon, merlon, thickness), CFrame.lookAt(pos, pos + right), colorB, "Merlon")
+				WorldKit.Brick(model, Vector3.new(merlon, merlon, thickness), CFrame.lookAt(pos, pos + right), merlonColor or colorA:Lerp(Color3.new(1, 1, 1), 0.35), "Merlon")
 			end
 		end
 	end
@@ -124,7 +124,7 @@ function WorldKit.SurfaceText(part: BasePart, face: Enum.NormalId, lines: { { Te
 	gui.Name = "Text"
 	gui.Face = face
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = pixelsPerStud or 40
+	gui.PixelsPerStud = math.max(50, pixelsPerStud or 50)
 	gui.LightInfluence = 0
 	gui.AlwaysOnTop = false
 	gui.Parent = part
@@ -136,23 +136,38 @@ function WorldKit.SurfaceText(part: BasePart, face: Enum.NormalId, lines: { { Te
 	layout.Padding = UDim.new(0, 4)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = gui
+	-- Lines are sized relative to the face so TextScaled has room.
+	local total = 0
+	for _, line in ipairs(lines) do
+		total += line.Size * 1.3 + 4
+	end
+	local faceScale = Instance.new("UIScale")
+	faceScale.Parent = gui
+	task.defer(function()
+		local absolute = gui.AbsoluteSize.Y
+		if absolute > 0 and total > 0 then
+			faceScale.Scale = math.min(1.6, absolute / total * 0.9)
+		end
+	end)
 
 	local labels = {}
 	for i, line in ipairs(lines) do
 		local label = Instance.new("TextLabel")
 		label.Name = line.Name or ("Line" .. i)
 		label.LayoutOrder = i
-		label.Size = UDim2.new(1, 0, 0, line.Size * 1.3)
+		-- line.Size is the share of the face height (in "units" of 1/10),
+		-- text scales to fit so it stays readable at any part size.
+		label.Size = UDim2.new(1, -16, 0, line.Size * 1.3)
 		label.BackgroundTransparency = 1
 		label.Font = Theme.Font
-		label.TextSize = line.Size
-		label.TextScaled = false
+		label.TextScaled = true
+		label.TextWrapped = true
 		label.TextColor3 = line.Color or Theme.Text
 		label.TextTransparency = line.Transparency or 0
 		label.Text = line.Text
 		label.Parent = gui
 		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = math.max(2, line.Size / 14)
+		stroke.Thickness = 3
 		stroke.Color = Theme.Outline
 		stroke.Transparency = line.Transparency or 0
 		stroke.Parent = label
