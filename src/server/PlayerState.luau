@@ -72,11 +72,6 @@ function PlayerState.GiveAura(player, baseAmount: number): number
 	return amount
 end
 
-function PlayerState.GetAura(player): number
-	local aura = auraValue(player)
-	return aura and aura.Value or 0
-end
-
 function PlayerState.SetAura(player, amount: number)
 	local aura = auraValue(player)
 	if aura then

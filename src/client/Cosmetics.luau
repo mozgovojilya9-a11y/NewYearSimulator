@@ -1,6 +1,6 @@
 --[[
 	Cosmetics.luau
-	Day 5: shows every player's equipped backpack (on their back) and
+	Shows every player's equipped backpack (on their back) and
 	pet (floating next to them). Purely visual and local: each client
 	builds the parts itself from the "EquippedBackpack"/"EquippedPet"
 	attributes the server sets, so nothing here can affect gameplay.

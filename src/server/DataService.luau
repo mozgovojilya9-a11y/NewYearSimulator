@@ -4,7 +4,7 @@
 	persistent data. Nothing outside ServerScriptService should touch
 	the DataStore directly -- go through this module instead.
 
-	Safety rules (Day 7):
+	Safety rules:
 	- Loads are retried. If the DataStore still fails, the player plays
 	  on default data but that data is NEVER saved, so a temporary
 	  Roblox outage can't overwrite real progress with zeros.

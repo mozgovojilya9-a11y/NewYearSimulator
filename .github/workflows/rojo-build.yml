@@ -31,7 +31,7 @@ jobs:
         run: rojo --version
 
       - name: Build Roblox place
-        run: rojo build -o NewYearSimulator.rbxlx
+        run: rojo build -o AuraClicker.rbxlx
 
       - name: Check patch whitespace
         run: |
@@ -44,7 +44,7 @@ jobs:
       - name: Upload built place
         uses: actions/upload-artifact@v4
         with:
-          name: NewYearSimulator-rbxlx
-          path: NewYearSimulator.rbxlx
+          name: AuraClicker-rbxlx
+          path: AuraClicker.rbxlx
           if-no-files-found: error
           retention-days: 7

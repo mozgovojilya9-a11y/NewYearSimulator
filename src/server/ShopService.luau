@@ -1,6 +1,6 @@
 --[[
 	ShopService.luau
-	Day 4: buying and equipping items from any Config.Shop category
+	Buying and equipping items from any Config.Shop category
 	(weapons, backpacks, pets). Everything is paid with Aura.
 
 	Client calls ShopRequest:InvokeServer(action, category, id) where
