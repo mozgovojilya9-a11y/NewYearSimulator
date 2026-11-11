@@ -7,6 +7,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
@@ -20,6 +21,25 @@ local RebirthService = require(script.Parent.RebirthService)
 local Remotes = require(script.Parent.Remotes)
 local ShopService = require(script.Parent.ShopService)
 local TravelService = require(script.Parent.TravelService)
+
+-- Workspace is not managed by Rojo, so leftovers of older versions of
+-- the place (old builds, decals, sounds) survive a sync. Remove
+-- everything except the few things we need (Config.World.Keep); the
+-- hub and dungeon are generated right after.
+local function purgeWorkspace()
+	local keep = {}
+	for _, name in ipairs(Config.World.Keep) do
+		keep[name] = true
+	end
+	for _, child in ipairs(Workspace:GetChildren()) do
+		if not keep[child.Name] and not child:IsA("Terrain") and not child:IsA("Camera") then
+			child:Destroy()
+		end
+	end
+end
+if Config.World.PurgeWorkspace then
+	purgeWorkspace()
+end
 
 -- Create every RemoteEvent before any client can look for it.
 Remotes.Init()

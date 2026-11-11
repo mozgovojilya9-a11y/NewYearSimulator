@@ -3,20 +3,48 @@
   "tree": {
     "$className": "DataModel",
     "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$ignoreUnknownInstances": false,
       "Shared": {
         "$path": "src/shared"
       }
     },
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "$ignoreUnknownInstances": false
+    },
     "ServerScriptService": {
       "$path": "src/server"
     },
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "$ignoreUnknownInstances": false
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$ignoreUnknownInstances": false
+    },
+    "SoundService": {
+      "$className": "SoundService",
+      "$ignoreUnknownInstances": false
+    },
     "StarterGui": {
-      "$className": "StarterGui"
+      "$className": "StarterGui",
+      "$ignoreUnknownInstances": false
+    },
+    "StarterPack": {
+      "$className": "StarterPack",
+      "$ignoreUnknownInstances": false
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",
+      "$ignoreUnknownInstances": false,
       "StarterPlayerScripts": {
         "$path": "src/client"
+      },
+      "StarterCharacterScripts": {
+        "$className": "StarterCharacterScripts",
+        "$ignoreUnknownInstances": false
       }
     }
   }

@@ -53,7 +53,7 @@ text and layout constant lives in `src/shared/Config.luau`.**
 - `src/shared/` — `Config` (balance + all visual constants), `Format` (1.2K / 3.4M / 5.6B).
 - `src/server/` — `Main.server` (startup, leaderstats Aura/Rebirths/Room, income, autosave), `Atmosphere` (base lighting), `WorldKit` (brick/floor/wall/sign/beam/HP-bar helpers), `HubGenerator`/`HubService`, `DungeonGenerator`/`DungeonService`, `MobBuilder`, `ClickService`, `ShopService`, `RebirthService`, `TravelService`, `PlayerState`, `DataService`, `Effects`, `Remotes`, `RateLimit`.
 - `src/client/` — `Client.client` (entry), `Combat`, `Zone`, `Prompts` (custom ProximityPrompt look), `Cosmetics`, `ui/Style` (colors, font, helpers), `ui/Popups`, `ui/Buttons`, `ui/Hud`, `ui/Windows/{Window,Shop,Rebirth,Reward,Settings}`.
-- `default.project.json` — Rojo mapping. `StarterGui` is owned by Rojo and stays empty; `Workspace` is not managed: `Workspace.Hub` and `Workspace.Dungeon` are generated at runtime.
+- `default.project.json` — Rojo mapping. Rojo fully owns `ReplicatedStorage`, `ReplicatedFirst`, `ServerStorage`, `Lighting`, `SoundService`, `StarterGui`, `StarterPack` and `StarterPlayer`: anything an older version of the place left there is deleted on the next sync (the plugin asks for confirmation once). `Workspace` is not managed, so the server wipes it at startup except `Config.World.Keep` (`SpawnLocation`, `Baseplate`) + Terrain, then generates `Workspace.Hub` and `Workspace.Dungeon`. Set `Config.World.PurgeWorkspace = false` to keep hand-placed builds.
 
 ## Run locally
 

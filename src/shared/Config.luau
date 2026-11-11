@@ -30,6 +30,14 @@ Config.StartingData = {
 
 Config.AutosaveInterval = 120
 
+-- Startup cleanup of the place. Everything in Workspace except these
+-- names (plus Terrain and the camera) is destroyed before the hub and
+-- dungeon are generated, so old builds can't leak into the new look.
+Config.World = {
+	PurgeWorkspace = true,
+	Keep = { "SpawnLocation", "Baseplate" },
+}
+
 ---------------------------------------------------------------------
 -- BALANCE
 ---------------------------------------------------------------------

@@ -24,6 +24,13 @@ local function ensure(className: string, name: string)
 end
 
 function Atmosphere.Init()
+	-- Wipe whatever an older version of the place left in Lighting
+	-- (skies, atmospheres, clouds, blur, extra effects): only the
+	-- effects this module creates below may exist.
+	for _, child in ipairs(Lighting:GetChildren()) do
+		child:Destroy()
+	end
+
 	local hub = Config.Lighting.Hub
 	Lighting.ClockTime = hub.ClockTime
 	Lighting.Brightness = hub.Brightness
