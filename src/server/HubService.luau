@@ -1,10 +1,10 @@
 --[[
 	HubService.luau
-	Builds the hub and wires its prompts:
-	- Weapon stand prompt: buys the unique weapon (or equips it if already
-	  owned) through ShopService with fromStand = true.
-	- The rebirth altar prompt is handled on the client (it only opens a
-	  window); the rebirth itself goes through RebirthService.
+	Builds the hub and wires its weapon-stand prompts: buying the unique
+	weapon (or equipping it if already owned) goes through ShopService
+	with fromStand = true. The altar / shop / egg prompts only open
+	client windows, so the client handles them (Prompts.luau); the
+	portal is wired by TravelService.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

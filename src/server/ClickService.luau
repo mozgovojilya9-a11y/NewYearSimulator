@@ -7,9 +7,10 @@
 	  - the player's character is within Config.Click.Range,
 	  - the per-player cooldown (Config.Click.Cooldown, anti-macro),
 	then rolls damage/crit itself and replies to that client:
-	  ("Hit", mob, damage, isCrit)      -- DungeonService
-	  ("Kill", position, auraGained)    -- DungeonService
-	  ("Train", trainer, aura, isCrit)  -- trainers
+	  ("Hit", mob, damage, isCrit)        -- DungeonService
+	  ("Kill", position, isBoss)          -- DungeonService
+	  ("Pickup", position, auraGained)    -- DungeonService (crystal collected)
+	  ("Train", trainer, aura, isCrit)    -- trainers
 	Numbers sent by the client are never used.
 ]]
 
@@ -29,7 +30,6 @@ local function isTrainer(target)
 	return trainersFolder ~= nil and target.Parent == trainersFolder
 end
 
--- trainers: the Hub.Trainers folder from HubGenerator (may be nil).
 function ClickService.Init(trainers: Folder?)
 	trainersFolder = trainers
 	local remote = Remotes.Get("ClickHit")
@@ -59,7 +59,8 @@ function ClickService.Init(trainers: Folder?)
 		if mob then
 			DungeonService.Hit(player, target)
 		else
-			local amount, isCrit = PlayerState.RollCrit(PlayerState.ClickPower(player) * Config.Hub.TrainerRate)
+			local multiplier = target:GetAttribute("Multiplier") or 1
+			local amount, isCrit = PlayerState.RollCrit(PlayerState.ClickPower(player) * Config.Hub.TrainerRate * multiplier)
 			local gained = PlayerState.GiveAura(player, amount)
 			remote:FireClient(player, "Train", target, gained, isCrit)
 		end

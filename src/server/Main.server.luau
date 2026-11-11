@@ -1,32 +1,35 @@
 --[[
 	Main.server.luau
-	Entry point: wires up player join/leave to DataService, and exposes
-	current progress through standard Roblox leaderstats so the top bar
-	UI (and the default Roblox leaderboard) can read it.
+	Entry point: builds the world, starts every service, wires player
+	join/leave into DataService and exposes progress through leaderstats
+	(Aura, Rebirths, Room). Also runs passive income and autosave.
 ]]
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local DataService = require(script.Parent.DataService)
-local PlayerState = require(script.Parent.PlayerState)
-local Remotes = require(script.Parent.Remotes)
+local Config = require(ReplicatedStorage.Shared.Config)
+local Format = require(ReplicatedStorage.Shared.Format)
+local Atmosphere = require(script.Parent.Atmosphere)
 local ClickService = require(script.Parent.ClickService)
+local DataService = require(script.Parent.DataService)
 local DungeonService = require(script.Parent.DungeonService)
 local HubService = require(script.Parent.HubService)
-local ShopService = require(script.Parent.ShopService)
+local PlayerState = require(script.Parent.PlayerState)
 local RebirthService = require(script.Parent.RebirthService)
+local Remotes = require(script.Parent.Remotes)
+local ShopService = require(script.Parent.ShopService)
 local TravelService = require(script.Parent.TravelService)
-local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
-local Format = require(game:GetService("ReplicatedStorage").Shared.Format)
 
 -- Create every RemoteEvent before any client can look for it.
 Remotes.Init()
+Atmosphere.Init()
 local hub = HubService.Init()
 DungeonService.Init()
 ClickService.Init(hub.Trainers)
 ShopService.Init()
 RebirthService.Init()
-TravelService.Init()
+TravelService.Init(hub)
 
 -- Backpack income for the time the player was away (Config.Offline).
 local function giveOfflineIncome(player, data)
@@ -42,7 +45,6 @@ local function giveOfflineIncome(player, data)
 		return
 	end
 	local gained = PlayerState.GiveAura(player, perSecond * away * Config.Offline.Efficiency)
-	-- Give the client a moment to build its UI before the toast.
 	task.delay(4, function()
 		if player.Parent then
 			Remotes.Notify(player, ("🎒 Пока тебя не было (%d мин): +%s Ауры"):format(math.floor(away / 60), Format.Number(gained)), "gold")
@@ -57,6 +59,7 @@ local function onPlayerAdded(player)
 		return
 	end
 	started[player] = true
+	player:SetAttribute("Zone", "Hub")
 
 	local data = DataService.Load(player)
 	if not data then
@@ -82,8 +85,7 @@ local function onPlayerAdded(player)
 	room.Value = data.RoomReached
 	room.Parent = leaderstats
 
-	-- Keep the cached data table in sync whenever Aura changes, from
-	-- wherever it changes (clicks, mobs, backpacks, rebirth).
+	-- Keep the cached data table in sync whenever Aura changes.
 	aura.Changed:Connect(function(newValue)
 		data.Aura = newValue
 	end)
