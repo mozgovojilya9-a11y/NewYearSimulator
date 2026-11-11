@@ -16,6 +16,7 @@ Config.StartingData = {
 	Zone = 1,
 	EquippedWeapon = "Stick",
 	Rebirths = 0,
+	Gems = 0, -- Day 3: second currency, dropped by mobs
 }
 
 -- Autosave interval (seconds) as a safety net in addition to
@@ -40,6 +41,55 @@ Config.ClickRemoteName = "ClickHit"
 -- Swap for your own rbxassetid:// later if you want.
 Config.Sounds = {
 	Click = "rbxasset://sounds/electronicpingshort.wav",
+	Hit = "rbxasset://sounds/swordslash.wav",
+}
+
+-- Day 3: the first zone and its mobs.
+-- The zone is generated at runtime in Workspace.AuraZone (nothing is
+-- placed in Workspace by hand), Offset is relative to the SpawnLocation.
+Config.Zone = {
+	Name = "Поляна Ауры",
+	Offset = Vector3.new(0, 0, -70),
+	Radius = 48,
+	HitDistance = 80, -- max studs between player and mob to land a hit
+}
+
+-- Each mob: HP, Aura reward on kill, gem drop chance/amount, respawn
+-- time and how many copies live in the zone at once. Everyone who hit
+-- a mob gets the full reward when it dies (no kill-stealing).
+Config.Mobs = {
+	{
+		Id = "Slime", Name = "Слизень", Health = 8, Reward = 15,
+		GemChance = 0.05, Gems = 1, Respawn = 3, Count = 4,
+		Size = Vector3.new(4, 4, 4), Shape = "Ball", Color = Color3.fromRGB(110, 230, 120),
+	},
+	{
+		Id = "Goblin", Name = "Гоблин", Health = 40, Reward = 80,
+		GemChance = 0.15, Gems = 1, Respawn = 4, Count = 3,
+		Size = Vector3.new(3, 5, 3), Shape = "Block", Color = Color3.fromRGB(150, 120, 70),
+	},
+	{
+		Id = "Shade", Name = "Тень", Health = 200, Reward = 450,
+		GemChance = 0.4, Gems = 2, Respawn = 6, Count = 2,
+		Size = Vector3.new(4, 7, 4), Shape = "Block", Color = Color3.fromRGB(70, 50, 110),
+	},
+	{
+		Id = "Guardian", Name = "Страж Ауры", Health = 2500, Reward = 6000,
+		GemChance = 1, Gems = 5, Respawn = 45, Count = 1, Boss = true,
+		Size = Vector3.new(9, 12, 9), Shape = "Block", Color = Color3.fromRGB(170, 90, 255),
+	},
+}
+
+Config.MobById = {}
+for _, mob in ipairs(Config.Mobs) do
+	Config.MobById[mob.Id] = mob
+end
+
+-- All RemoteEvents/RemoteFunctions live directly in ReplicatedStorage
+-- and are created by the server on startup.
+Config.Remotes = {
+	ClickHit = "RemoteEvent",
+	MobHit = "RemoteEvent",
 }
 
 return Config

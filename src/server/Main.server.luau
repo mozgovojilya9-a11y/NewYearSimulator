@@ -8,11 +8,16 @@
 local Players = game:GetService("Players")
 
 local DataService = require(script.Parent.DataService)
+local PlayerState = require(script.Parent.PlayerState)
+local Remotes = require(script.Parent.Remotes)
 local ClickService = require(script.Parent.ClickService)
+local MobService = require(script.Parent.MobService)
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 
--- Create the ClickHit RemoteEvent before any client can look for it.
+-- Create every RemoteEvent before any client can look for it.
+Remotes.Init()
 ClickService.Init()
+MobService.Init()
 
 local function onPlayerAdded(player)
 	local data = DataService.Load(player)
@@ -31,6 +36,8 @@ local function onPlayerAdded(player)
 	aura.Changed:Connect(function(newValue)
 		data.Aura = newValue
 	end)
+
+	PlayerState.Sync(player)
 end
 
 local function onPlayerRemoving(player)

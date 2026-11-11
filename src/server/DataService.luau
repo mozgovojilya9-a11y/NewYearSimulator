@@ -48,7 +48,8 @@ function DataService.Load(player)
 		-- last save, without clobbering their existing progress.
 		for key2, defaultValue in pairs(Config.StartingData) do
 			if data[key2] == nil then
-				data[key2] = defaultValue
+				-- copy tables so players never share one default table
+				data[key2] = if type(defaultValue) == "table" then deepCopy(defaultValue) else defaultValue
 			end
 		end
 	end
