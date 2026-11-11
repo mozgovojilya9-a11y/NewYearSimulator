@@ -12,12 +12,12 @@
 	Every player who damaged a mob gets the full reward when it dies.
 ]]
 
-local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local Effects = require(script.Parent.Effects)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
 local Remotes = require(script.Parent.Remotes)
@@ -114,6 +114,21 @@ local function buildZone()
 	disc.Color = Color3.fromRGB(120, 70, 200)
 	disc.Transparency = 0.55
 	disc.Parent = zoneFolder
+
+	-- Day 6: slow sparkles rising from the zone floor.
+	local sparkles = Instance.new("ParticleEmitter")
+	sparkles.Color = ColorSequence.new(Color3.fromRGB(200, 150, 255))
+	sparkles.LightEmission = 1
+	sparkles.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.3, 0.5),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	sparkles.Lifetime = NumberRange.new(3, 5)
+	sparkles.Speed = NumberRange.new(2, 4)
+	sparkles.Rate = 12
+	sparkles.EmissionDirection = Enum.NormalId.Right -- disc is rotated: its +X points up
+	sparkles.Parent = disc
 
 	makeSign(center - away * radius + Vector3.new(0, 10, 0), Config.Zone.Name)
 
@@ -276,35 +291,6 @@ local function spawnMob(def, cframe)
 	model.Parent = mobsFolder
 end
 
-local function deathBurst(position: Vector3, color: Color3, big: boolean)
-	local anchor = Instance.new("Part")
-	anchor.Anchored = true
-	anchor.CanCollide = false
-	anchor.CanQuery = false
-	anchor.CanTouch = false
-	anchor.Transparency = 1
-	anchor.Size = Vector3.one
-	anchor.Position = position
-	anchor.Parent = zoneFolder
-
-	local emitter = Instance.new("ParticleEmitter")
-	emitter.Color = ColorSequence.new(color, Color3.fromRGB(255, 240, 255))
-	emitter.LightEmission = 0.7
-	emitter.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, if big then 2 else 1),
-		NumberSequenceKeypoint.new(1, 0),
-	})
-	emitter.Transparency = NumberSequence.new(0, 1)
-	emitter.Lifetime = NumberRange.new(0.5, 0.9)
-	emitter.Speed = NumberRange.new(12, if big then 35 else 22)
-	emitter.SpreadAngle = Vector2.new(180, 180)
-	emitter.Rate = 0
-	emitter.Parent = anchor
-	emitter:Emit(if big then 90 else 25)
-
-	Debris:AddItem(anchor, 2)
-end
-
 local function killMob(model)
 	local info = spawnInfo[model]
 	local who = damagers[model] or {}
@@ -314,7 +300,11 @@ local function killMob(model)
 	local def = info.def
 	local position = model.PrimaryPart.Position
 	model:Destroy()
-	deathBurst(position, def.Color, def.Boss == true)
+	if def.Boss then
+		Effects.Burst(position, def.Color, 90, 35, 2)
+	else
+		Effects.Burst(position, def.Color, 25)
+	end
 
 	for player in pairs(who) do
 		if player.Parent and PlayerState.IsReady(player) then

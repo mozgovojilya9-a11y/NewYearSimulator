@@ -43,7 +43,7 @@ function PlayerState.AuraMultiplier(player): number
 	end
 	local pet = Config.ItemById.Pet[data.EquippedPet]
 	local petMultiplier = if pet then 1 + pet.Bonus else 1
-	return petMultiplier
+	return petMultiplier * Config.RebirthMultiplier(data.Rebirths)
 end
 
 -- Passive Aura per second from the equipped backpack, before the
@@ -122,7 +122,14 @@ function PlayerState.Sync(player)
 		return
 	end
 	player:SetAttribute("Gems", data.Gems)
+	player:SetAttribute("Rebirths", data.Rebirths)
 	player:SetAttribute("ClickPower", PlayerState.ClickPower(player))
+
+	local leaderstats = player:FindFirstChild("leaderstats")
+	local rebirths = leaderstats and leaderstats:FindFirstChild("Rebirths")
+	if rebirths then
+		rebirths.Value = data.Rebirths
+	end
 
 	-- Shop state per category: "EquippedWeapon" = "IronSword",
 	-- "OwnedWeapon" = "Stick,WoodSword,IronSword".

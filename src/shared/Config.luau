@@ -48,6 +48,7 @@ Config.Sounds = {
 	Click = "rbxasset://sounds/electronicpingshort.wav",
 	Hit = "rbxasset://sounds/swordslash.wav",
 	Buy = "rbxasset://sounds/electronicpingshort.wav", -- played at a higher pitch
+	Rebirth = "rbxasset://sounds/electronicpingshort.wav", -- played at a low pitch
 }
 
 -- Day 3: the first zone and its mobs.
@@ -97,7 +98,26 @@ Config.Remotes = {
 	ClickHit = "RemoteEvent",
 	MobHit = "RemoteEvent",
 	ShopRequest = "RemoteFunction", -- Day 4: (action, category, id) -> ok, message
+	RebirthRequest = "RemoteFunction", -- Day 6: () -> ok, message
 }
+
+-- Day 6: rebirth. Costs Aura, resets Aura/weapons/backpacks, keeps Gems
+-- and pets, and permanently multiplies all Aura gains:
+--   multiplier = 1 + Rebirths * MultiplierPerRebirth
+--   cost       = BaseCost * CostGrowth ^ Rebirths
+Config.Rebirth = {
+	BaseCost = 25000,
+	CostGrowth = 3,
+	MultiplierPerRebirth = 1,
+}
+
+function Config.RebirthCost(rebirths: number): number
+	return math.floor(Config.Rebirth.BaseCost * Config.Rebirth.CostGrowth ^ rebirths)
+end
+
+function Config.RebirthMultiplier(rebirths: number): number
+	return 1 + rebirths * Config.Rebirth.MultiplierPerRebirth
+end
 
 -- Day 4: weapons. Damage multiplies click power (button and mobs).
 -- IDs are saved in player data: never rename them.

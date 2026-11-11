@@ -13,6 +13,7 @@ local Remotes = require(script.Parent.Remotes)
 local ClickService = require(script.Parent.ClickService)
 local MobService = require(script.Parent.MobService)
 local ShopService = require(script.Parent.ShopService)
+local RebirthService = require(script.Parent.RebirthService)
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 
 -- Create every RemoteEvent before any client can look for it.
@@ -20,6 +21,7 @@ Remotes.Init()
 ClickService.Init()
 MobService.Init()
 ShopService.Init()
+RebirthService.Init()
 
 local function onPlayerAdded(player)
 	local data = DataService.Load(player)
@@ -32,6 +34,11 @@ local function onPlayerAdded(player)
 	aura.Name = "Aura"
 	aura.Value = data.Aura
 	aura.Parent = leaderstats
+
+	local rebirths = Instance.new("IntValue")
+	rebirths.Name = "Rebirths"
+	rebirths.Value = data.Rebirths
+	rebirths.Parent = leaderstats
 
 	-- Keep the cached data table in sync whenever Aura changes, from
 	-- wherever it changes (ClickService, later mobs/pets/rebirth).
