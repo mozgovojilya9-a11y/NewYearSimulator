@@ -42,7 +42,8 @@ function PlayerState.AuraMultiplier(player): number
 	end
 	local pet = Config.ItemById.Pet[data.EquippedPet]
 	local petMultiplier = if pet then 1 + pet.Bonus else 1
-	return petMultiplier * Config.RebirthMultiplier(data.Rebirths)
+	local boost = if (data.BoostUntil or 0) > os.time() then Config.Progression.Boost.Multiplier else 1
+	return petMultiplier * Config.RebirthMultiplier(data.Rebirths) * boost
 end
 
 -- Passive Aura per second from the equipped backpack, before the
@@ -133,6 +134,10 @@ function PlayerState.Sync(player)
 	end
 	player:SetAttribute("Rebirths", data.Rebirths)
 	player:SetAttribute("RoomReached", data.RoomReached)
+	player:SetAttribute("Level", data.Level)
+	player:SetAttribute("Xp", data.Xp)
+	player:SetAttribute("XpNext", math.floor(Config.Progression.Level.XpBase * data.Level ^ 1.5))
+	player:SetAttribute("BoostUntil", data.BoostUntil or 0)
 	local unlocked = {}
 	for index in pairs(data.TrainersUnlocked) do
 		table.insert(unlocked, index)

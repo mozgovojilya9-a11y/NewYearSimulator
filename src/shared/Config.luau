@@ -26,6 +26,13 @@ Config.StartingData = {
 	EquippedPet = "",
 	RoomReached = 0, -- highest dungeon room cleared (0 = none, 20 = all)
 	TrainersUnlocked = { ["1"] = true }, -- hub platforms unlocked by Aura (permanent)
+	-- Engagement systems (ProgressionService)
+	Daily = { LastClaim = 0, Streak = 0 },
+	WheelLast = 0,
+	Quests = { Day = 0, List = {} },
+	Level = 1,
+	Xp = 0,
+	BoostUntil = 0,
 	LastSeen = 0, -- os.time() of the last save, used for offline income
 }
 
@@ -207,6 +214,51 @@ Config.Hub = {
 	StandRotationMinutes = 30, -- the unique-weapon stand swaps its weapon this often
 }
 
+-- Engagement loop: things to do every few minutes.
+-- Aura rewards scale with the player's record room so they stay relevant.
+Config.Progression = {
+	Daily = {
+		CooldownHours = 20, -- can claim again after this
+		StreakWindowHours = 48, -- longer gap resets the streak
+		Aura = { 100, 200, 350, 500, 800, 1200, 2500 }, -- day 1..7, x (1 + record/2)
+		Day7Boost = true, -- day 7 also grants a boost
+	},
+	Wheel = {
+		CooldownHours = 4,
+		Prizes = { -- weights sum does not need to be 100
+			{ Kind = "Aura", Amount = 150, Weight = 30, Label = "Аура" },
+			{ Kind = "Aura", Amount = 400, Weight = 22, Label = "Аура+" },
+			{ Kind = "Aura", Amount = 1200, Weight = 10, Label = "Много Ауры" },
+			{ Kind = "Boost", Minutes = 15, Weight = 16, Label = "x2 Аура 15 мин" },
+			{ Kind = "Aura", Amount = 250, Weight = 12, Label = "Аура" },
+			{ Kind = "Egg", Weight = 6, Label = "Яйцо питомца" },
+			{ Kind = "Aura", Amount = 600, Weight = 10, Label = "Аура++" },
+			{ Kind = "Boost", Minutes = 30, Weight = 4, Label = "x2 Аура 30 мин" },
+		},
+	},
+	Boost = { Multiplier = 2 },
+	Quests = { -- 3 per day are picked from this pool
+		Pool = {
+			{ Id = "kill30", Kind = "Kill", Target = 30, Text = "Убей 30 мобов", Aura = 300 },
+			{ Id = "kill80", Kind = "Kill", Target = 80, Text = "Убей 80 мобов", Aura = 900 },
+			{ Id = "room5", Kind = "Room", Target = 5, Text = "Дойди до этапа 5", Aura = 500 },
+			{ Id = "room10", Kind = "Room", Target = 10, Text = "Дойди до этапа 10", Aura = 1500 },
+			{ Id = "train500", Kind = "Train", Target = 500, Text = "Покликай на тренажёре 500 раз", Aura = 400 },
+			{ Id = "train1500", Kind = "Train", Target = 1500, Text = "Покликай на тренажёре 1500 раз", Aura = 1200 },
+			{ Id = "boss2", Kind = "Boss", Target = 2, Text = "Победи 2 боссов", Aura = 1000 },
+			{ Id = "runs3", Kind = "Run", Target = 3, Text = "Соверши 3 забега", Aura = 350 },
+		},
+		PerDay = 3,
+	},
+	Level = {
+		XpPerKill = 10, -- x room index
+		XpPerBoss = 100, -- x room index
+		XpBase = 100, -- xp to next level = XpBase x level^1.5
+		RewardEvery = 5, -- levels
+		RewardAura = 500, -- x level
+	},
+}
+
 -- Equipment on the character (visual only). Grip = offset of the weapon
 -- Handle from the hand part; Back = offset of the backpack Body from the
 -- torso. Swing: shoulder Motor6D rotation per rig type and timing.
@@ -260,6 +312,7 @@ Config.Remotes = {
 	AutoClick = "RemoteEvent", -- C->S (enabled: boolean)
 	RoomState = "RemoteEvent", -- S->C (room, alive, total) for the player's own run
 	RunEnded = "RemoteEvent", -- S->C (reason, room, auraEarned, record, isNewRecord)
+	Progression = "RemoteFunction", -- ("Status") | ("ClaimDaily") | ("Spin") | ("ClaimQuest", index) -> ok, payload
 }
 
 ---------------------------------------------------------------------
@@ -491,9 +544,8 @@ Config.Hud = {
 		Cleared = "Иди дальше!",
 		Done = "Данж пройден! Иди к алтарю",
 	},
-	-- Quick damage upgrades (bottom center) = these shop weapons, in order.
-	-- Prices and damage come from Config.Weapons; the server shop sells them.
-	QuickUpgrades = { "WoodSword", "IronSword", "AuraKatana", "StormBlade" },
+	-- Quick damage upgrades (bottom center): the next 4 weapons stronger
+	-- than the equipped one, cheapest first; colors per slot.
 	QuickUpgradeColors = { Color3.fromRGB(90, 230, 110), Color3.fromRGB(70, 140, 255), Color3.fromRGB(150, 80, 255), Color3.fromRGB(255, 201, 60) },
 	MenuButtons = { -- 2x3 grid on the left
 		{ Id = "Shop", Icon = "🛒", Label = "Магазин", Color = Color3.fromRGB(90, 230, 110) },
@@ -501,7 +553,7 @@ Config.Hud = {
 		{ Id = "Pets", Icon = "🐾", Label = "Питомцы", Color = Color3.fromRGB(255, 61, 184) },
 		{ Id = "Rebirth", Icon = "🔁", Label = "Перерождение", Color = Color3.fromRGB(150, 80, 255) },
 		{ Id = "Reward", Icon = "🎁", Label = "Награда", Color = Color3.fromRGB(255, 201, 60) },
-		{ Id = "Travel", Icon = "🌀", Label = "Телепорт", Color = Color3.fromRGB(46, 230, 255) },
+		{ Id = "Travel", Icon = "🚪", Label = "Телепорт", Color = Color3.fromRGB(70, 60, 190) },
 	},
 	ToastSeconds = 4,
 	ShakeCrit = { Amplitude = 0.25, Seconds = 0.15 },

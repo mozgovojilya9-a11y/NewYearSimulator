@@ -20,6 +20,7 @@ local HubService = require(script.Parent.HubService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local MobAI = require(script.Parent.MobAI)
 local PlayerState = require(script.Parent.PlayerState)
+local ProgressionService = require(script.Parent.ProgressionService)
 local RebirthService = require(script.Parent.RebirthService)
 local Remotes = require(script.Parent.Remotes)
 local ShopService = require(script.Parent.ShopService)
@@ -56,6 +57,8 @@ ShopService.Init()
 RebirthService.Init()
 TravelService.Init(hub)
 EquipmentService.Init()
+ProgressionService.Init()
+HubService.OnTrainerClick = ProgressionService.OnTrainerClick
 
 -- Backpack income for the time the player was away (Config.Offline).
 local function giveOfflineIncome(player, data)
@@ -118,6 +121,7 @@ local function onPlayerAdded(player)
 
 	PlayerState.Sync(player)
 	giveOfflineIncome(player, data)
+	ProgressionService.RefreshReady(player)
 end
 
 local function onPlayerRemoving(player)

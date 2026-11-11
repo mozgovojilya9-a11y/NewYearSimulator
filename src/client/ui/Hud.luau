@@ -271,7 +271,9 @@ end
 player:GetAttributeChangedSignal("RoomReached"):Connect(refreshProgress)
 refreshProgress()
 
--- Quick damage upgrades: the 4 weapons from Config.Hud.QuickUpgrades.
+-- Quick damage upgrades: the next 4 weapons STRONGER than the equipped
+-- one ("+gain / price"). Owned stronger weapons show "Надеть"; unique
+-- ones point to the hub stand; no upgrades left -> "Макс".
 local row = Instance.new("Frame")
 row.LayoutOrder = 4
 row.Size = UDim2.fromOffset(440, 64)
@@ -284,55 +286,63 @@ rowLayout.Padding = UDim.new(0, 8)
 rowLayout.SortOrder = Enum.SortOrder.LayoutOrder
 rowLayout.Parent = row
 
-local quickRefreshers = {}
-for order, weaponId in ipairs(Config.Hud.QuickUpgrades) do
-	local weapon = Config.ItemById.Weapon[weaponId]
+local quickSlots = {}
+for order = 1, 4 do
 	local color = Config.Hud.QuickUpgradeColors[order] or Style.Colors.Green
 	local button, setColor = Style.Button(row, { Size = UDim2.fromOffset(100, 60), Color = color, TextSize = 1, LayoutOrder = order, Shadow = false })
 	local top = Style.Label(button, "", 20, Style.Colors.Text, { Size = UDim2.new(1, 0, 0.55, 0), ZIndex = 3 })
 	local bottom = Style.Label(button, "", 14, Style.Colors.Text, { Position = UDim2.fromScale(0, 0.52), Size = UDim2.new(1, 0, 0.4, 0), ZIndex = 3 })
-	local state = "buy"
+	local slot = { button = button, setColor = setColor, top = top, bottom = bottom, color = color, state = "none", weaponId = nil }
 	button.Activated:Connect(function()
-		if state == "buy" then
-			Shop.Request("Buy", "Weapon", weaponId)
-		elseif state == "equip" then
-			Shop.Request("Equip", "Weapon", weaponId)
-		elseif state == "stand" then
-			Shop.Open("Weapon")
+		if slot.state == "buy" then
+			Shop.Request("Buy", "Weapon", slot.weaponId)
+		elseif slot.state == "equip" then
+			Shop.Request("Equip", "Weapon", slot.weaponId)
+		elseif slot.state == "stand" then
+			Popups.Toast("Это оружие продаётся на стенде в хабе", "gold")
 		end
 	end)
-	table.insert(quickRefreshers, function(owned, equipped, currentDamage)
-		local delta = weapon.Damage * Config.Click.BaseDamage - currentDamage
-		if equipped == weaponId then
-			state = "equipped"
-			top.Text = "Надето"
-			bottom.Text = weapon.Name
-			setColor(Color3.fromRGB(120, 120, 140))
-		elseif owned[weaponId] then
-			state = "equip"
-			top.Text = (if delta >= 0 then "+" else "") .. Format.Number(delta)
-			bottom.Text = "Надеть"
-			setColor(Style.Colors.Blue)
-		elseif weapon.Unique then
-			state = "stand"
-			top.Text = "+" .. Format.Number(math.max(0, delta))
-			bottom.Text = "Стенд"
-			setColor(Style.Colors.Gold)
-		else
-			state = "buy"
-			top.Text = "+" .. Format.Number(math.max(0, delta))
-			bottom.Text = Format.Number(weapon.Cost) .. " ✨"
-			setColor(if aura.Value >= weapon.Cost then color else Style.Darker(color, 0.5))
-		end
-	end)
+	quickSlots[order] = slot
 end
 
 local function refreshQuick()
 	local owned = Shop.OwnedSet("Weapon")
-	local equipped = player:GetAttribute("EquippedWeapon")
 	local current = player:GetAttribute("ClickPower") or 1
-	for _, update in ipairs(quickRefreshers) do
-		update(owned, equipped, current)
+	local currentWeapon = Config.ItemById.Weapon[player:GetAttribute("EquippedWeapon") or ""]
+	local currentDamage = if currentWeapon then currentWeapon.Damage else 1
+	-- Candidates: stronger than what is equipped, cheapest first (Config order).
+	local upgrades = {}
+	for _, weapon in ipairs(Config.Weapons) do
+		if weapon.Damage > currentDamage then
+			table.insert(upgrades, weapon)
+		end
+	end
+	for order, slot in ipairs(quickSlots) do
+		local weapon = upgrades[order]
+		if not weapon then
+			slot.state = "none"
+			slot.weaponId = nil
+			slot.top.Text = "Макс"
+			slot.bottom.Text = if order == 1 then "Лучшее оружие!" else ""
+			slot.setColor(Color3.fromRGB(110, 110, 130))
+			continue
+		end
+		slot.weaponId = weapon.Id
+		local delta = (weapon.Damage - currentDamage) * Config.Click.BaseDamage * (current / math.max(1, currentDamage * Config.Click.BaseDamage))
+		slot.top.Text = "+" .. Format.Number(math.floor(delta + 0.5))
+		if owned[weapon.Id] then
+			slot.state = "equip"
+			slot.bottom.Text = "Надеть"
+			slot.setColor(Style.Colors.Blue)
+		elseif weapon.Unique then
+			slot.state = "stand"
+			slot.bottom.Text = "Стенд в хабе"
+			slot.setColor(Style.Colors.Gold)
+		else
+			slot.state = "buy"
+			slot.bottom.Text = Format.Number(weapon.Cost) .. " ✨"
+			slot.setColor(if aura.Value >= weapon.Cost then slot.color else Style.Darker(slot.color, 0.5))
+		end
 	end
 end
 aura.Changed:Connect(refreshQuick)
@@ -340,5 +350,62 @@ player:GetAttributeChangedSignal("OwnedWeapon"):Connect(refreshQuick)
 player:GetAttributeChangedSignal("EquippedWeapon"):Connect(refreshQuick)
 player:GetAttributeChangedSignal("ClickPower"):Connect(refreshQuick)
 refreshQuick()
+
+---------------------------------------------------------------------
+-- Level bar (bottom left, above the counters) and boost timer
+---------------------------------------------------------------------
+
+local levelTrack = Instance.new("Frame")
+levelTrack.Name = "Level"
+levelTrack.LayoutOrder = -1
+levelTrack.Size = UDim2.new(1, 0, 0, 26)
+levelTrack.BackgroundColor3 = Style.Colors.PanelDark
+levelTrack.BackgroundTransparency = 0.2
+levelTrack.ZIndex = 2
+levelTrack.Parent = counters
+Style.Corner(levelTrack, UDim.new(0.5, 0))
+Style.Stroke(levelTrack, 2.5)
+local levelFill = Instance.new("Frame")
+levelFill.Size = UDim2.fromScale(0, 1)
+levelFill.BackgroundColor3 = Style.Colors.Cyan
+levelFill.ZIndex = 3
+levelFill.Parent = levelTrack
+Style.Corner(levelFill, UDim.new(0.5, 0))
+Style.Gradient(levelFill, Style.Colors.Cyan)
+local levelText = Style.Label(levelTrack, "", 15, Style.Colors.Text, { Size = UDim2.fromScale(1, 1), ZIndex = 4 })
+
+local function refreshLevel()
+	local level = player:GetAttribute("Level") or 1
+	local xp = player:GetAttribute("Xp") or 0
+	local xpNext = math.max(1, player:GetAttribute("XpNext") or 100)
+	Style.Tween(levelFill, 0.3, { Size = UDim2.fromScale(math.clamp(xp / xpNext, 0, 1), 1) })
+	levelText.Text = ("Ур. %d   %s / %s XP"):format(level, Format.Number(xp), Format.Number(xpNext))
+end
+for _, attribute in ipairs({ "Level", "Xp", "XpNext" }) do
+	player:GetAttributeChangedSignal(attribute):Connect(refreshLevel)
+end
+refreshLevel()
+
+local boostLabel = Style.Label(Style.Gui, "", 20, Style.Colors.Gold, {
+	Name = "Boost",
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, Config.Hud.TopLeftReserved.Y + 74),
+	Size = UDim2.fromOffset(400, 26),
+	ZIndex = 5,
+})
+boostLabel.Visible = false
+task.spawn(function()
+	while true do
+		local until_ = player:GetAttribute("BoostUntil") or 0
+		local left = until_ - os.time()
+		if left > 0 then
+			boostLabel.Text = ("⚡ x%s Аура  %d:%02d"):format(tostring(Config.Progression.Boost.Multiplier), left // 60, left % 60)
+			boostLabel.Visible = true
+		else
+			boostLabel.Visible = false
+		end
+		task.wait(1)
+	end
+end)
 
 return Hud

@@ -43,6 +43,11 @@ function Shop.Request(action, category, id)
 		Popups.Toast(message or "", if ok then "good" else "bad")
 		if ok then
 			Style.PlaySound(Config.Sounds.Buy, if action == "Buy" then 1.6 else 1.2, 0.6)
+			if action == "Buy" and category == "Pet" then
+				local pet = Config.ItemById.Pet[id]
+				local color, rainbow = Style.RarityColor(pet and pet.Rarity)
+				Popups.Hatch(pet and pet.Name or "", color, rainbow)
+			end
 		end
 	end)
 end

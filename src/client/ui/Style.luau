@@ -173,7 +173,11 @@ function Style.Button(parent, props: { [string]: any })
 		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	end
 	if props.Shadow ~= false and not props.LayoutOrder then
-		Style.Shadow(button)
+		local shadow = Style.Shadow(button)
+		shadow.Visible = button.Visible
+		button:GetPropertyChangedSignal("Visible"):Connect(function()
+			shadow.Visible = button.Visible
+		end)
 	end
 
 	local pressScale = Instance.new("UIScale")

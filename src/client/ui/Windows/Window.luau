@@ -86,7 +86,7 @@ function Window.new(title: string, color: Color3, size: Vector2?)
 		Position = UDim2.new(1, 8, 0, -12),
 		Size = UDim2.fromOffset(44, 44),
 		Color = Style.Colors.Red,
-		Text = "✕",
+		Text = "X", -- plain Latin X: the game font has no ✕ glyph
 		TextSize = 26,
 		ZIndex = 34,
 		Radius = UDim.new(0.5, 0),

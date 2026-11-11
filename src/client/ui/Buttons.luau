@@ -109,9 +109,10 @@ local function refreshBadges()
 	badges.Backpack.Visible = Shop.HasAffordable("Backpack")
 	badges.Pets.Visible = Shop.HasAffordable("Pet")
 	badges.Rebirth.Visible = Rebirth.CanRebirth()
+	badges.Reward.Visible = player:GetAttribute("RewardReady") == true
 end
 aura.Changed:Connect(refreshBadges)
-for _, attribute in ipairs({ "OwnedWeapon", "OwnedBackpack", "OwnedPet", "RoomReached" }) do
+for _, attribute in ipairs({ "OwnedWeapon", "OwnedBackpack", "OwnedPet", "RoomReached", "RewardReady" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshBadges)
 end
 refreshBadges()

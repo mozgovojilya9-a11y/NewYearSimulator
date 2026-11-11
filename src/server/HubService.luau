@@ -28,6 +28,8 @@ local hub
 local trainerModels = {} -- [index] = Model
 local autoClick = {} -- [player] = true
 
+HubService.OnTrainerClick = nil -- set by ProgressionService (quests)
+
 ---------------------------------------------------------------------
 -- Trainers
 ---------------------------------------------------------------------
@@ -95,6 +97,9 @@ function HubService.TrainerClick(player, index: number)
 	local multiplier = Config.Hub.TrainerMultipliers[index] or 1
 	local amount, isCrit = PlayerState.RollCrit(PlayerState.ClickPower(player) * Config.Hub.TrainerRate * multiplier)
 	local gained = PlayerState.GiveAura(player, amount)
+	if HubService.OnTrainerClick then
+		HubService.OnTrainerClick(player)
+	end
 	return gained, isCrit, trainerModels[index]
 end
 

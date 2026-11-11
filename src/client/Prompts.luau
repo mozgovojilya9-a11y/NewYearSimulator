@@ -11,9 +11,9 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local Popups = require(script.Parent.ui.Popups)
 local Style = require(script.Parent.ui.Style)
 local Rebirth = require(script.Parent.ui.Windows.Rebirth)
+local Reward = require(script.Parent.ui.Windows.Reward)
 local Shop = require(script.Parent.ui.Windows.Shop)
 
 local player = Players.LocalPlayer
@@ -27,9 +27,7 @@ local ACTIONS = {
 	end,
 	OpenPets = Shop.OpenPets,
 	RebirthAltar = Rebirth.Open,
-	Wheel = function()
-		Popups.Toast("Колесо удачи откроется чуть позже (этап 7)", "gold")
-	end,
+	Wheel = Reward.OpenWheel,
 }
 
 -- Stand prompts say Buy / Equip / Equipped depending on ownership.

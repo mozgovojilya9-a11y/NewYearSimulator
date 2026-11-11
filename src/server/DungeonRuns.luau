@@ -36,10 +36,14 @@ local laneOwner = {} -- [lane] = player
 local mobInfo = {} -- [model] = { run = run, room = index }
 local drops = {} -- [part] = { player, amount }
 
--- Hooks: MobAI listens to mob spawn/removal, TravelService to run end.
+-- Hooks: MobAI listens to mob spawn/removal, TravelService to run end,
+-- ProgressionService to kills / clears / run starts.
 DungeonRuns.OnMobSpawned = nil
 DungeonRuns.OnMobRemoved = nil
 DungeonRuns.OnRunEnded = nil
+DungeonRuns.OnKill = nil
+DungeonRuns.OnRoomCleared = nil
+DungeonRuns.OnRunStarted = nil
 
 ---------------------------------------------------------------------
 -- Rooms and mobs
@@ -327,6 +331,9 @@ function DungeonRuns.StartRun(player)
 		roomBarrierText(room, room.Alive, room.Total)
 		Remotes.Get("RoomState"):FireClient(player, index, room.Alive, room.Total)
 	end
+	if DungeonRuns.OnRunStarted then
+		DungeonRuns.OnRunStarted(player)
+	end
 
 	-- Death ends the run.
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -344,6 +351,9 @@ local function roomCleared(run, index)
 	local room = run.rooms[index]
 	openBarrier(room)
 	run.best = math.max(run.best, index)
+	if DungeonRuns.OnRoomCleared then
+		DungeonRuns.OnRoomCleared(run.player, index)
+	end
 	if PlayerState.ReachRoom(run.player, index) then
 		run.newRecord = true
 		Remotes.Notify(run.player, Texts.NewRecord, "gold")
@@ -398,6 +408,9 @@ local function kill(model)
 	spawnDrop(player, position, reward)
 	if isBoss then
 		rollPetDrop(player)
+	end
+	if DungeonRuns.OnKill then
+		DungeonRuns.OnKill(player, info.room, isBoss)
 	end
 
 	if room then
