@@ -54,6 +54,21 @@ for _, player in ipairs(Players:GetPlayers()) do
 	task.spawn(onPlayerAdded, player)
 end
 
+-- Day 5: passive income from backpacks, once per second.
+task.spawn(function()
+	while true do
+		task.wait(1)
+		for _, player in ipairs(Players:GetPlayers()) do
+			if PlayerState.IsReady(player) then
+				local perSecond = PlayerState.BasePerSecond(player)
+				if perSecond > 0 then
+					PlayerState.GiveAura(player, perSecond)
+				end
+			end
+		end
+	end
+end)
+
 -- Safety-net autosave loop in case of a crash before PlayerRemoving fires.
 task.spawn(function()
 	while true do

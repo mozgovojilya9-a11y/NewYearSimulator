@@ -18,6 +18,10 @@ Config.StartingData = {
 	Rebirths = 0,
 	Gems = 0, -- Day 3: second currency, dropped by mobs
 	OwnedWeapons = { Stick = true }, -- Day 4
+	OwnedBackpacks = {}, -- Day 5
+	EquippedBackpack = "",
+	OwnedPets = {}, -- Day 5
+	EquippedPet = "",
 }
 
 -- Autosave interval (seconds) as a safety net in addition to
@@ -104,6 +108,21 @@ Config.Weapons = {
 	{ Id = "AuraKatana", Name = "Катана Ауры", Damage = 35, Cost = 12000, Color = Color3.fromRGB(190, 110, 255) },
 }
 
+-- Day 5: backpacks give passive Aura every second (multiplied by the
+-- Aura multiplier). Size is the cosmetic box on the player's back.
+Config.Backpacks = {
+	{ Id = "Pouch", Name = "Мешочек", PerSecond = 2, Cost = 300, Color = Color3.fromRGB(170, 120, 80), Size = Vector3.new(1.2, 1.2, 0.6) },
+	{ Id = "Satchel", Name = "Ранец", PerSecond = 10, Cost = 3000, Color = Color3.fromRGB(70, 120, 200), Size = Vector3.new(1.6, 1.8, 0.8) },
+	{ Id = "AuraPack", Name = "Ранец Ауры", PerSecond = 50, Cost = 25000, Color = Color3.fromRGB(180, 100, 255), Size = Vector3.new(1.9, 2.2, 1), Neon = true },
+}
+
+-- Day 5: pets are bought with Gems and boost all Aura gains:
+-- multiplier = 1 + Bonus. One pet can be equipped at a time.
+Config.Pets = {
+	{ Id = "Spark", Name = "Искорка", Bonus = 0.5, Cost = 10, Color = Color3.fromRGB(255, 220, 90), Size = 1.4 },
+	{ Id = "Dragon", Name = "Дракончик Ауры", Bonus = 1.5, Cost = 60, Color = Color3.fromRGB(170, 90, 255), Size = 2, Wings = true },
+}
+
 -- Shop categories. Each one says where the list lives, which save
 -- fields hold owned/equipped items, the currency and how to describe
 -- an item's stat in the UI.
@@ -116,6 +135,26 @@ Config.Shop = {
 		Currency = "Aura",
 		Describe = function(item)
 			return "Урон x" .. item.Damage
+		end,
+	},
+	Backpack = {
+		Title = "Ранцы",
+		Items = Config.Backpacks,
+		OwnedKey = "OwnedBackpacks",
+		EquippedKey = "EquippedBackpack",
+		Currency = "Aura",
+		Describe = function(item)
+			return "+" .. item.PerSecond .. " Ауры/сек"
+		end,
+	},
+	Pet = {
+		Title = "Питомцы",
+		Items = Config.Pets,
+		OwnedKey = "OwnedPets",
+		EquippedKey = "EquippedPet",
+		Currency = "Gems",
+		Describe = function(item)
+			return "+" .. math.floor(item.Bonus * 100) .. "% ко всей Ауре"
 		end,
 	},
 }

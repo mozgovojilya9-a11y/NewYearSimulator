@@ -36,8 +36,22 @@ function PlayerState.ClickPower(player): number
 end
 
 -- Multiplier applied to every Aura gain (clicks, kills, passive income).
-function PlayerState.AuraMultiplier(_player): number
-	return 1
+function PlayerState.AuraMultiplier(player): number
+	local data = DataService.Get(player)
+	if not data then
+		return 1
+	end
+	local pet = Config.ItemById.Pet[data.EquippedPet]
+	local petMultiplier = if pet then 1 + pet.Bonus else 1
+	return petMultiplier
+end
+
+-- Passive Aura per second from the equipped backpack, before the
+-- Aura multiplier (GiveAura applies it).
+function PlayerState.BasePerSecond(player): number
+	local data = DataService.Get(player)
+	local backpack = data and Config.ItemById.Backpack[data.EquippedBackpack]
+	return if backpack then backpack.PerSecond else 0
 end
 
 -- Rolls a crit on top of a base amount.
@@ -123,6 +137,10 @@ function PlayerState.Sync(player)
 		player:SetAttribute("Equipped" .. category, data[shop.EquippedKey] or "")
 	end
 	player:SetAttribute("AuraMultiplier", PlayerState.AuraMultiplier(player))
+	player:SetAttribute(
+		"AuraPerSecond",
+		math.floor(PlayerState.BasePerSecond(player) * PlayerState.AuraMultiplier(player))
+	)
 end
 
 return PlayerState

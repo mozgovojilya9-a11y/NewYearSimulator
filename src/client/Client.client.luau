@@ -11,3 +11,4 @@ require(modules:WaitForChild("ClickButton"))
 require(modules:WaitForChild("Combat"))
 require(modules:WaitForChild("TopBar")) -- waits for leaderstats
 require(modules:WaitForChild("Shop"))
+require(modules:WaitForChild("Cosmetics"))

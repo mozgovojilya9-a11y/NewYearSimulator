@@ -230,6 +230,7 @@ function Shop.MakeWindow(title: string, icon: string, color: Color3, categories:
 	return window
 end
 
-Shop.MakeWindow("Магазин", "🛒", Color3.fromRGB(70, 160, 90), { "Weapon" })
+Shop.MakeWindow("Магазин", "🛒", Color3.fromRGB(70, 160, 90), { "Weapon", "Backpack" })
+Shop.MakeWindow("Питомцы", "🐾", Color3.fromRGB(230, 150, 60), { "Pet" })
 
 return Shop
