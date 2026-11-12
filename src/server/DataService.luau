@@ -91,6 +91,10 @@ function DataService.Load(player)
 		end
 	end
 
+	-- Fields of removed systems: dropped so they are never written back.
+	data.OwnedBackpacks = nil
+	data.EquippedBackpack = nil
+
 	if player.Parent == nil then
 		noSave[player.UserId] = nil
 		return nil -- left during the load

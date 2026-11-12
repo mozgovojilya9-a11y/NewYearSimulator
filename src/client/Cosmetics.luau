@@ -2,7 +2,7 @@
 	Cosmetics.luau
 	Shows every player's equipped pet floating next to them. Purely
 	visual and local: each client builds the pet from the "EquippedPet"
-	attribute the server sets. (Weapons and backpacks are welded to the
+	attribute the server sets. (Weapons are welded to the
 	character by the server: EquipmentService.)
 ]]
 

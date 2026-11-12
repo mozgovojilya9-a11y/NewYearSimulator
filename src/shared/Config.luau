@@ -14,14 +14,12 @@ Config.DataStoreName = "AuraClicker_v1"
 
 -- Default data for a brand-new player. DataService backfills any
 -- fields missing from an older save. IDs stored in saves (weapons,
--- backpacks, pets) must never be renamed without a migration.
+-- pets) must never be renamed without a migration.
 Config.StartingData = {
 	Aura = 0,
 	Rebirths = 0,
 	EquippedWeapon = "Stick",
-	OwnedWeapons = { Stick = true },
-	OwnedBackpacks = {},
-	EquippedBackpack = "",
+	OwnedWeapons = { Stick = true }, -- crafted (or legacy bought) weapons
 	OwnedPets = {},
 	EquippedPet = "",
 	RoomReached = 0, -- highest dungeon room cleared (0 = none, 20 = all)
@@ -33,8 +31,10 @@ Config.StartingData = {
 	Level = 1,
 	Xp = 0,
 	BoostUntil = 0,
-	LastSeen = 0, -- os.time() of the last save, used for offline income
+	LastSeen = 0, -- os.time() of the last save
 }
+-- Fields from older versions that are ignored on load (never written back):
+-- OwnedBackpacks, EquippedBackpack.
 
 Config.AutosaveInterval = 120
 
@@ -73,14 +73,11 @@ Config.Dungeon = {
 	RecommendedGrowth = 1.42, -- r1 = 2, r5 ~ 8, r10 ~ 47, r15 ~ 280, r20 ~ 1650
 	ClicksToKill = 8, -- normal mob dies in ~8 clicks at recommended damage
 	BossClicksToKill = 50,
-	RewardPerHealth = 2, -- Aura per kill = HP x this
-	BossRewardMultiplier = 1.5,
 
 	-- Personal runs: every portal entry starts a new run from room 1 in
 	-- the player's own lane; only the current and next rooms exist.
 	Lanes = { Max = 16, Spacing = 260 },
 	RoomsAhead = 1,
-	DropLifetime = 60, -- seconds an Aura crystal waits for "E · Собрать" before vanishing unpaid
 
 	-- Mob behaviour (stage 5): aggro, walking, telegraphed melee hits and
 	-- the boss ground slam. Damage to the player grows per room.
@@ -130,15 +127,6 @@ function Config.MobHealth(room: number, isBoss: boolean): number
 	return Config.RecommendedDamage(room) * (if isBoss then d.BossClicksToKill else d.ClicksToKill)
 end
 
-function Config.MobReward(room: number, isBoss: boolean): number
-	local d = Config.Dungeon
-	local reward = Config.MobHealth(room, isBoss) * d.RewardPerHealth
-	if isBoss then
-		reward *= d.BossRewardMultiplier
-	end
-	return math.floor(reward)
-end
-
 function Config.MobDamage(room: number, isBoss: boolean): number
 	local m = Config.Dungeon.Mob
 	local damage = m.DamageBase * m.DamageGrowth ^ (room - 1)
@@ -148,8 +136,9 @@ function Config.MobDamage(room: number, isBoss: boolean): number
 	return math.floor(damage)
 end
 
--- Weapons: Damage multiplies click power. Unique weapons are bought
--- only at the hub stand, the rest in the shop. One weapon is active.
+-- Weapons: Damage is the weapon base. Weapons are crafted at the forge
+-- (recipes arrive with the crafting stage); these entries are the
+-- legacy list so already-owned weapons keep working. One weapon is active.
 Config.Weapons = {
 	{ Id = "Stick", Name = "Палка", Rarity = "Common", Damage = 1, Cost = 0, Color = Color3.fromRGB(150, 110, 70) },
 	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 3, Cost = 100, Color = Color3.fromRGB(200, 150, 90) },
@@ -160,14 +149,6 @@ Config.Weapons = {
 	{ Id = "StarAuraSword", Name = "Меч Звёздной Ауры", Rarity = "Mythic", Damage = 1600, Cost = 1500000, Unique = true, Color = Color3.fromRGB(255, 230, 120) },
 }
 
--- Backpacks: passive Aura per second (x Aura multiplier), also offline.
-Config.Backpacks = {
-	{ Id = "Pouch", Name = "Мешочек", Rarity = "Common", PerSecond = 2, Cost = 300, Color = Color3.fromRGB(170, 120, 80), Size = Vector3.new(1.2, 1.2, 0.6) },
-	{ Id = "Satchel", Name = "Ранец", Rarity = "Rare", PerSecond = 10, Cost = 3000, Color = Color3.fromRGB(70, 120, 200), Size = Vector3.new(1.6, 1.8, 0.8) },
-	{ Id = "AuraPack", Name = "Ранец Ауры", Rarity = "Epic", PerSecond = 50, Cost = 25000, Color = Color3.fromRGB(180, 100, 255), Size = Vector3.new(1.9, 2.2, 1), Neon = true },
-	{ Id = "StarPack", Name = "Ранец Звёзд", Rarity = "Legendary", PerSecond = 250, Cost = 400000, Color = Color3.fromRGB(255, 220, 110), Size = Vector3.new(2.1, 2.5, 1.1), Neon = true },
-}
-
 -- Pets: +Bonus to all Aura gains (multiplier = 1 + Bonus).
 Config.Pets = {
 	{ Id = "Spark", Name = "Искорка", Rarity = "Epic", Bonus = 0.25, Cost = 5000, Color = Color3.fromRGB(255, 220, 90), Size = 1.4 },
@@ -175,14 +156,8 @@ Config.Pets = {
 }
 Config.PetSlots = 1 -- shown as "N/1" in the HUD
 
-Config.Offline = {
-	Efficiency = 0.5,
-	MaxHours = 8,
-	MinSeconds = 60,
-}
-
 -- Rebirth at the hub altar: requires RoomReached >= RebirthRequirement.
--- Resets Aura, weapons, backpacks and dungeon progress; keeps pets.
+-- Resets Aura and the room record; keeps weapons, armor, items, pets.
 Config.RebirthRequirement = 20
 Config.Rebirth = {
 	MultiplierPerRebirth = 0.1,
@@ -211,7 +186,6 @@ Config.Hub = {
 		{ Rebirths = 5 },
 	},
 	AutoClickInterval = 0.5,
-	StandRotationMinutes = 30, -- the unique-weapon stand swaps its weapon this often
 }
 
 -- Engagement loop: things to do every few minutes.
@@ -260,19 +234,16 @@ Config.Progression = {
 }
 
 -- Equipment on the character (visual only). Grip = offset of the weapon
--- Handle from the hand part; Back = offset of the backpack Body from the
--- torso. Swing: shoulder Motor6D rotation per rig type and timing.
+-- Handle from the hand part. Swing: shoulder Motor6D rotation per rig
+-- type and timing.
 Config.Equipment = {
 	GripR6 = CFrame.new(0, -1, -0.6) * CFrame.Angles(math.rad(-90), 0, 0),
 	GripR15 = CFrame.new(0, -0.3, -0.6) * CFrame.Angles(math.rad(-90), 0, 0),
-	BackR6 = CFrame.new(0, 0.2, 0.9),
-	BackR15 = CFrame.new(0, 0.1, 0.9),
 	Swing = {
 		RaiseR6 = CFrame.Angles(0, 0, math.rad(110)),
 		RaiseR15 = CFrame.Angles(math.rad(-110), 0, 0),
 		UpSeconds = 0.06,
 		DownSeconds = 0.1,
-		TrailLifetime = 0.25,
 	},
 }
 
@@ -286,10 +257,8 @@ Config.Leaderboards = {
 
 -- Shop categories (what is owned / equipped and how to describe it).
 Config.Shop = {
-	Weapon = { Title = "Оружие", Items = Config.Weapons, OwnedKey = "OwnedWeapons", EquippedKey = "EquippedWeapon",
-		Describe = function(item) return "Урон x" .. item.Damage .. (if item.Unique then " • стенд в хабе" else "") end },
-	Backpack = { Title = "Рюкзаки", Items = Config.Backpacks, OwnedKey = "OwnedBackpacks", EquippedKey = "EquippedBackpack",
-		Describe = function(item) return "+" .. item.PerSecond .. " Ауры/сек (и офлайн)" end },
+	Weapon = { Title = "Оружие", Items = Config.Weapons, OwnedKey = "OwnedWeapons", EquippedKey = "EquippedWeapon", Purchasable = false,
+		Describe = function(item) return "Урон x" .. item.Damage end },
 	Pet = { Title = "Питомцы", Items = Config.Pets, OwnedKey = "OwnedPets", EquippedKey = "EquippedPet",
 		Describe = function(item) return "+" .. math.floor(item.Bonus * 100 + 0.5) .. "% ко всей Ауре • дроп с боссов" end },
 }
@@ -304,7 +273,7 @@ end
 
 -- All remotes live directly in ReplicatedStorage, created by the server.
 Config.Remotes = {
-	ClickHit = "RemoteEvent", -- C->S (target); S->C ("Hit"|"Train"|"Kill"|"Pickup", ...)
+	ClickHit = "RemoteEvent", -- C->S (target); S->C ("Hit"|"Train"|"Kill", ...)
 	ShopRequest = "RemoteFunction", -- (action, category, id) -> ok, message
 	RebirthRequest = "RemoteFunction", -- () -> ok, message
 	Travel = "RemoteFunction", -- ("Hub") | ("Room", n) -> ok, message
@@ -414,12 +383,6 @@ Config.HubLayout = {
 		{ Kind = "Core", Name = "Аура-ядро", Color = Color3.fromRGB(255, 61, 184) },
 	},
 
-	-- Weapon alley (right of the path): 4 shop weapons + 1 rotating unique.
-	WeaponRow = { X = 30, ZStart = 36, Spacing = -12 },
-	-- Backpack alley further right.
-	BackpackRow = { X = 50, ZStart = 36, Spacing = -12 },
-	Stand = { SpinSeconds = 4, FloatHeight = 0.8, FloatSeconds = 1.6 },
-
 	-- Back of the courtyard (+Z).
 	Altar = { Offset = Vector3.new(-56, 0, 66) },
 	Shop = { Offset = Vector3.new(-18, 0, 70) },
@@ -440,25 +403,18 @@ Config.HubLayout = {
 		Trainer = "x%s Мощность",
 		TrainerLockedAura = "Нужно %s Ауры",
 		TrainerLockedRebirth = "Открывается: Перерождение %d",
-		Stand = "Лимитированное!",
-		StandTimer = "Смена через %s",
 		Altar = "АЛТАРЬ ПЕРЕРОЖДЕНИЯ",
 		Shop = "МАСТЕРСКАЯ",
 		Wheel = "КОЛЕСО УДАЧИ",
 		WheelFree = "Бесплатное вращение!",
 		Egg = "Новинка!",
 		Npc = "Подземелье →",
-		Backpack = "+%s Ауры/сек",
 	},
 	Prompts = {
 		Rebirth = "Переродиться",
 		Shop = "Открыть",
 		Egg = "Открыть",
 		Wheel = "Крутить",
-		Buy = "Купить",
-		Equip = "Надеть",
-		Equipped = "Надето ✓",
-		Collect = "Собрать",
 	},
 }
 
@@ -529,7 +485,6 @@ Config.MobLooks = {
 		[20] = { Kind = "Shade", Name = "Повелитель Бездны", Color = Color3.fromRGB(15, 10, 30), Crown = Color3.fromRGB(255, 61, 184) },
 	},
 	HealthBar = { MaxDistance = 50, Width = 4.5, Height = 0.9 }, -- studs (BillboardGui scale units)
-	Drop = { Color = Color3.fromRGB(190, 120, 255), BeamColor = Color3.fromRGB(230, 180, 255) },
 }
 
 ---------------------------------------------------------------------
@@ -544,12 +499,8 @@ Config.Hud = {
 		Cleared = "Иди дальше!",
 		Done = "Данж пройден! Иди к алтарю",
 	},
-	-- Quick damage upgrades (bottom center): the next 4 weapons stronger
-	-- than the equipped one, cheapest first; colors per slot.
-	QuickUpgradeColors = { Color3.fromRGB(90, 230, 110), Color3.fromRGB(70, 140, 255), Color3.fromRGB(150, 80, 255), Color3.fromRGB(255, 201, 60) },
-	MenuButtons = { -- 2x3 grid on the left
-		{ Id = "Shop", Icon = "🛒", Label = "Магазин", Color = Color3.fromRGB(90, 230, 110) },
-		{ Id = "Backpack", Icon = "🎒", Label = "Рюкзак", Color = Color3.fromRGB(255, 150, 50) },
+	MenuButtons = { -- grid on the left, 2 columns
+		{ Id = "Equipment", Icon = "⚔", Label = "Снаряжение", Color = Color3.fromRGB(90, 230, 110) },
 		{ Id = "Pets", Icon = "🐾", Label = "Питомцы", Color = Color3.fromRGB(255, 61, 184) },
 		{ Id = "Rebirth", Icon = "🔁", Label = "Перерождение", Color = Color3.fromRGB(150, 80, 255) },
 		{ Id = "Reward", Icon = "🎁", Label = "Награда", Color = Color3.fromRGB(255, 201, 60) },
@@ -570,7 +521,6 @@ Config.Sounds = {
 	Hit = "rbxasset://sounds/swordslash.wav",
 	Buy = "rbxasset://sounds/electronicpingshort.wav",
 	Rebirth = "rbxasset://sounds/electronicpingshort.wav",
-	Pickup = "rbxasset://sounds/electronicpingshort.wav",
 	Barrier = "", -- TODO: barrier dissolve
 	Portal = "", -- TODO: portal whoosh
 	BossDeath = "", -- TODO: boss explosion

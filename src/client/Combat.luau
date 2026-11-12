@@ -3,7 +3,7 @@
 	Click (or tap) a dungeon mob or a hub trainer to hit it. The client
 	only reports WHICH model was clicked (ClickHit:FireServer(model));
 	the server checks range/cooldown/room access, rolls damage and
-	answers with "Hit" / "Kill" / "Pickup" / "Train", which become
+	answers with "Hit" / "Kill" / "Train", which become
 	popups, flashes, knockback, particles and camera shake here.
 ]]
 
@@ -42,7 +42,7 @@ local function targetFromPart(part)
 		if model.Parent == trainersFolder then
 			return model
 		end
-		if model:FindFirstChildOfClass("Humanoid") and model:GetAttribute("Reward") then
+		if model:FindFirstChildOfClass("Humanoid") and model:GetAttribute("Room") then
 			return model
 		end
 		model = model.Parent and model.Parent:FindFirstAncestorOfClass("Model")
@@ -225,11 +225,6 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 			Popups.Toast("👑 Босс побеждён!", "gold")
 			Style.PlaySound(Config.Sounds.BossDeath, 1, 0.8)
 		end
-	elseif kind == "Pickup" then
-		local position, aura = ...
-		Popups.World(position + Vector3.new(0, 2, 0), "+" .. Format.Number(aura) .. " ✨", Style.Colors.Gold, 34, false)
-		hitParticles(position, Config.MobLooks.Drop.Color, 12)
-		Style.PlaySound(Config.Sounds.Pickup, 1.5, 0.5)
 	end
 end)
 

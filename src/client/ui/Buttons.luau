@@ -65,11 +65,8 @@ gridLayout.Parent = grid
 local badges = {}
 
 local actions = {
-	Shop = function()
+	Equipment = function()
 		Shop.Open("Weapon")
-	end,
-	Backpack = function()
-		Shop.Open("Backpack")
 	end,
 	Pets = Shop.OpenPets,
 	Rebirth = Rebirth.Open,
@@ -104,15 +101,18 @@ for order, def in ipairs(Config.Hud.MenuButtons) do
 	button.Activated:Connect(actions[def.Id] or function() end)
 end
 
+local function setBadge(id, visible)
+	if badges[id] then
+		badges[id].Visible = visible == true
+	end
+end
 local function refreshBadges()
-	badges.Shop.Visible = Shop.HasAffordable("Weapon")
-	badges.Backpack.Visible = Shop.HasAffordable("Backpack")
-	badges.Pets.Visible = Shop.HasAffordable("Pet")
-	badges.Rebirth.Visible = Rebirth.CanRebirth()
-	badges.Reward.Visible = player:GetAttribute("RewardReady") == true
+	setBadge("Pets", Shop.HasAffordable("Pet"))
+	setBadge("Rebirth", Rebirth.CanRebirth())
+	setBadge("Reward", player:GetAttribute("RewardReady") == true)
 end
 aura.Changed:Connect(refreshBadges)
-for _, attribute in ipairs({ "OwnedWeapon", "OwnedBackpack", "OwnedPet", "RoomReached", "RewardReady" }) do
+for _, attribute in ipairs({ "OwnedWeapon", "OwnedPet", "RoomReached", "RewardReady" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshBadges)
 end
 refreshBadges()

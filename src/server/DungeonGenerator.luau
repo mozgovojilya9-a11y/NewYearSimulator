@@ -256,9 +256,6 @@ function DungeonGenerator.Init()
 	lanesFolder = Instance.new("Folder")
 	lanesFolder.Name = "Lanes"
 	lanesFolder.Parent = root
-	local drops = Instance.new("Folder")
-	drops.Name = "Drops"
-	drops.Parent = root
 
 	local spawn = Workspace:FindFirstChildWhichIsA("SpawnLocation", true)
 	groundY = if spawn then spawn.Position.Y + spawn.Size.Y / 2 else 0
@@ -276,7 +273,7 @@ function DungeonGenerator.Init()
 
 	root:SetAttribute("GateZ", L.Origin.Z)
 	root.Parent = Workspace
-	return { Folder = root, Lanes = lanesFolder, Drops = drops }
+	return { Folder = root, Lanes = lanesFolder }
 end
 
 function DungeonGenerator.GroundY(): number

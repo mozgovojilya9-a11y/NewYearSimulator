@@ -1,9 +1,9 @@
 --[[
 	PlayerState.luau
 	The one place that knows how the economy works: how hard a player
-	hits, what multiplies their Aura, and how currencies are added or
-	spent. Every service goes through here instead of poking leaderstats
-	or the data table directly, so balance changes live in one file.
+	hits, what multiplies their Aura, and how Aura is added or spent.
+	Every service goes through here instead of poking leaderstats or
+	the data table directly, so balance changes live in one file.
 
 	Aura lives in leaderstats.Aura (Main.server mirrors it into the save
 	data). Everything else lives in the DataService table and is pushed
@@ -34,7 +34,7 @@ function PlayerState.ClickPower(player): number
 	return Config.Click.BaseDamage * weaponDamage
 end
 
--- Multiplier applied to every Aura gain (clicks, kills, passive income).
+-- Multiplier applied to every Aura gain (clicks, trainers).
 function PlayerState.AuraMultiplier(player): number
 	local data = DataService.Get(player)
 	if not data then
@@ -44,14 +44,6 @@ function PlayerState.AuraMultiplier(player): number
 	local petMultiplier = if pet then 1 + pet.Bonus else 1
 	local boost = if (data.BoostUntil or 0) > os.time() then Config.Progression.Boost.Multiplier else 1
 	return petMultiplier * Config.RebirthMultiplier(data.Rebirths) * boost
-end
-
--- Passive Aura per second from the equipped backpack, before the
--- Aura multiplier (GiveAura applies it).
-function PlayerState.BasePerSecond(player): number
-	local data = DataService.Get(player)
-	local backpack = data and Config.ItemById.Backpack[data.EquippedBackpack]
-	return if backpack then backpack.PerSecond else 0
 end
 
 -- Rolls a crit on top of a base amount.
@@ -164,11 +156,6 @@ function PlayerState.Sync(player)
 		player:SetAttribute("Equipped" .. category, data[shop.EquippedKey] or "")
 	end
 	player:SetAttribute("AuraMultiplier", PlayerState.AuraMultiplier(player))
-	player:SetAttribute(
-		"AuraPerSecond",
-		math.floor(PlayerState.BasePerSecond(player) * PlayerState.AuraMultiplier(player))
-	)
 end
 
 return PlayerState
-

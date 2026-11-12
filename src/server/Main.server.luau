@@ -2,7 +2,7 @@
 	Main.server.luau
 	Entry point: builds the world, starts every service, wires player
 	join/leave into DataService and exposes progress through leaderstats
-	(Aura, Rebirths, Room). Also runs passive income and autosave.
+	(Aura, Rebirths, Room). Also runs the autosave.
 ]]
 
 local Players = game:GetService("Players")
@@ -10,7 +10,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local Format = require(ReplicatedStorage.Shared.Format)
 local Atmosphere = require(script.Parent.Atmosphere)
 local ClickService = require(script.Parent.ClickService)
 local DataService = require(script.Parent.DataService)
@@ -27,9 +26,8 @@ local ShopService = require(script.Parent.ShopService)
 local TravelService = require(script.Parent.TravelService)
 
 -- Workspace is not managed by Rojo, so leftovers of older versions of
--- the place (old builds, decals, sounds) survive a sync. Remove
--- everything except the few things we need (Config.World.Keep); the
--- hub and dungeon are generated right after.
+-- the place survive a sync. Remove everything except Config.World.Keep;
+-- the hub and dungeon are generated right after.
 local function purgeWorkspace()
 	local keep = {}
 	for _, name in ipairs(Config.World.Keep) do
@@ -59,27 +57,6 @@ TravelService.Init(hub)
 EquipmentService.Init()
 ProgressionService.Init()
 HubService.OnTrainerClick = ProgressionService.OnTrainerClick
-
--- Backpack income for the time the player was away (Config.Offline).
-local function giveOfflineIncome(player, data)
-	local now = os.time()
-	local lastSeen = data.LastSeen
-	data.LastSeen = now
-	if lastSeen <= 0 then
-		return
-	end
-	local away = math.min(now - lastSeen, Config.Offline.MaxHours * 3600)
-	local perSecond = PlayerState.BasePerSecond(player)
-	if away < Config.Offline.MinSeconds or perSecond <= 0 then
-		return
-	end
-	local gained = PlayerState.GiveAura(player, perSecond * away * Config.Offline.Efficiency)
-	task.delay(4, function()
-		if player.Parent then
-			Remotes.Notify(player, ("🎒 Пока тебя не было (%d мин): +%s Ауры"):format(math.floor(away / 60), Format.Number(gained)), "gold")
-		end
-	end)
-end
 
 local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)
 
@@ -120,7 +97,6 @@ local function onPlayerAdded(player)
 	end)
 
 	PlayerState.Sync(player)
-	giveOfflineIncome(player, data)
 	ProgressionService.RefreshReady(player)
 end
 
@@ -136,21 +112,6 @@ Players.PlayerRemoving:Connect(onPlayerRemoving)
 for _, player in ipairs(Players:GetPlayers()) do
 	task.spawn(onPlayerAdded, player)
 end
-
--- Passive income from backpacks, once per second while online.
-task.spawn(function()
-	while true do
-		task.wait(1)
-		for _, player in ipairs(Players:GetPlayers()) do
-			if PlayerState.IsReady(player) then
-				local perSecond = PlayerState.BasePerSecond(player)
-				if perSecond > 0 then
-					PlayerState.GiveAura(player, perSecond)
-				end
-			end
-		end
-	end
-end)
 
 -- Safety-net autosave loop in case of a crash before PlayerRemoving fires.
 task.spawn(function()

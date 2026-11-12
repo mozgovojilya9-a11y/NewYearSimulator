@@ -1,6 +1,6 @@
 --[[
 	Preview.luau
-	ViewportFrame with a slowly rotating Part model (weapon / backpack)
+	ViewportFrame with a slowly rotating Part model (weapon)
 	for shop cards. Models come from the shared builders so the preview
 	always matches what the character carries.
 ]]
@@ -9,7 +9,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local BackpackBuilder = require(ReplicatedStorage.Shared.BackpackBuilder)
 local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
 local Style = require(script.Parent.Style)
 
@@ -19,10 +18,6 @@ local function buildFor(category: string, item)
 	if category == "Weapon" then
 		local model = WeaponBuilder.Build(item)
 		WeaponBuilder.SetAnchored(model, true)
-		return model
-	elseif category == "Backpack" then
-		local model = BackpackBuilder.Build(item)
-		BackpackBuilder.SetAnchored(model, true)
 		return model
 	end
 	return nil

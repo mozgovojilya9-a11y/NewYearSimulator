@@ -9,7 +9,6 @@
 	then rolls damage/crit itself and replies to that client:
 	  ("Hit", mob, damage, isCrit)        -- DungeonRuns
 	  ("Kill", position, isBoss)          -- DungeonRuns
-	  ("Pickup", position, auraGained)    -- DungeonRuns (crystal collected)
 	  ("Train", trainer, aura, isCrit)    -- trainers
 	Numbers sent by the client are never used.
 ]]

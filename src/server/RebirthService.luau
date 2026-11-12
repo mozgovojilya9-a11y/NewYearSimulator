@@ -4,7 +4,7 @@
 	altar, but the server re-checks everything.
 
 	Requirement: RoomReached >= Config.RebirthRequirement.
-	Resets Aura, weapons, backpacks and dungeon progress; keeps pets.
+	Resets Aura and the room record; keeps weapons, armor, materials, pets.
 	Rebirths + 1 -> permanent multiplier Config.RebirthMultiplier(n).
 ]]
 
@@ -30,10 +30,6 @@ local function rebirth(player)
 
 	data.Rebirths += 1
 	PlayerState.SetAura(player, 0)
-	data.OwnedWeapons = { Stick = true }
-	data.EquippedWeapon = "Stick"
-	data.OwnedBackpacks = {}
-	data.EquippedBackpack = ""
 	data.RoomReached = 0
 	PlayerState.Sync(player)
 	task.spawn(DataService.Save, player) -- big moment: don't wait for the autosave

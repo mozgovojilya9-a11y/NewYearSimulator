@@ -38,7 +38,7 @@ local countLabel = line(1, 22, Style.Colors.Outline)
 local multiplierLabel = line(2, 30, Style.Colors.Gold)
 local requirementLabel = line(3, 20, Style.Colors.Purple)
 local infoLabel = line(4, 16, Style.Colors.Outline)
-infoLabel.Text = "Сбросится: Аура, оружие, рюкзаки и прогресс данжа.\nОстанутся: питомцы и множитель перерождения (навсегда)."
+infoLabel.Text = "Сбросится: Аура и рекорд этапа.\nОстанутся: оружие, броня, материалы, питомцы и множитель (навсегда)."
 
 local progress = Instance.new("Frame")
 progress.LayoutOrder = 5

@@ -30,24 +30,6 @@ local ACTIONS = {
 	Wheel = Reward.OpenWheel,
 }
 
--- Stand prompts say Buy / Equip / Equipped depending on ownership.
-local function standText(prompt: ProximityPrompt): string
-	local category, id
-	if prompt:GetAttribute("WeaponId") then
-		category, id = "Weapon", prompt:GetAttribute("WeaponId")
-	elseif prompt:GetAttribute("BackpackId") then
-		category, id = "Backpack", prompt:GetAttribute("BackpackId")
-	else
-		return prompt.ActionText
-	end
-	local prompts = Config.HubLayout.Prompts
-	if player:GetAttribute("Equipped" .. category) == id then
-		return prompts.Equipped
-	elseif Shop.OwnedSet(category)[id] then
-		return prompts.Equip
-	end
-	return prompts.Buy
-end
 
 local function keyText(prompt: ProximityPrompt): string
 	if prompt.KeyboardKeyCode ~= Enum.KeyCode.Unknown then
@@ -111,7 +93,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	text.Font = Style.Font
 	text.TextSize = 20
 	text.TextColor3 = Style.Colors.Text
-	text.Text = standText(prompt) .. "  ·  " .. prompt.ObjectText
+	text.Text = prompt.ActionText .. "  ·  " .. prompt.ObjectText
 	text.LayoutOrder = 2
 	text.Parent = plate
 	Style.Stroke(text, 2)

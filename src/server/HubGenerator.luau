@@ -7,8 +7,6 @@
 	Layout (looking forward from the spawn = -Z):
 	  center: purple path with yellow chevrons -> dungeon portal arch
 	  left:   row of 8 trainer platforms (chevrons lead there first)
-	  right:  weapon alley (4 shop weapons + rotating unique stand) and
-	          backpack alley
 	  back:   rebirth altar, shop stall, wheel of fortune, pet egg,
 	          two leaderboards on the wall, fountain in the middle
 	  around: castle walls, corner towers, flags, torches, trees, bushes,
@@ -21,8 +19,6 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
-local BackpackBuilder = require(ReplicatedStorage.Shared.BackpackBuilder)
-local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
 local TrainerBuilder = require(script.Parent.TrainerBuilder)
 local WorldKit = require(script.Parent.WorldKit)
 
@@ -315,106 +311,6 @@ local function buildTrainer(parent, index, def)
 end
 
 ---------------------------------------------------------------------
--- Stands (weapons / backpacks)
----------------------------------------------------------------------
-
-local function pedestal(parent, position: Vector3, color: Color3, name: string)
-	local base_ = WorldKit.Brick(parent, Vector3.new(6, 3, 6), CFrame.new(position + Vector3.new(0, 1.5, 0)), T.StoneDark, name)
-	WorldKit.Part(parent, {
-		Name = "PedestalRing",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.3, 7, 7),
-		CFrame = CFrame.new(position + Vector3.new(0, 3.2, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = color,
-		Material = Enum.Material.Neon,
-		CanCollide = false,
-		CanQuery = false,
-	})
-	WorldKit.Beam(parent, position + Vector3.new(0, 3.1, 0), position + Vector3.new(0, 16, 0), ColorSequence.new(color, Color3.new(1, 1, 1)), 4)
-	return base_
-end
-
--- Places a display model floating + spinning above a pedestal.
-local function float(model: Model, position: Vector3, liftY: number)
-	local handle = model.PrimaryPart
-	handle.Anchored = true
-	model:PivotTo(CFrame.new(position + Vector3.new(0, liftY, 0)))
-	TweenService:Create(handle, TweenInfo.new(L.Stand.SpinSeconds, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), { Orientation = handle.Orientation + Vector3.new(0, 360, 0) }):Play()
-	TweenService:Create(handle, TweenInfo.new(L.Stand.FloatSeconds, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Position = handle.Position + Vector3.new(0, L.Stand.FloatHeight, 0) }):Play()
-end
-
--- Weapon pedestal. Returns { Prompt, Sign lines refresher, Holder }.
-local function buildWeaponStand(parent, position: Vector3, weapon, rotating: boolean)
-	local rarity = Config.Rarity[weapon.Rarity] or Config.Rarity.Common
-	local holder = Instance.new("Model")
-	holder.Name = "Stand_" .. (if rotating then "Unique" else weapon.Id)
-	holder.Parent = parent
-	local ped = pedestal(holder, position, rarity.Color, "Pedestal")
-
-	local display = Instance.new("Folder")
-	display.Name = "Display"
-	display.Parent = holder
-
-	local signPart = sign(holder, position + Vector3.new(0, 12.5, 0), Vector3.new(8, 3.4, 0.4), {
-		{ Name = "Title", Text = weapon.Name, Size = 30, Color = rarity.Color },
-		{ Name = "Stats", Text = Format.Number(weapon.Cost) .. " ✨  •  урон x" .. Format.Number(weapon.Damage), Size = 22 },
-		{ Name = "Note", Text = if rotating then Texts.Stand else "", Size = 22, Color = T.Gold },
-	}, { Enum.NormalId.Front, Enum.NormalId.Back })
-
-	local prompt = WorldKit.Prompt(ped, L.Prompts.Buy, weapon.Name, { WeaponId = weapon.Id, Kind = "Weapon" })
-
-	local function show(item)
-		display:ClearAllChildren()
-		local model = WeaponBuilder.Build(item)
-		model.Parent = display
-		-- Lift so the grip floats ~1.5 studs above the pedestal top.
-		float(model, position, 3 + 1.5)
-		local light = Instance.new("PointLight")
-		light.Color = item.Color
-		light.Range = 14
-		light.Brightness = 2
-		light.Parent = model.PrimaryPart
-		local r = Config.Rarity[item.Rarity] or Config.Rarity.Common
-		for _, gui in ipairs(signPart:GetChildren()) do
-			if gui:IsA("SurfaceGui") then
-				gui.Title.Text = item.Name
-				gui.Title.TextColor3 = r.Color
-				gui.Stats.Text = Format.Number(item.Cost) .. " ✨  •  урон x" .. Format.Number(item.Damage)
-			end
-		end
-		prompt:SetAttribute("WeaponId", item.Id)
-		prompt.ObjectText = item.Name
-	end
-	show(weapon)
-
-	local function setNote(text: string)
-		for _, gui in ipairs(signPart:GetChildren()) do
-			if gui:IsA("SurfaceGui") then
-				gui.Note.Text = text
-			end
-		end
-	end
-
-	return { Prompt = prompt, Show = show, SetNote = setNote, Holder = holder }
-end
-
-local function buildBackpackStand(parent, position: Vector3, item)
-	local rarity = Config.Rarity[item.Rarity] or Config.Rarity.Common
-	local holder = Instance.new("Model")
-	holder.Name = "Stand_" .. item.Id
-	holder.Parent = parent
-	local ped = pedestal(holder, position, rarity.Color, "Pedestal")
-	local model = BackpackBuilder.Build(item)
-	model.Parent = holder
-	float(model, position, 3 + 2)
-	sign(holder, position + Vector3.new(0, 12.5, 0), Vector3.new(8, 3.4, 0.4), {
-		{ Text = item.Name, Size = 30, Color = rarity.Color },
-		{ Text = Format.Number(item.Cost) .. " ✨  •  " .. Texts.Backpack:format(Format.Number(item.PerSecond)), Size = 22 },
-	}, { Enum.NormalId.Front, Enum.NormalId.Back })
-	return WorldKit.Prompt(ped, L.Prompts.Buy, item.Name, { BackpackId = item.Id, Kind = "Backpack" })
-end
-
----------------------------------------------------------------------
 -- Back row: altar, stall, wheel, egg, leaderboards, fountain
 ---------------------------------------------------------------------
 
@@ -596,9 +492,6 @@ function HubGenerator.Build()
 	local trainers = Instance.new("Folder")
 	trainers.Name = "Trainers"
 	trainers.Parent = root
-	local stands = Instance.new("Folder")
-	stands.Name = "Stands"
-	stands.Parent = root
 
 	local spawn = Workspace:FindFirstChildWhichIsA("SpawnLocation", true)
 	local origin = if spawn then spawn.Position else Vector3.zero
@@ -612,36 +505,6 @@ function HubGenerator.Build()
 
 	for i, def in ipairs(L.Trainers) do
 		buildTrainer(trainers, i, def)
-	end
-
-	-- Weapon alley: shop weapons, then the rotating unique stand.
-	local weaponPrompts = {}
-	local uniqueStand
-	local slot = 0
-	for _, weapon in ipairs(Config.Weapons) do
-		if not weapon.Unique and weapon.Cost > 0 then
-			local pos = at(Vector3.new(L.WeaponRow.X, 0, L.WeaponRow.ZStart + L.WeaponRow.Spacing * slot))
-			slot += 1
-			table.insert(weaponPrompts, buildWeaponStand(stands, pos, weapon, false).Prompt)
-		end
-	end
-	local firstUnique
-	for _, weapon in ipairs(Config.Weapons) do
-		if weapon.Unique then
-			firstUnique = weapon
-			break
-		end
-	end
-	if firstUnique then
-		local pos = at(Vector3.new(L.WeaponRow.X, 0, L.WeaponRow.ZStart + L.WeaponRow.Spacing * slot))
-		uniqueStand = buildWeaponStand(stands, pos, firstUnique, true)
-		table.insert(weaponPrompts, uniqueStand.Prompt)
-	end
-
-	local backpackPrompts = {}
-	for i, item in ipairs(Config.Backpacks) do
-		local pos = at(Vector3.new(L.BackpackRow.X, 0, L.BackpackRow.ZStart + L.BackpackRow.Spacing * (i - 1)))
-		table.insert(backpackPrompts, buildBackpackStand(stands, pos, item))
 	end
 
 	local altarPrompt = buildAltar(root)
@@ -663,9 +526,6 @@ function HubGenerator.Build()
 		Folder = root,
 		Trainers = trainers,
 		Portal = portal,
-		WeaponPrompts = weaponPrompts,
-		UniqueStand = uniqueStand,
-		BackpackPrompts = backpackPrompts,
 		AltarPrompt = altarPrompt,
 		ShopPrompt = shopPrompt,
 		WheelPrompt = wheelPrompt,

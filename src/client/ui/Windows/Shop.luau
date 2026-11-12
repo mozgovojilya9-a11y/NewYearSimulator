@@ -1,6 +1,6 @@
 --[[
 	Shop.luau
-	Shop window (tabs: Оружие / Рюкзаки) and Pets window, built from
+	Equipment window (owned weapons) and Pets window, built from
 	Config.Shop. Cards are colored by rarity (mythic = animated rainbow).
 	Buttons only ASK the server (ShopRequest); what is owned/equipped
 	comes back through Player attributes set by PlayerState.Sync.
@@ -55,8 +55,11 @@ end
 -- Is there anything in a category the player can afford right now?
 function Shop.HasAffordable(category): boolean
 	local owned = Shop.OwnedSet(category)
+	if Config.Shop[category].Purchasable == false then
+		return false
+	end
 	for _, item in ipairs(Config.Shop[category].Items) do
-		if not owned[item.Id] and not item.Unique and aura.Value >= item.Cost then
+		if not owned[item.Id] and aura.Value >= item.Cost then
 			return true
 		end
 	end
@@ -124,8 +127,8 @@ local function makeCard(parent, category, item, order)
 			Shop.Request("Buy", category, item.Id)
 		elseif state == "equip" then
 			Shop.Request("Equip", category, item.Id)
-		elseif state == "stand" then
-			Popups.Toast("Это оружие продаётся на стенде в хабе", "gold")
+		elseif state == "craft" then
+			Popups.Toast("Оружие куётся в Кузнице из материалов", "gold")
 		end
 	end)
 
@@ -138,10 +141,10 @@ local function makeCard(parent, category, item, order)
 			state = "equip"
 			button.Text = "Надеть"
 			setColor(Style.Colors.Blue)
-		elseif item.Unique then
-			state = "stand"
-			button.Text = "Стенд в хабе"
-			setColor(Style.Colors.Gold)
+		elseif shop.Purchasable == false then
+			state = "craft"
+			button.Text = "Кузница"
+			setColor(Color3.fromRGB(150, 140, 170))
 		else
 			state = "buy"
 			button.Text = Format.Number(item.Cost) .. " ✨"
@@ -224,7 +227,7 @@ local function makeWindow(title: string, color: Color3, categories: { string })
 	return window, showTab
 end
 
-local shopWindow, showShopTab = makeWindow("Мастерская", Style.Colors.Green, { "Weapon", "Backpack" })
+local shopWindow, showShopTab = makeWindow("Снаряжение", Style.Colors.Green, { "Weapon" })
 local petsWindow = makeWindow("Питомцы", Style.Colors.Magenta, { "Pet" })
 
 Shop.Window = shopWindow

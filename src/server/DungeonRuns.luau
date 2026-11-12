@@ -6,9 +6,8 @@
 
 	Run ends on: death, "Назад"/leaving, clearing room 20. The best room
 	is kept in RoomReached (record for the leaderboard and rebirth).
-	Kills drop an Aura crystal that must be collected with "E · Собрать"
-	within Config.Dungeon.DropLifetime; uncollected crystals are lost
-	(also when the run ends or the player leaves). Mob AI: see MobAI.
+	Mobs give no Aura; loot comes with the drop stage (LootService).
+	Mob AI / player damage: see MobAI.
 ]]
 
 local Players = game:GetService("Players")
@@ -16,7 +15,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local Format = require(ReplicatedStorage.Shared.Format)
 local DungeonGenerator = require(script.Parent.DungeonGenerator)
 local Effects = require(script.Parent.Effects)
 local MobBuilder = require(script.Parent.MobBuilder)
@@ -34,10 +32,10 @@ local world -- DungeonGenerator.Init() result
 local runs = {} -- [player] = run
 local laneOwner = {} -- [lane] = player
 local mobInfo = {} -- [model] = { run = run, room = index }
-local drops = {} -- [part] = { player, amount }
 
 -- Hooks: MobAI listens to mob spawn/removal, TravelService to run end,
--- ProgressionService to kills / clears / run starts.
+-- ProgressionService to kills / clears / run starts, LootService to
+-- kills (position, kind, boss).
 DungeonRuns.OnMobSpawned = nil
 DungeonRuns.OnMobRemoved = nil
 DungeonRuns.OnRunEnded = nil
@@ -79,7 +77,7 @@ local function buildMob(run, room, spot)
 	humanoid.Health = health
 	model:SetAttribute("Room", room.Index)
 	model:SetAttribute("Boss", isBoss)
-	model:SetAttribute("Reward", Config.MobReward(room.Index, isBoss))
+	model:SetAttribute("Kind", look.Kind)
 	model:SetAttribute("Damage", Config.MobDamage(room.Index, isBoss))
 	local height = model:GetAttribute("Height") or 6
 	WorldKit.HealthGui(model.PrimaryPart, if isBoss then look.Name else nil, height - (model.PrimaryPart.Position.Y - spot.Position.Y) + 1.5)
@@ -171,92 +169,6 @@ local function destroyRoom(run, index)
 end
 
 ---------------------------------------------------------------------
--- Drops
----------------------------------------------------------------------
-
-local function collect(part)
-	local drop = drops[part]
-	if not drop then
-		return
-	end
-	drops[part] = nil
-	local player = drop.player
-	if player.Parent and PlayerState.IsReady(player) then
-		local gained = PlayerState.GiveAura(player, drop.amount)
-		local run = runs[player]
-		if run then
-			run.aura += gained
-		end
-		Remotes.Get("ClickHit"):FireClient(player, "Pickup", part.Position, gained)
-	end
-	part:Destroy()
-end
-
-local function spawnDrop(player, position: Vector3, amount: number)
-	local look = Looks.Drop
-	local crystal = WorldKit.Part(world.Drops, {
-		Name = "AuraCrystal",
-		Size = Vector3.new(1.6, 2.6, 1.6),
-		CFrame = CFrame.new(position + Vector3.new(0, 1.6, 0)) * CFrame.Angles(0, math.rad(45), 0),
-		Color = look.Color,
-		Material = Enum.Material.Neon,
-		CanCollide = false,
-		CanTouch = false,
-	})
-	crystal:SetAttribute("Owner", player.UserId)
-	crystal:SetAttribute("Amount", amount)
-	TweenService:Create(crystal, TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { CFrame = crystal.CFrame * CFrame.new(0, 0.8, 0) * CFrame.Angles(0, math.rad(90), 0) }):Play()
-	WorldKit.Beam(crystal, crystal.Position, crystal.Position + Vector3.new(0, 14, 0), ColorSequence.new(look.BeamColor, Color3.new(1, 1, 1)), 2)
-	WorldKit.Light(crystal, look.Color, 12, 1.5)
-
-	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.new(5, 0, 1.2, 0)
-	gui.StudsOffsetWorldSpace = Vector3.new(0, 2.6, 0)
-	gui.AlwaysOnTop = true
-	gui.MaxDistance = 60
-	gui.Parent = crystal
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Font = Config.Theme.Font
-	label.TextScaled = true
-	label.TextColor3 = Config.Theme.Text
-	label.Text = "+" .. Format.Number(amount)
-	label.Parent = gui
-	local stroke = Instance.new("UIStroke")
-	stroke.Thickness = 2
-	stroke.Color = Config.Theme.Outline
-	stroke.Parent = label
-
-	-- Manual pickup only: "E · Собрать" with no hold. No touch pickup,
-	-- no auto-collect; after DropLifetime the crystal fades away unpaid.
-	local prompt = WorldKit.Prompt(crystal, Config.HubLayout.Prompts.Collect, "Аура", { Action = "Collect" }, 10, 0)
-	prompt.Triggered:Connect(function(who)
-		if who == player then
-			collect(crystal)
-		end
-	end)
-	drops[crystal] = { player = player, amount = amount }
-	task.delay(D.DropLifetime, function()
-		if drops[crystal] then
-			drops[crystal] = nil
-			TweenService:Create(crystal, TweenInfo.new(0.5), { Transparency = 1 }):Play()
-			task.delay(0.5, crystal.Destroy, crystal)
-		end
-	end)
-end
-
--- Uncollected crystals are lost when the run ends (nothing is credited).
-local function discardAll(player)
-	for part, drop in pairs(drops) do
-		if drop.player == player then
-			drops[part] = nil
-			part:Destroy()
-		end
-	end
-end
-
----------------------------------------------------------------------
 -- Runs
 ---------------------------------------------------------------------
 
@@ -279,17 +191,14 @@ local function endRun(player, reason: string)
 	if run.diedConnection then
 		run.diedConnection:Disconnect()
 	end
-	discardAll(player)
 	for index in pairs(run.rooms) do
 		destroyRoom(run, index)
 	end
 	run.folder:Destroy()
 
 	local record = PlayerState.GetRoomReached(player)
-	Remotes.Get("RunEnded"):FireClient(player, reason, run.best, run.aura, record, run.newRecord)
+	Remotes.Get("RunEnded"):FireClient(player, reason, run.best, run.loot, record, run.newRecord)
 	player:SetAttribute("Zone", "Hub")
-	-- Dead players respawn at the hub spawn by themselves; everyone else
-	-- is teleported back by TravelService through this hook.
 	if reason ~= "Died" and DungeonRuns.OnRunEnded then
 		DungeonRuns.OnRunEnded(player)
 	end
@@ -301,6 +210,10 @@ end
 
 function DungeonRuns.HasRun(player): boolean
 	return runs[player] ~= nil
+end
+
+function DungeonRuns.GetRun(player)
+	return runs[player]
 end
 
 -- Starts a fresh run. Returns the entry CFrame or nil, message.
@@ -319,7 +232,7 @@ function DungeonRuns.StartRun(player)
 		rooms = {},
 		current = 1,
 		best = 0,
-		aura = 0,
+		loot = {}, -- [materialId] = count picked up this run (LootService fills it)
 		newRecord = false,
 	}
 	runs[player] = run
@@ -335,7 +248,6 @@ function DungeonRuns.StartRun(player)
 		DungeonRuns.OnRunStarted(player)
 	end
 
-	-- Death ends the run.
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		run.diedConnection = humanoid.Died:Connect(function()
@@ -345,6 +257,13 @@ function DungeonRuns.StartRun(player)
 		end)
 	end
 	return run.rooms[1].Entry
+end
+
+-- Entry CFrame of the room the run is currently in (for fall recovery).
+function DungeonRuns.CurrentEntry(player): CFrame?
+	local run = runs[player]
+	local room = run and run.rooms[run.current]
+	return room and room.Entry
 end
 
 local function roomCleared(run, index)
@@ -374,17 +293,7 @@ local function roomCleared(run, index)
 	if nextRoom then
 		Remotes.Get("RoomState"):FireClient(run.player, nextRoom.Index, nextRoom.Alive, nextRoom.Total)
 	end
-	-- Drop the room behind the previous one (keep current + next).
 	destroyRoom(run, index - 1)
-end
-
-local function rollPetDrop(player)
-	for _, drop in ipairs(D.BossPetDrops) do
-		if math.random() < drop.Chance and PlayerState.GrantPet(player, drop.PetId) then
-			Remotes.Notify(player, "🐾 Новый питомец: " .. Config.ItemById.Pet[drop.PetId].Name .. "!", "gold")
-			return
-		end
-	end
 end
 
 local function kill(model)
@@ -397,20 +306,16 @@ local function kill(model)
 	end
 
 	local position = model:GetPivot().Position
-	local reward = model:GetAttribute("Reward")
 	local isBoss = model:GetAttribute("Boss") == true
+	local kind = model:GetAttribute("Kind")
 	local color = (model:FindFirstChild("Torso") or model.PrimaryPart).Color
 	model:Destroy()
 	Effects.Burst(position, color, if isBoss then 90 else 25, if isBoss then 35 else 22, if isBoss then 2 else 1)
 
 	local player = run.player
 	Remotes.Get("ClickHit"):FireClient(player, "Kill", position, isBoss)
-	spawnDrop(player, position, reward)
-	if isBoss then
-		rollPetDrop(player)
-	end
 	if DungeonRuns.OnKill then
-		DungeonRuns.OnKill(player, info.room, isBoss)
+		DungeonRuns.OnKill(player, info.room, isBoss, position, kind)
 	end
 
 	if room then
@@ -432,7 +337,7 @@ end
 function DungeonRuns.Hit(player, model)
 	local info = mobInfo[model]
 	if not info or info.run.player ~= player then
-		return -- not this player's mob
+		return
 	end
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then
@@ -457,7 +362,6 @@ function DungeonRuns.RefreshHints(player)
 	end
 end
 
--- For MobAI: the run a mob belongs to.
 function DungeonRuns.RunOf(model)
 	local info = mobInfo[model]
 	return info and info.run
@@ -470,24 +374,20 @@ function DungeonRuns.Init()
 			endRun(player, "Left")
 		end
 	end)
-	-- Losing the character (death, reset) ends the run.
 	local function watch(player)
 		player.CharacterRemoving:Connect(function()
 			if runs[player] then
 				endRun(player, "Died")
 			end
 		end)
+		player:GetAttributeChangedSignal("ClickPower"):Connect(function()
+			DungeonRuns.RefreshHints(player)
+		end)
 	end
 	Players.PlayerAdded:Connect(watch)
 	for _, player in ipairs(Players:GetPlayers()) do
 		watch(player)
 	end
-	-- Hint colors follow the equipped weapon.
-	Players.PlayerAdded:Connect(function(player)
-		player:GetAttributeChangedSignal("ClickPower"):Connect(function()
-			DungeonRuns.RefreshHints(player)
-		end)
-	end)
 end
 
 return DungeonRuns

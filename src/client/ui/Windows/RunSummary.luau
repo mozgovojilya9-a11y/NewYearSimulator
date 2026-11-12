@@ -1,7 +1,7 @@
 --[[
 	RunSummary.luau
 	Window shown when a dungeon run ends (death, Back, or room 20):
-	how far you got, Aura earned this run, your record.
+	how far you got, items looted this run, your record.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -34,7 +34,7 @@ local function stat(order, icon)
 	return Style.Label(plate, "", 22, Style.Colors.Text, { Position = UDim2.fromOffset(56, 0), Size = UDim2.new(1, -64, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
 end
 local roomLabel = stat(2, "🏰")
-local auraLabel = stat(3, "✨")
+local lootLabel = stat(3, "🎒")
 local recordLabel = stat(4, "🏆")
 
 local again = Style.Button(content, { Size = UDim2.fromOffset(260, 54), Color = Style.Colors.Green, Text = "В подземелье!", TextSize = 22, ZIndex = 34, LayoutOrder = 5, Shadow = false })
@@ -49,11 +49,15 @@ again.Activated:Connect(function()
 	end)
 end)
 
-ReplicatedStorage:WaitForChild("RunEnded").OnClientEvent:Connect(function(reason, room, aura, record, isNewRecord)
+ReplicatedStorage:WaitForChild("RunEnded").OnClientEvent:Connect(function(reason, room, loot, record, isNewRecord)
 	title.Text = TITLES[reason] or Texts.RunLeft
 	title.TextColor3 = COLORS[reason] or Style.Colors.Text
 	roomLabel.Text = ("Дошёл до этапа %d"):format(room)
-	auraLabel.Text = ("Заработано %s Ауры"):format(Format.Number(aura))
+	local items = 0
+	for _, count in pairs(if type(loot) == "table" then loot else {}) do
+		items += count
+	end
+	lootLabel.Text = ("Выбито предметов: %s"):format(Format.Number(items))
 	recordLabel.Text = ("Рекорд: этап %d%s"):format(record, if isNewRecord then "  — НОВЫЙ!" else "")
 	recordLabel.TextColor3 = if isNewRecord then Style.Colors.Gold else Style.Colors.Text
 	task.delay(0.6, window.Open)

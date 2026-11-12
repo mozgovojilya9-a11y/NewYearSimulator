@@ -2,8 +2,7 @@
 	Swing.luau
 	Procedural weapon swing for every character: when a character's
 	"Swing" attribute changes (server bumps it per accepted click) the
-	right shoulder Motor6D is tweened forward and back and the blade
-	Trail is enabled for a moment. The local player also swings
+	right shoulder Motor6D is tweened forward and back. The local player also swings
 	immediately on their own click (Swing.Local) so it feels instant.
 ]]
 
@@ -45,18 +44,9 @@ local function play(character)
 	local base = baseC0[motor]
 	local raise = if isR15 then S.RaiseR15 else S.RaiseR6
 
-	local weapon = character:FindFirstChild("EquippedWeapon")
-	local trail = weapon and weapon:FindFirstChild("SwingTrail", true)
-	if trail then
-		trail.Enabled = true
-	end
-
 	local up = Style.Tween(motor, S.UpSeconds, { C0 = base * raise }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	up.Completed:Wait()
 	Style.Tween(motor, S.DownSeconds, { C0 = base }, Enum.EasingStyle.Quad, Enum.EasingDirection.In).Completed:Wait()
-	if trail then
-		trail.Enabled = false
-	end
 	swinging[character] = nil
 end
 

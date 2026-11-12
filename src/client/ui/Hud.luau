@@ -2,7 +2,7 @@
 	Hud.luau
 	Objective text (top center), counters (bottom left: Aura, rebirths,
 	pets) and the bottom-center stack: damage, player health (dungeon),
-	room progress bar and the 4 quick damage-upgrade buttons.
+	and the room progress bar.
 ]]
 
 local Players = game:GetService("Players")
@@ -270,86 +270,6 @@ local function refreshProgress()
 end
 player:GetAttributeChangedSignal("RoomReached"):Connect(refreshProgress)
 refreshProgress()
-
--- Quick damage upgrades: the next 4 weapons STRONGER than the equipped
--- one ("+gain / price"). Owned stronger weapons show "Надеть"; unique
--- ones point to the hub stand; no upgrades left -> "Макс".
-local row = Instance.new("Frame")
-row.LayoutOrder = 4
-row.Size = UDim2.fromOffset(440, 64)
-row.BackgroundTransparency = 1
-row.Parent = stack
-local rowLayout = Instance.new("UIListLayout")
-rowLayout.FillDirection = Enum.FillDirection.Horizontal
-rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-rowLayout.Padding = UDim.new(0, 8)
-rowLayout.SortOrder = Enum.SortOrder.LayoutOrder
-rowLayout.Parent = row
-
-local quickSlots = {}
-for order = 1, 4 do
-	local color = Config.Hud.QuickUpgradeColors[order] or Style.Colors.Green
-	local button, setColor = Style.Button(row, { Size = UDim2.fromOffset(100, 60), Color = color, TextSize = 1, LayoutOrder = order, Shadow = false })
-	local top = Style.Label(button, "", 20, Style.Colors.Text, { Size = UDim2.new(1, 0, 0.55, 0), ZIndex = 3 })
-	local bottom = Style.Label(button, "", 14, Style.Colors.Text, { Position = UDim2.fromScale(0, 0.52), Size = UDim2.new(1, 0, 0.4, 0), ZIndex = 3 })
-	local slot = { button = button, setColor = setColor, top = top, bottom = bottom, color = color, state = "none", weaponId = nil }
-	button.Activated:Connect(function()
-		if slot.state == "buy" then
-			Shop.Request("Buy", "Weapon", slot.weaponId)
-		elseif slot.state == "equip" then
-			Shop.Request("Equip", "Weapon", slot.weaponId)
-		elseif slot.state == "stand" then
-			Popups.Toast("Это оружие продаётся на стенде в хабе", "gold")
-		end
-	end)
-	quickSlots[order] = slot
-end
-
-local function refreshQuick()
-	local owned = Shop.OwnedSet("Weapon")
-	local current = player:GetAttribute("ClickPower") or 1
-	local currentWeapon = Config.ItemById.Weapon[player:GetAttribute("EquippedWeapon") or ""]
-	local currentDamage = if currentWeapon then currentWeapon.Damage else 1
-	-- Candidates: stronger than what is equipped, cheapest first (Config order).
-	local upgrades = {}
-	for _, weapon in ipairs(Config.Weapons) do
-		if weapon.Damage > currentDamage then
-			table.insert(upgrades, weapon)
-		end
-	end
-	for order, slot in ipairs(quickSlots) do
-		local weapon = upgrades[order]
-		if not weapon then
-			slot.state = "none"
-			slot.weaponId = nil
-			slot.top.Text = "Макс"
-			slot.bottom.Text = if order == 1 then "Лучшее оружие!" else ""
-			slot.setColor(Color3.fromRGB(110, 110, 130))
-			continue
-		end
-		slot.weaponId = weapon.Id
-		local delta = (weapon.Damage - currentDamage) * Config.Click.BaseDamage * (current / math.max(1, currentDamage * Config.Click.BaseDamage))
-		slot.top.Text = "+" .. Format.Number(math.floor(delta + 0.5))
-		if owned[weapon.Id] then
-			slot.state = "equip"
-			slot.bottom.Text = "Надеть"
-			slot.setColor(Style.Colors.Blue)
-		elseif weapon.Unique then
-			slot.state = "stand"
-			slot.bottom.Text = "Стенд в хабе"
-			slot.setColor(Style.Colors.Gold)
-		else
-			slot.state = "buy"
-			slot.bottom.Text = Format.Number(weapon.Cost) .. " ✨"
-			slot.setColor(if aura.Value >= weapon.Cost then slot.color else Style.Darker(slot.color, 0.5))
-		end
-	end
-end
-aura.Changed:Connect(refreshQuick)
-player:GetAttributeChangedSignal("OwnedWeapon"):Connect(refreshQuick)
-player:GetAttributeChangedSignal("EquippedWeapon"):Connect(refreshQuick)
-player:GetAttributeChangedSignal("ClickPower"):Connect(refreshQuick)
-refreshQuick()
 
 ---------------------------------------------------------------------
 -- Level bar (bottom left, above the counters) and boost timer
