@@ -19,6 +19,7 @@ local EquipmentService = require(script.Parent.EquipmentService)
 local HubService = require(script.Parent.HubService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local MobAI = require(script.Parent.MobAI)
+local Passes = require(script.Parent.Passes)
 local PlayerState = require(script.Parent.PlayerState)
 local ProgressionService = require(script.Parent.ProgressionService)
 local RebirthService = require(script.Parent.RebirthService)
@@ -46,19 +47,21 @@ end
 
 -- Create every RemoteEvent before any client can look for it.
 Remotes.Init()
+Passes.Init()
+Passes.OnChanged = PlayerState.Sync
 Atmosphere.Init()
 local hub = HubService.Init()
 LeaderboardService.Init(hub.Leaderboards)
 DungeonRuns.Init()
 Bounds.Init(hub)
 MobAI.Init()
-ClickService.Init(hub.Trainers)
+ClickService.Init()
 ShopService.Init()
 RebirthService.Init()
 TravelService.Init(hub)
 EquipmentService.Init()
 ProgressionService.Init()
-HubService.OnTrainerClick = ProgressionService.OnTrainerClick
+ClickService.OnTrainerClick = ProgressionService.OnTrainerClick
 
 local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)
 
@@ -96,9 +99,11 @@ local function onPlayerAdded(player)
 	-- Keep the cached data table in sync whenever Aura changes.
 	aura.Changed:Connect(function(newValue)
 		data.Aura = newValue
+		PlayerState.RefreshPower(player) -- damage grows with Aura
 	end)
 
 	PlayerState.Sync(player)
+	task.spawn(Passes.Load, player)
 	ProgressionService.RefreshReady(player)
 end
 

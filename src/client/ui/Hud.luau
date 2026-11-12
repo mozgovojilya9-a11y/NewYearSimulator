@@ -58,6 +58,28 @@ local function refreshHint()
 end
 player:GetAttributeChangedSignal("ClickPower"):Connect(refreshHint)
 
+-- Trainer plate: shown while the server says we stand on a trainer.
+local trainerPlate = Style.Plate(Style.Gui, {
+	Name = "Trainer",
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, Config.Hud.TopLeftReserved.Y + 46),
+	Size = UDim2.fromOffset(380, 40),
+	ZIndex = 5,
+})
+trainerPlate.Visible = false
+local trainerText = Style.Label(trainerPlate, "", 22, Style.Colors.Green, { Size = UDim2.fromScale(1, 1), ZIndex = 6 })
+local function refreshTrainer()
+	local def = Config.TrainerById[player:GetAttribute("OnTrainer") or ""]
+	trainerPlate.Visible = def ~= nil
+	if def then
+		local perSecond = Config.Aura.TrainerTickBase * def.Multiplier * (player:GetAttribute("AuraMultiplier") or 1) / Config.Aura.TrainerTickInterval
+		trainerText.Text = Config.HubLayout.Texts.TrainerHud:format(tostring(def.Multiplier), Format.Number(perSecond))
+	end
+end
+player:GetAttributeChangedSignal("OnTrainer"):Connect(refreshTrainer)
+player:GetAttributeChangedSignal("AuraMultiplier"):Connect(refreshTrainer)
+refreshTrainer()
+
 local currentRoomAlive = nil -- alive count in the room the player is in (nil = unknown)
 local function setObjective(text)
 	if objective.Text ~= text then
@@ -130,7 +152,7 @@ end
 local auraValue, auraScale = counter(1, "✨", Style.Colors.Gold)
 local rebirthValue = counter(2, "🔁", Style.Colors.Purple)
 
--- Auto-click toggle (works only while standing on a trainer platform).
+-- Auto-click toggle: the server clicks for you (on trainers; everywhere with the pass).
 local autoClickRemote = ReplicatedStorage:WaitForChild("AutoClick")
 local autoButton, setAutoColor = Style.Button(counters, { Size = UDim2.new(1, 0, 0, 46), Color = Style.Colors.Red, Text = "Авто-клик: ВЫКЛ", TextSize = 20, LayoutOrder = 0, Shadow = false })
 local autoOn = false
@@ -144,7 +166,7 @@ autoButton.Activated:Connect(function()
 	autoClickRemote:FireServer(autoOn)
 	renderAuto()
 	if autoOn then
-		Popups.Toast("Авто-клик работает на платформе тренажёра", "gold")
+		Popups.Toast("Авто-клик работает на тренажёре (везде — с пассом «Авто-клик»)", "gold")
 	end
 end)
 renderAuto()

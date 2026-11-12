@@ -1,9 +1,17 @@
 --[[
 	HubService.luau
-	Builds the hub and runs the trainer logic: which platform a player
-	stands on, whether it is unlocked (Config.Hub.TrainerRequirements)
-	and the auto-click loop. Altar / shop / egg / wheel prompts only open
-	client windows, so the client handles them (Prompts.luau).
+	Builds the hub and runs the trainers.
+
+	Which trainer a player stands on is decided ONLY by the server, by
+	coordinates: every Config.Aura.TrainerCheckInterval seconds the
+	character position is compared with each trainer's square territory
+	(no Touched / TouchEnded, they are unreliable). The result is the
+	player attribute "OnTrainer" = trainer id or nil; it is set only for
+	trainers the player has unlocked.
+
+	While "OnTrainer" is set the player receives Aura automatically every
+	Config.Aura.TrainerTickInterval seconds (base x trainer multiplier);
+	clicks add a bonus on top (ClickService).
 ]]
 
 local Players = game:GetService("Players")
@@ -11,28 +19,31 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local DataService = require(script.Parent.DataService)
+local EquipmentService = require(script.Parent.EquipmentService)
 local HubGenerator = require(script.Parent.HubGenerator)
+local Passes = require(script.Parent.Passes)
 local PlayerState = require(script.Parent.PlayerState)
 local Remotes = require(script.Parent.Remotes)
 
 local HubService = {}
 
+local A = Config.Aura
+
 local hub
-local trainerModels = {} -- [index] = Model
-local autoClick = {} -- [player] = true
+local trainers = {} -- [id] = { def, model, center: Vector3, half: number }
 
-HubService.OnTrainerClick = nil -- set by ProgressionService (quests)
-
-function HubService.TrainerUnlocked(player, index: number): boolean
-	local req = Config.Hub.TrainerRequirements[index]
+function HubService.TrainerUnlocked(player, def): boolean
 	local data = DataService.Get(player)
-	if not req or not data then
+	if not def or not data then
 		return false
 	end
-	if req.Aura and PlayerState.GetAura(player) < req.Aura and not data.TrainersUnlocked[tostring(index)] then
+	if def.Pass then
+		return Passes.Owns(player, def.Pass)
+	end
+	if def.Rebirths and data.Rebirths < def.Rebirths then
 		return false
 	end
-	if req.Rebirths and data.Rebirths < req.Rebirths then
+	if def.Aura and not data.TrainersUnlocked[def.Id] and PlayerState.GetAura(player) < def.Aura then
 		return false
 	end
 	return true
@@ -45,13 +56,11 @@ local function rememberUnlocks(player)
 		return
 	end
 	local changed = false
-	for index in ipairs(Config.Hub.TrainerMultipliers) do
-		if not data.TrainersUnlocked[tostring(index)] and HubService.TrainerUnlocked(player, index) then
-			data.TrainersUnlocked[tostring(index)] = true
+	for _, def in ipairs(Config.Trainers) do
+		if def.Aura and not data.TrainersUnlocked[def.Id] and PlayerState.GetAura(player) >= def.Aura then
+			data.TrainersUnlocked[def.Id] = true
 			changed = true
-			if index > 1 then
-				Remotes.Notify(player, ("Тренажёр x%s открыт!"):format(tostring(Config.Hub.TrainerMultipliers[index])), "gold")
-			end
+			Remotes.Notify(player, ("Тренажёр x%s «%s» открыт!"):format(tostring(def.Multiplier), def.Name), "gold")
 		end
 	end
 	if changed then
@@ -59,74 +68,76 @@ local function rememberUnlocks(player)
 	end
 end
 
-function HubService.TrainerUnderPlayer(player): number?
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if not root then
-		return nil
-	end
-	for index, model in ipairs(trainerModels) do
-		local center = model:GetAttribute("Center")
-		local radius = model:GetAttribute("Radius")
-		local flat = Vector3.new(root.Position.X - center.X, 0, root.Position.Z - center.Z)
-		if flat.Magnitude <= radius + 1 and math.abs(root.Position.Y - center.Y) < 8 then
-			return index
+local function trainerAt(position: Vector3)
+	for _, trainer in pairs(trainers) do
+		local d = position - trainer.center
+		if math.abs(d.X) <= trainer.half and math.abs(d.Z) <= trainer.half and d.Y > -1 and d.Y < 14 then
+			return trainer
 		end
 	end
 	return nil
 end
 
-function HubService.TrainerClick(player, index: number)
-	if not HubService.TrainerUnlocked(player, index) then
-		return nil
-	end
-	local multiplier = Config.Hub.TrainerMultipliers[index] or 1
-	local amount, isCrit = PlayerState.RollCrit(PlayerState.ClickPower(player) * Config.Hub.TrainerRate * multiplier)
-	local gained = PlayerState.GiveAura(player, amount)
-	if HubService.OnTrainerClick then
-		HubService.OnTrainerClick(player)
-	end
-	return gained, isCrit, trainerModels[index]
+-- The trainer record ({ def, model, ... }) the player is training on, or nil.
+function HubService.TrainerOf(player)
+	local id = player:GetAttribute("OnTrainer")
+	return if id then trainers[id] else nil
 end
 
-function HubService.TrainerIndexOf(model): number?
-	return model and model:GetAttribute("Index")
+local function detect()
+	for _, player in ipairs(Players:GetPlayers()) do
+		local found = nil
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if root and PlayerState.IsReady(player) then
+			local trainer = trainerAt(root.Position)
+			if trainer and HubService.TrainerUnlocked(player, trainer.def) then
+				found = trainer.def.Id
+			end
+		end
+		if player:GetAttribute("OnTrainer") ~= found then
+			player:SetAttribute("OnTrainer", found)
+		end
+	end
+end
+
+local function tick(remote)
+	for _, player in ipairs(Players:GetPlayers()) do
+		local trainer = HubService.TrainerOf(player)
+		if trainer and PlayerState.IsReady(player) then
+			local gained = PlayerState.GiveAura(player, A.TrainerTickBase * trainer.def.Multiplier)
+			EquipmentService.Swing(player)
+			remote:FireClient(player, "Tick", trainer.model, gained)
+		end
+	end
 end
 
 function HubService.Init()
 	hub = HubGenerator.Build()
 	for _, model in ipairs(hub.Trainers:GetChildren()) do
-		trainerModels[model:GetAttribute("Index")] = model
+		local def = Config.TrainerById[model:GetAttribute("TrainerId")]
+		if def then
+			trainers[def.Id] = { def = def, model = model, center = model:GetAttribute("Center"), half = model:GetAttribute("Half") + 0.5 }
+		end
 	end
 
-	local remote = Remotes.Get("AutoClick")
-	remote.OnServerEvent:Connect(function(player, enabled)
-		autoClick[player] = if enabled == true then true else nil
-		player:SetAttribute("AutoClick", enabled == true)
-	end)
-	Players.PlayerRemoving:Connect(function(player)
-		autoClick[player] = nil
-	end)
-	local clickRemote = Remotes.Get("ClickHit")
 	task.spawn(function()
 		while true do
-			task.wait(Config.Hub.AutoClickInterval)
-			for player in pairs(autoClick) do
-				if PlayerState.IsReady(player) then
-					local index = HubService.TrainerUnderPlayer(player)
-					if index then
-						local gained, isCrit, model = HubService.TrainerClick(player, index)
-						if gained then
-							clickRemote:FireClient(player, "Train", model, gained, isCrit)
-						end
-					end
-				end
-			end
+			task.wait(A.TrainerCheckInterval)
+			detect()
+		end
+	end)
+
+	local remote = Remotes.Get("ClickHit")
+	task.spawn(function()
+		while true do
+			task.wait(A.TrainerTickInterval)
+			tick(remote)
 		end
 	end)
 
 	task.spawn(function()
 		while true do
-			task.wait(3)
+			task.wait(2)
 			for _, player in ipairs(Players:GetPlayers()) do
 				if PlayerState.IsReady(player) then
 					rememberUnlocks(player)

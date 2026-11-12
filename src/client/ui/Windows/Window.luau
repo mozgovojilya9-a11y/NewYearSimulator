@@ -45,6 +45,11 @@ function Window.CloseAll()
 end
 dim.Activated:Connect(Window.CloseAll)
 
+-- True while any window is open (world clicks are ignored then).
+function Window.AnyOpen(): boolean
+	return openWindow ~= nil
+end
+
 function Window.new(title: string, color: Color3, size: Vector2?)
 	local w = size or Vector2.new(520, 420)
 	local frame = Instance.new("Frame")

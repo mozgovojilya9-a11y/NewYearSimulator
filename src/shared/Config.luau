@@ -23,7 +23,7 @@ Config.StartingData = {
 	OwnedPets = {},
 	EquippedPet = "",
 	RoomReached = 0, -- highest dungeon room cleared (0 = none, 20 = all)
-	TrainersUnlocked = { ["1"] = true }, -- hub platforms unlocked by Aura (permanent)
+	TrainersUnlocked = { ["1"] = true }, -- trainer ids whose Aura requirement was reached (permanent)
 	-- Engagement systems (ProgressionService)
 	Daily = { LastClaim = 0, Streak = 0 },
 	WheelLast = 0,
@@ -51,11 +51,53 @@ Config.World = {
 ---------------------------------------------------------------------
 
 Config.Click = {
-	BaseDamage = 1, -- damage of one click with weapon x1
+	BaseDamage = 1, -- damage of one click with weapon x1 and no Aura
 	CritChance = 0.1, -- 10% chance per click
 	CritMultiplier = 5, -- crit = damage x5
 	Cooldown = 0.1, -- min seconds between accepted clicks per player (anti-macro)
-	Range = 60, -- max studs between player and target
+	Range = 60, -- max studs between player and a clicked mob
+	MeleeRange = 16, -- a click with no target hits the nearest mob within this range
+}
+
+-- Aura = strength + currency. It comes ONLY from clicks, auto-click and
+-- trainers (mobs give materials, never Aura).
+--   click anywhere            -> ClickBase
+--   click on a trainer        -> + TrainerClickBonus x trainer multiplier
+--   standing on a trainer     -> TrainerTickBase x trainer multiplier every
+--                                TrainerTickInterval seconds, no clicks needed
+-- Every gain is then multiplied by pets / rebirths / passes / boosts.
+Config.Aura = {
+	ClickBase = 1,
+	TrainerClickBonus = 1,
+	TrainerTickInterval = 1,
+	TrainerTickBase = 3,
+	TrainerCheckInterval = 0.2, -- how often the server looks which trainer a player stands on
+	AutoClickInterval = 0.35, -- server-side auto-click period
+	-- Without the "AutoClick" game pass the auto-click toggle works only
+	-- while standing on a trainer; with the pass it works everywhere.
+	AutoClickFreeOnTrainer = true,
+}
+
+-- Damage of one click = weapon base x AuraPower(Aura) x armor set bonus
+-- x pets x passes x boosts x rebirths. AuraPower grows with the
+-- logarithm of Aura: 0 -> x1, 1K -> x3.25, 100K -> x4.75, 10M -> x6.25.
+Config.Damage = {
+	AuraPowerK = 0.75,
+}
+
+function Config.AuraPower(aura: number): number
+	return 1 + math.log10(math.max(0, aura) + 1) * Config.Damage.AuraPowerK
+end
+
+-- Robux game passes. Id = 0 means "not created yet": buttons show
+-- "Скоро" and nothing is checked. Put the real ids from the Creator
+-- Dashboard here (see README).
+Config.VipAuraMultiplier = 1.5
+
+Config.GamePasses = {
+	VIP = { Id = 0, Name = "VIP", Price = 199, Text = "x1.5 Аура, VIP-тег и VIP-тренажёр" },
+	GoldTrainer = { Id = 0, Name = "Золотой тренажёр", Price = 299, Text = "Доступ к тренажёру x500" },
+	AbyssTrainer = { Id = 0, Name = "Тренажёр бездны", Price = 499, Text = "Доступ к тренажёру x1000" },
 }
 
 Config.Dungeon = {
@@ -69,8 +111,8 @@ Config.Dungeon = {
 	-- Difficulty curve. "Recommended damage" for room r grows faster than
 	-- a single run can pay for, so the loop is: run -> stuck -> trainers /
 	-- weapons -> deeper run. Mob HP = RecommendedDamage(r) x ClicksToKill.
-	RecommendedBase = 2,
-	RecommendedGrowth = 1.42, -- r1 = 2, r5 ~ 8, r10 ~ 47, r15 ~ 280, r20 ~ 1650
+	RecommendedBase = 3,
+	RecommendedGrowth = 1.5, -- r1 = 3, r5 ~ 15, r10 ~ 115, r15 ~ 875, r20 ~ 6650
 	ClicksToKill = 8, -- normal mob dies in ~8 clicks at recommended damage
 	BossClicksToKill = 50,
 
@@ -175,33 +217,33 @@ Config.PetSlots = 1 -- shown as "N/1" in the HUD
 -- Resets Aura and the room record; keeps weapons, armor, items, pets.
 Config.RebirthRequirement = 20
 Config.Rebirth = {
-	MultiplierPerRebirth = 0.1,
+	MultiplierPerRebirth = 0.25, -- applies to Aura gains AND damage
 }
 
 function Config.RebirthMultiplier(rebirths: number): number
 	return 1 + rebirths * Config.Rebirth.MultiplierPerRebirth
 end
 
--- Hub trainers: standing on a platform and clicking its object gives
--- ClickPower x TrainerRate x the platform multiplier. Platforms unlock
--- by Aura (early) or rebirths (late). Auto-click repeats a trainer
--- click every AutoClickInterval seconds while the toggle is on and the
--- player stands on an unlocked platform (the AFK progression loop).
-Config.Hub = {
-	TrainerRate = 0.25,
-	TrainerMultipliers = { 1, 3, 6, 12, 25, 50, 100, 250 },
-	TrainerRequirements = {
-		{},
-		{ Aura = 500 },
-		{ Aura = 5000 },
-		{ Aura = 50000 },
-		{ Rebirths = 1 },
-		{ Rebirths = 2 },
-		{ Rebirths = 3 },
-		{ Rebirths = 5 },
-	},
-	AutoClickInterval = 0.5,
+-- Hub trainers. Requirements: Aura (remembered forever once reached),
+-- Rebirths, or a game pass (Premium). Ids are stored in saves
+-- (TrainersUnlocked) -- never rename them.
+Config.Trainers = {
+	{ Id = "1", Kind = "Dummy", Name = "Манекен", Multiplier = 1, Color = Color3.fromRGB(90, 230, 110) },
+	{ Id = "2", Kind = "Boulder", Name = "Валун", Multiplier = 3, Aura = 500, Color = Color3.fromRGB(70, 140, 255) },
+	{ Id = "3", Kind = "IceCube", Name = "Ледяной куб", Multiplier = 6, Aura = 5000, Color = Color3.fromRGB(46, 230, 255) },
+	{ Id = "4", Kind = "Mimic", Name = "Сундук-мимик", Multiplier = 12, Aura = 50000, Color = Color3.fromRGB(255, 150, 50) },
+	{ Id = "5", Kind = "Skull", Name = "Гигантский череп", Multiplier = 25, Aura = 500000, Color = Color3.fromRGB(230, 230, 240), Particles = true },
+	{ Id = "6", Kind = "Pumpkin", Name = "Тыква-монстр", Multiplier = 50, Rebirths = 1, Color = Color3.fromRGB(255, 120, 30), Particles = true },
+	{ Id = "7", Kind = "Golem", Name = "Кристальный голем", Multiplier = 100, Rebirths = 2, Color = Color3.fromRGB(150, 80, 255), Particles = true },
+	{ Id = "8", Kind = "Core", Name = "Аура-ядро", Multiplier = 250, Rebirths = 4, Color = Color3.fromRGB(255, 61, 184), Particles = true },
+	{ Id = "VIP", Kind = "Throne", Name = "VIP-трон", Multiplier = 100, Pass = "VIP", Premium = true, Color = Color3.fromRGB(255, 201, 60), Particles = true },
+	{ Id = "Gold", Kind = "Idol", Name = "Золотой идол", Multiplier = 500, Pass = "GoldTrainer", Premium = true, Color = Color3.fromRGB(255, 215, 80), Particles = true },
+	{ Id = "Abyss", Kind = "AbyssPortal", Name = "Портал бездны", Multiplier = 1000, Pass = "AbyssTrainer", Premium = true, Color = Color3.fromRGB(170, 80, 255), Particles = true },
 }
+Config.TrainerById = {}
+for _, trainer in ipairs(Config.Trainers) do
+	Config.TrainerById[trainer.Id] = trainer
+end
 
 -- Engagement loop: things to do every few minutes.
 -- Aura rewards scale with the player's record room so they stay relevant.
@@ -232,8 +274,8 @@ Config.Progression = {
 			{ Id = "kill80", Kind = "Kill", Target = 80, Text = "Убей 80 мобов", Aura = 900 },
 			{ Id = "room5", Kind = "Room", Target = 5, Text = "Дойди до этапа 5", Aura = 500 },
 			{ Id = "room10", Kind = "Room", Target = 10, Text = "Дойди до этапа 10", Aura = 1500 },
-			{ Id = "train500", Kind = "Train", Target = 500, Text = "Покликай на тренажёре 500 раз", Aura = 400 },
-			{ Id = "train1500", Kind = "Train", Target = 1500, Text = "Покликай на тренажёре 1500 раз", Aura = 1200 },
+			{ Id = "train500", Kind = "Train", Target = 300, Text = "Кликни на тренажёре 300 раз", Aura = 400 },
+			{ Id = "train1500", Kind = "Train", Target = 1000, Text = "Кликни на тренажёре 1000 раз", Aura = 1200 },
 			{ Id = "boss2", Kind = "Boss", Target = 2, Text = "Победи 2 боссов", Aura = 1000 },
 			{ Id = "runs3", Kind = "Run", Target = 3, Text = "Соверши 3 забега", Aura = 350 },
 		},
@@ -288,7 +330,7 @@ end
 
 -- All remotes live directly in ReplicatedStorage, created by the server.
 Config.Remotes = {
-	ClickHit = "RemoteEvent", -- C->S (target); S->C ("Hit"|"Train"|"Kill", ...)
+	ClickHit = "RemoteEvent", -- C->S (mob or nil) on every click; S->C ("Aura"|"Tick"|"Hit"|"Kill", ...)
 	ShopRequest = "RemoteFunction", -- (action, category, id) -> ok, message
 	RebirthRequest = "RemoteFunction", -- () -> ok, message
 	Travel = "RemoteFunction", -- ("Hub") | ("Room", n) -> ok, message
@@ -387,19 +429,13 @@ Config.HubLayout = {
 
 	Portal = { Offset = Vector3.new(0, 0, -80), Radius = 7, ArchWidth = 22, ArchHeight = 20, SpinSeconds = 6 },
 
-	-- Trainer row, left of the path, front to back (index 1 nearest the spawn).
-	TrainerRow = { X = -30, ZStart = 36, Spacing = -11 },
-	TrainerPlatformRadius = 4.5,
-	-- Looks: platform color + the object on it (built by TrainerBuilder).
-	Trainers = {
-		{ Kind = "Dummy", Name = "Манекен", Color = Color3.fromRGB(90, 230, 110) },
-		{ Kind = "Boulder", Name = "Валун", Color = Color3.fromRGB(70, 140, 255) },
-		{ Kind = "IceCube", Name = "Ледяной куб", Color = Color3.fromRGB(46, 230, 255) },
-		{ Kind = "Mimic", Name = "Сундук-мимик", Color = Color3.fromRGB(255, 150, 50) },
-		{ Kind = "Skull", Name = "Гигантский череп", Color = Color3.fromRGB(230, 230, 240) },
-		{ Kind = "Pumpkin", Name = "Тыква-монстр", Color = Color3.fromRGB(255, 120, 30) },
-		{ Kind = "Golem", Name = "Кристальный голем", Color = Color3.fromRGB(150, 80, 255) },
-		{ Kind = "Core", Name = "Аура-ядро", Color = Color3.fromRGB(255, 61, 184) },
+	-- Trainers: a square "territory" each. Regular ones stand west of the
+	-- path in 2 rows of 4 (step 20) facing the path, premium ones east.
+	TrainerSize = 12,
+	TrainerSpots = {
+		["1"] = Vector3.new(-38, 0, 0), ["2"] = Vector3.new(-38, 0, -20), ["3"] = Vector3.new(-38, 0, -40), ["4"] = Vector3.new(-38, 0, -60),
+		["5"] = Vector3.new(-60, 0, 0), ["6"] = Vector3.new(-60, 0, -20), ["7"] = Vector3.new(-60, 0, -40), ["8"] = Vector3.new(-60, 0, -60),
+		VIP = Vector3.new(50, 0, 0), Gold = Vector3.new(50, 0, -20), Abyss = Vector3.new(50, 0, -40),
 	},
 
 	-- Back of the courtyard (+Z).
@@ -413,15 +449,19 @@ Config.HubLayout = {
 		{ Offset = Vector3.new(40, 0, 85), Kind = "Room", Title = "Глубже всех в данже" },
 	},
 	Npc = { Offset = Vector3.new(14, 0, -66) },
-	Trees = { Vector3.new(-70, 0, -60), Vector3.new(70, 0, -60), Vector3.new(72, 0, 10), Vector3.new(-72, 0, 10) },
-	Bushes = { Vector3.new(-62, 0, 40), Vector3.new(62, 0, 40), Vector3.new(-12, 0, 46), Vector3.new(12, 0, 46), Vector3.new(-66, 0, -20), Vector3.new(66, 0, -20) },
+	Trees = { Vector3.new(-76, 0, -76), Vector3.new(76, 0, -76), Vector3.new(76, 0, 24), Vector3.new(-76, 0, 24) },
+	Bushes = { Vector3.new(-62, 0, 40), Vector3.new(62, 0, 40), Vector3.new(-12, 0, 46), Vector3.new(12, 0, 46) },
 	TorchesAlongPath = 5,
 
 	Texts = {
 		Portal = "ПОДЗЕМЕЛЬЕ",
-		Trainer = "x%s Мощность",
+		Trainer = "x%s",
+		TrainerOpen = "Встань сюда!",
 		TrainerLockedAura = "Нужно %s Ауры",
-		TrainerLockedRebirth = "Открывается: Перерождение %d",
+		TrainerLockedRebirth = "Нужно перерождений: %d",
+		TrainerLockedPass = "Game Pass · %d R$",
+		TrainerSoon = "Скоро",
+		TrainerHud = "Тренажёр x%s  ·  +%s/сек",
 		Altar = "АЛТАРЬ ПЕРЕРОЖДЕНИЯ",
 		Shop = "МАСТЕРСКАЯ",
 		Wheel = "КОЛЕСО УДАЧИ",

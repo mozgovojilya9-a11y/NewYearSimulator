@@ -148,22 +148,9 @@ local function buildPaths()
 		Material = Enum.Material.Plastic,
 		TopSurface = Enum.SurfaceType.Studs,
 	})
-	-- Side path along the trainer row.
-	local trainerX = L.TrainerRow.X + 9
-	local tz0 = L.TrainerRow.ZStart + 6
-	local tz1 = L.TrainerRow.ZStart + L.TrainerRow.Spacing * (#L.Trainers - 1) - 6
-	WorldKit.Part(root, {
-		Name = "TrainerPath",
-		Size = Vector3.new(6, 0.2, tz0 - tz1),
-		Position = at(Vector3.new(trainerX, 0.08, (tz0 + tz1) / 2)),
-		Color = T.Path,
-		Material = Enum.Material.Plastic,
-		TopSurface = Enum.SurfaceType.Studs,
-	})
-	-- Chevrons: spawn -> first trainer, along the row, then to the portal.
-	chevronLine(Vector3.new(0, 0, 6), Vector3.new(trainerX, 0, tz0 - 4))
-	chevronLine(Vector3.new(trainerX, 0, tz0 - 4), Vector3.new(trainerX, 0, tz1 + 2))
-	chevronLine(Vector3.new(trainerX, 0, tz1 + 2), Vector3.new(0, 0, zEnd + 8))
+	-- Chevrons: spawn -> the first trainer, and spawn -> portal.
+	local first = L.TrainerSpots["1"]
+	chevronLine(Vector3.new(-L.PathWidth / 2, 0, 2), Vector3.new(first.X + L.TrainerSize / 2 + 2, 0, first.Z))
 	chevronLine(Vector3.new(0, 0, 4), Vector3.new(0, 0, zEnd + 6))
 
 	for i = 1, L.TorchesAlongPath do
@@ -257,69 +244,87 @@ end
 -- Trainers
 ---------------------------------------------------------------------
 
-local function buildTrainer(parent, index, def)
-	local pos = at(Vector3.new(L.TrainerRow.X, 0, L.TrainerRow.ZStart + L.TrainerRow.Spacing * (index - 1)))
-	local mult = Config.Hub.TrainerMultipliers[index] or 1
-	local req = Config.Hub.TrainerRequirements[index] or {}
-	local r = L.TrainerPlatformRadius
+-- One trainer = a square territory (the server gives Aura to whoever
+-- stands inside it), the big object at its back, a sign at eye height
+-- between the platforms and a lock box the client shows per player.
+local function buildTrainer(parent, def)
+	local pos = at(L.TrainerSpots[def.Id])
+	local dirX = if pos.X < base.X then 1 else -1 -- faces the main path
+	local front = Vector3.new(dirX, 0, 0)
+	local S = L.TrainerSize
 
 	local model = Instance.new("Model")
-	model.Name = "Trainer" .. index
+	model.Name = "Trainer_" .. def.Id
 
-	-- Platform: colored disc with a darker rim, player stands here.
 	WorldKit.Part(model, {
 		Name = "Platform",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.6, r * 2, r * 2),
-		CFrame = CFrame.new(pos + Vector3.new(0, 0.3, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Size = Vector3.new(S, 0.6, S),
+		Position = pos + Vector3.new(0, 0.3, 0),
 		Color = def.Color,
 		Material = Enum.Material.Plastic,
 		TopSurface = Enum.SurfaceType.Studs,
 	})
 	WorldKit.Part(model, {
 		Name = "Rim",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.3, r * 2 + 1.2, r * 2 + 1.2),
-		CFrame = CFrame.new(pos + Vector3.new(0, 0.15, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = def.Color:Lerp(Color3.new(0, 0, 0), 0.4),
+		Size = Vector3.new(S + 1.2, 0.3, S + 1.2),
+		Position = pos + Vector3.new(0, 0.15, 0),
+		Color = def.Color:Lerp(Color3.new(0, 0, 0), 0.45),
 	})
-	-- The object sits at the back of the platform, facing the path (+X).
-	local objectPos = pos + Vector3.new(-r + 2.5, 0.6, 0)
-	local object, height = TrainerBuilder.Build(def, CFrame.lookAt(objectPos, objectPos + Vector3.new(1, 0, 0)))
+	for _, dx in ipairs({ -1, 1 }) do
+		for _, dz in ipairs({ -1, 1 }) do
+			WorldKit.Brick(model, Vector3.new(1, 1.4, 1), CFrame.new(pos + Vector3.new(dx * (S / 2 + 0.1), 0.7, dz * (S / 2 + 0.1))), if def.Premium then T.Gold else T.StoneDark, "Post")
+		end
+	end
+
+	-- The object sits at the back of the territory, facing the path.
+	local objectPos = pos - front * (S / 2 - 3) + Vector3.new(0, 0.6, 0)
+	local object = TrainerBuilder.Build(def, CFrame.lookAt(objectPos, objectPos + front))
 	object.Name = "Object"
 	object.Parent = model
 	model.PrimaryPart = model.Platform
-	model:SetAttribute("Index", index)
-	model:SetAttribute("Multiplier", mult)
+	model:SetAttribute("TrainerId", def.Id)
+	model:SetAttribute("Multiplier", def.Multiplier)
 	model:SetAttribute("Center", pos)
-	model:SetAttribute("Radius", r)
-	if req.Aura then
-		model:SetAttribute("RequireAura", req.Aura)
-	end
-	if req.Rebirths then
-		model:SetAttribute("RequireRebirths", req.Rebirths)
-	end
+	model:SetAttribute("Half", S / 2)
 
-	-- Multiplier sign above the object, both faces.
-	sign(model, pos + Vector3.new(-r + 2.5, height + 3.2, 0), Vector3.new(0.3, 2.4, 8), { { Text = Texts.Trainer:format(tostring(mult)), Size = 48, Color = def.Color } }, { Enum.NormalId.Right, Enum.NormalId.Left })
+	-- Requirement line (the client repaints it per player: HubFx).
+	local reqText = Texts.TrainerOpen
+	if def.Pass then
+		local pass = Config.GamePasses[def.Pass]
+		reqText = if pass and pass.Id > 0 then Texts.TrainerLockedPass:format(pass.Price) else Texts.TrainerSoon
+		model:SetAttribute("RequirePass", def.Pass)
+	elseif def.Rebirths then
+		reqText = Texts.TrainerLockedRebirth:format(def.Rebirths)
+		model:SetAttribute("RequireRebirths", def.Rebirths)
+	elseif def.Aura then
+		reqText = Texts.TrainerLockedAura:format(Format.Number(def.Aura))
+		model:SetAttribute("RequireAura", def.Aura)
+	end
+	model:SetAttribute("RequireText", reqText)
 
-	-- Lock: barrier ring + lock sign; the client hides them per player.
-	local lock = Instance.new("Model")
-	lock.Name = "Lock"
-	lock.Parent = model
-	WorldKit.Part(lock, {
-		Name = "Barrier",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(10, r * 2 + 0.6, r * 2 + 0.6),
-		CFrame = CFrame.new(pos + Vector3.new(0, 5.3, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = Color3.fromRGB(40, 30, 60),
+	-- Sign: vertical board at eye height beside the platform, facing the path.
+	local signPos = pos + Vector3.new(0, 0, S / 2 + 4)
+	WorldKit.Part(model, { Name = "SignPole", Size = Vector3.new(0.5, 2.6, 0.5), Position = signPos + Vector3.new(0, 1.3, 0), Color = T.StoneDark })
+	local board = sign(model, signPos + Vector3.new(0, 4.6, 0), Vector3.new(0.4, 4.2, 7.4), {
+		{ Name = "Mult", Text = Texts.Trainer:format(tostring(def.Multiplier)) .. " Аура", Size = 56, Color = T.Gold },
+		{ Name = "Title", Text = def.Name, Size = 26 },
+		{ Name = "Req", Text = reqText, Size = 26, Color = T.Green },
+	}, { if dirX > 0 then Enum.NormalId.Right else Enum.NormalId.Left })
+	board.Name = "Sign"
+
+	-- Lock: invisible on the server; a locked-out client makes it solid.
+	WorldKit.Part(model, {
+		Name = "Lock",
+		Size = Vector3.new(S + 0.4, 12, S + 0.4),
+		Position = pos + Vector3.new(0, 6.6, 0),
+		Color = Color3.fromRGB(60, 50, 80),
 		Material = Enum.Material.ForceField,
-		Transparency = 0.35,
+		Transparency = 1,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CastShadow = false,
 	})
-	local lockText = if req.Rebirths then Texts.TrainerLockedRebirth:format(req.Rebirths) elseif req.Aura then Texts.TrainerLockedAura:format(Format.Number(req.Aura)) else ""
-	if lockText ~= "" then
-		sign(lock, pos + Vector3.new(r + 0.6, 4, 0), Vector3.new(0.3, 3, 8), { { Text = "🔒", Size = 40 }, { Text = lockText, Size = 30, Color = T.Red } }, { Enum.NormalId.Right })
-	end
 
 	model.Parent = parent
 	return model
@@ -518,8 +523,8 @@ function HubGenerator.Build()
 	local portal = buildPortal()
 	buildNpc()
 
-	for i, def in ipairs(L.Trainers) do
-		buildTrainer(trainers, i, def)
+	for _, def in ipairs(Config.Trainers) do
+		buildTrainer(trainers, def)
 	end
 
 	local altarPrompt = buildAltar(root)

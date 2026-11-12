@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local DataService = require(script.Parent.DataService)
+local Passes = require(script.Parent.Passes)
 
 local PlayerState = {}
 
@@ -26,24 +27,46 @@ function PlayerState.IsReady(player): boolean
 	return DataService.Get(player) ~= nil and auraValue(player) ~= nil
 end
 
--- Damage of one click before crit (mobs and trainers).
-function PlayerState.ClickPower(player): number
+-- Damage of one click before crit: weapon base x AuraPower(Aura) x
+-- rebirths (x armor set / pets / passes / boosts as those systems exist).
+function PlayerState.Damage(player): number
 	local data = DataService.Get(player)
-	local weapon = data and Config.ItemById.Weapon[data.EquippedWeapon]
-	local weaponDamage = if weapon then weapon.Damage else 1
-	return Config.Click.BaseDamage * weaponDamage
+	if not data then
+		return 1
+	end
+	local weapon = Config.ItemById.Weapon[data.EquippedWeapon]
+	local damage = Config.Click.BaseDamage * (if weapon then weapon.Damage else 1)
+	damage *= Config.AuraPower(PlayerState.GetAura(player))
+	damage *= Config.RebirthMultiplier(data.Rebirths)
+	return math.max(1, math.floor(damage))
+end
+PlayerState.ClickPower = PlayerState.Damage
+
+-- Aura changes on every click, and damage depends on it: keep the
+-- "ClickPower" attribute (HUD, barrier hints) fresh.
+function PlayerState.RefreshPower(player)
+	local damage = PlayerState.Damage(player)
+	if player:GetAttribute("ClickPower") ~= damage then
+		player:SetAttribute("ClickPower", damage)
+	end
 end
 
--- Multiplier applied to every Aura gain (clicks, trainers).
+-- Multiplier applied to every Aura gain (clicks, trainers, rewards).
 function PlayerState.AuraMultiplier(player): number
 	local data = DataService.Get(player)
 	if not data then
 		return 1
 	end
 	local pet = Config.ItemById.Pet[data.EquippedPet]
-	local petMultiplier = if pet then 1 + pet.Bonus else 1
-	local boost = if (data.BoostUntil or 0) > os.time() then Config.Progression.Boost.Multiplier else 1
-	return petMultiplier * Config.RebirthMultiplier(data.Rebirths) * boost
+	local multiplier = if pet then 1 + pet.Bonus else 1
+	multiplier *= Config.RebirthMultiplier(data.Rebirths)
+	if (data.BoostUntil or 0) > os.time() then
+		multiplier *= Config.Progression.Boost.Multiplier
+	end
+	if Passes.Owns(player, "VIP") then
+		multiplier *= Config.VipAuraMultiplier
+	end
+	return multiplier
 end
 
 -- Rolls a crit on top of a base amount.
@@ -131,11 +154,11 @@ function PlayerState.Sync(player)
 	player:SetAttribute("XpNext", math.floor(Config.Progression.Level.XpBase * data.Level ^ 1.5))
 	player:SetAttribute("BoostUntil", data.BoostUntil or 0)
 	local unlocked = {}
-	for index in pairs(data.TrainersUnlocked) do
-		table.insert(unlocked, index)
+	for id in pairs(data.TrainersUnlocked) do
+		table.insert(unlocked, id)
 	end
 	player:SetAttribute("TrainersUnlocked", table.concat(unlocked, ","))
-	player:SetAttribute("ClickPower", PlayerState.ClickPower(player))
+	PlayerState.RefreshPower(player)
 
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then

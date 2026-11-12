@@ -371,6 +371,28 @@ function DungeonRuns.IsMob(model): boolean
 	return mobInfo[model] ~= nil
 end
 
+-- Closest living mob of the player's run within `range` studs.
+function DungeonRuns.NearestMob(player, position: Vector3, range: number)
+	local run = runs[player]
+	if not run then
+		return nil
+	end
+	local best, bestDistance = nil, range
+	for _, room in pairs(run.rooms) do
+		for model in pairs(room.Mobs) do
+			local root = model.PrimaryPart
+			if root then
+				-- big mobs (bosses) are measured from their surface, not the center
+				local distance = (root.Position - position).Magnitude - math.max(root.Size.X, root.Size.Z) / 2
+				if distance <= bestDistance then
+					best, bestDistance = model, distance
+				end
+			end
+		end
+	end
+	return best
+end
+
 -- Called by ClickService after cooldown and range checks.
 function DungeonRuns.Hit(player, model)
 	local info = mobInfo[model]
@@ -381,7 +403,7 @@ function DungeonRuns.Hit(player, model)
 	if not humanoid or humanoid.Health <= 0 then
 		return
 	end
-	local damage, isCrit = PlayerState.RollCrit(PlayerState.ClickPower(player))
+	local damage, isCrit = PlayerState.RollCrit(PlayerState.Damage(player))
 	humanoid.Health = math.max(0, humanoid.Health - damage)
 	WorldKit.UpdateHealth(model.PrimaryPart, humanoid.Health, humanoid.MaxHealth)
 	Remotes.Get("ClickHit"):FireClient(player, "Hit", model, damage, isCrit)
