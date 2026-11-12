@@ -88,7 +88,7 @@ end
 
 local function roomBarrierText(room, alive, total)
 	if room.Barrier then
-		local label = room.Barrier:FindFirstChild("Text") and room.Barrier.Text:FindFirstChild("Enemies")
+		local label = room.Barrier:FindFirstChild("Text") and room.Barrier.Text:FindFirstChild("Enemies", true)
 		if label then
 			label.Text = if alive <= 0 then Texts.Cleared else Texts.Enemies:format(total - alive, total)
 			if alive <= 0 then
@@ -104,7 +104,7 @@ local function refreshRecommended(run, room)
 	if not room or not room.Barrier then
 		return
 	end
-	local label = room.Barrier:FindFirstChild("Text") and room.Barrier.Text:FindFirstChild("Recommended")
+	local label = room.Barrier:FindFirstChild("Text") and room.Barrier.Text:FindFirstChild("Recommended", true)
 	if label then
 		local enough = PlayerState.ClickPower(run.player) >= Config.RecommendedDamage(room.Index)
 		label.TextColor3 = if enough then Config.Theme.Green else Config.Theme.Red

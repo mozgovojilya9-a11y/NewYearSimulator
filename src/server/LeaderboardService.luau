@@ -67,7 +67,7 @@ local function refresh(kind)
 	end
 	local rows = pages:GetCurrentPage()
 	for i = 1, L.Top do
-		local label = gui:FindFirstChild("Row" .. i)
+		local label = gui:FindFirstChild("Row" .. i, true)
 		if label then
 			local row = rows[i]
 			if row then

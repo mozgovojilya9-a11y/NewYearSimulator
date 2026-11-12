@@ -59,7 +59,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	plate.Size = UDim2.fromOffset(0, 56)
 	plate.AutomaticSize = Enum.AutomaticSize.X
 	plate.BackgroundColor3 = Style.Colors.PanelDark
-	plate.BackgroundTransparency = 0.15
+	plate.BackgroundTransparency = 0
 	plate.Parent = gui
 	Style.Corner(plate, UDim.new(0, 16))
 	Style.Stroke(plate, 2.5, Style.Colors.Cyan)
@@ -91,7 +91,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	text.Size = UDim2.fromOffset(0, 40)
 	text.BackgroundTransparency = 1
 	text.Font = Style.Font
-	text.TextSize = 20
+	text.TextSize = 22
 	text.TextColor3 = Style.Colors.Text
 	text.Text = prompt.ActionText .. "  ·  " .. prompt.ObjectText
 	text.LayoutOrder = 2

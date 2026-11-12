@@ -108,7 +108,7 @@ local counters = Instance.new("Frame")
 counters.Name = "Counters"
 counters.AnchorPoint = Vector2.new(0, 1)
 counters.Position = UDim2.new(0, 16, 1, -16)
-counters.Size = UDim2.fromOffset(230, 210)
+counters.Size = UDim2.fromOffset(230, 180)
 counters.BackgroundTransparency = 1
 counters.Parent = Style.Gui
 local countersLayout = Instance.new("UIListLayout")
@@ -118,7 +118,7 @@ countersLayout.SortOrder = Enum.SortOrder.LayoutOrder
 countersLayout.Parent = counters
 
 local function counter(order, icon, color)
-	local plate = Style.Plate(counters, { Size = UDim2.new(1, 0, 0, 44), Transparency = 0.2 })
+	local plate = Style.Plate(counters, { Size = UDim2.new(1, 0, 0, 44) })
 	plate.LayoutOrder = order
 	Style.Label(plate, icon, 26, Style.Colors.Text, { Position = UDim2.fromOffset(8, 0), Size = UDim2.fromOffset(40, 44), ZIndex = 2 }):FindFirstChildOfClass("UIStroke").Transparency = 1
 	local value = Style.Label(plate, "0", 24, color, { Position = UDim2.fromOffset(52, 0), Size = UDim2.new(1, -60, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 })
@@ -129,14 +129,14 @@ end
 
 local auraValue, auraScale = counter(1, "✨", Style.Colors.Gold)
 local rebirthValue = counter(2, "🔁", Style.Colors.Purple)
-local petValue = counter(3, "🐾", Style.Colors.Magenta)
 
 -- Auto-click toggle (works only while standing on a trainer platform).
 local autoClickRemote = ReplicatedStorage:WaitForChild("AutoClick")
-local autoButton, setAutoColor = Style.Button(counters, { Size = UDim2.new(1, 0, 0, 44), Color = Style.Colors.Red, Text = "⚡ Авто-клик: ВЫКЛ", TextSize = 18, LayoutOrder = 0, Shadow = false })
+local autoButton, setAutoColor = Style.Button(counters, { Size = UDim2.new(1, 0, 0, 46), Color = Style.Colors.Red, Text = "Авто-клик: ВЫКЛ", TextSize = 20, LayoutOrder = 0, Shadow = false })
 local autoOn = false
 local function renderAuto()
-	autoButton.Text = "⚡ Авто-клик: " .. (if autoOn then "ВКЛ" else "ВЫКЛ")
+	autoButton.Text = "Авто-клик: " .. (if autoOn then "ВКЛ" else "ВЫКЛ")
+	autoButton.TextColor3 = Color3.new(1, 1, 1)
 	setAutoColor(if autoOn then Style.Colors.Green else Style.Colors.Red)
 end
 autoButton.Activated:Connect(function()
@@ -171,14 +171,8 @@ end)
 
 local function refreshCounters()
 	rebirthValue.Text = tostring(player:GetAttribute("Rebirths") or 0)
-	local owned = 0
-	for _ in pairs(Shop.OwnedSet("Pet")) do
-		owned += 1
-	end
-	petValue.Text = ("%d/%d"):format(owned, #Config.Pets)
 end
 player:GetAttributeChangedSignal("Rebirths"):Connect(refreshCounters)
-player:GetAttributeChangedSignal("OwnedPet"):Connect(refreshCounters)
 refreshCounters()
 
 ---------------------------------------------------------------------
@@ -216,7 +210,7 @@ local function bar(order, color, width)
 	track.LayoutOrder = order
 	track.Size = UDim2.fromOffset(width, 24)
 	track.BackgroundColor3 = Style.Colors.PanelDark
-	track.BackgroundTransparency = 0.2
+	track.BackgroundTransparency = 0
 	track.ZIndex = 2
 	track.Parent = stack
 	Style.Corner(track, UDim.new(0.5, 0))
@@ -280,7 +274,7 @@ levelTrack.Name = "Level"
 levelTrack.LayoutOrder = -1
 levelTrack.Size = UDim2.new(1, 0, 0, 26)
 levelTrack.BackgroundColor3 = Style.Colors.PanelDark
-levelTrack.BackgroundTransparency = 0.2
+levelTrack.BackgroundTransparency = 0
 levelTrack.ZIndex = 2
 levelTrack.Parent = counters
 Style.Corner(levelTrack, UDim.new(0.5, 0))
@@ -292,7 +286,7 @@ levelFill.ZIndex = 3
 levelFill.Parent = levelTrack
 Style.Corner(levelFill, UDim.new(0.5, 0))
 Style.Gradient(levelFill, Style.Colors.Cyan)
-local levelText = Style.Label(levelTrack, "", 15, Style.Colors.Text, { Size = UDim2.fromScale(1, 1), ZIndex = 4 })
+local levelText = Style.Label(levelTrack, "", 16, Style.Colors.Text, { Size = UDim2.fromScale(1, 1), ZIndex = 4 })
 
 local function refreshLevel()
 	local level = player:GetAttribute("Level") or 1

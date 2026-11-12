@@ -1,8 +1,8 @@
 --[[
 	Atmosphere.luau
 	Base look of the world from Config.Lighting.Hub: clear day, blue
-	sky, light haze (Atmosphere), tiny bloom (only neon glows) and a
-	gentle color correction. No fog: Atmosphere does the depth. The client (Zone.luau) tweens the same
+	sky, thin neutral haze, bloom practically off (no pink wash) and
+	only a +0.1 saturation color correction. No fog: Atmosphere does the depth. The client (Zone.luau) tweens the same
 	properties to the Dungeon preset when the player is in the dungeon.
 ]]
 

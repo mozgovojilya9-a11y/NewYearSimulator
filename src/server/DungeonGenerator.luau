@@ -90,8 +90,8 @@ end
 local function barrierLines(index, isBoss, total)
 	local lines = {
 		{ Name = "Enemies", Text = Texts.Enemies:format(0, total), Size = 90 },
-		{ Name = "Stage", Text = Texts.Stage:format(index), Size = 44, Transparency = 0.35 },
-		{ Name = "Recommended", Text = Texts.Recommended:format(Format.Number(Config.RecommendedDamage(index))), Size = 26, Transparency = 0.2 },
+		{ Name = "Stage", Text = Texts.Stage:format(index), Size = 44, Color = Config.Theme.Gold },
+		{ Name = "Recommended", Text = Texts.Recommended:format(Format.Number(Config.RecommendedDamage(index))), Size = 30 },
 	}
 	if isBoss then
 		table.insert(lines, 1, { Name = "BossLine", Text = Texts.Boss, Size = 60, Color = Config.Theme.Magenta })
@@ -154,10 +154,10 @@ function DungeonGenerator.BuildRoom(parent: Instance, index: number, x: number)
 				Size = Vector3.new(1, 1, 1),
 				Position = Vector3.new(x + dx * (size / 2 - 1.5), groundY + h * 0.6, center.Z + dz * (size / 2 - 1.5)),
 				Color = biome.Light,
-				Material = Enum.Material.Neon,
+				Material = Enum.Material.Glass,
 				CanCollide = false,
 			})
-			WorldKit.Light(lamp, biome.Light, size * 0.8, 1.2)
+			WorldKit.Light(lamp, biome.Light, size * 0.9, 1.6)
 		end
 		WorldKit.Part(model, {
 			Name = "Trim",
@@ -168,6 +168,14 @@ function DungeonGenerator.BuildRoom(parent: Instance, index: number, x: number)
 			CanCollide = false,
 			CanQuery = false,
 		})
+	end
+
+	-- Torches on the side walls: warm light so nothing is pitch dark.
+	for _, dx in ipairs({ -1, 1 }) do
+		for i = 1, L.TorchesPerWall do
+			local tz = zFront - size * i / (L.TorchesPerWall + 1)
+			WorldKit.Torch(model, Vector3.new(x + dx * (size / 2 - 1.2), groundY, tz), biome.Accent)
+		end
 	end
 
 	if isBoss then

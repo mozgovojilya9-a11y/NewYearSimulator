@@ -162,16 +162,22 @@ function Style.Button(parent, props: { [string]: any })
 	button.LayoutOrder = props.LayoutOrder or 0
 	button.Parent = parent
 	Style.Corner(button, props.Radius or UDim.new(0, 14))
-	local stroke = Style.Stroke(button, 2.5)
 	local gradient = Style.Gradient(button, props.Color or Style.Colors.Purple)
-	if props.TextStroke ~= false then
-		local ts = Instance.new("UIStroke")
-		ts.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-		ts.Thickness = 2
-		ts.Color = Style.Colors.Outline
-		ts.Parent = button
-		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	end
+	-- One UIStroke per instance: the text stroke lives on the button,
+	-- the outline on a transparent child frame of the same shape.
+	local ts = Instance.new("UIStroke")
+	ts.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+	ts.Thickness = 2
+	ts.Color = Color3.new(0, 0, 0)
+	ts.Parent = button
+	local border = Instance.new("Frame")
+	border.Name = "Border"
+	border.Size = UDim2.fromScale(1, 1)
+	border.BackgroundTransparency = 1
+	border.ZIndex = button.ZIndex
+	border.Parent = button
+	Style.Corner(border, props.Radius or UDim.new(0, 14))
+	Style.Stroke(border, 2.5)
 	if props.Shadow ~= false and not props.LayoutOrder then
 		local shadow = Style.Shadow(button)
 		shadow.Visible = button.Visible
@@ -202,7 +208,7 @@ function Style.Button(parent, props: { [string]: any })
 	return button, setColor
 end
 
--- Dark translucent HUD plate.
+-- Dark opaque HUD plate (the text rule: white text on #1E1B2E).
 function Style.Plate(parent, props: { [string]: any })
 	local frame = Instance.new("Frame")
 	frame.Name = props.Name or "Plate"
@@ -210,7 +216,7 @@ function Style.Plate(parent, props: { [string]: any })
 	frame.Position = props.Position or UDim2.new()
 	frame.Size = props.Size or UDim2.fromOffset(200, 40)
 	frame.BackgroundColor3 = props.Color or Style.Colors.PanelDark
-	frame.BackgroundTransparency = props.Transparency or 0.25
+	frame.BackgroundTransparency = props.Transparency or 0
 	frame.BorderSizePixel = 0
 	frame.ZIndex = props.ZIndex or 1
 	frame.Parent = parent

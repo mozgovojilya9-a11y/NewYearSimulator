@@ -74,7 +74,7 @@ local function makeCard(parent, category, item, order)
 	card.Name = item.Id
 	card.LayoutOrder = order
 	card.Size = UDim2.new(1, -8, 0, 72)
-	card.BackgroundColor3 = Style.Lighter(rarityColor, 0.82)
+	card.BackgroundColor3 = Style.Darker(rarityColor, 0.72)
 	card.ZIndex = 33
 	card.Parent = parent
 	Style.Corner(card, UDim.new(0, 14))
@@ -96,10 +96,10 @@ local function makeCard(parent, category, item, order)
 		Style.Gradient(swatch, item.Color)
 	end
 
-	Style.Label(card, item.Name, 20, Style.Colors.Outline, {
+	Style.Label(card, item.Name, 20, Style.Colors.Text, {
 		Position = UDim2.fromOffset(72, 8), Size = UDim2.new(1, -230, 0, 24),
 		TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 34,
-	}):FindFirstChildOfClass("UIStroke").Transparency = 1
+	})
 	local rarityLabel = Style.Label(card, (Config.Rarity[item.Rarity] or Config.Rarity.Common).Name, 14, rarityColor, {
 		Position = UDim2.fromOffset(72, 32), Size = UDim2.new(1, -230, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34,
 	})
@@ -107,9 +107,9 @@ local function makeCard(parent, category, item, order)
 	if rainbow then
 		Style.Rainbow(rarityLabel)
 	end
-	Style.Label(card, shop.Describe(item), 14, Style.Colors.Outline, {
+	Style.Label(card, shop.Describe(item), 14, Style.Colors.Text, {
 		Position = UDim2.fromOffset(72, 50), Size = UDim2.new(1, -230, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34,
-	}):FindFirstChildOfClass("UIStroke").Transparency = 1
+	})
 
 	local button, setColor = Style.Button(card, {
 		AnchorPoint = Vector2.new(1, 0.5),

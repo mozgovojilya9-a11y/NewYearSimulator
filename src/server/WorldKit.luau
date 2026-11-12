@@ -118,58 +118,82 @@ function WorldKit.CastleWall(parent: Instance, from: Vector3, to: Vector3, heigh
 	return model
 end
 
--- Text on a face of a part (SurfaceGui). face: Enum.NormalId.
-function WorldKit.SurfaceText(part: BasePart, face: Enum.NormalId, lines: { { Text: string, Size: number, Color: Color3?, Transparency: number?, Name: string? } }, pixelsPerStud: number?)
+-- Text on a face of a part (SurfaceGui). The text rule of the game:
+-- an opaque dark plate (Theme.PanelDark, rounded) under white / yellow
+-- FredokaOne text with a black stroke, LightInfluence 0, 50-75 px per
+-- stud. The plate hugs the lines, so it also works on barriers and
+-- stone walls. Labels are found with gui:FindFirstChild(name, true).
+local function faceStuds(part: BasePart, face: Enum.NormalId): (number, number)
+	local s = part.Size
+	if face == Enum.NormalId.Front or face == Enum.NormalId.Back then
+		return s.X, s.Y
+	elseif face == Enum.NormalId.Left or face == Enum.NormalId.Right then
+		return s.Z, s.Y
+	end
+	return s.X, s.Z
+end
+
+function WorldKit.SurfaceText(part: BasePart, face: Enum.NormalId, lines: { { Text: string, Size: number, Color: Color3?, Name: string? } }, pixelsPerStud: number?)
+	local pps = math.clamp(pixelsPerStud or 50, 50, 75)
 	local gui = Instance.new("SurfaceGui")
 	gui.Name = "Text"
 	gui.Face = face
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = math.max(50, pixelsPerStud or 50)
+	gui.PixelsPerStud = pps
 	gui.LightInfluence = 0
 	gui.AlwaysOnTop = false
 	gui.Parent = part
+
+	local studsW, studsH = faceStuds(part, face)
+	local canvasW, canvasH = studsW * pps, studsH * pps
+	local gap = 4
+	local total = 0
+	for _, line in ipairs(lines) do
+		total += line.Size * 1.3 + gap
+	end
+	local scale = math.min(1.6, (canvasH - 28) / math.max(1, total))
+
+	local plate = Instance.new("Frame")
+	plate.Name = "Plate"
+	plate.AnchorPoint = Vector2.new(0.5, 0.5)
+	plate.Position = UDim2.fromScale(0.5, 0.5)
+	plate.Size = UDim2.fromOffset(canvasW - 8, math.min(canvasH - 8, total * scale + 20))
+	plate.BackgroundColor3 = Theme.PanelDark
+	plate.BackgroundTransparency = 0
+	plate.BorderSizePixel = 0
+	plate.Parent = gui
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 14)
+	corner.Parent = plate
+	local border = Instance.new("UIStroke")
+	border.Thickness = 3
+	border.Color = Theme.Outline
+	border.Parent = plate
 
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Vertical
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.Padding = UDim.new(0, 4)
+	layout.Padding = UDim.new(0, gap * scale)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = gui
-	-- Lines are sized relative to the face so TextScaled has room.
-	local total = 0
-	for _, line in ipairs(lines) do
-		total += line.Size * 1.3 + 4
-	end
-	local faceScale = Instance.new("UIScale")
-	faceScale.Parent = gui
-	task.defer(function()
-		local absolute = gui.AbsoluteSize.Y
-		if absolute > 0 and total > 0 then
-			faceScale.Scale = math.min(1.6, absolute / total * 0.9)
-		end
-	end)
+	layout.Parent = plate
 
 	local labels = {}
 	for i, line in ipairs(lines) do
 		local label = Instance.new("TextLabel")
 		label.Name = line.Name or ("Line" .. i)
 		label.LayoutOrder = i
-		-- line.Size is the share of the face height (in "units" of 1/10),
-		-- text scales to fit so it stays readable at any part size.
-		label.Size = UDim2.new(1, -16, 0, line.Size * 1.3)
+		label.Size = UDim2.new(1, -20, 0, line.Size * 1.3 * scale)
 		label.BackgroundTransparency = 1
 		label.Font = Theme.Font
 		label.TextScaled = true
 		label.TextWrapped = true
 		label.TextColor3 = line.Color or Theme.Text
-		label.TextTransparency = line.Transparency or 0
 		label.Text = line.Text
-		label.Parent = gui
+		label.Parent = plate
 		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 3
-		stroke.Color = Theme.Outline
-		stroke.Transparency = line.Transparency or 0
+		stroke.Thickness = 2.5
+		stroke.Color = Color3.new(0, 0, 0)
 		stroke.Parent = label
 		labels[i] = label
 	end

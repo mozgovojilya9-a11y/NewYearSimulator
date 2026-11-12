@@ -100,19 +100,17 @@ gridLayout.Parent = dailyGrid
 for day = 1, 7 do
 	local cell = Instance.new("Frame")
 	cell.LayoutOrder = day
-	cell.BackgroundColor3 = Style.Lighter(Style.Colors.Gold, 0.8)
+	cell.BackgroundColor3 = Style.Darker(Style.Colors.Gold, 0.72)
 	cell.ZIndex = 33
 	cell.Parent = dailyGrid
 	Style.Corner(cell, UDim.new(0, 12))
 	local stroke = Style.Stroke(cell, 3, Style.Colors.Gold)
-	Style.Label(cell, "День " .. day, 16, Style.Colors.Outline, { Position = UDim2.fromOffset(0, 6), Size = UDim2.new(1, 0, 0, 20), ZIndex = 34 }):FindFirstChildOfClass("UIStroke").Transparency = 1
-	local amount = Style.Label(cell, "", 20, Style.Colors.Purple, { Position = UDim2.fromOffset(0, 30), Size = UDim2.new(1, 0, 0, 24), ZIndex = 34 })
-	local note = Style.Label(cell, if day == 7 then "+ x2 буст" else "", 13, Style.Colors.Outline, { Position = UDim2.fromOffset(0, 54), Size = UDim2.new(1, 0, 0, 16), ZIndex = 34 })
-	note:FindFirstChildOfClass("UIStroke").Transparency = 1
+	Style.Label(cell, "День " .. day, 16, Style.Colors.Text, { Position = UDim2.fromOffset(0, 6), Size = UDim2.new(1, 0, 0, 20), ZIndex = 34 })
+	local amount = Style.Label(cell, "", 20, Style.Colors.Gold, { Position = UDim2.fromOffset(0, 30), Size = UDim2.new(1, 0, 0, 24), ZIndex = 34 })
+	local note = Style.Label(cell, if day == 7 then "+ x2 буст" else "", 13, Style.Colors.Text, { Position = UDim2.fromOffset(0, 54), Size = UDim2.new(1, 0, 0, 16), ZIndex = 34 })
 	dailyCells[day] = { cell = cell, stroke = stroke, amount = amount }
 end
-local dailyInfo = Style.Label(dailyPage, "", 18, Style.Colors.Outline, { Position = UDim2.fromOffset(0, 180), Size = UDim2.new(1, 0, 0, 24), ZIndex = 34 })
-dailyInfo:FindFirstChildOfClass("UIStroke").Transparency = 1
+local dailyInfo = Style.Label(dailyPage, "", 18, Style.Colors.Text, { Position = UDim2.fromOffset(0, 180), Size = UDim2.new(1, 0, 0, 24), ZIndex = 34 })
 local dailyButton, setDailyColor = Style.Button(dailyPage, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 214), Size = UDim2.fromOffset(280, 54), Color = Style.Colors.Green, Text = "Забрать", TextSize = 22, ZIndex = 34, Shadow = false })
 
 ---------------------------------------------------------------------
@@ -133,13 +131,12 @@ for i = 1, Config.Progression.Quests.PerDay do
 	local card = Instance.new("Frame")
 	card.LayoutOrder = i
 	card.Size = UDim2.new(1, -8, 0, 84)
-	card.BackgroundColor3 = Style.Lighter(Style.Colors.Green, 0.82)
+	card.BackgroundColor3 = Style.Darker(Style.Colors.Green, 0.72)
 	card.ZIndex = 33
 	card.Parent = questList
 	Style.Corner(card, UDim.new(0, 14))
 	Style.Stroke(card, 3, Style.Colors.Green)
-	local text = Style.Label(card, "", 18, Style.Colors.Outline, { Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -180, 0, 24), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
-	text:FindFirstChildOfClass("UIStroke").Transparency = 1
+	local text = Style.Label(card, "", 18, Style.Colors.Text, { Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -180, 0, 24), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
 	local track = Instance.new("Frame")
 	track.Position = UDim2.fromOffset(14, 42)
 	track.Size = UDim2.new(1, -190, 0, 22)
@@ -187,8 +184,7 @@ for i, prize in ipairs(Config.Progression.Wheel.Prizes) do
 	Style.Label(cell, prize.Label, 16, Style.Colors.Text, { Size = UDim2.fromScale(1, 1), ZIndex = 34 })
 	prizeCells[i] = cell
 end
-local wheelInfo = Style.Label(wheelPage, "", 18, Style.Colors.Outline, { Position = UDim2.fromOffset(0, 210), Size = UDim2.new(1, 0, 0, 24), ZIndex = 34 })
-wheelInfo:FindFirstChildOfClass("UIStroke").Transparency = 1
+local wheelInfo = Style.Label(wheelPage, "", 18, Style.Colors.Text, { Position = UDim2.fromOffset(0, 210), Size = UDim2.new(1, 0, 0, 24), ZIndex = 34 })
 local spinButton, setSpinColor = Style.Button(wheelPage, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 244), Size = UDim2.fromOffset(280, 54), Color = Style.Colors.Magenta, Text = "Крутить!", TextSize = 22, ZIndex = 34, Shadow = false })
 
 -- Spins the hub wheel disc locally (anchored part, local CFrame change).
@@ -229,7 +225,7 @@ local function render(s)
 		local isNext = day == s.Daily.NextDay
 		cell.stroke.Color = if isNext then Style.Colors.Green elseif claimed then Style.Colors.Purple else Style.Colors.Gold
 		cell.stroke.Thickness = if isNext then 4 else 3
-		cell.cell.BackgroundColor3 = if claimed then Style.Lighter(Style.Colors.Purple, 0.75) else Style.Lighter(Style.Colors.Gold, 0.8)
+		cell.cell.BackgroundColor3 = if claimed then Style.Darker(Style.Colors.Purple, 0.72) else Style.Darker(Style.Colors.Gold, 0.72)
 	end
 	if s.Daily.CanClaim then
 		dailyInfo.Text = ("Серия: %d дн.  •  сегодня день %d"):format(s.Daily.Streak, s.Daily.NextDay)

@@ -86,12 +86,25 @@ function Window.new(title: string, color: Color3, size: Vector2?)
 		Position = UDim2.new(1, 8, 0, -12),
 		Size = UDim2.fromOffset(44, 44),
 		Color = Style.Colors.Red,
-		Text = "X", -- plain Latin X: the game font has no ✕ glyph
-		TextSize = 26,
+		Text = "", -- the cross is drawn from two bars (the font has no ✕ glyph)
+		TextSize = 1,
 		ZIndex = 34,
 		Radius = UDim.new(0.5, 0),
 		Shadow = false,
 	})
+
+	for _, angle in ipairs({ 45, -45 }) do
+		local bar = Instance.new("Frame")
+		bar.AnchorPoint = Vector2.new(0.5, 0.5)
+		bar.Position = UDim2.fromScale(0.5, 0.5)
+		bar.Size = UDim2.fromOffset(24, 5)
+		bar.Rotation = angle
+		bar.BackgroundColor3 = Color3.new(1, 1, 1)
+		bar.BorderSizePixel = 0
+		bar.ZIndex = 35
+		bar.Parent = closeButton
+		Style.Corner(bar, UDim.new(0.5, 0))
+	end
 
 	local content = Instance.new("Frame")
 	content.Name = "Content"
@@ -147,7 +160,7 @@ function Window.List(parent)
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
 	list.ScrollBarThickness = 6
-	list.ScrollBarImageColor3 = Style.Colors.Purple
+	list.ScrollBarImageColor3 = Style.Colors.Cyan
 	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	list.CanvasSize = UDim2.new()
 	list.ZIndex = 32

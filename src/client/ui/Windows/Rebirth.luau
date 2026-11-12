@@ -34,16 +34,16 @@ local function line(order, size, color)
 	return label
 end
 
-local countLabel = line(1, 22, Style.Colors.Outline)
+local countLabel = line(1, 22, Style.Colors.Text)
 local multiplierLabel = line(2, 30, Style.Colors.Gold)
-local requirementLabel = line(3, 20, Style.Colors.Purple)
-local infoLabel = line(4, 16, Style.Colors.Outline)
+local requirementLabel = line(3, 20, Style.Colors.Cyan)
+local infoLabel = line(4, 16, Style.Colors.Text)
 infoLabel.Text = "Сбросится: Аура и рекорд этапа.\nОстанутся: оружие, броня, материалы, питомцы и множитель (навсегда)."
 
 local progress = Instance.new("Frame")
 progress.LayoutOrder = 5
 progress.Size = UDim2.fromOffset(300, 18)
-progress.BackgroundColor3 = Style.Lighter(Style.Colors.Purple, 0.75)
+progress.BackgroundColor3 = Style.Darker(Style.Colors.Purple, 0.72)
 progress.ZIndex = 33
 progress.Parent = content
 Style.Corner(progress, UDim.new(0.5, 0))

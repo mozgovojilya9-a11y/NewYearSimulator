@@ -98,22 +98,31 @@ function Popups.Toast(text: string, kind: string?)
 	plate.AutomaticSize = Enum.AutomaticSize.XY
 	plate.Size = UDim2.fromOffset(0, 40)
 	plate.BackgroundColor3 = Style.Colors.PanelDark
-	plate.BackgroundTransparency = 0.15
+	plate.BackgroundTransparency = 0
 	plate.Font = Style.Font
-	plate.TextSize = 20
-	plate.TextColor3 = color
+	plate.TextSize = 22
+	plate.TextColor3 = Style.Colors.Text
 	plate.TextWrapped = true
 	plate.Text = text
 	plate.ZIndex = 41
 	plate.LayoutOrder = math.floor(os.clock() * 1000)
 	plate.Parent = toastHolder
 	Style.Corner(plate)
-	Style.Stroke(plate, 2.5, color)
 	local ts = Instance.new("UIStroke")
 	ts.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
 	ts.Thickness = 2
-	ts.Color = Style.Colors.Outline
+	ts.Color = Color3.new(0, 0, 0)
 	ts.Parent = plate
+	-- Kind color: a bar on the left edge (the text itself stays white).
+	local bar = Instance.new("Frame")
+	bar.AnchorPoint = Vector2.new(0, 0.5)
+	bar.Position = UDim2.new(0, -8, 0.5, 0)
+	bar.Size = UDim2.new(0, 5, 1, 4)
+	bar.BackgroundColor3 = color
+	bar.BorderSizePixel = 0
+	bar.ZIndex = 42
+	bar.Parent = plate
+	Style.Corner(bar, UDim.new(0.5, 0))
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft = UDim.new(0, 14)
 	padding.PaddingRight = UDim.new(0, 14)
@@ -131,6 +140,8 @@ function Popups.Toast(text: string, kind: string?)
 
 	task.delay(Config.Hud.ToastSeconds, function()
 		Style.Tween(plate, 0.3, { TextTransparency = 1, BackgroundTransparency = 1 })
+		Style.Tween(bar, 0.3, { BackgroundTransparency = 1 })
+		Style.Tween(ts, 0.3, { Transparency = 1 })
 		task.wait(0.3)
 		plate:Destroy()
 	end)

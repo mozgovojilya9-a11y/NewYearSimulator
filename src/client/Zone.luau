@@ -55,6 +55,7 @@ local function applyBiome(room: number?)
 	local biomes = Config.DungeonLayout.Biomes
 	local biome = biomes[math.min(#biomes, math.ceil(room / Config.Dungeon.BossEvery))]
 	Style.Tween(atmosphere, Config.Lighting.TransitionSeconds, { Color = biome.Atmosphere.Color, Decay = biome.Atmosphere.Decay })
+	Style.Tween(Lighting, Config.Lighting.TransitionSeconds, { Ambient = biome.Lighting.Ambient, OutdoorAmbient = biome.Lighting.OutdoorAmbient })
 end
 
 local lastZone = nil
@@ -67,7 +68,7 @@ local function onZone()
 	lastZone = zone
 	applyLighting(if zone == "Dungeon" then "Dungeon" else "Hub")
 	if not first then
-		Popups.Fade(if zone == "Dungeon" then Color3.new(0, 0, 0) else Style.Colors.Panel, 0.3)
+		Popups.Fade(Color3.new(0, 0, 0), 0.3)
 		Style.PlaySound(Config.Sounds.Portal, 1, 0.6)
 	end
 end
