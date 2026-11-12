@@ -99,6 +99,41 @@ local function barrierLines(index, isBoss, total)
 	return lines
 end
 
+-- Invisible closed box around a rectangle of floor: side walls from below
+-- the floor to the ceiling, extended past both ends by Overlap, + ceiling.
+-- Door gaps (front/back, along Z) are left open below DoorHeight.
+local function boundBox(model: Model, x: number, zFront: number, zBack: number, halfWidth: number, frontDoor: boolean, backDoor: boolean, closeEnds: boolean)
+	local B = Config.Bounds
+	local t = L.WallThickness
+	local height = B.DungeonCeiling + 2
+	local y = groundY + height / 2 - 1
+	local length = zFront - zBack
+	local zMid = (zFront + zBack) / 2
+	local bounds = Instance.new("Model")
+	bounds.Name = "Bounds"
+	bounds.Parent = model
+	for _, dir in ipairs({ -1, 1 }) do
+		WorldKit.Invisible(bounds, Vector3.new(t, height, length + (t + B.Overlap) * 2), Vector3.new(x + dir * (halfWidth + t / 2), y, zMid))
+	end
+	WorldKit.Invisible(bounds, Vector3.new((halfWidth + t + B.Overlap) * 2, 2, length + (t + B.Overlap) * 2), Vector3.new(x, groundY + B.DungeonCeiling + 1, zMid), "Ceiling")
+	if closeEnds then
+		local full = (halfWidth + t + B.Overlap) * 2
+		for _, e in ipairs({ { z = zFront + t / 2, door = frontDoor }, { z = zBack - t / 2, door = backDoor } }) do
+			if e.door then
+				local sideW = full / 2 - L.DoorWidth / 2 + B.Overlap
+				for _, dir in ipairs({ -1, 1 }) do
+					WorldKit.Invisible(bounds, Vector3.new(sideW, height, t), Vector3.new(x + dir * (L.DoorWidth / 2 - B.Overlap + sideW / 2), y, e.z))
+				end
+				local above = height - L.DoorHeight
+				WorldKit.Invisible(bounds, Vector3.new(L.DoorWidth + 2, above, t), Vector3.new(x, groundY + L.DoorHeight + above / 2 - 1, e.z))
+			else
+				WorldKit.Invisible(bounds, Vector3.new(full, height, t), Vector3.new(x, y, e.z))
+			end
+		end
+	end
+	return bounds
+end
+
 function DungeonGenerator.BuildCorridor(parent: Instance, index: number, x: number)
 	local biome = biomeFor(index)
 	local length = L.CorridorLength
@@ -114,6 +149,7 @@ function DungeonGenerator.BuildCorridor(parent: Instance, index: number, x: numb
 		local wx = x + dir * (width / 2 + L.WallThickness / 2)
 		WorldKit.CastleWall(model, Vector3.new(wx, groundY, zStart), Vector3.new(wx, groundY, zStart - length), h, L.WallThickness, biome.StoneA, biome.StoneB, 0)
 	end
+	boundBox(model, x, zStart, zStart - length, width / 2, false, false, false)
 	return model
 end
 
@@ -220,6 +256,21 @@ function DungeonGenerator.BuildRoom(parent: Instance, index: number, x: number)
 		WorldKit.SurfaceText(barrier, Enum.NormalId.Back, barrierLines(index, isBoss, #info.Spots), 50)
 	end
 
+	-- Bounds: closed invisible box + the seal of the entrance doorway
+	-- (on from the start in room 1, switched on when the room behind is
+	-- removed: DungeonGenerator.Seal).
+	boundBox(model, x, zFront, zBack, size / 2, true, not isLast, true)
+	local seal = WorldKit.Part(model, {
+		Name = "FrontSeal",
+		Size = Vector3.new(L.DoorWidth + 2, L.DoorHeight + 1, 2),
+		Position = Vector3.new(x, groundY + (L.DoorHeight + 1) / 2 - 0.5, zFront + t / 2),
+		Color = biome.StoneB,
+		Material = Enum.Material.Plastic,
+		Transparency = 1,
+		CanCollide = false,
+		CanQuery = false,
+	})
+
 	model:SetAttribute("Room", index)
 	model:SetAttribute("Boss", isBoss)
 	model:SetAttribute("X", x)
@@ -240,9 +291,21 @@ function DungeonGenerator.BuildRoom(parent: Instance, index: number, x: number)
 		Size = size,
 		Entry = CFrame.lookAt(entryPosition, Vector3.new(x, groundY + 3, center.Z)),
 		Barrier = barrier,
+		Seal = seal,
+		ZFront = zFront,
+		ZBack = zBack,
 		Model = model,
 		MobSpots = spots,
 	}
+end
+
+-- Closes the entrance doorway of a room for good (brick plug).
+function DungeonGenerator.Seal(room)
+	local seal = room.Seal
+	if seal and seal.Parent then
+		seal.Transparency = 0
+		seal.CanCollide = true
+	end
 end
 
 -- Folder for a lane (created on demand).

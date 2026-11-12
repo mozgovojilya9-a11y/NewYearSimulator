@@ -55,6 +55,20 @@ function WorldKit.Anchor(parent: Instance, position: Vector3, name: string?)
 	})
 end
 
+-- Invisible collision-only part (map bounds).
+function WorldKit.Invisible(parent: Instance, size: Vector3, position: Vector3, name: string?)
+	return WorldKit.Part(parent, {
+		Name = name or "Bound",
+		Size = size,
+		Position = position,
+		Transparency = 1,
+		CanCollide = true,
+		CanQuery = false,
+		CanTouch = false,
+		CastShadow = false,
+	})
+end
+
 -- Floor of alternating-tint tiles. Tile count is capped so a room
 -- never spends more than maxParts on its floor.
 function WorldKit.TiledFloor(parent: Instance, center: Vector3, width: number, depth: number, tile: number, colorA: Color3, colorB: Color3, maxParts: number?)
@@ -91,18 +105,24 @@ function WorldKit.CastleWall(parent: Instance, from: Vector3, to: Vector3, heigh
 	local length = delta.Magnitude
 	local dir = delta.Unit
 	local right = Vector3.new(-dir.Z, 0, dir.X)
-	local segment = 8
-	local count = math.max(1, math.floor(length / segment + 0.5))
-	segment = length / count
-	for i = 0, count - 1 do
-		local s = i * segment + segment / 2
-		local skip = false
-		if gap and math.abs(s - gap.Center) < gap.Width / 2 + segment / 2 - 0.01 then
-			skip = true
-		end
-		if not skip then
-			local pos = from + dir * s + Vector3.new(0, height / 2, 0)
-			WorldKit.Brick(model, Vector3.new(segment, height, thickness), CFrame.lookAt(pos, pos + right), if i % 2 == 0 then colorA else colorB)
+	-- The wall is laid in runs that end exactly at the gap edges, so the
+	-- opening is never wider than gap.Width (no holes beside a doorway).
+	local runs = { { 0, length } }
+	if gap then
+		runs = { { 0, gap.Center - gap.Width / 2 }, { gap.Center + gap.Width / 2, length } }
+	end
+	local brick = 0
+	for _, run in ipairs(runs) do
+		local runLength = run[2] - run[1]
+		if runLength > 0.05 then
+			local count = math.max(1, math.floor(runLength / 8 + 0.5))
+			local segment = runLength / count
+			for i = 0, count - 1 do
+				local s = run[1] + i * segment + segment / 2
+				local pos = from + dir * s + Vector3.new(0, height / 2, 0)
+				WorldKit.Brick(model, Vector3.new(segment, height, thickness), CFrame.lookAt(pos, pos + right), if brick % 2 == 0 then colorA else colorB)
+				brick += 1
+			end
 		end
 	end
 	if merlon and merlon > 0 then

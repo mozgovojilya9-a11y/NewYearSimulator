@@ -131,8 +131,13 @@ local function ensureRoom(run, index)
 		return
 	end
 	local x = DungeonGenerator.LaneX(run.lane)
-	DungeonGenerator.BuildCorridor(run.folder, index, x)
+	if index > 1 then
+		DungeonGenerator.BuildCorridor(run.folder, index, x)
+	end
 	local room = DungeonGenerator.BuildRoom(run.folder, index, x)
+	if index == 1 then
+		DungeonGenerator.Seal(room) -- nothing behind room 1
+	end
 	room.Alive = 0
 	room.Total = #room.MobSpots
 	room.Mobs = {}
@@ -259,11 +264,44 @@ function DungeonRuns.StartRun(player)
 	return run.rooms[1].Entry
 end
 
--- Entry CFrame of the room the run is currently in (for fall recovery).
-function DungeonRuns.CurrentEntry(player): CFrame?
+-- Where to put a player who left the map: the entrance of the room
+-- they are in by Z (or of the run's current room).
+function DungeonRuns.RecoveryCFrame(player): CFrame?
 	local run = runs[player]
-	local room = run and run.rooms[run.current]
+	if not run then
+		return nil
+	end
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if root then
+		for _, room in pairs(run.rooms) do
+			if root.Position.Z <= room.ZFront and root.Position.Z >= room.ZBack then
+				return room.Entry
+			end
+		end
+	end
+	local room = run.rooms[run.current] or run.rooms[run.best]
 	return room and room.Entry
+end
+
+-- The room behind `index` is gone: remove it and the corridor between,
+-- plug the doorway and pull the player in if they stayed behind.
+local function sealBehind(run, index)
+	local room = run.rooms[index]
+	if not room then
+		return
+	end
+	destroyRoom(run, index - 1)
+	local corridor = run.folder:FindFirstChild(("Corridor%02d"):format(index))
+	if corridor then
+		corridor:Destroy()
+	end
+	DungeonGenerator.Seal(room)
+	local character = run.player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	if root and root.Position.Z > room.ZFront - 1.5 then
+		root.AssemblyLinearVelocity = Vector3.zero
+		character:PivotTo(room.Entry)
+	end
 end
 
 local function roomCleared(run, index)
@@ -293,7 +331,7 @@ local function roomCleared(run, index)
 	if nextRoom then
 		Remotes.Get("RoomState"):FireClient(run.player, nextRoom.Index, nextRoom.Alive, nextRoom.Total)
 	end
-	destroyRoom(run, index - 1)
+	sealBehind(run, index)
 end
 
 local function kill(model)

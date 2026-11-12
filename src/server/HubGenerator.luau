@@ -81,6 +81,21 @@ local function buildCourtyard()
 		WorldKit.Part(tower, { Name = "Pole", Size = Vector3.new(0.4, 10, 0.4), Position = pos + Vector3.new(0, L.TowerHeight + 7, 0), Color = T.StoneDark })
 		WorldKit.Part(tower, { Name = "Flag", Size = Vector3.new(5, 3, 0.2), Position = pos + Vector3.new(2.7, L.TowerHeight + 10.5, 0), Color = if i % 2 == 0 then T.Magenta else T.Cyan, CanCollide = false })
 	end
+	-- Map bounds: invisible walls on the wall line (they also close the
+	-- gap behind the portal arch) up to HubWallExtra above the walls, + lid.
+	local bounds = Instance.new("Model")
+	bounds.Name = "Bounds"
+	bounds.Parent = root
+	local B = Config.Bounds
+	local t = L.WallThickness
+	local boundH = L.WallHeight + B.HubWallExtra + 2
+	local span = L.Size + t + B.Overlap * 2
+	for _, side in ipairs({ -1, 1 }) do
+		WorldKit.Invisible(bounds, Vector3.new(span, boundH, t), base + Vector3.new(0, boundH / 2 - 1, side * half))
+		WorldKit.Invisible(bounds, Vector3.new(t, boundH, span), base + Vector3.new(side * half, boundH / 2 - 1, 0))
+	end
+	WorldKit.Invisible(bounds, Vector3.new(span, 2, span), base + Vector3.new(0, boundH, 0), "Lid")
+
 	-- Flags along the walls too.
 	for i = -2, 2 do
 		for _, zSide in ipairs({ -1, 1 }) do
@@ -532,6 +547,7 @@ function HubGenerator.Build()
 		EggPrompt = eggPrompt,
 		Leaderboards = boards,
 		SpawnCFrame = CFrame.new(base + Vector3.new(0, 4, 0)),
+		GroundY = base.Y,
 	}
 end
 

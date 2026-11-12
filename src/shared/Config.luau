@@ -112,6 +112,21 @@ Config.Player = {
 	RegenPerSecond = 6,
 }
 
+-- Map bounds: nobody can leave the playable area. Invisible walls rise
+-- HubWallExtra studs above the castle walls; every dungeon room and
+-- corridor is a closed invisible box (walls overlap by Overlap studs).
+-- A character below FallY (relative to the ground) is teleported back
+-- without dying; FallenPartsDestroyHeight sits far below that.
+Config.Bounds = {
+	FallY = -25,
+	DestroyY = -500,
+	HubWallExtra = 60,
+	DungeonCeiling = 34, -- studs above the room floor
+	Overlap = 1,
+	CheckInterval = 0.5,
+	Text = "Ты вернулся на карту",
+}
+
 function Config.IsBossRoom(room: number): boolean
 	return room % Config.Dungeon.BossEvery == 0
 end
