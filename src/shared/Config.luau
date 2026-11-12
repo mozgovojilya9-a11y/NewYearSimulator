@@ -411,12 +411,22 @@ Config.Lighting = {
 }
 
 ---------------------------------------------------------------------
--- VISUAL: hub layout (offsets from the SpawnLocation; forward = -Z)
+-- VISUAL: hub layout
 ---------------------------------------------------------------------
 
+-- All offsets are from the SpawnLocation; north (the portal) is -Z,
+-- west is -X. Top view:
+--
+--                 [ PORTAL ]
+--     TRAINERS        |          FORGE
+--     (2 rows of 4)   |      (big building)
+--     Eggs        [FOUNTAIN]     Premium showcase
+--     Wheel           |      (Robux trainers, store)
+--     Leaderboards [ SPAWN ]     Rebirth altar
 Config.HubLayout = {
 	Name = "Цитадель Ауры",
 	Size = 176, -- courtyard side (square)
+	Center = Vector3.new(0, 0, -60), -- courtyard center: the spawn sits near the south wall
 	TileSize = 8,
 	WallHeight = 14,
 	WallThickness = 4,
@@ -424,34 +434,50 @@ Config.HubLayout = {
 	TowerHeight = 24,
 	MerlonSize = 2,
 
-	PathWidth = 14,
+	PathWidth = 16, -- main straight path spawn -> portal
+	SidePathWidth = 7,
 	ChevronSpacing = 9,
+	LanternSpacing = 24,
 
-	Portal = { Offset = Vector3.new(0, 0, -80), Radius = 7, ArchWidth = 22, ArchHeight = 20, SpinSeconds = 6 },
+	Portal = { Offset = Vector3.new(0, 0, -138), Radius = 7, ArchWidth = 22, ArchHeight = 20, SpinSeconds = 6 },
+	Fountain = { Offset = Vector3.new(0, 0, -52), Radius = 7, PlazaRadius = 17 },
 
 	-- Trainers: a square "territory" each. Regular ones stand west of the
 	-- path in 2 rows of 4 (step 20) facing the path, premium ones east.
 	TrainerSize = 12,
 	TrainerSpots = {
-		["1"] = Vector3.new(-38, 0, 0), ["2"] = Vector3.new(-38, 0, -20), ["3"] = Vector3.new(-38, 0, -40), ["4"] = Vector3.new(-38, 0, -60),
-		["5"] = Vector3.new(-60, 0, 0), ["6"] = Vector3.new(-60, 0, -20), ["7"] = Vector3.new(-60, 0, -40), ["8"] = Vector3.new(-60, 0, -60),
-		VIP = Vector3.new(50, 0, 0), Gold = Vector3.new(50, 0, -20), Abyss = Vector3.new(50, 0, -40),
+		["1"] = Vector3.new(-38, 0, -76), ["2"] = Vector3.new(-38, 0, -96), ["3"] = Vector3.new(-38, 0, -116), ["4"] = Vector3.new(-38, 0, -136),
+		["5"] = Vector3.new(-60, 0, -76), ["6"] = Vector3.new(-60, 0, -96), ["7"] = Vector3.new(-60, 0, -116), ["8"] = Vector3.new(-60, 0, -136),
+		VIP = Vector3.new(50, 0, -24), Gold = Vector3.new(50, 0, -44), Abyss = Vector3.new(50, 0, -64),
 	},
 
-	-- Back of the courtyard (+Z).
-	Altar = { Offset = Vector3.new(-56, 0, 66) },
-	Shop = { Offset = Vector3.new(-18, 0, 70) },
-	Wheel = { Offset = Vector3.new(18, 0, 70) },
-	Egg = { Offset = Vector3.new(56, 0, 66) },
-	Fountain = { Offset = Vector3.new(0, 0, 34), Radius = 7 },
-	Leaderboards = { -- on the inner face of the back wall
-		{ Offset = Vector3.new(-40, 0, 85), Kind = "Aura", Title = "Топ Ауры" },
-		{ Offset = Vector3.new(40, 0, 85), Kind = "Room", Title = "Глубже всех в данже" },
+	-- The forge: the main visual object of the hub (north-east). Samples
+	-- on its racks are a showcase of craftable gear, not a shop.
+	Forge = {
+		Offset = Vector3.new(54, 0, -108),
+		SignOffset = Vector3.new(30, 0, -96),
+		SampleWeapons = { "IronSword", "AuraKatana", "StormBlade", "StarAuraSword" },
+		SampleArmor = {},
 	},
-	Npc = { Offset = Vector3.new(14, 0, -66) },
-	Trees = { Vector3.new(-76, 0, -76), Vector3.new(76, 0, -76), Vector3.new(76, 0, 24), Vector3.new(-76, 0, 24) },
-	Bushes = { Vector3.new(-62, 0, 40), Vector3.new(62, 0, 40), Vector3.new(-12, 0, 46), Vector3.new(12, 0, 46) },
-	TorchesAlongPath = 5,
+	Store = { Offset = Vector3.new(36, 0, -55), SignOffset = Vector3.new(30, 0, -33) }, -- premium kiosk beside the Robux trainers
+	Egg = { Offset = Vector3.new(-46, 0, -28) },
+	Wheel = { Offset = Vector3.new(-46, 0, -50) },
+	Altar = { Offset = Vector3.new(48, 0, 6) },
+	Leaderboards = { -- free-standing boards west of the spawn, facing it
+		{ Offset = Vector3.new(-44, 0, -4), Kind = "Aura", Title = "Топ Ауры" },
+		{ Offset = Vector3.new(-44, 0, 15), Kind = "Room", Title = "Глубже всех в данже" },
+	},
+	Npc = { Offset = Vector3.new(11, 0, -12) },
+
+	Trees = { Vector3.new(-78, 0, 18), Vector3.new(78, 0, 18), Vector3.new(-78, 0, -44), Vector3.new(78, 0, -84), Vector3.new(20, 0, -138), Vector3.new(-20, 0, -138), Vector3.new(80, 0, -138) },
+	Bushes = { Vector3.new(-22, 0, 14), Vector3.new(22, 0, 14), Vector3.new(-70, 0, -40), Vector3.new(70, 0, -8), Vector3.new(-78, 0, -100), Vector3.new(24, 0, -76), Vector3.new(-22, 0, -124), Vector3.new(72, 0, -76) },
+	FlowerBeds = { Vector3.new(-18, 0, -34), Vector3.new(18, 0, -34), Vector3.new(-18, 0, -70), Vector3.new(18, 0, -70) },
+	Benches = { -- offset + facing direction
+		{ Offset = Vector3.new(-13, 0, -52), Facing = Vector3.new(1, 0, 0) },
+		{ Offset = Vector3.new(13, 0, -52), Facing = Vector3.new(-1, 0, 0) },
+		{ Offset = Vector3.new(-14, 0, -14), Facing = Vector3.new(1, 0, 0) },
+		{ Offset = Vector3.new(-14, 0, -100), Facing = Vector3.new(1, 0, 0) },
+	},
 
 	Texts = {
 		Portal = "ПОДЗЕМЕЛЬЕ",
@@ -462,17 +488,22 @@ Config.HubLayout = {
 		TrainerLockedPass = "Game Pass · %d R$",
 		TrainerSoon = "Скоро",
 		TrainerHud = "Тренажёр x%s  ·  +%s/сек",
+		Trainers = "ТРЕНАЖЁРЫ",
+		Forge = "КУЗНИЦА",
+		Premium = "ПРЕМИУМ",
+		Store = "МАГАЗИН",
+		Pets = "ПИТОМЦЫ",
 		Altar = "АЛТАРЬ ПЕРЕРОЖДЕНИЯ",
-		Shop = "МАСТЕРСКАЯ",
 		Wheel = "КОЛЕСО УДАЧИ",
 		WheelFree = "Бесплатное вращение!",
-		Egg = "Новинка!",
-		Npc = "Подземелье →",
+		Egg = "Яйца питомцев",
+		Npc = "Подземелье там!",
 	},
 	Prompts = {
 		Rebirth = "Переродиться",
-		Shop = "Открыть",
-		Egg = "Открыть",
+		Forge = "Кузница",
+		Store = "Магазин",
+		Egg = "Питомцы",
 		Wheel = "Крутить",
 	},
 }

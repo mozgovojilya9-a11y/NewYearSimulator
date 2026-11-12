@@ -3,7 +3,7 @@
 	Custom look for every ProximityPrompt (Style = Custom on the
 	server): a round key button "E" and the action text in the game
 	font. Also routes prompts that only open client windows
-	(Action = OpenShop / OpenPets / RebirthAltar).
+	(Action = OpenForge / OpenStore / OpenPets / RebirthAltar / Wheel).
 ]]
 
 local Players = game:GetService("Players")
@@ -11,6 +11,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Popups = require(script.Parent.ui.Popups)
 local Style = require(script.Parent.ui.Style)
 local Rebirth = require(script.Parent.ui.Windows.Rebirth)
 local Reward = require(script.Parent.ui.Windows.Reward)
@@ -22,8 +23,11 @@ local playerGui = player:WaitForChild("PlayerGui")
 local Prompts = {}
 
 local ACTIONS = {
-	OpenShop = function()
+	OpenForge = function()
 		Shop.Open("Weapon")
+	end,
+	OpenStore = function()
+		Popups.Toast("Магазин скоро откроется", "gold")
 	end,
 	OpenPets = Shop.OpenPets,
 	RebirthAltar = Rebirth.Open,
@@ -93,7 +97,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	text.Font = Style.Font
 	text.TextSize = 22
 	text.TextColor3 = Style.Colors.Text
-	text.Text = prompt.ActionText .. "  ·  " .. prompt.ObjectText
+	text.Text = if prompt.ObjectText ~= "" then prompt.ActionText .. "  ·  " .. prompt.ObjectText else prompt.ActionText
 	text.LayoutOrder = 2
 	text.Parent = plate
 	Style.Stroke(text, 2)

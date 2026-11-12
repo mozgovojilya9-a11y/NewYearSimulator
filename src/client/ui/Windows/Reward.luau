@@ -187,17 +187,28 @@ end
 local wheelInfo = Style.Label(wheelPage, "", 18, Style.Colors.Text, { Position = UDim2.fromOffset(0, 210), Size = UDim2.new(1, 0, 0, 24), ZIndex = 34 })
 local spinButton, setSpinColor = Style.Button(wheelPage, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 244), Size = UDim2.fromOffset(280, 54), Color = Style.Colors.Magenta, Text = "Крутить!", TextSize = 22, ZIndex = 34, Shadow = false })
 
--- Spins the hub wheel disc locally (anchored part, local CFrame change).
+-- Spins the hub wheel locally: the "Spin" model (disc + pegs) is
+-- pivoted around the disc axis.
 local function spinHubWheel(prizeIndex)
 	local hub = Workspace:FindFirstChild("Hub")
 	local wheel = hub and hub:FindFirstChild("Wheel")
-	local disc = wheel and wheel:FindFirstChild("Disc")
-	if not disc then
-		return
+	local spin = wheel and wheel:FindFirstChild("Spin")
+	if spin and spin.PrimaryPart then
+		local n = #Config.Progression.Wheel.Prizes
+		local target = (prizeIndex - 1) / n * 360 + 360 * 4
+		local start = spin:GetPivot()
+		local value = Instance.new("NumberValue")
+		value.Changed:Connect(function(v)
+			if spin.Parent then
+				spin:PivotTo(start * CFrame.Angles(math.rad(v), 0, 0))
+			end
+		end)
+		local tween = TweenService:Create(value, TweenInfo.new(3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Value = target })
+		tween:Play()
+		tween.Completed:Once(function()
+			value:Destroy()
+		end)
 	end
-	local n = #Config.Progression.Wheel.Prizes
-	local target = (prizeIndex - 1) / n * 360 + 360 * 4
-	TweenService:Create(disc, TweenInfo.new(3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { CFrame = disc.CFrame * CFrame.Angles(math.rad(target), 0, 0) }):Play()
 	local cell = prizeCells[prizeIndex]
 	if cell then
 		task.delay(3, function()
