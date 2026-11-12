@@ -532,16 +532,30 @@ Config.Progression = {
 }
 
 -- Equipment on the character (visual only). Grip = offset of the weapon
--- Handle from the hand part. Swing: shoulder Motor6D rotation per rig
--- type and timing.
+-- Handle from the hand part.
 Config.Equipment = {
 	GripR6 = CFrame.new(0, -1, -0.6) * CFrame.Angles(math.rad(-90), 0, 0),
 	GripR15 = CFrame.new(0, -0.3, -0.6) * CFrame.Angles(math.rad(-90), 0, 0),
+}
+
+-- Weapon swing. Procedural by default: the right shoulder Motor6D goes
+-- base -> Wind -> Strike -> base (rotations are in the torso's space:
+-- X = pitch forward, Y = yaw, applied as Yaw * Pitch) while the torso
+-- leans by Lean degrees. The variants are played in turn.
+-- SwingIds: put your own uploaded animation ids here (rbxassetid://...)
+-- and they are played instead, in turn. Never guess ids.
+Config.Animations = {
+	SwingIds = {},
 	Swing = {
-		RaiseR6 = CFrame.Angles(0, 0, math.rad(110)),
-		RaiseR15 = CFrame.Angles(math.rad(-110), 0, 0),
-		UpSeconds = 0.06,
-		DownSeconds = 0.1,
+		WindSeconds = 0.07,
+		StrikeSeconds = 0.08,
+		ReturnSeconds = 0.09,
+		TrailSeconds = 0.3,
+		Variants = {
+			{ Name = "Overhead", Wind = { Pitch = 165, Yaw = 0 }, Strike = { Pitch = 35, Yaw = 0 }, Lean = 14 },
+			{ Name = "Horizontal", Wind = { Pitch = 90, Yaw = -75 }, Strike = { Pitch = 90, Yaw = 60 }, Lean = 6, Twist = 22 },
+			{ Name = "Thrust", Wind = { Pitch = -30, Yaw = 0 }, Strike = { Pitch = 95, Yaw = 0 }, Lean = 18 },
+		},
 	},
 }
 
