@@ -1,6 +1,6 @@
 --[[
 	Buttons.luau
-	Left 2x3 menu grid (with "!" badges), top-right round buttons
+	Left 2-column menu grid (with "!" badges), top-right round buttons
 	(settings, sound) and the Back button shown in the dungeon (key B).
 	The top-left corner (Config.Hud.TopLeftReserved) is left empty for
 	the Roblox buttons.
@@ -13,6 +13,8 @@ local UserInputService = game:GetService("UserInputService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Popups = require(script.Parent.Popups)
 local Style = require(script.Parent.Style)
+local Equipment = require(script.Parent.Windows.Equipment)
+local Forge = require(script.Parent.Windows.Forge)
 local Inventory = require(script.Parent.Windows.Inventory)
 local Rebirth = require(script.Parent.Windows.Rebirth)
 local Reward = require(script.Parent.Windows.Reward)
@@ -49,12 +51,13 @@ Buttons.Go = go
 -- Left grid
 ---------------------------------------------------------------------
 
-local BUTTON = 86
-local GAP = 10
+local BUTTON = 78
+local GAP = 8
+local ROWS = math.ceil(#Config.Hud.MenuButtons / 2)
 local grid = Instance.new("Frame")
 grid.Name = "Menu"
 grid.Position = UDim2.fromOffset(16, Config.Hud.TopLeftReserved.Y + 20)
-grid.Size = UDim2.fromOffset(BUTTON * 2 + GAP, BUTTON * 3 + GAP * 2)
+grid.Size = UDim2.fromOffset(BUTTON * 2 + GAP, BUTTON * ROWS + GAP * (ROWS - 1))
 grid.BackgroundTransparency = 1
 grid.Parent = Style.Gui
 local gridLayout = Instance.new("UIGridLayout")
@@ -66,10 +69,9 @@ gridLayout.Parent = grid
 local badges = {}
 
 local actions = {
+	Forge = Forge.Open,
 	Inventory = Inventory.Open,
-	Equipment = function()
-		Shop.Open("Weapon")
-	end,
+	Equipment = Equipment.Open,
 	Pets = Shop.OpenPets,
 	Rebirth = Rebirth.Open,
 	Reward = Reward.Open,
@@ -80,7 +82,7 @@ local actions = {
 
 for order, def in ipairs(Config.Hud.MenuButtons) do
 	local button = Style.Button(grid, { Name = def.Id, Color = def.Color, TextSize = 1, ZIndex = 2, LayoutOrder = order, Shadow = false })
-	Style.Label(button, def.Icon, 34, Style.Colors.Text, { Size = UDim2.new(1, 0, 0.6, 0), ZIndex = 3 }):FindFirstChildOfClass("UIStroke").Transparency = 1
+	Style.Label(button, def.Icon, 30, Style.Colors.Text, { Size = UDim2.new(1, 0, 0.6, 0), ZIndex = 3 }):FindFirstChildOfClass("UIStroke").Transparency = 1
 	Style.Label(button, def.Label, 13, Style.Colors.Text, { Position = UDim2.fromScale(0, 0.62), Size = UDim2.new(1, 0, 0.3, 0), TextScaled = true, ZIndex = 3 })
 
 	local badge = Instance.new("TextLabel")
@@ -152,7 +154,7 @@ end)
 
 local back = Style.Button(Style.Gui, {
 	Name = "Back",
-	Position = UDim2.fromOffset(16, Config.Hud.TopLeftReserved.Y + 20 + BUTTON * 3 + GAP * 2 + 14),
+	Position = UDim2.fromOffset(16, Config.Hud.TopLeftReserved.Y + 20 + BUTTON * ROWS + GAP * (ROWS - 1) + 12),
 	Size = UDim2.fromOffset(BUTTON * 2 + GAP, 44),
 	Color = Style.Colors.Red,
 	Text = "← Назад  [B]",

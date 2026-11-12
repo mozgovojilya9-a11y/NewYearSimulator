@@ -1,6 +1,6 @@
 --[[
 	Shop.luau
-	Equipment window (owned weapons) and Pets window, built from
+	Pets window (weapons and armor live in Equipment / Forge), built from
 	Config.Shop. Cards are colored by rarity (mythic = animated rainbow).
 	Buttons only ASK the server (ShopRequest); what is owned/equipped
 	comes back through Player attributes set by PlayerState.Sync.
@@ -227,16 +227,9 @@ local function makeWindow(title: string, color: Color3, categories: { string })
 	return window, showTab
 end
 
-local shopWindow, showShopTab = makeWindow("Снаряжение", Style.Colors.Green, { "Weapon" })
 local petsWindow = makeWindow("Питомцы", Style.Colors.Magenta, { "Pet" })
 
-Shop.Window = shopWindow
 Shop.PetsWindow = petsWindow
-
-function Shop.Open(tab: string?)
-	showShopTab(tab or "Weapon")
-	shopWindow.Open()
-end
 
 function Shop.OpenPets()
 	petsWindow.Open()

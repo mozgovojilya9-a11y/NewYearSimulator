@@ -20,6 +20,8 @@ Config.StartingData = {
 	Rebirths = 0,
 	EquippedWeapon = "Stick",
 	OwnedWeapons = { Stick = true }, -- crafted (or legacy bought) weapons
+	OwnedArmor = {}, -- [armorId] = true
+	EquippedArmor = { Helmet = "", Chest = "", Legs = "" },
 	Materials = {}, -- [materialId] = count
 	OwnedPets = {},
 	EquippedPet = "",
@@ -269,6 +271,7 @@ end
 -- The player in combat. Health regenerates only when nothing hit the
 -- player for RegenDelay seconds (the default Roblox regen is disabled).
 Config.Player = {
+	Health = 100, -- base max health (+ armor)
 	RegenDelay = 4,
 	RegenPerSecond = 6,
 }
@@ -312,17 +315,136 @@ function Config.MobDamage(room: number, isBoss: boolean): number
 	return math.floor(damage)
 end
 
--- Weapons: Damage is the weapon base. Weapons are crafted at the forge
--- (recipes arrive with the crafting stage); these entries are the
--- legacy list so already-owned weapons keep working. One weapon is active.
+-- Weapons: Damage is the weapon base (see Config.Damage for the full
+-- formula). One weapon is active. Weapons are CRAFTED at the forge from
+-- materials (Config.Recipes): 4 per biome, each stronger than the last.
+-- Shape = model built by Shared.WeaponBuilder. Legacy = bought in an
+-- older version of the game: still owned and usable, not craftable.
+-- Ids are stored in saves: never rename.
 Config.Weapons = {
-	{ Id = "Stick", Name = "Палка", Rarity = "Common", Damage = 1, Cost = 0, Color = Color3.fromRGB(150, 110, 70) },
-	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 3, Cost = 100, Color = Color3.fromRGB(200, 150, 90) },
-	{ Id = "IronSword", Name = "Железный меч", Rarity = "Rare", Damage = 10, Cost = 1200, Color = Color3.fromRGB(190, 200, 215) },
-	{ Id = "AuraKatana", Name = "Катана Ауры", Rarity = "Epic", Damage = 35, Cost = 12000, Color = Color3.fromRGB(190, 110, 255) },
-	{ Id = "StormBlade", Name = "Клинок Бури", Rarity = "Legendary", Damage = 120, Cost = 60000, Unique = true, Color = Color3.fromRGB(90, 200, 255) },
-	{ Id = "EclipseScythe", Name = "Коса Затмения", Rarity = "Legendary", Damage = 450, Cost = 300000, Unique = true, Color = Color3.fromRGB(255, 120, 60) },
-	{ Id = "StarAuraSword", Name = "Меч Звёздной Ауры", Rarity = "Mythic", Damage = 1600, Cost = 1500000, Unique = true, Color = Color3.fromRGB(255, 230, 120) },
+	{ Id = "Stick", Name = "Палка", Rarity = "Common", Damage = 1, Shape = "Stick", Color = Color3.fromRGB(150, 110, 70) },
+	-- 1. Катакомбы
+	{ Id = "BoneSword", Name = "Костяной меч", Rarity = "Common", Damage = 2, Biome = 1, Shape = "BoneSword", Color = Color3.fromRGB(235, 230, 215) },
+	{ Id = "SlimeDagger", Name = "Слизневый кинжал", Rarity = "Uncommon", Damage = 3, Biome = 1, Shape = "SlimeDagger", Color = Color3.fromRGB(110, 235, 120) },
+	{ Id = "RustCleaver", Name = "Ржавый тесак", Rarity = "Rare", Damage = 5, Biome = 1, Shape = "Cleaver", Color = Color3.fromRGB(165, 95, 60) },
+	{ Id = "SkullMace", Name = "Булава Черепов", Rarity = "Epic", Damage = 8, Biome = 1, Shape = "SkullMace", Color = Color3.fromRGB(190, 120, 255) },
+	-- 2. Ледяной грот
+	{ Id = "IceBlade", Name = "Ледяной клинок", Rarity = "Uncommon", Damage = 12, Biome = 2, Shape = "IceBlade", Color = Color3.fromRGB(170, 225, 255) },
+	{ Id = "YetiClub", Name = "Дубина йети", Rarity = "Rare", Damage = 18, Biome = 2, Shape = "YetiClub", Color = Color3.fromRGB(240, 245, 250) },
+	{ Id = "FrostSpear", Name = "Морозное копьё", Rarity = "Epic", Damage = 28, Biome = 2, Shape = "FrostSpear", Color = Color3.fromRGB(90, 190, 255) },
+	{ Id = "EternalBlade", Name = "Клинок Вечного льда", Rarity = "Legendary", Damage = 43, Biome = 2, Shape = "EternalBlade", Color = Color3.fromRGB(140, 240, 255) },
+	-- 3. Лавовая кузня
+	{ Id = "ObsidianAxe", Name = "Обсидиановый топор", Rarity = "Rare", Damage = 66, Biome = 3, Shape = "ObsidianAxe", Color = Color3.fromRGB(60, 45, 80) },
+	{ Id = "EmberSword", Name = "Угольный меч", Rarity = "Epic", Damage = 100, Biome = 3, Shape = "EmberSword", Color = Color3.fromRGB(255, 130, 40) },
+	{ Id = "MagmaHammer", Name = "Лавовый молот", Rarity = "Epic", Damage = 160, Biome = 3, Shape = "MagmaHammer", Color = Color3.fromRGB(255, 110, 30) },
+	{ Id = "PhoenixBlade", Name = "Клинок Феникса", Rarity = "Legendary", Damage = 250, Biome = 3, Shape = "PhoenixBlade", Color = Color3.fromRGB(255, 170, 50) },
+	-- 4. Бездна ауры
+	{ Id = "ShadowKatana", Name = "Теневая катана", Rarity = "Epic", Damage = 380, Biome = 4, Shape = "ShadowKatana", Color = Color3.fromRGB(120, 90, 170) },
+	{ Id = "DuskScythe", Name = "Коса сумрака", Rarity = "Legendary", Damage = 600, Biome = 4, Shape = "DuskScythe", Color = Color3.fromRGB(170, 80, 255) },
+	{ Id = "AbyssBlade", Name = "Клинок бездны", Rarity = "Legendary", Damage = 920, Biome = 4, Shape = "AbyssBlade", Color = Color3.fromRGB(255, 61, 184) },
+	{ Id = "AuraReaver", Name = "Разрушитель Ауры", Rarity = "Mythic", Damage = 1450, Biome = 4, Shape = "AuraReaver", Color = Color3.fromRGB(255, 230, 120) },
+	-- Legacy (bought for Aura before crafting existed)
+	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 3, Legacy = true, Shape = "WoodSword", Color = Color3.fromRGB(200, 150, 90) },
+	{ Id = "IronSword", Name = "Железный меч", Rarity = "Rare", Damage = 10, Legacy = true, Shape = "IronSword", Color = Color3.fromRGB(190, 200, 215) },
+	{ Id = "AuraKatana", Name = "Катана Ауры", Rarity = "Epic", Damage = 35, Legacy = true, Shape = "AuraKatana", Color = Color3.fromRGB(190, 110, 255) },
+	{ Id = "StormBlade", Name = "Клинок Бури", Rarity = "Legendary", Damage = 120, Legacy = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
+	{ Id = "EclipseScythe", Name = "Коса Затмения", Rarity = "Legendary", Damage = 450, Legacy = true, Shape = "EclipseScythe", Color = Color3.fromRGB(255, 120, 60) },
+	{ Id = "StarAuraSword", Name = "Меч Звёздной Ауры", Rarity = "Mythic", Damage = 1600, Legacy = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 230, 120) },
+}
+
+-- Armor: one set per biome, three pieces each (Helmet / Chest / Legs).
+-- Health adds to the base Config.Player.Health, Defense is the share of
+-- incoming damage removed. Wearing all 3 pieces of a set gives its
+-- Bonus (damage multiplier). Style = look built by Shared.ArmorBuilder.
+Config.ArmorSlots = { "Helmet", "Chest", "Legs" }
+Config.ArmorSlotNames = { Helmet = "Шлем", Chest = "Нагрудник", Legs = "Поножи" }
+Config.ArmorSets = {
+	Bone = { Name = "Костяной сет", Biome = 1, Rarity = "Uncommon", Health = 20, Defense = 0.03, Bonus = 0.10,
+		Style = { Kind = "Bone", Main = Color3.fromRGB(235, 228, 205), Trim = Color3.fromRGB(150, 135, 110), Glow = Color3.fromRGB(110, 235, 120), Material = Enum.Material.SmoothPlastic } },
+	Ice = { Name = "Ледяной сет", Biome = 2, Rarity = "Rare", Health = 45, Defense = 0.05, Bonus = 0.20,
+		Style = { Kind = "Ice", Main = Color3.fromRGB(150, 215, 255), Trim = Color3.fromRGB(240, 250, 255), Glow = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Ice } },
+	Lava = { Name = "Лавовый сет", Biome = 3, Rarity = "Epic", Health = 90, Defense = 0.07, Bonus = 0.35,
+		Style = { Kind = "Lava", Main = Color3.fromRGB(50, 38, 42), Trim = Color3.fromRGB(120, 55, 40), Glow = Color3.fromRGB(255, 130, 30), Material = Enum.Material.Slate } },
+	Abyss = { Name = "Сет бездны", Biome = 4, Rarity = "Legendary", Health = 160, Defense = 0.09, Bonus = 0.50,
+		Style = { Kind = "Abyss", Main = Color3.fromRGB(60, 35, 110), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(255, 61, 184), Material = Enum.Material.Metal } },
+}
+Config.ArmorSetOrder = { "Bone", "Ice", "Lava", "Abyss" }
+Config.Armor = {}
+do
+	local adjective = { Bone = { "Костяной", "Костяные" }, Ice = { "Ледяной", "Ледяные" }, Lava = { "Лавовый", "Лавовые" } }
+	local noun = { Helmet = "шлем", Chest = "нагрудник", Legs = "поножи" }
+	local nounCapital = { Helmet = "Шлем", Chest = "Нагрудник", Legs = "Поножи" }
+	for _, setId in ipairs(Config.ArmorSetOrder) do
+		local set = Config.ArmorSets[setId]
+		set.Id = setId
+		for _, slot in ipairs(Config.ArmorSlots) do
+			local name = if setId == "Abyss" then nounCapital[slot] .. " бездны" else adjective[setId][if slot == "Legs" then 2 else 1] .. " " .. noun[slot]
+			table.insert(Config.Armor, {
+				Id = setId .. slot, -- "BoneHelmet", "IceChest", ... (stored in saves)
+				Name = name,
+				Slot = slot,
+				Set = setId,
+				Biome = set.Biome,
+				Rarity = set.Rarity,
+				Health = if slot == "Chest" then math.floor(set.Health * 1.5) else set.Health,
+				Defense = set.Defense,
+				Color = set.Style.Main,
+			})
+		end
+	end
+end
+
+-- Forge recipes: materials + an Aura fee -> the item (Id = weapon or
+-- armor id). Shown in this order inside each tab.
+Config.Recipes = {
+	-- Weapons
+	{ Id = "BoneSword", Kind = "Weapon", Aura = 50, Materials = { Bone = 8 } },
+	{ Id = "SlimeDagger", Kind = "Weapon", Aura = 200, Materials = { Bone = 12, Slime = 6 } },
+	{ Id = "RustCleaver", Kind = "Weapon", Aura = 800, Materials = { Bone = 20, RustyIron = 4 } },
+	{ Id = "SkullMace", Kind = "Weapon", Aura = 3000, Materials = { Bone = 30, Slime = 12, RustyIron = 6, CursedSkull = 1 } },
+	{ Id = "IceBlade", Kind = "Weapon", Aura = 5000, Materials = { Ice = 15, RustyIron = 3 } },
+	{ Id = "YetiClub", Kind = "Weapon", Aura = 10000, Materials = { Ice = 25, YetiFur = 10 } },
+	{ Id = "FrostSpear", Kind = "Weapon", Aura = 20000, Materials = { Ice = 40, YetiFur = 15, FrostCrystal = 6 } },
+	{ Id = "EternalBlade", Kind = "Weapon", Aura = 40000, Materials = { Ice = 60, FrostCrystal = 10, EternalIce = 1 } },
+	{ Id = "ObsidianAxe", Kind = "Weapon", Aura = 60000, Materials = { Obsidian = 30, Ember = 10 } },
+	{ Id = "EmberSword", Kind = "Weapon", Aura = 100000, Materials = { Obsidian = 45, Ember = 20, MagmaCore = 5 } },
+	{ Id = "MagmaHammer", Kind = "Weapon", Aura = 160000, Materials = { Obsidian = 70, MagmaCore = 8, FirePlume = 2 } },
+	{ Id = "PhoenixBlade", Kind = "Weapon", Aura = 250000, Materials = { Obsidian = 100, MagmaCore = 14, FirePlume = 5 } },
+	{ Id = "ShadowKatana", Kind = "Weapon", Aura = 350000, Materials = { DarkShard = 40, ShadowDust = 15 } },
+	{ Id = "DuskScythe", Kind = "Weapon", Aura = 500000, Materials = { DarkShard = 60, ShadowDust = 25, AuraEssence = 8 } },
+	{ Id = "AbyssBlade", Kind = "Weapon", Aura = 750000, Materials = { DarkShard = 90, AuraEssence = 12, AbyssEye = 1 } },
+	{ Id = "AuraReaver", Kind = "Weapon", Aura = 1200000, Materials = { DarkShard = 140, AuraEssence = 20, AbyssEye = 3, EternalIce = 2 } },
+	-- Armor
+	{ Id = "BoneHelmet", Kind = "Armor", Aura = 150, Materials = { Bone = 10, Slime = 3 } },
+	{ Id = "BoneChest", Kind = "Armor", Aura = 400, Materials = { Bone = 18, Slime = 6, RustyIron = 2 } },
+	{ Id = "BoneLegs", Kind = "Armor", Aura = 250, Materials = { Bone = 14, Slime = 4 } },
+	{ Id = "IceHelmet", Kind = "Armor", Aura = 8000, Materials = { Ice = 20, YetiFur = 8 } },
+	{ Id = "IceChest", Kind = "Armor", Aura = 15000, Materials = { Ice = 35, YetiFur = 14, FrostCrystal = 4 } },
+	{ Id = "IceLegs", Kind = "Armor", Aura = 11000, Materials = { Ice = 28, YetiFur = 10, FrostCrystal = 2 } },
+	{ Id = "LavaHelmet", Kind = "Armor", Aura = 80000, Materials = { Obsidian = 35, Ember = 12, MagmaCore = 3 } },
+	{ Id = "LavaChest", Kind = "Armor", Aura = 140000, Materials = { Obsidian = 60, Ember = 20, MagmaCore = 6, FirePlume = 1 } },
+	{ Id = "LavaLegs", Kind = "Armor", Aura = 100000, Materials = { Obsidian = 45, Ember = 15, MagmaCore = 4 } },
+	{ Id = "AbyssHelmet", Kind = "Armor", Aura = 400000, Materials = { DarkShard = 50, ShadowDust = 20, AuraEssence = 5 } },
+	{ Id = "AbyssChest", Kind = "Armor", Aura = 700000, Materials = { DarkShard = 80, ShadowDust = 30, AuraEssence = 10, AbyssEye = 1 } },
+	{ Id = "AbyssLegs", Kind = "Armor", Aura = 500000, Materials = { DarkShard = 60, ShadowDust = 24, AuraEssence = 6 } },
+}
+Config.RecipeById = {}
+for order, recipe in ipairs(Config.Recipes) do
+	recipe.Order = order
+	Config.RecipeById[recipe.Id] = recipe
+end
+
+Config.Forge = {
+	AnimationSeconds = 2.5,
+	Strikes = 3,
+	Texts = {
+		Craft = "Выковать",
+		Owned = "Уже выковано ✓",
+		Missing = "Не хватает материалов",
+		NoAura = "Не хватает Ауры",
+		Skip = "Пропустить",
+		Done = "Выковано: %s!",
+	},
 }
 
 -- Pets: +Bonus to all Aura gains (multiplier = 1 + Bonus).
@@ -434,7 +556,7 @@ Config.Leaderboards = {
 -- Shop categories (what is owned / equipped and how to describe it).
 Config.Shop = {
 	Weapon = { Title = "Оружие", Items = Config.Weapons, OwnedKey = "OwnedWeapons", EquippedKey = "EquippedWeapon", Purchasable = false,
-		Describe = function(item) return "Урон x" .. item.Damage end },
+		Describe = function(item) return "Урон " .. item.Damage end },
 	Pet = { Title = "Питомцы", Items = Config.Pets, OwnedKey = "OwnedPets", EquippedKey = "EquippedPet",
 		Describe = function(item) return "+" .. math.floor(item.Bonus * 100 + 0.5) .. "% ко всей Ауре • дроп с боссов" end },
 }
@@ -447,10 +569,17 @@ for category, shop in pairs(Config.Shop) do
 	end
 end
 
+Config.ItemById.Armor = {}
+for order, piece in ipairs(Config.Armor) do
+	piece.Order = order
+	Config.ItemById.Armor[piece.Id] = piece
+end
+
 -- All remotes live directly in ReplicatedStorage, created by the server.
 Config.Remotes = {
 	ClickHit = "RemoteEvent", -- C->S (mob or nil) on every click; S->C ("Aura"|"Tick"|"Hit"|"Kill", ...)
-	ShopRequest = "RemoteFunction", -- (action, category, id) -> ok, message
+	ShopRequest = "RemoteFunction", -- ("Equip", "Weapon"|"Armor", id) | ("Unequip", "Armor", slot) | pets -> ok, message
+	Craft = "RemoteFunction", -- (recipeId) -> ok, message
 	RebirthRequest = "RemoteFunction", -- () -> ok, message
 	Travel = "RemoteFunction", -- ("Hub") | ("Room", n) -> ok, message
 	Notify = "RemoteEvent", -- S->C (text, kind) toast
@@ -586,8 +715,8 @@ Config.HubLayout = {
 	Forge = {
 		Offset = Vector3.new(54, 0, -108),
 		SignOffset = Vector3.new(30, 0, -96),
-		SampleWeapons = { "IronSword", "AuraKatana", "StormBlade", "StarAuraSword" },
-		SampleArmor = {},
+		SampleWeapons = { "BoneSword", "FrostSpear", "MagmaHammer", "AbyssBlade" },
+		SampleArmor = { "Bone", "Lava", "Abyss" }, -- armor sets on the three stands
 	},
 	Store = { Offset = Vector3.new(36, 0, -55), SignOffset = Vector3.new(30, 0, -33) }, -- premium kiosk beside the Robux trainers
 	Egg = { Offset = Vector3.new(-46, 0, -28) },
@@ -711,7 +840,8 @@ Config.Hud = {
 		Done = "Данж пройден! Иди к алтарю",
 	},
 	MenuButtons = { -- grid on the left, 2 columns
-		{ Id = "Inventory", Icon = "🎒", Label = "Инвентарь", Color = Color3.fromRGB(255, 150, 50) },
+		{ Id = "Forge", Icon = "⚒", Label = "Кузница", Color = Color3.fromRGB(255, 120, 40) },
+		{ Id = "Inventory", Icon = "🎒", Label = "Инвентарь", Color = Color3.fromRGB(70, 140, 255) },
 		{ Id = "Equipment", Icon = "⚔", Label = "Снаряжение", Color = Color3.fromRGB(90, 230, 110) },
 		{ Id = "Pets", Icon = "🐾", Label = "Питомцы", Color = Color3.fromRGB(255, 61, 184) },
 		{ Id = "Rebirth", Icon = "🔁", Label = "Перерождение", Color = Color3.fromRGB(150, 80, 255) },

@@ -29,6 +29,8 @@ require(ui:WaitForChild("Popups"))
 require(windows:WaitForChild("Window"))
 require(windows:WaitForChild("Shop")) -- waits for leaderstats
 require(windows:WaitForChild("Inventory"))
+require(windows:WaitForChild("Forge"))
+require(windows:WaitForChild("Equipment"))
 require(windows:WaitForChild("Rebirth"))
 require(windows:WaitForChild("Reward"))
 require(windows:WaitForChild("Settings"))

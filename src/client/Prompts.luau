@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Popups = require(script.Parent.ui.Popups)
 local Style = require(script.Parent.ui.Style)
+local Forge = require(script.Parent.ui.Windows.Forge)
 local Rebirth = require(script.Parent.ui.Windows.Rebirth)
 local Reward = require(script.Parent.ui.Windows.Reward)
 local Shop = require(script.Parent.ui.Windows.Shop)
@@ -23,9 +24,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 local Prompts = {}
 
 local ACTIONS = {
-	OpenForge = function()
-		Shop.Open("Weapon")
-	end,
+	OpenForge = Forge.Open,
 	OpenStore = function()
 		Popups.Toast("Магазин скоро откроется", "gold")
 	end,

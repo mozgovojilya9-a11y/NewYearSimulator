@@ -17,6 +17,7 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local DungeonRuns = require(script.Parent.DungeonRuns)
+local PlayerState = require(script.Parent.PlayerState)
 local WorldKit = require(script.Parent.WorldKit)
 
 local MobAI = {}
@@ -31,7 +32,7 @@ local lastDamaged = {} -- [player] = os.clock() of the last hit taken
 local function damagePlayer(player, amount: number)
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid and humanoid.Health > 0 then
-		humanoid:TakeDamage(amount)
+		humanoid:TakeDamage(math.max(1, amount * (1 - PlayerState.Defense(player)))) -- armor
 		lastDamaged[player] = os.clock()
 	end
 end

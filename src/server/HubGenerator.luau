@@ -25,6 +25,7 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local ArmorBuilder = require(ReplicatedStorage.Shared.ArmorBuilder)
 local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
 local TrainerBuilder = require(script.Parent.TrainerBuilder)
 local WorldKit = require(script.Parent.WorldKit)
@@ -539,7 +540,13 @@ local function buildForge(parent)
 		part(stand, "Legs", Vector3.new(1.9, 2, 0.9), standCf * CFrame.new(0, 2, 0), WOOD, Enum.Material.Wood)
 		part(stand, "Torso", Vector3.new(2, 2, 1), standCf * CFrame.new(0, 4, 0), WOOD, Enum.Material.Wood)
 		part(stand, "Head", Vector3.new(1.2, 1.2, 1.2), standCf * CFrame.new(0, 5.6, 0), WOOD, Enum.Material.Wood)
-		stand:SetAttribute("Frame", standCf)
+		-- Dress the stand in a craftable set (showcase, not a shop).
+		local setId = F.SampleArmor[i]
+		if setId and Config.ArmorSets[setId] then
+			local armor = ArmorBuilder.BuildSet(setId)
+			armor:PivotTo(standCf * CFrame.new(0, 1, 0))
+			armor.Parent = stand
+		end
 	end
 
 	lantern(model, (cf * CFrame.new(-21, 0, -17)).Position)

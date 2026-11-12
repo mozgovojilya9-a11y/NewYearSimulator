@@ -28,6 +28,53 @@ function PlayerState.IsReady(player): boolean
 	return DataService.Get(player) ~= nil and auraValue(player) ~= nil
 end
 
+---------------------------------------------------------------------
+-- Armor
+---------------------------------------------------------------------
+
+-- The equipped armor piece in a slot (or nil).
+function PlayerState.ArmorIn(player, slot: string)
+	local data = DataService.Get(player)
+	local id = data and data.EquippedArmor[slot]
+	return if id and id ~= "" and data.OwnedArmor[id] then Config.ItemById.Armor[id] else nil
+end
+
+-- The armor set whose 3 pieces are all equipped (or nil).
+function PlayerState.ActiveSet(player)
+	local setId = nil
+	for _, slot in ipairs(Config.ArmorSlots) do
+		local piece = PlayerState.ArmorIn(player, slot)
+		if not piece or (setId and piece.Set ~= setId) then
+			return nil
+		end
+		setId = piece.Set
+	end
+	return Config.ArmorSets[setId]
+end
+
+function PlayerState.MaxHealth(player): number
+	local health = Config.Player.Health
+	for _, slot in ipairs(Config.ArmorSlots) do
+		local piece = PlayerState.ArmorIn(player, slot)
+		if piece then
+			health += piece.Health
+		end
+	end
+	return health
+end
+
+-- Share of incoming damage removed by armor (0..0.8).
+function PlayerState.Defense(player): number
+	local defense = 0
+	for _, slot in ipairs(Config.ArmorSlots) do
+		local piece = PlayerState.ArmorIn(player, slot)
+		if piece then
+			defense += piece.Defense
+		end
+	end
+	return math.min(0.8, defense)
+end
+
 -- Damage of one click before crit: weapon base x AuraPower(Aura) x
 -- rebirths (x armor set / pets / passes / boosts as those systems exist).
 function PlayerState.Damage(player): number
@@ -39,6 +86,10 @@ function PlayerState.Damage(player): number
 	local damage = Config.Click.BaseDamage * (if weapon then weapon.Damage else 1)
 	damage *= Config.AuraPower(PlayerState.GetAura(player))
 	damage *= Config.RebirthMultiplier(data.Rebirths)
+	local set = PlayerState.ActiveSet(player)
+	if set then
+		damage *= 1 + set.Bonus
+	end
 	return math.max(1, math.floor(damage))
 end
 PlayerState.ClickPower = PlayerState.Damage
@@ -208,7 +259,6 @@ function PlayerState.Sync(player)
 		table.insert(unlocked, id)
 	end
 	player:SetAttribute("TrainersUnlocked", table.concat(unlocked, ","))
-	PlayerState.RefreshPower(player)
 
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then
@@ -228,7 +278,24 @@ function PlayerState.Sync(player)
 		player:SetAttribute("Owned" .. category, table.concat(owned, ","))
 		player:SetAttribute("Equipped" .. category, data[shop.EquippedKey] or "")
 	end
+	-- Armor: owned list, one attribute per slot, derived stats.
+	local ownedArmor = {}
+	for _, piece in ipairs(Config.Armor) do
+		if data.OwnedArmor[piece.Id] then
+			table.insert(ownedArmor, piece.Id)
+		end
+	end
+	player:SetAttribute("OwnedArmor", table.concat(ownedArmor, ","))
+	for _, slot in ipairs(Config.ArmorSlots) do
+		local piece = PlayerState.ArmorIn(player, slot)
+		player:SetAttribute("Equipped" .. slot, if piece then piece.Id else "")
+	end
+	local set = PlayerState.ActiveSet(player)
+	player:SetAttribute("ArmorSet", if set then set.Id else "")
+	player:SetAttribute("MaxHealth", PlayerState.MaxHealth(player))
+	player:SetAttribute("Defense", PlayerState.Defense(player))
 	player:SetAttribute("AuraMultiplier", PlayerState.AuraMultiplier(player))
+	PlayerState.RefreshPower(player)
 end
 
 return PlayerState
