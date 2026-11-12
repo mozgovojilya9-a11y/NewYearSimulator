@@ -52,9 +52,11 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	gui.Name = "PromptUI"
 	gui.Adornee = adornee
 	gui.Size = UDim2.fromOffset(240, 70)
-	gui.StudsOffsetWorldSpace = Vector3.new(0, adornee.Size.Y / 2 + 2, 0)
+	-- Loot drops carry their own name plate above: their prompt sits lower.
+	gui.StudsOffsetWorldSpace = Vector3.new(0, if prompt:GetAttribute("NoPlate") then -1.6 else adornee.Size.Y / 2 + 2, 0)
 	gui.AlwaysOnTop = true
 	gui.MaxDistance = 40
+	gui.Active = true
 	gui.Parent = playerGui
 
 	local plate = Instance.new("Frame")
@@ -112,6 +114,26 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	holdFill.ZIndex = 2
 	holdFill.Parent = key
 	Style.Corner(holdFill, UDim.new(0.5, 0))
+
+	-- Custom prompts get no built-in touch support: a transparent button
+	-- over the plate starts / ends the hold on phones (and with the mouse).
+	local hit = Instance.new("TextButton")
+	hit.Name = "Hold"
+	hit.Size = UDim2.fromScale(1, 1)
+	hit.BackgroundTransparency = 1
+	hit.Text = ""
+	hit.ZIndex = 5
+	hit.Parent = gui
+	hit.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+			prompt:InputHoldBegin()
+		end
+	end)
+	hit.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+			prompt:InputHoldEnd()
+		end
+	end)
 
 	local pop = Instance.new("UIScale")
 	pop.Scale = 0.6

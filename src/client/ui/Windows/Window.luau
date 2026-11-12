@@ -177,4 +177,65 @@ function Window.List(parent)
 	return list
 end
 
+-- Scrolling grid of fixed-size cells.
+function Window.Grid(parent, cellSize: UDim2, padding: number?)
+	local list = Instance.new("ScrollingFrame")
+	list.Size = UDim2.fromScale(1, 1)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.ScrollBarImageColor3 = Style.Colors.Cyan
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.ZIndex = 32
+	list.Parent = parent
+	local layout = Instance.new("UIGridLayout")
+	layout.CellSize = cellSize
+	layout.CellPadding = UDim2.fromOffset(padding or 8, padding or 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop = UDim.new(0, 4)
+	pad.PaddingLeft = UDim.new(0, 4)
+	pad.Parent = list
+	return list
+end
+
+-- Row of tab buttons at the top of `parent`. defs = { { Id, Text } }.
+-- Returns a table with .Changed (callback, set by the caller) and a
+-- function select(id) that highlights the tab and calls .Changed(id).
+function Window.Tabs(parent, defs, color: Color3, width: number?)
+	local bar = Instance.new("Frame")
+	bar.Name = "Tabs"
+	bar.Size = UDim2.new(1, 0, 0, 40)
+	bar.BackgroundTransparency = 1
+	bar.ZIndex = 33
+	bar.Parent = parent
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = bar
+
+	local tabs = { Changed = nil, Bar = bar, Current = nil }
+	local setColors = {}
+	local function select(id)
+		tabs.Current = id
+		for tabId, setColor in pairs(setColors) do
+			setColor(if tabId == id then color else Style.Colors.Card)
+		end
+		if tabs.Changed then
+			tabs.Changed(id)
+		end
+	end
+	for order, def in ipairs(defs) do
+		local button, setColor = Style.Button(bar, { Size = UDim2.fromOffset(width or 130, 38), Color = color, Text = def.Text, TextSize = 17, ZIndex = 34, LayoutOrder = order, Shadow = false })
+		setColors[def.Id] = setColor
+		button.Activated:Connect(function()
+			select(def.Id)
+		end)
+	end
+	return tabs, select
+end
+
 return Window

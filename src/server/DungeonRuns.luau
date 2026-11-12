@@ -42,6 +42,7 @@ DungeonRuns.OnRunEnded = nil
 DungeonRuns.OnKill = nil
 DungeonRuns.OnRoomCleared = nil
 DungeonRuns.OnRunStarted = nil
+DungeonRuns.OnRunClosed = nil -- every run end, any reason (LootService clears drops)
 
 ---------------------------------------------------------------------
 -- Rooms and mobs
@@ -49,27 +50,15 @@ DungeonRuns.OnRunStarted = nil
 
 local function buildMob(run, room, spot)
 	local isBoss = room.IsBoss
-	local look
-	if isBoss then
-		local bossDef = Looks.Bosses[room.Index]
-		look = {}
-		for _, kind in ipairs(Looks.Kinds) do
-			if kind.Kind == bossDef.Kind then
-				for k, v in pairs(kind) do
-					look[k] = v
-				end
-			end
-		end
-		look.Name = bossDef.Name
-		look.Color = bossDef.Color
-	else
-		look = Looks.Kinds[spot.Kind]
-	end
+	local def = Config.MobFor(room.Index, spot.Kind)
+	local look = table.clone(def.Look)
+	look.Name = def.Name
+	look.Kind = def.Id
 
 	local facing = Vector3.new(room.Entry.Position.X, spot.Position.Y, room.Entry.Position.Z)
 	local model = MobBuilder.Build(look, if isBoss then Looks.BossScale else 1, CFrame.lookAt(spot.Position, facing))
 	if isBoss then
-		MobBuilder.Decorate(model, Looks.Bosses[room.Index].Crown, Looks.BossScale)
+		MobBuilder.Decorate(model, look.Crown or Config.Theme.Gold, Looks.BossScale)
 	end
 	local health = Config.MobHealth(room.Index, isBoss)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
@@ -204,6 +193,9 @@ local function endRun(player, reason: string)
 	local record = PlayerState.GetRoomReached(player)
 	Remotes.Get("RunEnded"):FireClient(player, reason, run.best, run.loot, record, run.newRecord)
 	player:SetAttribute("Zone", "Hub")
+	if DungeonRuns.OnRunClosed then
+		DungeonRuns.OnRunClosed(player)
+	end
 	if reason ~= "Died" and DungeonRuns.OnRunEnded then
 		DungeonRuns.OnRunEnded(player)
 	end

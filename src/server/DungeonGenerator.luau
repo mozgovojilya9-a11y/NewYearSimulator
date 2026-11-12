@@ -56,7 +56,7 @@ local function pickSpots(rng: Random, size: number, count: number)
 				break
 			end
 		end
-		table.insert(spots, { Offset = chosen, Kind = rng:NextInteger(1, #Config.MobLooks.Kinds) })
+		table.insert(spots, { Offset = chosen, Kind = rng:NextInteger(1, Config.MobLooks.KindsPerBiome) })
 	end
 	return spots
 end

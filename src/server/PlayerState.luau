@@ -10,6 +10,7 @@
 	to the client as Player attributes by PlayerState.Sync.
 ]]
 
+local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -126,6 +127,54 @@ function PlayerState.ReachRoom(player, room: number): boolean
 	return true
 end
 
+---------------------------------------------------------------------
+-- Materials (inventory)
+---------------------------------------------------------------------
+
+-- Multiplier for the chances of Rare+ drops (passes / boosts).
+function PlayerState.LootLuck(player): number
+	local luck = 1
+	if Passes.Owns(player, "LootLuck") then
+		luck *= 2
+	end
+	return luck
+end
+
+local function publishMaterials(player, data)
+	player:SetAttribute("Materials", HttpService:JSONEncode(data.Materials))
+end
+
+function PlayerState.MaterialCount(player, materialId: string): number
+	local data = DataService.Get(player)
+	return if data then data.Materials[materialId] or 0 else 0
+end
+
+-- Adds (or removes, with a negative amount) a material. Returns the new count.
+function PlayerState.AddMaterial(player, materialId: string, amount: number): number
+	local data = DataService.Get(player)
+	if not data or not Config.MaterialById[materialId] then
+		return 0
+	end
+	local count = math.max(0, (data.Materials[materialId] or 0) + amount)
+	data.Materials[materialId] = if count > 0 then count else nil
+	publishMaterials(player, data)
+	return count
+end
+
+-- True when the player owns every { materialId = count } of `cost`.
+function PlayerState.HasMaterials(player, cost: { [string]: number }): boolean
+	local data = DataService.Get(player)
+	if not data then
+		return false
+	end
+	for materialId, count in pairs(cost) do
+		if (data.Materials[materialId] or 0) < count then
+			return false
+		end
+	end
+	return true
+end
+
 -- Gives a pet if the player doesn't own it yet. Returns true if given.
 function PlayerState.GrantPet(player, petId: string): boolean
 	local data = DataService.Get(player)
@@ -153,6 +202,7 @@ function PlayerState.Sync(player)
 	player:SetAttribute("Xp", data.Xp)
 	player:SetAttribute("XpNext", math.floor(Config.Progression.Level.XpBase * data.Level ^ 1.5))
 	player:SetAttribute("BoostUntil", data.BoostUntil or 0)
+	publishMaterials(player, data)
 	local unlocked = {}
 	for id in pairs(data.TrainersUnlocked) do
 		table.insert(unlocked, id)

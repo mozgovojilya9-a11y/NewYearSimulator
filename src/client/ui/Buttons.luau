@@ -13,6 +13,7 @@ local UserInputService = game:GetService("UserInputService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Popups = require(script.Parent.Popups)
 local Style = require(script.Parent.Style)
+local Inventory = require(script.Parent.Windows.Inventory)
 local Rebirth = require(script.Parent.Windows.Rebirth)
 local Reward = require(script.Parent.Windows.Reward)
 local Settings = require(script.Parent.Windows.Settings)
@@ -65,6 +66,7 @@ gridLayout.Parent = grid
 local badges = {}
 
 local actions = {
+	Inventory = Inventory.Open,
 	Equipment = function()
 		Shop.Open("Weapon")
 	end,

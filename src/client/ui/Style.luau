@@ -226,6 +226,22 @@ function Style.Plate(parent, props: { [string]: any })
 	return frame
 end
 
+-- Card for window grids: dark body with a rarity-colored frame
+-- (animated rainbow for the top rarities).
+function Style.Card(parent, color: Color3, rainbow: boolean?)
+	local card = Instance.new("Frame")
+	card.BackgroundColor3 = Style.Colors.Card
+	card.BorderSizePixel = 0
+	card.ZIndex = 33
+	card.Parent = parent
+	Style.Corner(card, UDim.new(0, 12))
+	local stroke = Style.Stroke(card, 3, color)
+	if rainbow then
+		Style.Rainbow(stroke)
+	end
+	return card, stroke
+end
+
 -- One-shot sound. Empty ids (TODO slots in Config.Sounds) are skipped.
 function Style.PlaySound(soundId: string?, speed: number?, volume: number?)
 	if Style.Muted or not soundId or soundId == "" then

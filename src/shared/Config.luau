@@ -20,6 +20,7 @@ Config.StartingData = {
 	Rebirths = 0,
 	EquippedWeapon = "Stick",
 	OwnedWeapons = { Stick = true }, -- crafted (or legacy bought) weapons
+	Materials = {}, -- [materialId] = count
 	OwnedPets = {},
 	EquippedPet = "",
 	RoomReached = 0, -- highest dungeon room cleared (0 = none, 20 = all)
@@ -146,6 +147,124 @@ Config.Dungeon = {
 		{ PetId = "Dragon", Chance = 0.05 },
 	},
 }
+
+-- Materials: what mobs drop and what the forge consumes. Biome = index
+-- into Config.DungeonLayout.Biomes. Shape = mini-model built from Parts
+-- by Shared.MaterialBuilder. Ids are stored in saves: never rename.
+Config.Materials = {
+	-- 1. Катакомбы
+	{ Id = "Bone", Name = "Кость", Biome = 1, Rarity = "Common", Shape = "Bone", Color = Color3.fromRGB(235, 230, 215) },
+	{ Id = "Slime", Name = "Слизь", Biome = 1, Rarity = "Uncommon", Shape = "Blob", Color = Color3.fromRGB(110, 235, 120) },
+	{ Id = "RustyIron", Name = "Ржавое железо", Biome = 1, Rarity = "Rare", Shape = "Ingot", Color = Color3.fromRGB(165, 95, 60) },
+	{ Id = "CursedSkull", Name = "Проклятый череп", Biome = 1, Rarity = "Epic", Shape = "Skull", Color = Color3.fromRGB(190, 120, 255) },
+	{ Id = "CatacombHeart", Name = "Сердце катакомб", Biome = 1, Rarity = "Secret", Shape = "Heart", Color = Color3.fromRGB(255, 90, 160) },
+	-- 2. Ледяной грот
+	{ Id = "Ice", Name = "Лёд", Biome = 2, Rarity = "Common", Shape = "Cube", Color = Color3.fromRGB(170, 225, 255) },
+	{ Id = "YetiFur", Name = "Мех йети", Biome = 2, Rarity = "Uncommon", Shape = "Fur", Color = Color3.fromRGB(240, 245, 250) },
+	{ Id = "FrostCrystal", Name = "Морозный кристалл", Biome = 2, Rarity = "Rare", Shape = "Crystal", Color = Color3.fromRGB(90, 190, 255) },
+	{ Id = "EternalIce", Name = "Вечный лёд", Biome = 2, Rarity = "Legendary", Shape = "Star", Color = Color3.fromRGB(140, 240, 255) },
+	-- 3. Лавовая кузня
+	{ Id = "Obsidian", Name = "Обсидиан", Biome = 3, Rarity = "Common", Shape = "Shards", Color = Color3.fromRGB(45, 35, 60) },
+	{ Id = "Ember", Name = "Тлеющий уголь", Biome = 3, Rarity = "Uncommon", Shape = "Coal", Color = Color3.fromRGB(255, 130, 40) },
+	{ Id = "MagmaCore", Name = "Магма-ядро", Biome = 3, Rarity = "Rare", Shape = "Core", Color = Color3.fromRGB(255, 110, 30) },
+	{ Id = "FirePlume", Name = "Огненное перо", Biome = 3, Rarity = "Epic", Shape = "Feather", Color = Color3.fromRGB(255, 170, 50) },
+	{ Id = "VolcanoHeart", Name = "Сердце вулкана", Biome = 3, Rarity = "Mythic", Shape = "Heart", Color = Color3.fromRGB(255, 80, 40) },
+	-- 4. Бездна ауры
+	{ Id = "DarkShard", Name = "Осколок тьмы", Biome = 4, Rarity = "Common", Shape = "Shards", Color = Color3.fromRGB(70, 40, 120) },
+	{ Id = "ShadowDust", Name = "Теневая пыль", Biome = 4, Rarity = "Uncommon", Shape = "Dust", Color = Color3.fromRGB(120, 90, 170) },
+	{ Id = "AuraEssence", Name = "Аура-эссенция", Biome = 4, Rarity = "Rare", Shape = "Vial", Color = Color3.fromRGB(255, 61, 184) },
+	{ Id = "AbyssEye", Name = "Глаз бездны", Biome = 4, Rarity = "Legendary", Shape = "Eye", Color = Color3.fromRGB(170, 80, 255) },
+}
+Config.MaterialById = {}
+for order, material in ipairs(Config.Materials) do
+	material.Order = order
+	Config.MaterialById[material.Id] = material
+end
+
+-- Loot. A drop is personal: only the player whose run killed the mob
+-- sees it and can pick it up, and only by HOLDING E (ProximityPrompt).
+Config.Loot = {
+	HoldSeconds = 0.5,
+	Lifetime = 60, -- seconds a drop stays on the ground
+	PickupRange = 16, -- server-side distance check
+	PromptDistance = 10,
+	ExtraDropChance = 0.3, -- normal mobs: 1 drop + this chance of a second one
+	BossDrops = 4,
+	BossGuaranteed = "Rare", -- the first boss drop is at least this rarity
+	BossLuck = 4, -- boss drops: chances of Rare+ multiplied by this
+	LuckFrom = "Rare", -- luck multiplies this rarity and everything above
+	FloatHeight = 2.4,
+	SpinSeconds = 4,
+	BeamHeight = 14,
+	Texts = {
+		Pickup = "Подобрать",
+		Announce = "%s выбил %s предмет: %s!",
+		Picked = "+%d %s",
+	},
+}
+
+-- Mobs: 3 kinds + a boss per biome. Drops = materials this mob can
+-- drop; the rarity is rolled first (Config.Rarities), then a material of
+-- that rarity is picked from this list (nearest lower rarity, else the
+-- nearest higher one, when the mob has none of the rolled rarity).
+-- Look = block rig parameters for MobBuilder.
+Config.Mobs = {
+	Biomes = {
+		{ Kinds = { "ZombieMiner", "SkeletonArcher", "AcidSlime" }, Boss = "SlimeKing" },
+		{ Kinds = { "SnowGolem", "IceSpider", "Yeti" }, Boss = "IceBoneLord" },
+		{ Kinds = { "FireImp", "MagmaGolem", "GoblinSmith" }, Boss = "FireChief" },
+		{ Kinds = { "ShadowKnight", "FlyingEye", "AuraGhost" }, Boss = "AbyssLord" },
+	},
+	Defs = {
+		ZombieMiner = { Name = "Зомби-шахтёр", Drops = { "Bone", "RustyIron", "CursedSkull", "CatacombHeart" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(110, 170, 100), HeadScale = 1.2, Scale = 1 } },
+		SkeletonArcher = { Name = "Скелет-лучник", Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(240, 240, 230), Thin = true, EyeColor = Color3.fromRGB(46, 230, 255), Scale = 1.05 } },
+		AcidSlime = { Name = "Кислотный слизень", Drops = { "Slime", "RustyIron", "CursedSkull", "CatacombHeart" },
+			Look = { Shape = "Jelly", Color = Color3.fromRGB(150, 240, 70), Transparency = 0.35, Scale = 1 } },
+		SlimeKing = { Name = "Король Слизней", Boss = true, Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" },
+			Look = { Shape = "Jelly", Color = Color3.fromRGB(60, 220, 100), Transparency = 0.35, Scale = 1, Crown = Color3.fromRGB(255, 201, 60) } },
+
+		SnowGolem = { Name = "Снежный голем", Drops = { "Ice", "FrostCrystal", "EternalIce" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(235, 245, 255), HeadScale = 1.1, Scale = 1.2 } },
+		IceSpider = { Name = "Ледяной паук", Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" },
+			Look = { Shape = "Jelly", Color = Color3.fromRGB(120, 200, 255), Transparency = 0.2, Scale = 0.8 } },
+		Yeti = { Name = "Йети", Drops = { "YetiFur", "FrostCrystal", "EternalIce" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(215, 230, 245), HeadScale = 1.3, Scale = 1.3 } },
+		IceBoneLord = { Name = "Ледяной Костяной Лорд", Boss = true, Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(200, 235, 255), Thin = true, EyeColor = Color3.fromRGB(46, 230, 255), Scale = 1.05, Crown = Color3.fromRGB(46, 230, 255) } },
+
+		FireImp = { Name = "Огненный бес", Drops = { "Ember", "Obsidian", "FirePlume", "VolcanoHeart" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(240, 80, 50), HeadScale = 1.4, Scale = 0.85 } },
+		MagmaGolem = { Name = "Магма-голем", Drops = { "Obsidian", "MagmaCore", "FirePlume", "VolcanoHeart" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(90, 50, 45), Outline = Color3.fromRGB(255, 120, 30), Scale = 1.3 } },
+		GoblinSmith = { Name = "Гоблин-кузнец", Drops = { "Obsidian", "Ember", "MagmaCore", "VolcanoHeart" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(110, 170, 70), HeadScale = 1.5, Scale = 1 } },
+		FireChief = { Name = "Огненный Вождь", Boss = true, Drops = { "Obsidian", "Ember", "MagmaCore", "FirePlume", "VolcanoHeart" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(230, 90, 40), HeadScale = 1.5, Scale = 1, Crown = Color3.fromRGB(255, 150, 50) } },
+
+		ShadowKnight = { Name = "Теневой рыцарь", Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(35, 28, 55), Outline = Color3.fromRGB(170, 80, 255), EyeColor = Color3.fromRGB(255, 61, 184), Scale = 1.15 } },
+		FlyingEye = { Name = "Летающий глаз", Drops = { "DarkShard", "AuraEssence", "AbyssEye" },
+			Look = { Shape = "Jelly", Color = Color3.fromRGB(200, 120, 255), Transparency = 0.1, Scale = 0.8 } },
+		AuraGhost = { Name = "Аура-призрак", Drops = { "ShadowDust", "AuraEssence", "AbyssEye" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(150, 110, 220), Thin = true, EyeColor = Color3.fromRGB(255, 255, 255), Scale = 1.1 } },
+		AbyssLord = { Name = "Повелитель Бездны", Boss = true, Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" },
+			Look = { Shape = "Humanoid", Color = Color3.fromRGB(20, 14, 36), Outline = Color3.fromRGB(170, 80, 255), EyeColor = Color3.fromRGB(255, 61, 184), Scale = 1.1, Crown = Color3.fromRGB(255, 61, 184) } },
+	},
+}
+for id, def in pairs(Config.Mobs.Defs) do
+	def.Id = id
+end
+
+-- The mob definition for a room: a boss in boss rooms, else kind 1..3.
+function Config.MobFor(room: number, kindIndex: number)
+	local biome = Config.Mobs.Biomes[math.min(#Config.Mobs.Biomes, math.ceil(room / Config.Dungeon.BossEvery))]
+	if Config.IsBossRoom(room) then
+		return Config.Mobs.Defs[biome.Boss]
+	end
+	return Config.Mobs.Defs[biome.Kinds[(kindIndex - 1) % #biome.Kinds + 1]]
+end
 
 -- The player in combat. Health regenerates only when nothing hit the
 -- player for RegenDelay seconds (the default Roblox regen is disabled).
@@ -339,6 +458,8 @@ Config.Remotes = {
 	RoomState = "RemoteEvent", -- S->C (room, alive, total) for the player's own run
 	RunEnded = "RemoteEvent", -- S->C (reason, room, auraEarned, record, isNewRecord)
 	Progression = "RemoteFunction", -- ("Status") | ("ClaimDaily") | ("Spin") | ("ClaimQuest", index) -> ok, payload
+	Loot = "RemoteEvent", -- S->C ("Spawn", id, materialId, position, lifetime) | ("Picked", id, materialId, total) | ("Remove", id) | ("Clear"); C->S (id) pick up
+	Announce = "RemoteEvent", -- S->all (text, color) system chat line + toast
 }
 
 ---------------------------------------------------------------------
@@ -377,15 +498,24 @@ Config.Theme = {
 	Sky = Color3.fromRGB(120, 190, 255),
 }
 
--- Rarity colors, identical in the shop, on pedestals and pets.
--- Mythic additionally gets an animated rainbow gradient in the UI.
-Config.Rarity = {
-	Common = { Name = "Обычное", Color = Color3.fromRGB(190, 190, 205) },
-	Rare = { Name = "Редкое", Color = Config.Theme.Blue },
-	Epic = { Name = "Эпическое", Color = Config.Theme.Purple },
-	Legendary = { Name = "Легендарное", Color = Config.Theme.Gold },
-	Mythic = { Name = "Мифическое", Color = Config.Theme.Magenta, Rainbow = true },
+-- Rarities, lowest to highest. Color is used everywhere (drops, cards,
+-- beams). Chance = base chance that a mob drop has this rarity; loot
+-- luck multiplies the chances of Rare and above. Fx: particles + sound
+-- on the drop; Announce: screen flash + server-wide chat message.
+Config.Rarities = {
+	{ Id = "Common", Name = "Обычный", Color = Color3.fromRGB(190, 190, 205), Chance = 0.60 },
+	{ Id = "Uncommon", Name = "Необычный", Color = Color3.fromRGB(90, 230, 110), Chance = 0.25 },
+	{ Id = "Rare", Name = "Редкий", Color = Color3.fromRGB(70, 140, 255), Chance = 0.10 },
+	{ Id = "Epic", Name = "Эпический", Color = Color3.fromRGB(170, 90, 255), Chance = 0.04 },
+	{ Id = "Legendary", Name = "Легендарный", Color = Color3.fromRGB(255, 201, 60), Chance = 0.009, Fx = true },
+	{ Id = "Mythic", Name = "Мифический", Color = Color3.fromRGB(255, 70, 70), Chance = 0.0009, Fx = true, Announce = true },
+	{ Id = "Secret", Name = "Секретный", Color = Color3.fromRGB(255, 120, 220), Chance = 0.0001, Fx = true, Announce = true, Rainbow = true },
 }
+Config.Rarity = {} -- [id] = rarity (+ .Index)
+for index, rarity in ipairs(Config.Rarities) do
+	rarity.Index = index
+	Config.Rarity[rarity.Id] = rarity
+end
 
 -- Lighting presets. The server applies Hub at start; the client tweens
 -- between presets when the player's "Zone" attribute changes. Rules:
@@ -561,24 +691,10 @@ Config.DungeonLayout = {
 	},
 }
 
--- Mob looks: block "aura monsters". Scale is relative to a 4-stud
--- torso; bosses multiply it by BossScale. Faces come from the built-in
--- rbxasset face texture or from small Parts (Skeleton / Shade eyes).
+-- Mob presentation shared by every kind (the kinds: Config.Mobs).
 Config.MobLooks = {
 	BossScale = 2.5,
-	Kinds = {
-		{ Kind = "Slime", Name = "Слизень", Shape = "Jelly", Color = Color3.fromRGB(90, 240, 120), Transparency = 0.35, Scale = 1 },
-		{ Kind = "Goblin", Name = "Гоблин", Shape = "Humanoid", Color = Color3.fromRGB(90, 190, 70), HeadScale = 1.5, Scale = 1 },
-		{ Kind = "Skeleton", Name = "Скелет", Shape = "Humanoid", Color = Color3.fromRGB(240, 240, 230), Thin = true, EyeColor = Color3.fromRGB(46, 230, 255), Scale = 1.05 },
-		{ Kind = "Shade", Name = "Тень", Shape = "Humanoid", Color = Color3.fromRGB(20, 15, 35), Outline = Color3.fromRGB(170, 80, 255), EyeColor = Color3.fromRGB(255, 61, 184), Scale = 1.1 },
-	},
-	-- Boss per boss room: base kind + name + crown color.
-	Bosses = {
-		[5] = { Kind = "Slime", Name = "Король Слизней", Color = Color3.fromRGB(60, 220, 100), Crown = Color3.fromRGB(255, 201, 60) },
-		[10] = { Kind = "Skeleton", Name = "Ледяной Костяной Лорд", Color = Color3.fromRGB(200, 235, 255), Crown = Color3.fromRGB(46, 230, 255) },
-		[15] = { Kind = "Goblin", Name = "Огненный Вождь", Color = Color3.fromRGB(230, 90, 40), Crown = Color3.fromRGB(255, 150, 50) },
-		[20] = { Kind = "Shade", Name = "Повелитель Бездны", Color = Color3.fromRGB(15, 10, 30), Crown = Color3.fromRGB(255, 61, 184) },
-	},
+	KindsPerBiome = 3,
 	HealthBar = { MaxDistance = 50, Width = 4.5, Height = 0.9 }, -- studs (BillboardGui scale units)
 }
 
@@ -595,6 +711,7 @@ Config.Hud = {
 		Done = "Данж пройден! Иди к алтарю",
 	},
 	MenuButtons = { -- grid on the left, 2 columns
+		{ Id = "Inventory", Icon = "🎒", Label = "Инвентарь", Color = Color3.fromRGB(255, 150, 50) },
 		{ Id = "Equipment", Icon = "⚔", Label = "Снаряжение", Color = Color3.fromRGB(90, 230, 110) },
 		{ Id = "Pets", Icon = "🐾", Label = "Питомцы", Color = Color3.fromRGB(255, 61, 184) },
 		{ Id = "Rebirth", Icon = "🔁", Label = "Перерождение", Color = Color3.fromRGB(150, 80, 255) },
@@ -609,10 +726,16 @@ Config.Hud = {
 }
 
 -- Sounds. Only built-in rbxasset:// files that ship with the Roblox
--- client are used; empty slots are TODO: put your own rbxassetid://
+-- client are used (the classic sword / victory / ping sounds, pitched); empty slots are TODO: put your own rbxassetid://
 -- there when you have uploaded sounds (never guess IDs).
 Config.Sounds = {
 	Click = "rbxasset://sounds/electronicpingshort.wav",
+	Pickup = "rbxasset://sounds/electronicpingshort.wav",
+	RareDrop = "rbxasset://sounds/victory.wav", -- legendary+ drop (pitched up for mythic / secret)
+	Swing = "rbxasset://sounds/swordslash.wav",
+	Hammer = "rbxasset://sounds/swordlunge.wav", -- forge hammer strike (played low)
+	Forged = "rbxasset://sounds/victory.wav",
+	Unsheath = "rbxasset://sounds/unsheath.wav",
 	Hit = "rbxasset://sounds/swordslash.wav",
 	Buy = "rbxasset://sounds/electronicpingshort.wav",
 	Rebirth = "rbxasset://sounds/electronicpingshort.wav",

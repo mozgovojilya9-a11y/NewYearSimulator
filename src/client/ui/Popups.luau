@@ -183,6 +183,22 @@ function Popups.Fade(color: Color3?, seconds: number?)
 	end)
 end
 
+-- Short bright flash of a color over the whole screen (rare drops).
+function Popups.Flash(color: Color3)
+	local flash = Instance.new("Frame")
+	flash.Size = UDim2.fromScale(1.2, 1.2)
+	flash.Position = UDim2.fromScale(-0.1, -0.1)
+	flash.BackgroundColor3 = color
+	flash.BackgroundTransparency = 0.35
+	flash.BorderSizePixel = 0
+	flash.ZIndex = 90
+	flash.Parent = Style.Gui
+	Style.Tween(flash, 0.7, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	task.delay(0.75, function()
+		flash:Destroy()
+	end)
+end
+
 -- Egg hatch: shaking egg, flash, then the pet's name in its rarity color.
 function Popups.Hatch(petName: string, color: Color3, rainbow: boolean?)
 	local holder = Instance.new("Frame")

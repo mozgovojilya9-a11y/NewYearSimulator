@@ -57,7 +57,23 @@ ReplicatedStorage:WaitForChild("RunEnded").OnClientEvent:Connect(function(reason
 	for _, count in pairs(if type(loot) == "table" then loot else {}) do
 		items += count
 	end
-	lootLabel.Text = ("Выбито предметов: %s"):format(Format.Number(items))
+	-- "Выбито: 14 (Кость x9, Слизь x3, ...)" -- rarest first
+	local names = {}
+	for materialId, count in pairs(if type(loot) == "table" then loot else {}) do
+		local material = Config.MaterialById[materialId]
+		if material then
+			table.insert(names, { text = ("%s x%d"):format(material.Name, count), rank = Config.Rarity[material.Rarity].Index })
+		end
+	end
+	table.sort(names, function(a, b)
+		return a.rank > b.rank
+	end)
+	local parts = {}
+	for i = 1, math.min(3, #names) do
+		parts[i] = names[i].text
+	end
+	lootLabel.Text = ("Выбито: %s%s"):format(Format.Number(items), if #parts > 0 then "  (" .. table.concat(parts, ", ") .. (if #names > 3 then ", …)" else ")") else "")
+	lootLabel.TextScaled = true
 	recordLabel.Text = ("Рекорд: этап %d%s"):format(record, if isNewRecord then "  — НОВЫЙ!" else "")
 	recordLabel.TextColor3 = if isNewRecord then Style.Colors.Gold else Style.Colors.Text
 	task.delay(0.6, window.Open)

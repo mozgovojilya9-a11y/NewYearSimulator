@@ -18,6 +18,7 @@ local DungeonRuns = require(script.Parent.DungeonRuns)
 local EquipmentService = require(script.Parent.EquipmentService)
 local HubService = require(script.Parent.HubService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
+local LootService = require(script.Parent.LootService)
 local MobAI = require(script.Parent.MobAI)
 local Passes = require(script.Parent.Passes)
 local PlayerState = require(script.Parent.PlayerState)
@@ -61,6 +62,7 @@ RebirthService.Init()
 TravelService.Init(hub)
 EquipmentService.Init()
 ProgressionService.Init()
+LootService.Init() -- after ProgressionService: both listen to kills
 ClickService.OnTrainerClick = ProgressionService.OnTrainerClick
 
 local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)

@@ -1,7 +1,7 @@
 --[[
 	Preview.luau
-	ViewportFrame with a slowly rotating Part model (weapon)
-	for shop cards. Models come from the shared builders so the preview
+	ViewportFrame with a slowly rotating Part model (weapon, material)
+	for cards. Models come from the shared builders so the preview
 	always matches what the character carries.
 ]]
 
@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local MaterialBuilder = require(ReplicatedStorage.Shared.MaterialBuilder)
 local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
 local Style = require(script.Parent.Style)
 
@@ -19,6 +20,8 @@ local function buildFor(category: string, item)
 		local model = WeaponBuilder.Build(item)
 		WeaponBuilder.SetAnchored(model, true)
 		return model
+	elseif category == "Material" then
+		return MaterialBuilder.Build(item)
 	end
 	return nil
 end
@@ -33,15 +36,14 @@ function Preview.Create(parent, category: string, item, size: UDim2, position: U
 	local viewport = Instance.new("ViewportFrame")
 	viewport.Size = size
 	viewport.Position = position
-	viewport.BackgroundColor3 = Style.Colors.PanelDark
-	viewport.BackgroundTransparency = 0.1
+	viewport.BackgroundColor3 = Style.Colors.CardDark
+	viewport.BackgroundTransparency = 0
 	viewport.Ambient = Color3.fromRGB(180, 180, 200)
 	viewport.LightColor = Color3.fromRGB(255, 255, 255)
 	viewport.LightDirection = Vector3.new(-1, -1, -0.5)
 	viewport.ZIndex = parent.ZIndex + 1
 	viewport.Parent = parent
-	Style.Corner(viewport, UDim.new(0, 12))
-	Style.Stroke(viewport, 2.5)
+	Style.Corner(viewport, UDim.new(0, 10))
 
 	local world = Instance.new("WorldModel")
 	world.Parent = viewport
