@@ -29,6 +29,7 @@ local EquipmentService = require(script.Parent.EquipmentService)
 local HubService = require(script.Parent.HubService)
 local Passes = require(script.Parent.Passes)
 local PlayerState = require(script.Parent.PlayerState)
+local StatService = require(script.Parent.StatService)
 local RateLimit = require(script.Parent.RateLimit)
 local Remotes = require(script.Parent.Remotes)
 
@@ -54,18 +55,19 @@ local function click(player, target)
 
 	EquipmentService.Swing(player)
 
-	-- Aura for the click itself (+ trainer bonus).
-	local base = A.ClickBase
+	-- Aura for the click itself: a share of one training tick (on a
+	-- trainer: a bonus on top of the automatic ticks).
+	local gain = StatService.Get(player).AuraGain
+	local amount = gain * A.ClickBase
 	local trainer = HubService.TrainerOf(player)
 	if trainer then
-		base += A.TrainerClickBonus * trainer.def.Multiplier
+		amount = gain * A.TrainerClickBonus * trainer.def.Multiplier
 		if ClickService.OnTrainerClick then
 			ClickService.OnTrainerClick(player)
 		end
 	end
-	local amount, isCrit = PlayerState.RollCrit(base)
 	local gained = PlayerState.GiveAura(player, amount)
-	remote:FireClient(player, "Aura", gained, isCrit, if trainer then trainer.model else nil)
+	remote:FireClient(player, "Aura", gained, false, if trainer then trainer.model else nil)
 
 	-- Combat: only inside the player's own run.
 	if DungeonRuns.HasRun(player) then
@@ -86,11 +88,17 @@ end
 
 function ClickService.Init()
 	remote = Remotes.Get("ClickHit")
-	local allow = RateLimit.new(Config.Click.Cooldown)
+	-- Cooldown depends on the player's AttackSpeed stat.
+	local lastClick = {}
 	remote.OnServerEvent:Connect(function(player, target)
-		if allow(player) then
+		local now = os.clock()
+		if now - (lastClick[player] or 0) >= StatService.ClickCooldown(player) * 0.9 then
+			lastClick[player] = now
 			click(player, target)
 		end
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		lastClick[player] = nil
 	end)
 
 	local toggleAllow = RateLimit.new(0.2)

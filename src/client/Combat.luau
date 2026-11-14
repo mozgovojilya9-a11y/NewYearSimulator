@@ -51,7 +51,7 @@ local function click(ray: Ray)
 		return
 	end
 	local now = os.clock()
-	if now - lastSent < Config.Click.Cooldown then
+	if now - lastSent < Config.Click.Cooldown / math.max(0.1, player:GetAttribute("Stat_AttackSpeed") or 1) then
 		return
 	end
 	lastSent = now

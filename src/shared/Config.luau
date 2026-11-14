@@ -56,26 +56,28 @@ Config.World = {
 ---------------------------------------------------------------------
 
 Config.Click = {
-	BaseDamage = 1, -- damage of one click with weapon x1 and no Aura
-	CritChance = 0.1, -- 10% chance per click
-	CritMultiplier = 5, -- crit = damage x5
-	Cooldown = 0.1, -- min seconds between accepted clicks per player (anti-macro)
+	BaseDamage = 1, -- damage of one hit with weapon x1 and no Aura
+	Cooldown = 0.1, -- min seconds between accepted clicks at AttackSpeed 1 (anti-macro)
 	Range = 60, -- max studs between player and a clicked mob
 	MeleeRange = 16, -- a click with no target hits the nearest mob within this range
 }
 
--- Aura = strength + currency. It comes ONLY from clicks, auto-click and
--- trainers (mobs give materials, never Aura).
---   click anywhere            -> ClickBase
---   click on a trainer        -> + TrainerClickBonus x trainer multiplier
---   standing on a trainer     -> TrainerTickBase x trainer multiplier every
---                                TrainerTickInterval seconds, no clicks needed
--- Every gain is then multiplied by pets / rebirths / passes / boosts.
+-- Aura = the character's POWER. It is never spent on anything. It comes
+-- ONLY from training: clicks, auto-click and trainers (mobs never give it).
+-- One "training unit" (StatService stat AuraGain) =
+--     BaseAura(level) x TrainingMult (weapon x armor pieces)
+--     x rebirths x pets x passes x boosts (x class / skills later)
+--   standing on a trainer  -> AuraGain x trainer multiplier every TrainerTickInterval s
+--   click on a trainer     -> + AuraGain x trainer multiplier x TrainerClickBonus
+--   click anywhere else    -> AuraGain x ClickBase
+-- Level 1 + Stick + trainer x1 = exactly 1 Aura per tick. Fractions are
+-- kept per player, so small gains still add up.
 Config.Aura = {
-	ClickBase = 1,
-	TrainerClickBonus = 1,
+	ClickBase = 0.2,
+	TrainerClickBonus = 0.25,
 	TrainerTickInterval = 1,
-	TrainerTickBase = 3,
+	TrainerTickBase = 1,
+	LevelGrowth = 1.06, -- BaseAura(level): lvl 10 -> x1.7, 25 -> x4, 50 -> x17
 	TrainerCheckInterval = 0.2, -- how often the server looks which trainer a player stands on
 	AutoClickInterval = 0.35, -- server-side auto-click period
 	-- Without the "AutoClick" game pass the auto-click toggle works only
@@ -83,16 +85,42 @@ Config.Aura = {
 	AutoClickFreeOnTrainer = true,
 }
 
--- Damage of one click = weapon base x AuraPower(Aura) x armor set bonus
--- x pets x passes x boosts x rebirths. AuraPower grows with the
--- logarithm of Aura: 0 -> x1, 1K -> x3.25, 100K -> x4.75, 10M -> x6.25.
+function Config.BaseAura(level: number): number
+	return Config.Aura.LevelGrowth ^ (math.max(1, level) - 1)
+end
+
+-- Damage of one hit = weapon Damage x PowerMult(Aura) x armor set bonus
+-- x pets x passes x boosts (x class / skills later). PowerMult grows as a
+-- power of Aura, so every new trainer is felt in combat:
+--   Aura 0 -> x1, 100 -> x2, 1K -> x3.5, 10K -> x7.3, 100K -> x17,
+--   1M -> x41, 10M -> x101, 100M -> x252.
 Config.Damage = {
-	AuraPowerK = 0.75,
+	PowerScale = 100,
+	PowerExponent = 0.4,
 }
 
-function Config.AuraPower(aura: number): number
-	return 1 + math.log10(math.max(0, aura) + 1) * Config.Damage.AuraPowerK
+function Config.PowerMult(aura: number): number
+	local power = Config.Damage
+	return 1 + (math.max(0, aura) / power.PowerScale) ^ power.PowerExponent
 end
+
+-- Base character stats before any bonus (StatService adds level, gear,
+-- set, pets, rebirths, passes, boosts; class and skills later).
+Config.Stats = {
+	CritChance = 0.08, -- share of hits that crit
+	CritDamage = 2, -- crit hit = damage x this
+	AttackSpeed = 1, -- x click rate (cooldown = Click.Cooldown / AttackSpeed)
+	Luck = 1, -- x chances of Rare+ drops
+	Regen = 6, -- HP per second out of combat (after Player.RegenDelay)
+	Dash = 0, -- dash distance in studs (the dash itself comes with classes)
+	HealthPerLevel = 5, -- + max HP per level above 1
+	-- Names for the UI (Equipment window).
+	Names = {
+		Damage = "Урон", MaxHealth = "Макс. HP", Defense = "Защита", AttackSpeed = "Скорость атаки",
+		CritChance = "Шанс крита", CritDamage = "Крит. урон", Luck = "Удача", Regen = "Регенерация",
+		Dash = "Рывок", TrainingMult = "Тренировка", AuraGain = "Аура за тик",
+	},
+}
 
 -- Robux game passes. Id = 0 means "not created yet": buttons show
 -- "Скоро" and nothing is checked. Put the real ids from the Creator
@@ -310,9 +338,8 @@ end
 -- The player in combat. Health regenerates only when nothing hit the
 -- player for RegenDelay seconds (the default Roblox regen is disabled).
 Config.Player = {
-	Health = 100, -- base max health (+ armor)
-	RegenDelay = 4,
-	RegenPerSecond = 6,
+	Health = 100, -- base max health (+ level, + armor)
+	RegenDelay = 4, -- seconds without being hit before regen starts (rate: Stats.Regen)
 }
 
 -- Map bounds: nobody can leave the playable area. Invisible walls rise
@@ -357,62 +384,64 @@ end
 -- Weapons: Damage is the weapon base (see Config.Damage for the full
 -- formula). One weapon is active. Weapons are CRAFTED at the forge from
 -- materials (Config.Recipes): 4 per biome, each stronger than the last.
+-- TrainingMult = x to all Aura training while equipped (Config.Aura).
 -- Shape = model built by Shared.WeaponBuilder. Legacy = bought in an
 -- older version of the game: still owned and usable, not craftable.
 -- Ids are stored in saves: never rename.
 Config.Weapons = {
-	{ Id = "Stick", Name = "Палка", Rarity = "Common", Damage = 1, Shape = "Stick", Color = Color3.fromRGB(150, 110, 70) },
+	{ Id = "Stick", Name = "Палка", Rarity = "Common", Damage = 1, TrainingMult = 1, Shape = "Stick", Color = Color3.fromRGB(150, 110, 70) },
 	-- 1. Катакомбы
-	{ Id = "BoneSword", Name = "Костяной меч", Rarity = "Common", Damage = 2, Biome = 1, Shape = "BoneSword", Color = Color3.fromRGB(235, 230, 215) },
-	{ Id = "SlimeDagger", Name = "Слизневый кинжал", Rarity = "Uncommon", Damage = 3, Biome = 1, Shape = "SlimeDagger", Color = Color3.fromRGB(110, 235, 120) },
-	{ Id = "RustCleaver", Name = "Ржавый тесак", Rarity = "Rare", Damage = 5, Biome = 1, Shape = "Cleaver", Color = Color3.fromRGB(165, 95, 60) },
-	{ Id = "SkullMace", Name = "Булава Черепов", Rarity = "Epic", Damage = 8, Biome = 1, Shape = "SkullMace", Color = Color3.fromRGB(190, 120, 255) },
+	{ Id = "BoneSword", Name = "Костяной меч", Rarity = "Common", Damage = 2, TrainingMult = 1.1, Biome = 1, Shape = "BoneSword", Color = Color3.fromRGB(235, 230, 215) },
+	{ Id = "SlimeDagger", Name = "Слизневый кинжал", Rarity = "Uncommon", Damage = 3, TrainingMult = 1.2, Biome = 1, Shape = "SlimeDagger", Color = Color3.fromRGB(110, 235, 120) },
+	{ Id = "RustCleaver", Name = "Ржавый тесак", Rarity = "Rare", Damage = 5, TrainingMult = 1.35, Biome = 1, Shape = "Cleaver", Color = Color3.fromRGB(165, 95, 60) },
+	{ Id = "SkullMace", Name = "Булава Черепов", Rarity = "Epic", Damage = 8, TrainingMult = 1.5, Biome = 1, Shape = "SkullMace", Color = Color3.fromRGB(190, 120, 255) },
 	-- 2. Ледяной грот
-	{ Id = "IceBlade", Name = "Ледяной клинок", Rarity = "Uncommon", Damage = 12, Biome = 2, Shape = "IceBlade", Color = Color3.fromRGB(170, 225, 255) },
-	{ Id = "YetiClub", Name = "Дубина йети", Rarity = "Rare", Damage = 18, Biome = 2, Shape = "YetiClub", Color = Color3.fromRGB(240, 245, 250) },
-	{ Id = "FrostSpear", Name = "Морозное копьё", Rarity = "Epic", Damage = 28, Biome = 2, Shape = "FrostSpear", Color = Color3.fromRGB(90, 190, 255) },
-	{ Id = "EternalBlade", Name = "Клинок Вечного льда", Rarity = "Legendary", Damage = 43, Biome = 2, Shape = "EternalBlade", Color = Color3.fromRGB(140, 240, 255) },
+	{ Id = "IceBlade", Name = "Ледяной клинок", Rarity = "Uncommon", Damage = 12, TrainingMult = 1.5, Biome = 2, Shape = "IceBlade", Color = Color3.fromRGB(170, 225, 255) },
+	{ Id = "YetiClub", Name = "Дубина йети", Rarity = "Rare", Damage = 18, TrainingMult = 1.69, Biome = 2, Shape = "YetiClub", Color = Color3.fromRGB(240, 245, 250) },
+	{ Id = "FrostSpear", Name = "Морозное копьё", Rarity = "Epic", Damage = 28, TrainingMult = 1.88, Biome = 2, Shape = "FrostSpear", Color = Color3.fromRGB(90, 190, 255) },
+	{ Id = "EternalBlade", Name = "Клинок Вечного льда", Rarity = "Legendary", Damage = 43, TrainingMult = 2.19, Biome = 2, Shape = "EternalBlade", Color = Color3.fromRGB(140, 240, 255) },
 	-- 3. Лавовая кузня
-	{ Id = "ObsidianAxe", Name = "Обсидиановый топор", Rarity = "Rare", Damage = 66, Biome = 3, Shape = "ObsidianAxe", Color = Color3.fromRGB(60, 45, 80) },
-	{ Id = "EmberSword", Name = "Угольный меч", Rarity = "Epic", Damage = 100, Biome = 3, Shape = "EmberSword", Color = Color3.fromRGB(255, 130, 40) },
-	{ Id = "MagmaHammer", Name = "Лавовый молот", Rarity = "Epic", Damage = 160, Biome = 3, Shape = "MagmaHammer", Color = Color3.fromRGB(255, 110, 30) },
-	{ Id = "PhoenixBlade", Name = "Клинок Феникса", Rarity = "Legendary", Damage = 250, Biome = 3, Shape = "PhoenixBlade", Color = Color3.fromRGB(255, 170, 50) },
+	{ Id = "ObsidianAxe", Name = "Обсидиановый топор", Rarity = "Rare", Damage = 66, TrainingMult = 2.03, Biome = 3, Shape = "ObsidianAxe", Color = Color3.fromRGB(60, 45, 80) },
+	{ Id = "EmberSword", Name = "Угольный меч", Rarity = "Epic", Damage = 100, TrainingMult = 2.25, Biome = 3, Shape = "EmberSword", Color = Color3.fromRGB(255, 130, 40) },
+	{ Id = "MagmaHammer", Name = "Лавовый молот", Rarity = "Epic", Damage = 160, TrainingMult = 2.25, Biome = 3, Shape = "MagmaHammer", Color = Color3.fromRGB(255, 110, 30) },
+	{ Id = "PhoenixBlade", Name = "Клинок Феникса", Rarity = "Legendary", Damage = 250, TrainingMult = 2.62, Biome = 3, Shape = "PhoenixBlade", Color = Color3.fromRGB(255, 170, 50) },
 	-- 4. Бездна ауры
-	{ Id = "ShadowKatana", Name = "Теневая катана", Rarity = "Epic", Damage = 380, Biome = 4, Shape = "ShadowKatana", Color = Color3.fromRGB(120, 90, 170) },
-	{ Id = "DuskScythe", Name = "Коса сумрака", Rarity = "Legendary", Damage = 600, Biome = 4, Shape = "DuskScythe", Color = Color3.fromRGB(170, 80, 255) },
-	{ Id = "AbyssBlade", Name = "Клинок бездны", Rarity = "Legendary", Damage = 920, Biome = 4, Shape = "AbyssBlade", Color = Color3.fromRGB(255, 61, 184) },
-	{ Id = "AuraReaver", Name = "Разрушитель Ауры", Rarity = "Mythic", Damage = 1450, Biome = 4, Shape = "AuraReaver", Color = Color3.fromRGB(255, 230, 120) },
+	{ Id = "ShadowKatana", Name = "Теневая катана", Rarity = "Epic", Damage = 380, TrainingMult = 2.62, Biome = 4, Shape = "ShadowKatana", Color = Color3.fromRGB(120, 90, 170) },
+	{ Id = "DuskScythe", Name = "Коса сумрака", Rarity = "Legendary", Damage = 600, TrainingMult = 3.06, Biome = 4, Shape = "DuskScythe", Color = Color3.fromRGB(170, 80, 255) },
+	{ Id = "AbyssBlade", Name = "Клинок бездны", Rarity = "Legendary", Damage = 920, TrainingMult = 3.06, Biome = 4, Shape = "AbyssBlade", Color = Color3.fromRGB(255, 61, 184) },
+	{ Id = "AuraReaver", Name = "Разрушитель Ауры", Rarity = "Mythic", Damage = 1450, TrainingMult = 3.5, Biome = 4, Shape = "AuraReaver", Color = Color3.fromRGB(255, 230, 120) },
 	-- Robux exclusives (Config.Products): a bit stronger than the tier they
 	-- become available at, weaker than the next biome's top weapon.
-	{ Id = "PatronBlade", Name = "Клинок Покровителя", Rarity = "Epic", Damage = 10, Robux = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
-	{ Id = "CometSword", Name = "Кометный меч", Rarity = "Legendary", Damage = 55, Robux = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 150, 90) },
-	{ Id = "CrownBlade", Name = "Коронный клинок", Rarity = "Mythic", Damage = 300, Robux = true, Shape = "AuraKatana", Color = Color3.fromRGB(255, 215, 80) },
+	{ Id = "PatronBlade", Name = "Клинок Покровителя", Rarity = "Epic", Damage = 10, TrainingMult = 1.5, Robux = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
+	{ Id = "CometSword", Name = "Кометный меч", Rarity = "Legendary", Damage = 55, TrainingMult = 1.75, Robux = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 150, 90) },
+	{ Id = "CrownBlade", Name = "Коронный клинок", Rarity = "Mythic", Damage = 300, TrainingMult = 2, Robux = true, Shape = "AuraKatana", Color = Color3.fromRGB(255, 215, 80) },
 	-- Legacy (bought for Aura before crafting existed)
-	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 3, Legacy = true, Shape = "WoodSword", Color = Color3.fromRGB(200, 150, 90) },
-	{ Id = "IronSword", Name = "Железный меч", Rarity = "Rare", Damage = 10, Legacy = true, Shape = "IronSword", Color = Color3.fromRGB(190, 200, 215) },
-	{ Id = "AuraKatana", Name = "Катана Ауры", Rarity = "Epic", Damage = 35, Legacy = true, Shape = "AuraKatana", Color = Color3.fromRGB(190, 110, 255) },
-	{ Id = "StormBlade", Name = "Клинок Бури", Rarity = "Legendary", Damage = 120, Legacy = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
-	{ Id = "EclipseScythe", Name = "Коса Затмения", Rarity = "Legendary", Damage = 450, Legacy = true, Shape = "EclipseScythe", Color = Color3.fromRGB(255, 120, 60) },
-	{ Id = "StarAuraSword", Name = "Меч Звёздной Ауры", Rarity = "Mythic", Damage = 1600, Legacy = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 230, 120) },
+	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 3, TrainingMult = 1.1, Legacy = true, Shape = "WoodSword", Color = Color3.fromRGB(200, 150, 90) },
+	{ Id = "IronSword", Name = "Железный меч", Rarity = "Rare", Damage = 10, TrainingMult = 1.35, Legacy = true, Shape = "IronSword", Color = Color3.fromRGB(190, 200, 215) },
+	{ Id = "AuraKatana", Name = "Катана Ауры", Rarity = "Epic", Damage = 35, TrainingMult = 1.5, Legacy = true, Shape = "AuraKatana", Color = Color3.fromRGB(190, 110, 255) },
+	{ Id = "StormBlade", Name = "Клинок Бури", Rarity = "Legendary", Damage = 120, TrainingMult = 1.75, Legacy = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
+	{ Id = "EclipseScythe", Name = "Коса Затмения", Rarity = "Legendary", Damage = 450, TrainingMult = 1.75, Legacy = true, Shape = "EclipseScythe", Color = Color3.fromRGB(255, 120, 60) },
+	{ Id = "StarAuraSword", Name = "Меч Звёздной Ауры", Rarity = "Mythic", Damage = 1600, TrainingMult = 2, Legacy = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 230, 120) },
 }
 
 -- Armor: one set per biome, three pieces each (Helmet / Chest / Legs).
 -- Health adds to the base Config.Player.Health, Defense is the share of
 -- incoming damage removed. Wearing all 3 pieces of a set gives its
--- Bonus (damage multiplier). Style = look built by Shared.ArmorBuilder.
+-- Bonus (damage multiplier). TrainingMult: every piece multiplies Aura
+-- training by it. Style = look built by Shared.ArmorBuilder.
 Config.ArmorSlots = { "Helmet", "Chest", "Legs" }
 Config.ArmorSlotNames = { Helmet = "Шлем", Chest = "Нагрудник", Legs = "Поножи" }
 Config.ArmorSets = {
-	Bone = { Name = "Костяной сет", Biome = 1, Rarity = "Uncommon", Health = 20, Defense = 0.03, Bonus = 0.10,
+	Bone = { Name = "Костяной сет", Biome = 1, Rarity = "Uncommon", Health = 20, Defense = 0.03, Bonus = 0.10, TrainingMult = 1.05,
 		Style = { Kind = "Bone", Main = Color3.fromRGB(235, 228, 205), Trim = Color3.fromRGB(150, 135, 110), Glow = Color3.fromRGB(110, 235, 120), Material = Enum.Material.SmoothPlastic } },
-	Ice = { Name = "Ледяной сет", Biome = 2, Rarity = "Rare", Health = 45, Defense = 0.05, Bonus = 0.20,
+	Ice = { Name = "Ледяной сет", Biome = 2, Rarity = "Rare", Health = 45, Defense = 0.05, Bonus = 0.20, TrainingMult = 1.1,
 		Style = { Kind = "Ice", Main = Color3.fromRGB(150, 215, 255), Trim = Color3.fromRGB(240, 250, 255), Glow = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Ice } },
-	Lava = { Name = "Лавовый сет", Biome = 3, Rarity = "Epic", Health = 90, Defense = 0.07, Bonus = 0.35,
+	Lava = { Name = "Лавовый сет", Biome = 3, Rarity = "Epic", Health = 90, Defense = 0.07, Bonus = 0.35, TrainingMult = 1.15,
 		Style = { Kind = "Lava", Main = Color3.fromRGB(50, 38, 42), Trim = Color3.fromRGB(120, 55, 40), Glow = Color3.fromRGB(255, 130, 30), Material = Enum.Material.Slate } },
-	Abyss = { Name = "Сет бездны", Biome = 4, Rarity = "Legendary", Health = 160, Defense = 0.09, Bonus = 0.50,
+	Abyss = { Name = "Сет бездны", Biome = 4, Rarity = "Legendary", Health = 160, Defense = 0.09, Bonus = 0.50, TrainingMult = 1.25,
 		Style = { Kind = "Abyss", Main = Color3.fromRGB(60, 35, 110), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(255, 61, 184), Material = Enum.Material.Metal } },
 	-- Robux exclusive (Config.Products "ArmorRoyal"): between Ice and Lava.
-	Royal = { Name = "Королевский сет", Rarity = "Legendary", Health = 70, Defense = 0.06, Bonus = 0.28, Robux = true,
+	Royal = { Name = "Королевский сет", Rarity = "Legendary", Health = 70, Defense = 0.06, Bonus = 0.28, TrainingMult = 1.15, Robux = true,
 		Style = { Kind = "Abyss", Main = Color3.fromRGB(240, 240, 250), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Metal } },
 }
 Config.ArmorSetOrder = { "Bone", "Ice", "Lava", "Abyss", "Royal" }
@@ -435,6 +464,7 @@ do
 				Rarity = set.Rarity,
 				Health = if slot == "Chest" then math.floor(set.Health * 1.5) else set.Health,
 				Defense = set.Defense,
+				TrainingMult = set.TrainingMult, -- per piece: a full set = TrainingMult^3
 				Color = set.Style.Main,
 			})
 		end

@@ -71,12 +71,12 @@ local function refreshTrainer()
 	local def = Config.TrainerById[player:GetAttribute("OnTrainer") or ""]
 	trainerPlate.Visible = def ~= nil
 	if def then
-		local perSecond = Config.Aura.TrainerTickBase * def.Multiplier * (player:GetAttribute("AuraMultiplier") or 1) / Config.Aura.TrainerTickInterval
+		local perSecond = (player:GetAttribute("Stat_AuraGain") or 1) * def.Multiplier / Config.Aura.TrainerTickInterval
 		trainerText.Text = Config.HubLayout.Texts.TrainerHud:format(tostring(def.Multiplier), Format.Number(perSecond))
 	end
 end
 player:GetAttributeChangedSignal("OnTrainer"):Connect(refreshTrainer)
-player:GetAttributeChangedSignal("AuraMultiplier"):Connect(refreshTrainer)
+player:GetAttributeChangedSignal("Stat_AuraGain"):Connect(refreshTrainer)
 refreshTrainer()
 
 local currentRoomAlive = nil -- alive count in the room the player is in (nil = unknown)

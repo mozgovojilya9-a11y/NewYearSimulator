@@ -22,6 +22,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local DataService = require(script.Parent.DataService)
 local PlayerState = require(script.Parent.PlayerState)
+local StatService = require(script.Parent.StatService)
 local Remotes = require(script.Parent.Remotes)
 
 local StoreService = {}
@@ -80,7 +81,7 @@ local function grant(player, product): string?
 		player:SetAttribute("RewardReady", true)
 		return "Колесо удачи можно крутить!"
 	elseif product.Kind == "Chest" then
-		local rewards = chestRewards(product.Biome, product.Rolls, product.Luck * PlayerState.LootLuck(player))
+		local rewards = chestRewards(product.Biome, product.Rolls, product.Luck * StatService.Get(player).Luck)
 		local parts = {}
 		for materialId, count in pairs(rewards) do
 			PlayerState.AddMaterial(player, materialId, count)

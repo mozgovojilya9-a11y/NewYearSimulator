@@ -22,6 +22,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local DungeonGenerator = require(script.Parent.DungeonGenerator)
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local PlayerState = require(script.Parent.PlayerState)
+local StatService = require(script.Parent.StatService)
 local RateLimit = require(script.Parent.RateLimit)
 local Remotes = require(script.Parent.Remotes)
 
@@ -112,7 +113,7 @@ function LootService.OnKill(player, room: number, isBoss: boolean, position: Vec
 	if not PlayerState.IsReady(player) or not dropsByRarity[kind] then
 		return
 	end
-	local luck = PlayerState.LootLuck(player)
+	local luck = StatService.Get(player).Luck
 	local count = 1
 	if isBoss then
 		count = LOOT.BossDrops

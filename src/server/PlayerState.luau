@@ -1,9 +1,9 @@
 --[[
 	PlayerState.luau
-	The one place that knows how the economy works: how hard a player
-	hits, what multiplies their Aura, and how Aura is added or spent.
+	Access to the player's state: Aura, materials, armor, pets, boosts.
 	Every service goes through here instead of poking leaderstats or
-	the data table directly, so balance changes live in one file.
+	the data table directly. Final numbers (damage, HP, Aura gain, ...)
+	are computed by StatService, never here.
 
 	Aura lives in leaderstats.Aura (Main.server mirrors it into the save
 	data). Everything else lives in the DataService table and is pushed
@@ -18,6 +18,8 @@ local DataService = require(script.Parent.DataService)
 local Passes = require(script.Parent.Passes)
 
 local PlayerState = {}
+
+PlayerState.OnSynced = nil -- set by StatService: recompute stats after every Sync
 
 local function auraValue(player)
 	local leaderstats = player:FindFirstChild("leaderstats")
@@ -52,102 +54,25 @@ function PlayerState.ActiveSet(player)
 	return Config.ArmorSets[setId]
 end
 
-function PlayerState.MaxHealth(player): number
-	local health = Config.Player.Health
-	for _, slot in ipairs(Config.ArmorSlots) do
-		local piece = PlayerState.ArmorIn(player, slot)
-		if piece then
-			health += piece.Health
-		end
-	end
-	return health
-end
-
--- Share of incoming damage removed by armor (0..0.8).
-function PlayerState.Defense(player): number
-	local defense = 0
-	for _, slot in ipairs(Config.ArmorSlots) do
-		local piece = PlayerState.ArmorIn(player, slot)
-		if piece then
-			defense += piece.Defense
-		end
-	end
-	return math.min(0.8, defense)
-end
-
--- Damage of one click before crit: weapon base x AuraPower(Aura) x
--- rebirths (x armor set / pets / passes / boosts as those systems exist).
-function PlayerState.Damage(player): number
-	local data = DataService.Get(player)
-	if not data then
-		return 1
-	end
-	local weapon = Config.ItemById.Weapon[data.EquippedWeapon]
-	local damage = Config.Click.BaseDamage * (if weapon then weapon.Damage else 1)
-	damage *= Config.AuraPower(PlayerState.GetAura(player))
-	damage *= Config.RebirthMultiplier(data.Rebirths)
-	local set = PlayerState.ActiveSet(player)
-	if set then
-		damage *= 1 + set.Bonus
-	end
-	local _, petDamage = PlayerState.PetBonus(player)
-	damage *= 1 + petDamage
-	if Passes.Owns(player, "Damage2x") then
-		damage *= 2
-	end
-	if PlayerState.BoostActive(player, "Damage") then
-		damage *= 2
-	end
-	return math.max(1, math.floor(damage))
-end
-PlayerState.ClickPower = PlayerState.Damage
-
--- Aura changes on every click, and damage depends on it: keep the
--- "ClickPower" attribute (HUD, barrier hints) fresh.
-function PlayerState.RefreshPower(player)
-	local damage = PlayerState.Damage(player)
-	if player:GetAttribute("ClickPower") ~= damage then
-		player:SetAttribute("ClickPower", damage)
-	end
-end
-
--- Multiplier applied to every Aura gain (clicks, trainers, rewards).
-function PlayerState.AuraMultiplier(player): number
-	local data = DataService.Get(player)
-	if not data then
-		return 1
-	end
-	local multiplier = 1 + PlayerState.PetBonus(player)
-	multiplier *= Config.RebirthMultiplier(data.Rebirths)
-	if (data.BoostUntil or 0) > os.time() then
-		multiplier *= Config.Progression.Boost.Multiplier
-	end
-	if Passes.Owns(player, "VIP") then
-		multiplier *= Config.VipAuraMultiplier
-	end
-	if Passes.Owns(player, "Aura2x") then
-		multiplier *= 2
-	end
-	return multiplier
-end
-
--- Rolls a crit on top of a base amount.
-function PlayerState.RollCrit(amount: number): (number, boolean)
-	if math.random() < Config.Click.CritChance then
-		return amount * Config.Click.CritMultiplier, true
-	end
-	return amount, false
-end
-
--- Adds Aura after applying the Aura multiplier. Returns what was added.
-function PlayerState.GiveAura(player, baseAmount: number): number
+-- Adds Aura (already multiplied by the caller: StatService AuraGain).
+-- The fraction below 1 is kept per player, so 0.2 + 0.2 + ... adds up.
+-- Returns the whole Aura actually added.
+local carry = {} -- [player] = fraction not yet added
+game:GetService("Players").PlayerRemoving:Connect(function(player)
+	carry[player] = nil
+end)
+function PlayerState.GiveAura(player, amount: number): number
 	local aura = auraValue(player)
-	if not aura then
+	if not aura or amount ~= amount or amount <= 0 then
 		return 0
 	end
-	local amount = math.max(1, math.floor(baseAmount * PlayerState.AuraMultiplier(player)))
-	aura.Value += amount
-	return amount
+	local total = amount + (carry[player] or 0)
+	local whole = math.floor(total)
+	carry[player] = total - whole
+	if whole > 0 then
+		aura.Value += whole
+	end
+	return whole
 end
 
 function PlayerState.GetAura(player): number
@@ -191,18 +116,6 @@ end
 ---------------------------------------------------------------------
 -- Materials (inventory)
 ---------------------------------------------------------------------
-
--- Multiplier for the chances of Rare+ drops (passes / boosts).
-function PlayerState.LootLuck(player): number
-	local luck = 1
-	if Passes.Owns(player, "LootLuck") then
-		luck *= 2
-	end
-	if PlayerState.BoostActive(player, "Loot") then
-		luck *= 2
-	end
-	return luck
-end
 
 -- Timed boosts: "Aura" (BoostUntil), "Damage", "Loot".
 function PlayerState.BoostActive(player, kind: string): boolean
@@ -381,8 +294,6 @@ function PlayerState.Sync(player)
 	end
 	local set = PlayerState.ActiveSet(player)
 	player:SetAttribute("ArmorSet", if set then set.Id else "")
-	player:SetAttribute("MaxHealth", PlayerState.MaxHealth(player))
-	player:SetAttribute("Defense", PlayerState.Defense(player))
 	-- Pets
 	player:SetAttribute("Pets", HttpService:JSONEncode(data.Pets))
 	player:SetAttribute("EquippedPets", table.concat(data.EquippedPets, ","))
@@ -392,8 +303,9 @@ function PlayerState.Sync(player)
 	end
 	player:SetAttribute("PetIndex", table.concat(index, ","))
 	player:SetAttribute("PetSlots", PlayerState.PetSlots(player))
-	player:SetAttribute("AuraMultiplier", PlayerState.AuraMultiplier(player))
-	PlayerState.RefreshPower(player)
+	if PlayerState.OnSynced then
+		PlayerState.OnSynced(player) -- StatService recomputes every stat
+	end
 end
 
 return PlayerState

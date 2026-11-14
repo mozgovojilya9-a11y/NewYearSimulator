@@ -28,6 +28,7 @@ local ProgressionService = require(script.Parent.ProgressionService)
 local RebirthService = require(script.Parent.RebirthService)
 local Remotes = require(script.Parent.Remotes)
 local ShopService = require(script.Parent.ShopService)
+local StatService = require(script.Parent.StatService)
 local StoreService = require(script.Parent.StoreService)
 local TravelService = require(script.Parent.TravelService)
 
@@ -62,6 +63,7 @@ end
 Remotes.Init()
 start("Passes", Passes.Init)
 Passes.OnChanged = PlayerState.Sync
+start("StatService", StatService.Init)
 start("Atmosphere", Atmosphere.Init)
 local hub = HubService.Init()
 start("LeaderboardService", LeaderboardService.Init, hub.Leaderboards)
@@ -116,7 +118,7 @@ local function onPlayerAdded(player)
 	-- Keep the cached data table in sync whenever Aura changes.
 	aura.Changed:Connect(function(newValue)
 		data.Aura = newValue
-		PlayerState.RefreshPower(player) -- damage grows with Aura
+		StatService.Refresh(player) -- damage grows with Aura
 	end)
 
 	PlayerState.Sync(player)

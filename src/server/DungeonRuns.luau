@@ -19,6 +19,7 @@ local DungeonGenerator = require(script.Parent.DungeonGenerator)
 local Effects = require(script.Parent.Effects)
 local MobBuilder = require(script.Parent.MobBuilder)
 local PlayerState = require(script.Parent.PlayerState)
+local StatService = require(script.Parent.StatService)
 local Remotes = require(script.Parent.Remotes)
 local WorldKit = require(script.Parent.WorldKit)
 
@@ -89,7 +90,7 @@ local function refreshRecommended(run, room)
 	end
 	local label = room.Barrier:FindFirstChild("Text") and room.Barrier.Text:FindFirstChild("Recommended", true)
 	if label then
-		local enough = PlayerState.ClickPower(run.player) >= Config.RecommendedDamage(room.Index)
+		local enough = StatService.Get(run.player).Damage >= Config.RecommendedDamage(room.Index)
 		label.TextColor3 = if enough then Config.Theme.Green else Config.Theme.Red
 	end
 end
@@ -407,7 +408,7 @@ function DungeonRuns.Hit(player, model)
 	if not humanoid or humanoid.Health <= 0 then
 		return
 	end
-	local damage, isCrit = PlayerState.RollCrit(PlayerState.Damage(player))
+	local damage, isCrit = StatService.RollHit(player)
 	humanoid.Health = math.max(0, humanoid.Health - damage)
 	model:SetAttribute("Hits", (model:GetAttribute("Hits") or 0) + 1)
 	WorldKit.UpdateHealth(model.PrimaryPart, humanoid.Health, humanoid.MaxHealth)

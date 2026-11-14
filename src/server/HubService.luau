@@ -24,6 +24,7 @@ local HubGenerator = require(script.Parent.HubGenerator)
 local Passes = require(script.Parent.Passes)
 local PlayerState = require(script.Parent.PlayerState)
 local Remotes = require(script.Parent.Remotes)
+local StatService = require(script.Parent.StatService)
 
 local HubService = {}
 
@@ -104,7 +105,8 @@ local function tick(remote)
 	for _, player in ipairs(Players:GetPlayers()) do
 		local trainer = HubService.TrainerOf(player)
 		if trainer and PlayerState.IsReady(player) then
-			local gained = PlayerState.GiveAura(player, A.TrainerTickBase * trainer.def.Multiplier)
+			-- AuraGain = TrainerTickBase x BaseAura(level) x gear x rebirth x pets x passes x boosts
+			local gained = PlayerState.GiveAura(player, StatService.Get(player).AuraGain * trainer.def.Multiplier)
 			EquipmentService.Swing(player)
 			remote:FireClient(player, "Tick", trainer.model, gained)
 		end
