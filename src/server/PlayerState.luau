@@ -90,6 +90,8 @@ function PlayerState.Damage(player): number
 	if set then
 		damage *= 1 + set.Bonus
 	end
+	local _, petDamage = PlayerState.PetBonus(player)
+	damage *= 1 + petDamage
 	return math.max(1, math.floor(damage))
 end
 PlayerState.ClickPower = PlayerState.Damage
@@ -109,8 +111,7 @@ function PlayerState.AuraMultiplier(player): number
 	if not data then
 		return 1
 	end
-	local pet = Config.ItemById.Pet[data.EquippedPet]
-	local multiplier = if pet then 1 + pet.Bonus else 1
+	local multiplier = 1 + PlayerState.PetBonus(player)
 	multiplier *= Config.RebirthMultiplier(data.Rebirths)
 	if (data.BoostUntil or 0) > os.time() then
 		multiplier *= Config.Progression.Boost.Multiplier
@@ -226,17 +227,67 @@ function PlayerState.HasMaterials(player, cost: { [string]: number }): boolean
 	return true
 end
 
--- Gives a pet if the player doesn't own it yet. Returns true if given.
+---------------------------------------------------------------------
+-- Pets
+---------------------------------------------------------------------
+
+-- "Spark:2" -> pet def, tier (or nil).
+function PlayerState.ParsePetKey(key: string)
+	if type(key) ~= "string" then
+		return nil, nil
+	end
+	local petId, tierText = string.match(key, "^(%w+):(%d)$")
+	local pet = petId and Config.PetById[petId]
+	local tier = tonumber(tierText)
+	if not pet or not tier or not Config.PetTiers[tier] then
+		return nil, nil
+	end
+	return pet, tier
+end
+
+function PlayerState.PetSlots(player): number
+	return Config.PetSlots + (if Passes.Owns(player, "PetSlots") then Config.PetSlotsPass else 0)
+end
+
+-- Sum of the equipped pets' bonuses: aura, damage.
+function PlayerState.PetBonus(player): (number, number)
+	local data = DataService.Get(player)
+	if not data then
+		return 0, 0
+	end
+	local aura, damage = 0, 0
+	for _, key in ipairs(data.EquippedPets) do
+		local pet, tier = PlayerState.ParsePetKey(key)
+		if pet then
+			local multiplier = Config.PetTiers[tier].Multiplier
+			aura += pet.Bonus * multiplier
+			damage += (pet.DamageBonus or 0) * multiplier
+		end
+	end
+	return aura, damage
+end
+
+-- Adds one pet (tier 1). Returns false when the storage is full.
 function PlayerState.GrantPet(player, petId: string): boolean
 	local data = DataService.Get(player)
-	if not data or data.OwnedPets[petId] or not Config.ItemById.Pet[petId] then
+	if not data or not Config.PetById[petId] then
 		return false
 	end
-	data.OwnedPets[petId] = true
-	if data.EquippedPet == "" then
-		data.EquippedPet = petId
+	local total = 0
+	for _, tiers in pairs(data.Pets) do
+		for _, count in pairs(tiers) do
+			total += count
+		end
 	end
-	PlayerState.Sync(player)
+	if total >= Config.PetStorage then
+		return false
+	end
+	data.Pets[petId] = data.Pets[petId] or {}
+	data.Pets[petId]["1"] = (data.Pets[petId]["1"] or 0) + 1
+	data.PetIndex[petId] = true
+	if #data.EquippedPets < PlayerState.PetSlots(player) then
+		table.insert(data.EquippedPets, petId .. ":1")
+	end
 	return true
 end
 
@@ -294,6 +345,15 @@ function PlayerState.Sync(player)
 	player:SetAttribute("ArmorSet", if set then set.Id else "")
 	player:SetAttribute("MaxHealth", PlayerState.MaxHealth(player))
 	player:SetAttribute("Defense", PlayerState.Defense(player))
+	-- Pets
+	player:SetAttribute("Pets", HttpService:JSONEncode(data.Pets))
+	player:SetAttribute("EquippedPets", table.concat(data.EquippedPets, ","))
+	local index = {}
+	for petId in pairs(data.PetIndex) do
+		table.insert(index, petId)
+	end
+	player:SetAttribute("PetIndex", table.concat(index, ","))
+	player:SetAttribute("PetSlots", PlayerState.PetSlots(player))
 	player:SetAttribute("AuraMultiplier", PlayerState.AuraMultiplier(player))
 	PlayerState.RefreshPower(player)
 end

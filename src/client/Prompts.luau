@@ -16,7 +16,7 @@ local Style = require(script.Parent.ui.Style)
 local Forge = require(script.Parent.ui.Windows.Forge)
 local Rebirth = require(script.Parent.ui.Windows.Rebirth)
 local Reward = require(script.Parent.ui.Windows.Reward)
-local Shop = require(script.Parent.ui.Windows.Shop)
+local Pets = require(script.Parent.ui.Windows.Pets)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -28,7 +28,7 @@ local ACTIONS = {
 	OpenStore = function()
 		Popups.Toast("Магазин скоро откроется", "gold")
 	end,
-	OpenPets = Shop.OpenPets,
+	OpenPets = Pets.OpenEggs,
 	RebirthAltar = Rebirth.Open,
 	Wheel = Reward.OpenWheel,
 }

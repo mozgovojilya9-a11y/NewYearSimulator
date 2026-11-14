@@ -23,8 +23,9 @@ Config.StartingData = {
 	OwnedArmor = {}, -- [armorId] = true
 	EquippedArmor = { Helmet = "", Chest = "", Legs = "" },
 	Materials = {}, -- [materialId] = count
-	OwnedPets = {},
-	EquippedPet = "",
+	Pets = {}, -- [petId] = { ["1"] = count, ["2"] = count, ["3"] = count } (tiers)
+	EquippedPets = {}, -- { "petId:tier", ... }
+	PetIndex = {}, -- [petId] = true once hatched
 	RoomReached = 0, -- highest dungeon room cleared (0 = none, 20 = all)
 	TrainersUnlocked = { ["1"] = true }, -- trainer ids whose Aura requirement was reached (permanent)
 	-- Engagement systems (ProgressionService)
@@ -36,8 +37,8 @@ Config.StartingData = {
 	BoostUntil = 0,
 	LastSeen = 0, -- os.time() of the last save
 }
--- Fields from older versions that are ignored on load (never written back):
--- OwnedBackpacks, EquippedBackpack.
+-- Fields from older versions that are migrated / dropped on load
+-- (DataService): OwnedBackpacks, EquippedBackpack, OwnedPets, EquippedPet.
 
 Config.AutosaveInterval = 120
 
@@ -140,13 +141,6 @@ Config.Dungeon = {
 		BossSlamRadius = 16,
 		BossSlamWarning = 1, -- seconds the red circle shows before the hit
 		BossSlamDamageMultiplier = 4,
-	},
-
-	-- Every boss kill rolls these in order; the first unowned pet that
-	-- hits is given to the player.
-	BossPetDrops = {
-		{ PetId = "Spark", Chance = 0.25 },
-		{ PetId = "Dragon", Chance = 0.05 },
 	},
 }
 
@@ -431,12 +425,59 @@ Config.Forge = {
 	},
 }
 
--- Pets: +Bonus to all Aura gains (multiplier = 1 + Bonus).
+-- Pets hatch from eggs (Aura) and follow the player. Every equipped pet
+-- adds Bonus x tier multiplier to all Aura gains (and DamageBonus x
+-- tier to damage). Three equal pets of one tier merge into one of the
+-- next tier. Shape = look built by Shared.PetBuilder. Ids are stored in
+-- saves: never rename.
 Config.Pets = {
-	{ Id = "Spark", Name = "Искорка", Rarity = "Epic", Bonus = 0.25, Cost = 5000, Color = Color3.fromRGB(255, 220, 90), Size = 1.4 },
-	{ Id = "Dragon", Name = "Дракончик Ауры", Rarity = "Mythic", Bonus = 0.75, Cost = 250000, Color = Color3.fromRGB(170, 90, 255), Size = 2, Wings = true },
+	{ Id = "Blob", Name = "Слизнячок", Rarity = "Common", Bonus = 0.05, Shape = "Blob", Color = Color3.fromRGB(110, 235, 120), Size = 1.3 },
+	{ Id = "Bunny", Name = "Ушастик", Rarity = "Common", Bonus = 0.07, Shape = "Ears", Color = Color3.fromRGB(245, 235, 240), Size = 1.3 },
+	{ Id = "Bat", Name = "Летучая мышка", Rarity = "Uncommon", Bonus = 0.12, Shape = "Wings", Color = Color3.fromRGB(120, 90, 170), Size = 1.3 },
+	{ Id = "Spark", Name = "Искорка", Rarity = "Rare", Bonus = 0.2, Shape = "Star", Color = Color3.fromRGB(255, 220, 90), Size = 1.4 },
+	{ Id = "IceFox", Name = "Ледяной лис", Rarity = "Rare", Bonus = 0.25, Shape = "Ears", Color = Color3.fromRGB(170, 225, 255), Size = 1.5 },
+	{ Id = "Imp", Name = "Бесёнок", Rarity = "Epic", Bonus = 0.4, DamageBonus = 0.05, Shape = "Horns", Color = Color3.fromRGB(240, 90, 60), Size = 1.5 },
+	{ Id = "Golem", Name = "Мини-голем", Rarity = "Epic", Bonus = 0.45, DamageBonus = 0.08, Shape = "Crystal", Color = Color3.fromRGB(150, 80, 255), Size = 1.6 },
+	{ Id = "Dragon", Name = "Дракончик Ауры", Rarity = "Legendary", Bonus = 0.8, DamageBonus = 0.15, Shape = "Wings", Color = Color3.fromRGB(170, 90, 255), Size = 2 },
+	{ Id = "Phoenix", Name = "Феникс", Rarity = "Legendary", Bonus = 1, DamageBonus = 0.2, Shape = "Wings", Color = Color3.fromRGB(255, 150, 40), Size = 2 },
+	{ Id = "AbyssEye", Name = "Око бездны", Rarity = "Mythic", Bonus = 2, DamageBonus = 0.4, Shape = "Eye", Color = Color3.fromRGB(255, 61, 184), Size = 2 },
 }
-Config.PetSlots = 1 -- shown as "N/1" in the HUD
+Config.PetById = {}
+for order, pet in ipairs(Config.Pets) do
+	pet.Order = order
+	Config.PetById[pet.Id] = pet
+end
+
+Config.PetTiers = {
+	{ Name = "", Multiplier = 1 },
+	{ Name = "Золотой", Multiplier = 3, Color = Color3.fromRGB(255, 201, 60) },
+	{ Name = "Радужный", Multiplier = 10, Color = Color3.fromRGB(255, 120, 220), Rainbow = true },
+}
+Config.PetMerge = 3 -- equal pets merged into one of the next tier
+Config.PetSlots = 3 -- equipped at once (+ PetSlotsPass with the pass)
+Config.PetSlotsPass = 3
+Config.PetStorage = 100 -- max pets kept
+
+-- Eggs: Aura price and the weight of each pet. Luck (pass / boost)
+-- multiplies the weight of Epic and better pets.
+Config.Eggs = {
+	{ Id = "Basic", Name = "Обычное яйцо", Cost = 500, Color = Color3.fromRGB(240, 235, 225),
+		Pets = { { Id = "Blob", Weight = 45 }, { Id = "Bunny", Weight = 35 }, { Id = "Bat", Weight = 15 }, { Id = "Spark", Weight = 5 } } },
+	{ Id = "Crystal", Name = "Кристальное яйцо", Cost = 25000, Color = Color3.fromRGB(150, 220, 255),
+		Pets = { { Id = "Bat", Weight = 40 }, { Id = "Spark", Weight = 28 }, { Id = "IceFox", Weight = 22 }, { Id = "Imp", Weight = 8 }, { Id = "Dragon", Weight = 2 } } },
+	{ Id = "Abyss", Name = "Яйцо бездны", Cost = 750000, Color = Color3.fromRGB(170, 80, 255),
+		Pets = { { Id = "IceFox", Weight = 35 }, { Id = "Imp", Weight = 28 }, { Id = "Golem", Weight = 22 }, { Id = "Dragon", Weight = 9 }, { Id = "Phoenix", Weight = 5 }, { Id = "AbyssEye", Weight = 1 } } },
+}
+Config.EggById = {}
+for _, egg in ipairs(Config.Eggs) do
+	Config.EggById[egg.Id] = egg
+end
+Config.Hatch = {
+	Seconds = 2.2, -- hatch animation
+	FastSeconds = 0.8, -- with the "Быстрые яйца" pass
+	TripleCount = 3, -- eggs per hatch with the "Открытие 3 яиц" pass
+	LuckFrom = "Epic",
+}
 
 -- Rebirth at the hub altar: requires RoomReached >= RebirthRequirement.
 -- Resets Aura and the room record; keeps weapons, armor, items, pets.
@@ -555,8 +596,6 @@ Config.Leaderboards = {
 Config.Shop = {
 	Weapon = { Title = "Оружие", Items = Config.Weapons, OwnedKey = "OwnedWeapons", EquippedKey = "EquippedWeapon", Purchasable = false,
 		Describe = function(item) return "Урон " .. item.Damage end },
-	Pet = { Title = "Питомцы", Items = Config.Pets, OwnedKey = "OwnedPets", EquippedKey = "EquippedPet",
-		Describe = function(item) return "+" .. math.floor(item.Bonus * 100 + 0.5) .. "% ко всей Ауре • дроп с боссов" end },
 }
 
 Config.ItemById = {} -- [category][id] = item
@@ -578,6 +617,7 @@ Config.Remotes = {
 	ClickHit = "RemoteEvent", -- C->S (mob or nil) on every click; S->C ("Aura"|"Tick"|"Hit"|"Kill", ...)
 	ShopRequest = "RemoteFunction", -- ("Equip", "Weapon"|"Armor", id) | ("Unequip", "Armor", slot) | pets -> ok, message
 	Craft = "RemoteFunction", -- (recipeId) -> ok, message
+	Pets = "RemoteFunction", -- ("Hatch", eggId, triple) | ("Equip"|"Unequip"|"Merge", key) | ("EquipBest") -> ok, message, results
 	RebirthRequest = "RemoteFunction", -- () -> ok, message
 	Travel = "RemoteFunction", -- ("Hub") | ("Room", n) -> ok, message
 	Notify = "RemoteEvent", -- S->C (text, kind) toast
@@ -864,6 +904,7 @@ Config.Sounds = {
 	Hammer = "rbxasset://sounds/swordlunge.wav", -- forge hammer strike (played low)
 	Forged = "rbxasset://sounds/victory.wav",
 	Unsheath = "rbxasset://sounds/unsheath.wav",
+	Music = "", -- TODO: your uploaded background music (rbxassetid://...)
 	Hit = "rbxasset://sounds/swordslash.wav",
 	Buy = "rbxasset://sounds/electronicpingshort.wav",
 	Rebirth = "rbxasset://sounds/electronicpingshort.wav",

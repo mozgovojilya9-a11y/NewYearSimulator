@@ -11,6 +11,7 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local ArmorBuilder = require(ReplicatedStorage.Shared.ArmorBuilder)
 local MaterialBuilder = require(ReplicatedStorage.Shared.MaterialBuilder)
+local PetBuilder = require(ReplicatedStorage.Shared.PetBuilder)
 local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
 local Style = require(script.Parent.Style)
 
@@ -25,6 +26,8 @@ local function buildFor(category: string, item)
 		return MaterialBuilder.Build(item)
 	elseif category == "Armor" then
 		return ArmorBuilder.Build(item)
+	elseif category == "Pet" then
+		return PetBuilder.Build(item.Pet, item.Tier) -- item = { Pet, Tier }
 	end
 	return nil
 end

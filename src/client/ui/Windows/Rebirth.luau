@@ -69,7 +69,7 @@ local function refresh()
 	local rebirths = player:GetAttribute("Rebirths") or 0
 	local reached = player:GetAttribute("RoomReached") or 0
 	countLabel.Text = "Перерождений: " .. rebirths
-	multiplierLabel.Text = ("Множитель Ауры: x%s → x%s"):format(tostring(Config.RebirthMultiplier(rebirths)), tostring(Config.RebirthMultiplier(rebirths + 1)))
+	multiplierLabel.Text = ("Аура и урон: x%s → x%s"):format(tostring(Config.RebirthMultiplier(rebirths)), tostring(Config.RebirthMultiplier(rebirths + 1)))
 	requirementLabel.Text = ("Условие: пройти этап %d (сейчас %d/%d)"):format(required, reached, required)
 	fill.Size = UDim2.fromScale(math.clamp(reached / required, 0, 1), 1)
 	if confirming then

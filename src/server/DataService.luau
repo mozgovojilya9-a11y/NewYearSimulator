@@ -94,6 +94,21 @@ function DataService.Load(player)
 	-- Fields of removed systems: dropped so they are never written back.
 	data.OwnedBackpacks = nil
 	data.EquippedBackpack = nil
+	-- Old pets (one of each, one equipped) -> pet stacks.
+	if type(data.OwnedPets) == "table" then
+		for petId in pairs(data.OwnedPets) do
+			if Config.PetById[petId] then
+				data.Pets[petId] = data.Pets[petId] or { ["1"] = 0 }
+				data.Pets[petId]["1"] = (data.Pets[petId]["1"] or 0) + 1
+				data.PetIndex[petId] = true
+			end
+		end
+		if type(data.EquippedPet) == "string" and data.Pets[data.EquippedPet] then
+			table.insert(data.EquippedPets, data.EquippedPet .. ":1")
+		end
+	end
+	data.OwnedPets = nil
+	data.EquippedPet = nil
 
 	if player.Parent == nil then
 		noSave[player.UserId] = nil

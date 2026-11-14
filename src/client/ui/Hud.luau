@@ -11,7 +11,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Popups = require(script.Parent.Popups)
-local Shop = require(script.Parent.Windows.Shop)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer

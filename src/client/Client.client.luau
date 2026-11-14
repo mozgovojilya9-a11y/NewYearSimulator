@@ -27,7 +27,7 @@ local windows = ui:WaitForChild("Windows")
 require(ui:WaitForChild("Style"))
 require(ui:WaitForChild("Popups"))
 require(windows:WaitForChild("Window"))
-require(windows:WaitForChild("Shop")) -- waits for leaderstats
+require(windows:WaitForChild("Pets")) -- waits for leaderstats
 require(windows:WaitForChild("Inventory"))
 require(windows:WaitForChild("Forge"))
 require(windows:WaitForChild("Equipment"))

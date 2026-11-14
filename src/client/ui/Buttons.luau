@@ -19,7 +19,7 @@ local Inventory = require(script.Parent.Windows.Inventory)
 local Rebirth = require(script.Parent.Windows.Rebirth)
 local Reward = require(script.Parent.Windows.Reward)
 local Settings = require(script.Parent.Windows.Settings)
-local Shop = require(script.Parent.Windows.Shop)
+local Pets = require(script.Parent.Windows.Pets)
 
 local player = Players.LocalPlayer
 local travel = ReplicatedStorage:WaitForChild("Travel")
@@ -72,7 +72,7 @@ local actions = {
 	Forge = Forge.Open,
 	Inventory = Inventory.Open,
 	Equipment = Equipment.Open,
-	Pets = Shop.OpenPets,
+	Pets = Pets.Open,
 	Rebirth = Rebirth.Open,
 	Reward = Reward.Open,
 	Travel = function()
@@ -111,12 +111,12 @@ local function setBadge(id, visible)
 	end
 end
 local function refreshBadges()
-	setBadge("Pets", Shop.HasAffordable("Pet"))
+	setBadge("Pets", Pets.CanHatch() and (player:GetAttribute("EquippedPets") or "") == "")
 	setBadge("Rebirth", Rebirth.CanRebirth())
 	setBadge("Reward", player:GetAttribute("RewardReady") == true)
 end
 aura.Changed:Connect(refreshBadges)
-for _, attribute in ipairs({ "OwnedWeapon", "OwnedPet", "RoomReached", "RewardReady" }) do
+for _, attribute in ipairs({ "EquippedPets", "RoomReached", "RewardReady" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshBadges)
 end
 refreshBadges()

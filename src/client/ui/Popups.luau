@@ -199,43 +199,6 @@ function Popups.Flash(color: Color3)
 	end)
 end
 
--- Egg hatch: shaking egg, flash, then the pet's name in its rarity color.
-function Popups.Hatch(petName: string, color: Color3, rainbow: boolean?)
-	local holder = Instance.new("Frame")
-	holder.AnchorPoint = Vector2.new(0.5, 0.5)
-	holder.Position = UDim2.fromScale(0.5, 0.45)
-	holder.Size = UDim2.fromOffset(300, 220)
-	holder.BackgroundTransparency = 1
-	holder.ZIndex = 60
-	holder.Parent = Style.Gui
-
-	local egg = Style.Label(holder, "🥚", 120, Style.Colors.Text, { Size = UDim2.new(1, 0, 0, 150), ZIndex = 61 })
-	egg:FindFirstChildOfClass("UIStroke").Transparency = 1
-	task.spawn(function()
-		for i = 1, 10 do
-			egg.Rotation = (if i % 2 == 0 then 1 else -1) * (4 + i * 1.5)
-			task.wait(0.09)
-		end
-		egg.Rotation = 0
-		Popups.Fade(Color3.new(1, 1, 1), 0.15)
-		Popups.Shake(0.4, 0.2)
-		task.wait(0.15)
-		egg.Text = "🐾"
-		local name = Style.Label(holder, petName, 34, color, { Position = UDim2.fromOffset(0, 150), Size = UDim2.new(1, 0, 0, 44), ZIndex = 61 })
-		if rainbow then
-			Style.Rainbow(name)
-		end
-		local pop = Instance.new("UIScale")
-		pop.Scale = 0.3
-		pop.Parent = holder
-		Style.Tween(pop, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
-		task.wait(2.2)
-		Style.Tween(pop, 0.3, { Scale = 0 }, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-		task.wait(0.3)
-		holder:Destroy()
-	end)
-end
-
 local shakeUntil = 0
 local shakeAmplitude = 0
 function Popups.Shake(amplitude: number, seconds: number)

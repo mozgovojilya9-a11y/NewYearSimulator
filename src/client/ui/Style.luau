@@ -25,6 +25,8 @@ Style.Font = Config.Theme.Font
 Style.Muted = false -- sound toggle (Settings window)
 Style.Shake = true
 Style.HideEffects = false -- Settings: skip hit particles and other extras
+Style.HideOtherPets = false -- Settings: hide other players' pets
+Style.MusicOn = true -- Settings: background music (Config.Sounds.Music)
 
 -- Root ScreenGui. IgnoreGuiInset is OFF so nothing lands under the
 -- Roblox buttons in the top-left corner.

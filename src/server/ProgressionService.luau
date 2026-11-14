@@ -20,6 +20,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local DataService = require(script.Parent.DataService)
 local DungeonRuns = require(script.Parent.DungeonRuns)
+local PetService = require(script.Parent.PetService)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
 local Remotes = require(script.Parent.Remotes)
@@ -256,21 +257,21 @@ local function spin(player)
 	elseif prize.Kind == "Boost" then
 		giveBoost(player, data, prize.Minutes)
 		message = ("x2 Аура на %d мин"):format(prize.Minutes)
-	else -- Egg: a random pet you don't own, or Aura if you own them all
-		local candidates = {}
-		for _, pet in ipairs(Config.Pets) do
-			if not data.OwnedPets[pet.Id] then
-				table.insert(candidates, pet)
+	else -- Egg: a free hatch of the best egg the player can afford, at least the first one
+		local egg = Config.Eggs[1]
+		for _, candidate in ipairs(Config.Eggs) do
+			if PlayerState.GetAura(player) >= candidate.Cost then
+				egg = candidate
 			end
 		end
-		if #candidates > 0 then
-			local pet = candidates[math.random(#candidates)]
-			PlayerState.GrantPet(player, pet.Id)
-			message = "Питомец: " .. pet.Name .. "!"
+		local petId = PetService.Roll(player, egg)
+		if PlayerState.GrantPet(player, petId) then
+			PlayerState.Sync(player)
+			message = "Питомец: " .. Config.PetById[petId].Name .. "!"
 		else
 			local amount = math.floor(1000 * auraScale(data))
 			PlayerState.GiveAura(player, amount)
-			message = "Все питомцы уже есть: +" .. Format.Number(amount) .. " Ауры"
+			message = "Хранилище питомцев полно: +" .. Format.Number(amount) .. " Ауры"
 		end
 	end
 	ProgressionService.RefreshReady(player)

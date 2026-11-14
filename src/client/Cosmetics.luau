@@ -1,9 +1,9 @@
 --[[
 	Cosmetics.luau
-	Shows every player's equipped pet floating next to them. Purely
-	visual and local: each client builds the pet from the "EquippedPet"
-	attribute the server sets. (Weapons are welded to the
-	character by the server: EquipmentService.)
+	Every player's equipped pets float around them (built locally from
+	the "EquippedPets" attribute the server sets). Purely visual. Other
+	players' pets can be hidden in Settings (Style.HideOtherPets).
+	(Weapons and armor are welded to the character by the server.)
 ]]
 
 local Players = game:GetService("Players")
@@ -12,6 +12,10 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local PetBuilder = require(ReplicatedStorage.Shared.PetBuilder)
+local Style = require(script.Parent.ui.Style)
+
+local localPlayer = Players.LocalPlayer
 
 local Cosmetics = {}
 
@@ -19,60 +23,31 @@ local folder = Instance.new("Folder")
 folder.Name = "LocalCosmetics"
 folder.Parent = Workspace
 
-local visuals = {} -- [player] = { petId, pet: Model? }
+local visuals = {} -- [player] = { key = string, pets = { Model } }
 
-local function part(name, size, color, parent)
-	local p = Instance.new("Part")
-	p.Name = name
-	p.Size = size
-	p.Color = color
-	p.Anchored = true
-	p.CanCollide = false
-	p.CanQuery = false
-	p.CanTouch = false
-	p.CastShadow = false
-	p.Material = Enum.Material.SmoothPlastic
-	p.Parent = parent
-	return p
-end
-
-local function makePet(def)
-	local model = Instance.new("Model")
-	model.Name = def.Name
-	local body = part("Body", Vector3.one * def.Size, def.Color, model)
-	body.Shape = Enum.PartType.Ball
-	body.Material = Enum.Material.Neon
-	model.PrimaryPart = body
-	local eyeSize = def.Size * 0.22
-	for _, side in ipairs({ -1, 1 }) do
-		local eye = part("Eye", Vector3.one * eyeSize, Color3.new(0, 0, 0), model)
-		eye.Shape = Enum.PartType.Ball
-		eye.CFrame = body.CFrame * CFrame.new(side * def.Size * 0.2, def.Size * 0.12, -def.Size * 0.42)
+local function clear(v)
+	for _, pet in ipairs(v.pets) do
+		pet:Destroy()
 	end
-	if def.Wings then
-		for _, side in ipairs({ -1, 1 }) do
-			local wing = part("Wing", Vector3.new(def.Size * 0.9, 0.15, def.Size * 0.5), def.Color:Lerp(Color3.new(1, 1, 1), 0.4), model)
-			wing.CFrame = body.CFrame * CFrame.new(side * def.Size * 0.75, def.Size * 0.15, def.Size * 0.1) * CFrame.Angles(0, 0, side * math.rad(20))
-		end
-	end
-	local light = Instance.new("PointLight")
-	light.Color = def.Color
-	light.Range = 8
-	light.Brightness = 1.2
-	light.Parent = body
-	model.Parent = folder
-	return model
+	v.pets = {}
 end
 
 local function sync(v, player)
-	local petId = player:GetAttribute("EquippedPet") or ""
-	if v.petId ~= petId then
-		if v.pet then
-			v.pet:Destroy()
+	local hidden = Style.HideOtherPets and player ~= localPlayer
+	local key = if hidden then "" else (player:GetAttribute("EquippedPets") or "")
+	if v.key == key then
+		return
+	end
+	v.key = key
+	clear(v)
+	for entry in string.gmatch(key, "[^,]+") do
+		local petId, tierText = string.match(entry, "^(%w+):(%d)$")
+		local pet = petId and Config.PetById[petId]
+		if pet then
+			local model = PetBuilder.Build(pet, tonumber(tierText))
+			model.Parent = folder
+			table.insert(v.pets, model)
 		end
-		local def = Config.ItemById.Pet[petId]
-		v.pet = if def then makePet(def) else nil
-		v.petId = petId
 	end
 end
 
@@ -81,19 +56,28 @@ RunService.RenderStepped:Connect(function(dt)
 	for _, player in ipairs(Players:GetPlayers()) do
 		local v = visuals[player]
 		if not v then
-			v = {}
+			v = { key = nil, pets = {} }
 			visuals[player] = v
 		end
 		sync(v, player)
 		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-		if v.pet and root then
-			local bob = math.sin(t * 3 + player.UserId % 7) * 0.4
-			local target = root.CFrame * CFrame.new(3, 1.5 + bob, 2)
-			local current = v.pet:GetPivot()
-			if (current.Position - target.Position).Magnitude > 40 then
-				v.pet:PivotTo(target)
-			else
-				v.pet:PivotTo(current:Lerp(target, math.min(1, dt * 8)))
+		local count = #v.pets
+		for i, pet in ipairs(v.pets) do
+			if root then
+				-- a fan behind the player
+				local spread = if count > 1 then (i - 1) / (count - 1) - 0.5 else 0
+				local bob = math.sin(t * 3 + i + player.UserId % 7) * 0.35
+				local target = root.CFrame * CFrame.new(spread * 6, 1.4 + bob, 3.2 + math.abs(spread) * 1.5)
+				local current = pet:GetPivot()
+				if (current.Position - target.Position).Magnitude > 40 then
+					pet:PivotTo(target)
+				else
+					pet:PivotTo(current:Lerp(target, math.min(1, dt * 7)))
+				end
+				local halo = pet:FindFirstChild("Halo")
+				if halo and halo:GetAttribute("Rainbow") then
+					halo.Color = Color3.fromHSV((t * 0.5 + i * 0.2) % 1, 0.7, 1)
+				end
 			end
 		end
 	end
@@ -101,8 +85,8 @@ end)
 
 Players.PlayerRemoving:Connect(function(player)
 	local v = visuals[player]
-	if v and v.pet then
-		v.pet:Destroy()
+	if v then
+		clear(v)
 	end
 	visuals[player] = nil
 end)
