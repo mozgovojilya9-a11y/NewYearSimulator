@@ -750,6 +750,41 @@ for order, piece in ipairs(Config.Armor) do
 	Config.ItemById.Armor[piece.Id] = piece
 end
 
+-- Owner-made models (ServerStorage/GameAssets/<Category>/<Name>, see
+-- Shared.Assets and README). Missing model -> procedural fallback.
+Config.Assets = {
+	-- Names the game looks for (AssetService reports the missing ones).
+	Expected = {
+		Weapons = { "Weapon_Sword_1", "Weapon_Sword_2", "Weapon_Spear_1", "Weapon_Spear_2", "Weapon_Blaster_1", "Weapon_Blaster_2", "Weapon_Blaster_3" },
+		Mobs = { "Boss_Juggernaut", "Mob_SpiderBot", "Mob_Mech", "Mob_RedAndroid", "Mob_Overseer", "Mob_Robot", "Mob_Android", "Mob_BlueBot", "Mob_Bot2" },
+		Props = { "Prop_Crate", "Prop_Door", "Prop_Lamp", "Prop_Pipes", "Prop_Hologram", "Prop_Barrel", "Prop_Misc_1", "Prop_Misc_2", "Prop_Misc_3", "Prop_Misc_4" },
+		Trainers = { "Trainer_Dummy", "Trainer_Bag", "Trainer_Machine", "Trainer_Refiner", "Trainer_Weights" },
+	},
+	-- Weapon look by class (Config.Weapons[i].Class): the first entry whose
+	-- UpTo rarity is >= the item's rarity. A model named exactly like the
+	-- weapon id (GameAssets/Weapons/<id>) wins over this table.
+	WeaponModels = {
+		Blade = { { Model = "Weapon_Sword_1", UpTo = "Uncommon" }, { Model = "Weapon_Sword_2" } },
+		Pulse = { { Model = "Weapon_Spear_1", UpTo = "Uncommon" }, { Model = "Weapon_Spear_2" } },
+		Gunner = { { Model = "Weapon_Blaster_1", UpTo = "Uncommon" }, { Model = "Weapon_Blaster_2", UpTo = "Epic" }, { Model = "Weapon_Blaster_3" } },
+	},
+	-- How a weapon model is held: Length in studs; GripAt = where the hand
+	-- is, 0 = rear end .. 1 = tip (default: the Tool's Handle, else 0.12);
+	-- Flip = true when the tip and the grip end come out swapped.
+	WeaponFit = {
+		Weapon_Sword_1 = { Length = 4.6 },
+		Weapon_Sword_2 = { Length = 5 },
+		Weapon_Spear_1 = { Length = 7 },
+		Weapon_Spear_2 = { Length = 7.5 },
+		Weapon_Blaster_1 = { Length = 2.6, GripAt = 0.3 },
+		Weapon_Blaster_2 = { Length = 3, GripAt = 0.3 },
+		Weapon_Blaster_3 = { Length = 3.6, GripAt = 0.3 },
+	},
+	-- Item icons: [item id] = "rbxassetid://..." uploaded by the owner.
+	-- Empty = the icon is rendered from the 3D model (Shared ItemIcon).
+	Icons = {},
+}
+
 -- DEV panel (only in Studio, never in a published game).
 Config.Dev = {
 	Credits = 100,

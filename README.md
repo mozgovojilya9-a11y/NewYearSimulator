@@ -31,7 +31,7 @@ Roblox-симулятор на Rojo 7 + Luau. Правила проекта и �
 
 | Папка | Что там |
 |---|---|
-| `src/shared` | `Config`, `Format`, конструкторы моделей: `WeaponBuilder`, `ArmorBuilder`, `MaterialBuilder`, `PetBuilder` |
+| `src/shared` | `Config`, `Format`, `Assets` (модели из GameAssets), конструкторы моделей: `WeaponBuilder`, `ArmorBuilder`, `MaterialBuilder`, `PetBuilder` |
 | `tools` | `pacing.py` — симулятор темпа прокачки по числам из `Config` (`--tune`, `--readme`) |
 | `src/server` | `Main.server` (старт), `StatService` (все характеристики игрока), `HubGenerator`/`HubService` (хаб), `DungeonGenerator`/`DungeonRuns`/`MobBuilder`/`MobAI` (данж), `ClickService` (клик, авто-клик), `LootService` (дроп), `CraftService` (кузница), `EquipmentService` (оружие и броня на персонаже), `PetService`, `StoreService` (Robux), `Passes`, `ProgressionService`, `TravelService`, `Bounds` (нельзя выпасть), `PlayerState`, `DataService` |
 | `src/client` | `Combat` (клик), `Swing` (взмах), `MobFx` (анимации мобов, полоска босса), `LootFx` (дроп), `Cosmetics` (питомцы), `Zone` (свет), `Prompts`, `ui/*` (HUD и окна) |
@@ -39,6 +39,26 @@ Roblox-симулятор на Rojo 7 + Luau. Правила проекта и �
 Запуск: `rokit install`, `rojo serve`, в Studio — плагин Rojo → Connect.
 Для сохранений в Studio: Game Settings → Security → Enable Studio Access
 to API Services. Для покупок — опубликованное место.
+
+## Модели (GameAssets)
+
+Свои модели клади в Studio в `ServerStorage/GameAssets/<Категория>/<Имя>`.
+Rojo эту папку не трогает. При старте сервер копирует очищенную копию в
+`ReplicatedStorage/GameAssets` (скрипты, звуки и всё «не-визуальное»
+удаляются) и печатает в Output список моделей с размерами и тех, которых
+не хватает. Нет модели — игра строит процедурную из деталей.
+
+| Категория | Имена | Где используется |
+|---|---|---|
+| `Weapons` | `Weapon_Sword_1/2`, `Weapon_Spear_1/2`, `Weapon_Blaster_1/2/3` | оружие классов Клинок / Импульс / Стрелок: `_1` — обычные/необычные, старшие номера — редкие и выше (`Config.Assets.WeaponModels`). Модель с именем ровно как id оружия (например `BoneSword`) важнее таблицы. Tool можно: берутся только детали. |
+| `Mobs` | `Boss_Juggernaut`, `Mob_SpiderBot`, `Mob_Mech`, `Mob_RedAndroid`, `Mob_Overseer`, `Mob_Robot`, `Mob_Android`, `Mob_BlueBot`, `Mob_Bot2` | мобы и боссы подземелья (`Config.Mobs`: какая модель, высота, перекраска) |
+| `Props` | `Prop_Crate`, `Prop_Door`, `Prop_Lamp`, `Prop_Pipes`, `Prop_Hologram`, `Prop_Barrel`, `Prop_Misc_1…4` | декор хаба и подземелья (подбираются по размеру) |
+| `Trainers` | `Trainer_Dummy`, `Trainer_Bag` (манекены полигона), `Trainer_Machine`, `Trainer_Refiner`, `Trainer_Weights` (декор) | полигон, фабрикатор, хаб |
+| `Armor` | — | броня процедурная |
+
+Если оружие в руке развёрнуто не тем концом или держится не за ту
+точку — поправь `Config.Assets.WeaponFit` (`Flip = true`, `GripAt`,
+`Length`).
 
 ## Robux: что создать в Creator Dashboard
 

@@ -3,9 +3,9 @@
 	Builds a weapon Model out of Parts for a Config.Weapons entry
 	(weapon.Shape picks the builder). Used for the character's hand and
 	forge racks (server) and ViewportFrames (client), so it lives in
-	Shared. If the owner made a model GameAssets/Weapons/<weapon id>
-	with a part named "Handle" (+Y = along the blade, grip at its
-	center), that cleaned model is used instead (Shared.Assets).
+	Shared. Owner models (GameAssets/Weapons, chosen by weapon class and
+	rarity, Config.Assets.WeaponModels) are used when present, normalized
+	by Shared.Assets.Weapon; otherwise the procedural model below.
 
 	Convention: PrimaryPart = "Handle"; its +Y axis points along the
 	blade and the grip point is the handle's center. All parts are
@@ -21,6 +21,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Assets = require(ReplicatedStorage.Shared.Assets)
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local WeaponBuilder = {}
 
@@ -525,45 +526,60 @@ local function weldAll(model, handle)
 	end
 end
 
--- The owner's model for this weapon (cleaned), prepared like a built
--- one: Handle as PrimaryPart, every part loose and welded to it. nil when
--- there is no usable model.
-local function fromAsset(weapon)
-	local asset = Assets.Get("Weapons", weapon.Id)
-	if not asset then
+-- Which GameAssets model shows this weapon: GameAssets/Weapons/<id> if
+-- the owner made one, else by class and rarity (Config.Assets.WeaponModels).
+local function assetNameFor(weapon): string?
+	if Assets.Has("Weapons", weapon.Id) then
+		return weapon.Id
+	end
+	local list = weapon.Class and Config.Assets.WeaponModels[weapon.Class]
+	if not list then
 		return nil
 	end
-	local handle = asset:FindFirstChild("Handle", true)
-	if not asset:IsA("Model") or not handle or not handle:IsA("BasePart") then
-		warn(("[WeaponBuilder] GameAssets/Weapons/%s: нужна модель с деталью Handle — беру процедурную"):format(weapon.Id))
-		asset:Destroy()
-		return nil
-	end
-	for _, p in ipairs(asset:GetDescendants()) do
-		if p:IsA("BasePart") then
-			p.Anchored = false
-			p.CanCollide = false
-			p.CanQuery = false
-			p.CanTouch = false
-			p.Massless = true
-			if p ~= handle then
-				p.Parent = asset -- flat, so weldAll reaches every part
-			end
+	local rank = Config.Rarity[weapon.Rarity] and Config.Rarity[weapon.Rarity].Index or 1
+	for _, entry in ipairs(list) do
+		if not entry.UpTo or rank <= Config.Rarity[entry.UpTo].Index then
+			return entry.Model
 		end
 	end
-	handle.Parent = asset
-	asset.Name = weapon.Id
-	asset.PrimaryPart = handle
+	return nil
+end
+WeaponBuilder.AssetNameFor = assetNameFor
+
+-- The owner's model for this weapon (cleaned, Handle at the grip, +Y to
+-- the tip, scaled; Shared.Assets.Weapon), with its glow parts recolored
+-- to the weapon color. nil -> the procedural model is built.
+local function fromAsset(weapon)
+	local name = assetNameFor(weapon)
+	if not name then
+		return nil
+	end
+	local model = Assets.Weapon(name, Config.Assets.WeaponFit[name])
+	if not model then
+		return nil
+	end
+	model.Name = weapon.Id
+	model:SetAttribute("Asset", name)
+	local glowPart
+	for _, p in ipairs(Assets.Parts(model)) do
+		if p.Material == NEON then
+			p.Color = weapon.Color
+			glowPart = glowPart or p
+		end
+		if p.Parent ~= model then
+			p.Parent = model -- flat, so the trail / glow code sees every part
+		end
+	end
 	-- Same frame as the procedural weapons: handle upright at the origin.
-	-- (move the whole model so that handle.CFrame becomes `target`)
-	local target = CFrame.new(0, handle.Size.Y / 2, 0)
-	asset:PivotTo(target * handle.CFrame:Inverse() * asset:GetPivot())
-	return asset, handle
+	local handle = model.PrimaryPart
+	model:PivotTo(CFrame.new(0, handle.Size.Y / 2, 0) * handle.CFrame:ToObjectSpace(model:GetPivot()))
+	return model, handle, glowPart
 end
 
 -- Returns a Model named after the weapon, PrimaryPart "Handle".
 function WeaponBuilder.Build(weapon): Model
 	local model, handle, glowPart = fromAsset(weapon)
+	local isAsset = model ~= nil -- already welded by Assets.Weapon
 	if not model then
 		model = Instance.new("Model")
 		model.Name = weapon.Id
@@ -621,7 +637,9 @@ function WeaponBuilder.Build(weapon): Model
 		emitter.Parent = source
 	end
 
-	weldAll(model, handle)
+	if not isAsset then
+		weldAll(model, handle)
+	end
 	return model
 end
 
