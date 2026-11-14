@@ -812,6 +812,24 @@ Config.Remotes = {
 -- VISUAL: theme
 ---------------------------------------------------------------------
 
+-- "Нано-Цитадель": world palette (hub and dungeon architecture). Graphite
+-- and dark steel as the base, warm white light, thin cyan / magenta
+-- neon accents, gold for UI and rarities.
+Config.Nano = {
+	Graphite = Color3.fromRGB(38, 40, 46),
+	Steel = Color3.fromRGB(74, 78, 88),
+	SteelLight = Color3.fromRGB(118, 122, 134),
+	Concrete = Color3.fromRGB(146, 146, 150),
+	ConcreteLight = Color3.fromRGB(184, 184, 188),
+	ConcreteDark = Color3.fromRGB(96, 97, 102),
+	Glass = Color3.fromRGB(150, 200, 225),
+	WarmLight = Color3.fromRGB(255, 226, 190),
+	Cyan = Color3.fromRGB(46, 230, 255),
+	Magenta = Color3.fromRGB(255, 61, 184),
+	Gold = Color3.fromRGB(255, 201, 60),
+	Leaf = Color3.fromRGB(70, 170, 95),
+}
+
 -- "Цитадель Ауры": bright cartoon brick world. Light lilac stone base,
 -- three loud accents. Neon is used only on trims, portals and runes.
 Config.Theme = {
@@ -897,83 +915,113 @@ Config.Lighting = {
 -- VISUAL: hub layout
 ---------------------------------------------------------------------
 
--- All offsets are from the SpawnLocation; north (the portal) is -Z,
--- west is -X. Top view:
+-- Hub "Нано-Цитадель": a square plaza of the floating technopolis.
+-- Offsets are from the SpawnLocation (ground level); north is -Z, west
+-- is -X. Top view:
 --
---                 [ PORTAL ]
---     POLYGON         |          FORGE
---     (test dummies)  |      (big building)
---     Eggs        [FOUNTAIN]     Premium kiosk
---     Wheel           |
+--                  [ ВРАТА ]              (gates to the modes)
+--     ПОЛИГОН        |  bridge  |       ФАБРИКАТОР
+--     (dummies)      |          |       (forge hall)
+--     ИНКУБАТОР   [ HOLO TOWER ]        Store kiosk
+--     Wheel          |
 --     Leaderboards [ SPAWN ]
 Config.HubLayout = {
-	Name = "Цитадель Ауры",
-	Size = 176, -- courtyard side (square)
-	Center = Vector3.new(0, 0, -60), -- courtyard center: the spawn sits near the south wall
-	TileSize = 8,
-	WallHeight = 14,
-	WallThickness = 4,
-	TowerSize = 12,
-	TowerHeight = 24,
-	MerlonSize = 2,
+	Name = "Нано-Цитадель",
+	Size = 176, -- plaza side (square)
+	Center = Vector3.new(0, 0, -60), -- plaza center: the spawn sits near the south wall
+	TileSize = 16,
+	WallHeight = 16,
+	WallThickness = 3,
+	TowerSize = 8, -- corner pylons
+	TowerHeight = 30,
 
-	PathWidth = 16, -- main straight path spawn -> portal
+	AvenueWidth = 16, -- main avenue spawn -> gates
 	SidePathWidth = 7,
-	ChevronSpacing = 9,
-	LanternSpacing = 24,
+	LampSpacing = 22,
 
-	Portal = { Offset = Vector3.new(0, 0, -138), Radius = 7, ArchWidth = 22, ArchHeight = 20, SpinSeconds = 6 },
-	Fountain = { Offset = Vector3.new(0, 0, -52), Radius = 7, PlazaRadius = 17 },
-
-	-- Polygon (west of the path): the place for test dummies (damage and
-	-- combos, no rewards; models from GameAssets/Trainers later). For now
-	-- only its paved area and sign.
-	Polygon = { Offset = Vector3.new(-49, 0, -106), Size = Vector3.new(44, 0, 72), SignOffset = Vector3.new(-25, 0, -63) },
-
-	-- The forge: the main visual object of the hub (north-east). Samples
-	-- on its racks are a showcase of craftable gear, not a shop.
-	Forge = {
-		Offset = Vector3.new(54, 0, -108),
-		SignOffset = Vector3.new(30, 0, -96),
-		SampleWeapons = { "BoneSword", "FrostSpear", "MagmaHammer", "AbyssBlade" },
-		SampleArmor = { "Bone", "Lava", "Abyss" }, -- armor sets on the three stands
+	Portal = { Offset = Vector3.new(0, 0, -138), Width = 18, Height = 20 }, -- the gates
+	Plaza = { Offset = Vector3.new(0, 0, -52), Radius = 17 }, -- holo tower in the middle
+	Forge = { Offset = Vector3.new(54, 0, -108), Size = Vector2.new(30, 26), Height = 14 }, -- fabricator hall
+	Store = { Offset = Vector3.new(38, 0, -52) },
+	Egg = { Offset = Vector3.new(-46, 0, -30), Radius = 11 }, -- incubator
+	Wheel = { Offset = Vector3.new(-46, 0, -56) },
+	-- Polygon: arena with test dummies (PolygonService places them).
+	Polygon = {
+		Offset = Vector3.new(-49, 0, -110), Size = Vector3.new(40, 0, 56),
+		Dummies = { -- offsets from the polygon center; Kind = asset (falls back to procedural)
+			{ Offset = Vector3.new(-8, 0, -18), Kind = "Trainer_Dummy" },
+			{ Offset = Vector3.new(8, 0, -18), Kind = "Trainer_Dummy" },
+			{ Offset = Vector3.new(-8, 0, 0), Kind = "Trainer_Bag" },
+			{ Offset = Vector3.new(8, 0, 0), Kind = "Trainer_Bag" },
+			{ Offset = Vector3.new(0, 0, 16), Kind = "Trainer_Dummy", Big = true },
+		},
 	},
-	Store = { Offset = Vector3.new(36, 0, -55), SignOffset = Vector3.new(30, 0, -33) }, -- premium kiosk
-	Egg = { Offset = Vector3.new(-46, 0, -28) },
-	Wheel = { Offset = Vector3.new(-46, 0, -50) },
 	Leaderboards = { -- free-standing boards west of the spawn, facing it
 		{ Offset = Vector3.new(-44, 0, -4), Kind = "Level", Title = "Топ уровней" },
 		{ Offset = Vector3.new(-44, 0, 15), Kind = "Room", Title = "Глубже всех в данже" },
 	},
-	Npc = { Offset = Vector3.new(11, 0, -12) },
+	Bridge = { From = Vector3.new(-34, 0, -92), To = Vector3.new(34, 0, -92), Height = 15, Width = 6 },
 
-	Trees = { Vector3.new(-78, 0, 18), Vector3.new(78, 0, 18), Vector3.new(-78, 0, -44), Vector3.new(78, 0, -84), Vector3.new(20, 0, -138), Vector3.new(-20, 0, -138), Vector3.new(80, 0, -138) },
-	Bushes = { Vector3.new(-22, 0, 14), Vector3.new(22, 0, 14), Vector3.new(-70, 0, -40), Vector3.new(70, 0, -8), Vector3.new(-78, 0, -100), Vector3.new(24, 0, -76), Vector3.new(-22, 0, -124), Vector3.new(72, 0, -76) },
-	FlowerBeds = { Vector3.new(-18, 0, -34), Vector3.new(18, 0, -34), Vector3.new(-18, 0, -70), Vector3.new(18, 0, -70) },
+	-- Decor
+	PlantCapsules = { Vector3.new(-12, 0, -38), Vector3.new(12, 0, -38), Vector3.new(-12, 0, -66), Vector3.new(12, 0, -66), Vector3.new(-20, 0, 6), Vector3.new(20, 0, 6), Vector3.new(24, 0, -120), Vector3.new(-24, 0, -124) },
 	Benches = { -- offset + facing direction
-		{ Offset = Vector3.new(-13, 0, -52), Facing = Vector3.new(1, 0, 0) },
-		{ Offset = Vector3.new(13, 0, -52), Facing = Vector3.new(-1, 0, 0) },
-		{ Offset = Vector3.new(-14, 0, -14), Facing = Vector3.new(1, 0, 0) },
-		{ Offset = Vector3.new(-14, 0, -100), Facing = Vector3.new(1, 0, 0) },
+		{ Offset = Vector3.new(-14, 0, -52), Facing = Vector3.new(1, 0, 0) },
+		{ Offset = Vector3.new(14, 0, -52), Facing = Vector3.new(-1, 0, 0) },
+		{ Offset = Vector3.new(-16, 0, -10), Facing = Vector3.new(1, 0, 0) },
+		{ Offset = Vector3.new(16, 0, -10), Facing = Vector3.new(-1, 0, 0) },
+	},
+	Cargo = { Vector3.new(72, 0, -130), Vector3.new(30, 0, -136), Vector3.new(-30, 0, -138), Vector3.new(74, 0, -20), Vector3.new(-74, 0, -76) },
+	Vents = { -- on the inner side of the walls: offset + facing
+		{ Offset = Vector3.new(-86, 0, -20), Facing = Vector3.new(1, 0, 0) },
+		{ Offset = Vector3.new(-86, 0, -140), Facing = Vector3.new(1, 0, 0) },
+		{ Offset = Vector3.new(86, 0, -40), Facing = Vector3.new(-1, 0, 0) },
+		{ Offset = Vector3.new(86, 0, -80), Facing = Vector3.new(-1, 0, 0) },
+	},
+	-- Slots for owner props whose purpose is unknown (Prop_Misc_*, Pipes,
+	-- Trainer_Machine / Refiner / Weights): each takes a model whose
+	-- height fits Size ("Small" < 4, "Medium" 4..10, "Large" > 10 studs).
+	PropSlots = {
+		{ Offset = Vector3.new(80, 0, -60), Facing = Vector3.new(-1, 0, 0), Size = "Large" },
+		{ Offset = Vector3.new(-80, 0, -6), Facing = Vector3.new(1, 0, 0), Size = "Large" },
+		{ Offset = Vector3.new(60, 0, -140), Facing = Vector3.new(0, 0, 1), Size = "Large" },
+		{ Offset = Vector3.new(24, 0, -14), Facing = Vector3.new(-1, 0, 0), Size = "Medium" },
+		{ Offset = Vector3.new(-24, 0, -80), Facing = Vector3.new(1, 0, 0), Size = "Medium" },
+		{ Offset = Vector3.new(30, 0, -80), Facing = Vector3.new(-1, 0, 0), Size = "Medium" },
+		{ Offset = Vector3.new(-8, 0, -24), Facing = Vector3.new(1, 0, 0), Size = "Small" },
+		{ Offset = Vector3.new(8, 0, -80), Facing = Vector3.new(-1, 0, 0), Size = "Small" },
+	},
+	DroneRoutes = {
+		{ Vector3.new(-30, 18, -20), Vector3.new(30, 18, -20), Vector3.new(30, 20, -100), Vector3.new(-30, 20, -100) },
+		{ Vector3.new(0, 24, -10), Vector3.new(60, 22, -60), Vector3.new(0, 24, -130), Vector3.new(-60, 22, -60) },
+		{ Vector3.new(40, 16, -120), Vector3.new(70, 18, -90), Vector3.new(40, 16, -70) },
+		{ Vector3.new(-40, 15, -20), Vector3.new(-70, 17, -40), Vector3.new(-60, 15, -120), Vector3.new(-30, 17, -100) },
+	},
+	FloatingPlatforms = { -- center (y = height) + size
+		{ Offset = Vector3.new(-70, 26, -150), Size = Vector3.new(14, 1.2, 10) },
+		{ Offset = Vector3.new(70, 30, 10), Size = Vector3.new(12, 1.2, 12) },
+		{ Offset = Vector3.new(100, 22, -110), Size = Vector3.new(10, 1.2, 16) },
+		{ Offset = Vector3.new(-100, 28, -40), Size = Vector3.new(12, 1.2, 10) },
 	},
 
 	Texts = {
-		Portal = "ПОДЗЕМЕЛЬЕ",
+		Title = "НАНО-ЦИТАДЕЛЬ",
+		Portal = "ВРАТА",
+		PortalSub = "Подземелье · Нано-фабрика",
 		Polygon = "ПОЛИГОН",
-		PolygonSoon = "Манекены скоро",
-		Forge = "КУЗНИЦА",
-		Premium = "ПРЕМИУМ",
+		PolygonSub = "Проверь урон и комбо",
+		Forge = "ФАБРИКАТОР",
+		ForgeSub = "Крафт оружия и брони",
 		Store = "МАГАЗИН",
-		Pets = "ПИТОМЦЫ",
+		Pets = "ИНКУБАТОР",
+		PetsSub = "Яйца питомцев",
 		Wheel = "КОЛЕСО УДАЧИ",
 		WheelFree = "Бесплатное вращение!",
-		Egg = "Яйца питомцев",
-		Npc = "Подземелье там!",
+		Guide = "Врата — прямо ↑",
 	},
 	Prompts = {
-		Forge = "Кузница",
+		Forge = "Фабрикатор",
 		Store = "Магазин",
-		Egg = "Питомцы",
+		Egg = "Инкубатор",
 		Wheel = "Крутить",
 	},
 }

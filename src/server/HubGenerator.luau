@@ -1,45 +1,40 @@
 --[[
 	HubGenerator.luau
-	Builds the hub, "Цитадель Ауры", at server start (Workspace.Hub).
-	Pure construction from Parts; logic lives in the services and on the
-	client (prompts only open windows).
+	Builds the hub "Нано-Цитадель" at server start (Workspace.Hub): a
+	plaza of a floating technopolis. Graphite / dark steel / concrete,
+	warm white light, thin cyan and magenta neon lines (Config.Nano).
+	Building blocks: NanoKit; owner props (GameAssets) where they fit.
 
-	Top view (south = spawn, north = portal), see Config.HubLayout:
-
-	                 [ PORTAL ]
-	     POLYGON         |          FORGE
-	     (dummies)       |      (big building)
-	     Eggs        [FOUNTAIN]     Premium kiosk
-	     Wheel           |
-	     Leaderboards [ SPAWN ]
-
-	Every object is built in its own frame `cf` (ground level, -Z = the
-	side that faces the visitor), so it can be turned to face the path.
-	Signs follow the text rule (WorldKit.SurfaceText): vertical boards at
-	eye height facing the player.
+	Zones (Config.HubLayout, south = spawn, north = gates):
+	  Spawn plaza + entrance arch, the avenue with lamps and pylons,
+	  the holo tower in the middle, the Gates (portal to the dungeon),
+	  the Fabricator hall (forge), the Incubator (pet eggs), the wheel,
+	  the store kiosk, the Polygon arena (dummies: PolygonService), the
+	  leaderboards; perimeter walls with corner pylons, a bridge over the
+	  avenue, floating platforms, cables, vents, cargo, drones.
+	Moving things (drones, rings, fans, platforms, flicker) are tagged for
+	the client (HubLife.luau); prompts only open client windows.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
+local Assets = require(ReplicatedStorage.Shared.Assets)
 local Config = require(ReplicatedStorage.Shared.Config)
-local Format = require(ReplicatedStorage.Shared.Format)
-local ArmorBuilder = require(ReplicatedStorage.Shared.ArmorBuilder)
-local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
+local NanoKit = require(script.Parent.NanoKit)
 local WorldKit = require(script.Parent.WorldKit)
 
 local HubGenerator = {}
 
 local L = Config.HubLayout
+local N = Config.Nano
 local T = Config.Theme
 local Texts = L.Texts
+local M = NanoKit.Materials
+local Panel = NanoKit.Panel
 
-local WOOD = Color3.fromRGB(120, 80, 50)
-local WOOD_DARK = Color3.fromRGB(85, 55, 35)
-local IRON = Color3.fromRGB(75, 75, 88)
-local WEST = Vector3.new(-1, 0, 0)
 local EAST = Vector3.new(1, 0, 0)
+local WEST = Vector3.new(-1, 0, 0)
 local SOUTH = Vector3.new(0, 0, 1)
 
 local root, base
@@ -54,78 +49,48 @@ local function frame(offset: Vector3, dir: Vector3): CFrame
 	return CFrame.lookAt(pos, pos + dir)
 end
 
-local function part(parent, name, size, cf, color, material, props)
-	local p = WorldKit.Part(parent, { Name = name, Size = size, CFrame = cf, Color = color, Material = material or Enum.Material.SmoothPlastic })
-	for key, value in pairs(props or {}) do
-		p[key] = value
-	end
-	return p
-end
-
--- Vertical sign board: text on the front (and optionally back) face.
-local function sign(parent, cf: CFrame, size: Vector3, lines, twoSided: boolean?)
-	local board = WorldKit.Part(parent, { Name = "Sign", Size = size, CFrame = cf, Color = T.PanelDark, CanCollide = false })
-	WorldKit.SurfaceText(board, Enum.NormalId.Front, lines, 50)
-	if twoSided then
-		WorldKit.SurfaceText(board, Enum.NormalId.Back, lines, 50)
-	end
-	return board
-end
-
--- Zone name on two posts, at eye height, readable from both sides.
-local function zoneSign(parent, offset: Vector3, dir: Vector3, text: string, color: Color3?)
-	local cf = frame(offset, dir)
-	for _, side in ipairs({ -1, 1 }) do
-		part(parent, "SignPost", Vector3.new(0.6, 5.2, 0.6), cf * CFrame.new(side * 4.6, 2.6, 0), WOOD_DARK, Enum.Material.Wood)
-	end
-	return sign(parent, cf * CFrame.new(0, 6.3, 0), Vector3.new(10.4, 2.8, 0.4), { { Text = text, Size = 50, Color = color or T.Gold } }, true)
+-- Spot light pointing down from a part.
+local function downlight(part: BasePart, range: number, angle: number?, brightness: number?)
+	local light = Instance.new("SpotLight")
+	light.Face = Enum.NormalId.Bottom
+	light.Color = N.WarmLight
+	light.Range = range
+	light.Angle = angle or 110
+	light.Brightness = brightness or 1.5
+	light.Parent = part
+	return light
 end
 
 ---------------------------------------------------------------------
--- Courtyard, walls, towers, bounds
+-- Plaza, walls, bounds
 ---------------------------------------------------------------------
 
-local function buildCourtyard()
+local function buildPlaza()
 	local half = L.Size / 2
 	local center = base + L.Center
-	WorldKit.TiledFloor(root, center - Vector3.new(0, 0.05, 0), L.Size, L.Size, L.TileSize, T.TileA, T.TileB, 196)
-	WorldKit.Part(root, {
-		Name = "Grass",
-		Size = Vector3.new(L.Size * 2.5, 1, L.Size * 2.5),
-		Position = center + Vector3.new(0, -0.6, 0),
-		Color = T.Grass,
-		Material = Enum.Material.Grass,
-	})
+	NanoKit.Floor(root, center, L.Size, L.Size, L.TileSize, N.Concrete, N.ConcreteLight)
+	-- the technopolis deck around the plaza
+	Panel(root, "Deck", Vector3.new(L.Size * 2.4, 1, L.Size * 2.4), CFrame.new(center + Vector3.new(0, -1.1, 0)), N.Graphite, M.Plate)
 
 	local corners = {
 		Vector3.new(-half, 0, -half), Vector3.new(half, 0, -half),
 		Vector3.new(half, 0, half), Vector3.new(-half, 0, half),
 	}
 	for i = 1, 4 do
-		WorldKit.CastleWall(root, center + corners[i], center + corners[i % 4 + 1], L.WallHeight, L.WallThickness, T.StoneA, T.StoneB, L.MerlonSize, nil, T.StoneLight)
+		NanoKit.Wall(root, center + corners[i], center + corners[i % 4 + 1], L.WallHeight, L.WallThickness, if i % 2 == 0 then N.Magenta else N.Cyan)
 	end
-
 	for i, c in ipairs(corners) do
-		local tower = Instance.new("Model")
-		tower.Name = "Tower" .. i
-		tower.Parent = root
-		local pos = center + c
-		WorldKit.Brick(tower, Vector3.new(L.TowerSize, L.TowerHeight, L.TowerSize), CFrame.new(pos + Vector3.new(0, L.TowerHeight / 2, 0)), T.StoneDark)
-		WorldKit.Brick(tower, Vector3.new(L.TowerSize + 2, 2, L.TowerSize + 2), CFrame.new(pos + Vector3.new(0, L.TowerHeight + 1, 0)), T.StoneLight, "Cap")
-		for _, dx in ipairs({ -1, 1 }) do
-			for _, dz in ipairs({ -1, 1 }) do
-				WorldKit.Brick(tower, Vector3.new(2, 2, 2), CFrame.new(pos + Vector3.new(dx * (L.TowerSize / 2), L.TowerHeight + 3, dz * (L.TowerSize / 2))), T.StoneLight, "Merlon")
-			end
-		end
-		WorldKit.Part(tower, { Name = "Pole", Size = Vector3.new(0.4, 10, 0.4), Position = pos + Vector3.new(0, L.TowerHeight + 7, 0), Color = T.StoneDark })
-		WorldKit.Part(tower, { Name = "Flag", Size = Vector3.new(5, 3, 0.2), Position = pos + Vector3.new(2.7, L.TowerHeight + 10.5, 0), Color = if i % 2 == 0 then T.Magenta else T.Cyan, CanCollide = false })
+		NanoKit.Pylon(root, center + c, L.TowerHeight, if i % 2 == 0 then N.Magenta else N.Cyan, L.TowerSize)
+	end
+	-- cables from the corner pylons to the holo tower
+	local towerTop = at(L.Plaza.Offset) + Vector3.new(0, 22, 0)
+	for _, c in ipairs(corners) do
+		NanoKit.Cable(root, center + c + Vector3.new(0, L.TowerHeight - 2, 0), towerTop, 6)
 	end
 
 	-- Map bounds: invisible walls on the wall line up to HubWallExtra
 	-- above the walls, plus a lid. Nothing leads onto the walls.
-	local bounds = Instance.new("Model")
-	bounds.Name = "Bounds"
-	bounds.Parent = root
+	local bounds = NanoKit.Model(root, "Bounds")
 	local B = Config.Bounds
 	local t = L.WallThickness
 	local boundH = L.WallHeight + B.HubWallExtra + 2
@@ -135,441 +100,449 @@ local function buildCourtyard()
 		WorldKit.Invisible(bounds, Vector3.new(t, boundH, span), center + Vector3.new(side * half, boundH / 2 - 1, 0))
 	end
 	WorldKit.Invisible(bounds, Vector3.new(span, 2, span), center + Vector3.new(0, boundH, 0), "Lid")
+end
 
-	-- Flags along the walls.
-	for i = -2, 2 do
-		for _, zSide in ipairs({ -1, 1 }) do
-			local pos = center + Vector3.new(i * 30, L.WallHeight + 2, zSide * (half - 2))
-			WorldKit.Part(root, { Name = "Pole", Size = Vector3.new(0.3, 6, 0.3), Position = pos + Vector3.new(0, 3, 0), Color = T.StoneDark })
-			WorldKit.Part(root, { Name = "Flag", Size = Vector3.new(3, 2, 0.2), Position = pos + Vector3.new(1.6, 5, 0), Color = if (i + zSide) % 2 == 0 then T.Gold else T.Magenta, CanCollide = false })
+---------------------------------------------------------------------
+-- Avenue, spawn, side paths
+---------------------------------------------------------------------
+
+local function path(name: string, a: Vector3, b: Vector3, width: number, accent: Color3?)
+	local pa, pb = at(a), at(b)
+	local length = (pb - pa).Magnitude
+	if length < 0.5 then
+		return
+	end
+	local cf = CFrame.lookAt((pa + pb) / 2 + Vector3.new(0, 0.06, 0), pb + Vector3.new(0, 0.06, 0))
+	Panel(root, name, Vector3.new(width, 0.12, length), cf, N.Steel, M.Plate)
+	if accent then
+		for _, side in ipairs({ -1, 1 }) do
+			NanoKit.Strip(root, (cf * CFrame.new(side * (width / 2 - 0.3), 0.08, -length / 2)).Position, (cf * CFrame.new(side * (width / 2 - 0.3), 0.08, length / 2)).Position, accent, 0.16)
 		end
 	end
 end
 
----------------------------------------------------------------------
--- Paths, chevrons, lanterns
----------------------------------------------------------------------
-
-local function chevron(position: Vector3, yaw: number)
-	for _, side in ipairs({ -1, 1 }) do
-		WorldKit.Part(root, {
-			Name = "Chevron",
-			Size = Vector3.new(1.4, 0.15, 5),
-			CFrame = CFrame.new(position + Vector3.new(0, 0.26, 0)) * CFrame.Angles(0, yaw, 0) * CFrame.new(side * 2.2, 0, 0) * CFrame.Angles(0, side * math.rad(35), 0),
-			Color = T.Chevron,
-			CanCollide = false,
-			CanQuery = false,
-		})
+local function buildAvenue()
+	local zEnd = L.Portal.Offset.Z + 8
+	path("Avenue", Vector3.new(0, 0, 4), Vector3.new(0, 0, zEnd), L.AvenueWidth, N.Cyan)
+	-- guide dashes in the middle (they lead to the gates)
+	for z = -6, zEnd + 6, -9 do
+		Panel(root, "Guide", Vector3.new(1.4, 0.06, 3), CFrame.new(at(Vector3.new(0, 0.16, z))), N.Cyan, M.Neon, { CanCollide = false })
 	end
-end
-
--- Chevrons along a straight segment from a to b (ground offsets).
-local function chevronLine(a: Vector3, b: Vector3)
-	local delta = b - a
-	local length = delta.Magnitude
-	local dir = delta.Unit
-	local yaw = math.atan2(-dir.X, -dir.Z)
-	local d = L.ChevronSpacing / 2
-	while d < length - 2 do
-		chevron(at(a + dir * d), yaw)
-		d += L.ChevronSpacing
-	end
-end
-
--- Flat axis-aligned strip from a to b (ground offsets).
-local function strip(name: string, a: Vector3, b: Vector3, width: number, color: Color3)
-	local d = b - a
-	local alongX = math.abs(d.X) > math.abs(d.Z)
-	WorldKit.Part(root, {
-		Name = name,
-		Size = if alongX then Vector3.new(math.abs(d.X), 0.2, width) else Vector3.new(width, 0.2, math.abs(d.Z)),
-		Position = at((a + b) / 2 + Vector3.new(0, 0.08, 0)),
-		Color = color,
-		Material = Enum.Material.Plastic,
-		TopSurface = Enum.SurfaceType.Studs,
-	})
-end
-
-local function lantern(parent, position: Vector3)
-	local model = Instance.new("Model")
-	model.Name = "Lantern"
-	model.Parent = parent
-	part(model, "Foot", Vector3.new(1.4, 0.5, 1.4), CFrame.new(position + Vector3.new(0, 0.25, 0)), IRON, Enum.Material.Metal)
-	part(model, "Post", Vector3.new(0.5, 7, 0.5), CFrame.new(position + Vector3.new(0, 3.8, 0)), IRON, Enum.Material.Metal)
-	part(model, "Cap", Vector3.new(1.8, 0.4, 1.8), CFrame.new(position + Vector3.new(0, 9.1, 0)), IRON, Enum.Material.Metal)
-	local lamp = part(model, "Lamp", Vector3.new(1.2, 1.4, 1.2), CFrame.new(position + Vector3.new(0, 8.2, 0)), Color3.fromRGB(255, 225, 150), Enum.Material.Glass, { CanCollide = false })
-	WorldKit.Light(lamp, Color3.fromRGB(255, 215, 150), 18, 0.9)
-	return model
-end
-
-local function buildPaths()
-	local F = L.Fountain
-	local pathColor = T.Path
-	local sideColor = T.Path:Lerp(Color3.new(1, 1, 1), 0.25)
-	local zStart = 8
-	local zEnd = L.Portal.Offset.Z + L.Portal.Radius - 2
-	-- Main straight path, with a round plaza around the fountain.
-	strip("Path", Vector3.new(0, 0, zStart), Vector3.new(0, 0, zEnd), L.PathWidth, pathColor)
-	WorldKit.Part(root, {
-		Name = "Plaza",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.24, F.PlazaRadius * 2, F.PlazaRadius * 2),
-		CFrame = CFrame.new(at(F.Offset + Vector3.new(0, 0.1, 0))) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = pathColor,
-		Material = Enum.Material.Plastic,
-	})
-	chevronLine(Vector3.new(0, 0, 2), Vector3.new(0, 0, F.Offset.Z + F.PlazaRadius))
-	chevronLine(Vector3.new(0, 0, F.Offset.Z - F.PlazaRadius), Vector3.new(0, 0, zEnd + 6))
-
-	-- Side paths to every zone.
-	local w = L.SidePathWidth
-	local half = L.PathWidth / 2
-	local PG = L.Polygon
-	local polygonEdge = PG.Offset.X + PG.Size.X / 2
-	strip("PathPolygon", Vector3.new(-half, 0, PG.Offset.Z), Vector3.new(polygonEdge, 0, PG.Offset.Z), w, sideColor)
-	strip("PathForge", Vector3.new(half, 0, L.Forge.Offset.Z), Vector3.new(L.Forge.Offset.X - 16, 0, L.Forge.Offset.Z), w, sideColor)
-	strip("PathPets", Vector3.new(-half, 0, L.Egg.Offset.Z), Vector3.new(L.Egg.Offset.X + 5, 0, L.Egg.Offset.Z), w, sideColor)
-	strip("PathWheel", Vector3.new(-F.PlazaRadius + 2, 0, L.Wheel.Offset.Z), Vector3.new(L.Wheel.Offset.X + 4, 0, L.Wheel.Offset.Z), w, sideColor)
-	strip("PathPremium", Vector3.new(F.PlazaRadius - 2, 0, L.Store.Offset.Z), Vector3.new(L.Store.Offset.X - 3, 0, L.Store.Offset.Z), w, sideColor)
-	strip("PathLeaders", Vector3.new(-half, 0, 5), Vector3.new(L.Leaderboards[1].Offset.X + 2, 0, 5), w, sideColor)
-
-	-- Lanterns on both sides of the main path.
-	local z = zStart - 6
-	while z > zEnd + 4 do
-		if math.abs(z - F.Offset.Z) > F.PlazaRadius + 2 then
-			lantern(root, at(Vector3.new(-half - 2, 0, z)))
-			lantern(root, at(Vector3.new(half + 2, 0, z)))
+	-- lamps along the avenue
+	local w = L.AvenueWidth / 2 + 3
+	for z = -10, zEnd + 10, -L.LampSpacing do
+		for _, side in ipairs({ -1, 1 }) do
+			NanoKit.Lamp(root, at(Vector3.new(side * w, 0, z)), 9, Vector3.new(-side, 0, 0))
 		end
-		z -= L.LanternSpacing
 	end
+	-- side paths to every zone
+	local s = L.SidePathWidth
+	local half = L.AvenueWidth / 2
+	path("PathForge", Vector3.new(half, 0, L.Forge.Offset.Z), Vector3.new(L.Forge.Offset.X - L.Forge.Size.X / 2, 0, L.Forge.Offset.Z), s, N.Magenta)
+	path("PathStore", Vector3.new(L.Plaza.Radius, 0, L.Store.Offset.Z), Vector3.new(L.Store.Offset.X - 4, 0, L.Store.Offset.Z), s, N.Gold)
+	path("PathPets", Vector3.new(-half, 0, L.Egg.Offset.Z), Vector3.new(L.Egg.Offset.X + L.Egg.Radius, 0, L.Egg.Offset.Z), s, N.Magenta)
+	path("PathWheel", Vector3.new(-L.Plaza.Radius, 0, L.Wheel.Offset.Z), Vector3.new(L.Wheel.Offset.X + 4, 0, L.Wheel.Offset.Z), s, N.Gold)
+	path("PathPolygon", Vector3.new(-half, 0, L.Polygon.Offset.Z), Vector3.new(L.Polygon.Offset.X + L.Polygon.Size.X / 2, 0, L.Polygon.Offset.Z), s, N.Cyan)
+	path("PathLeaders", Vector3.new(-half, 0, 5), Vector3.new(L.Leaderboards[1].Offset.X + 2, 0, 5), s, nil)
+
+	-- spawn pad + entrance arch with the title
+	local pad = at(Vector3.zero)
+	local flat = CFrame.Angles(0, 0, math.rad(90))
+	NanoKit.Cylinder(root, "SpawnPad", 0.3, 14, CFrame.new(pad + Vector3.new(0, 0.15, 0)) * flat, N.Steel, M.Plate)
+	local ring = NanoKit.Cylinder(root, "SpawnRing", 0.06, 13, CFrame.new(pad + Vector3.new(0, 0.33, 0)) * flat, N.Cyan, M.Neon)
+	ring.CanCollide = false
+	NanoKit.Cylinder(root, "SpawnInner", 0.08, 12.4, CFrame.new(pad + Vector3.new(0, 0.36, 0)) * flat, N.Steel, M.Plate).CanCollide = false
+	NanoKit.Tag(ring, "Pulse", { Period = 3 })
+	local _, beam = NanoKit.Arch(root, frame(Vector3.new(0, 0, -16), SOUTH), L.AvenueWidth + 6, 14, N.Cyan)
+	WorldKit.SurfaceText(beam, Enum.NormalId.Back, { { Text = Texts.Title, Size = 64, Color = N.Gold } }, 50)
+	WorldKit.SurfaceText(beam, Enum.NormalId.Front, { { Text = Texts.Title, Size = 64, Color = N.Gold } }, 50)
+	NanoKit.PostSign(root, frame(Vector3.new(11, 0, -10), SOUTH), Texts.Guide, N.Cyan)
 end
 
 ---------------------------------------------------------------------
--- Portal + guide NPC
+-- Holo tower (center)
 ---------------------------------------------------------------------
 
-local function buildPortal()
-	local P = L.Portal
-	local model = Instance.new("Model")
-	model.Name = "Portal"
-	model.Parent = root
+local function buildTower()
+	local P = L.Plaza
 	local pos = at(P.Offset)
-	local pillarW = 4
-	for _, side in ipairs({ -1, 1 }) do
-		WorldKit.Brick(model, Vector3.new(pillarW, P.ArchHeight, 6), CFrame.new(pos + Vector3.new(side * (P.ArchWidth / 2 - pillarW / 2), P.ArchHeight / 2, 0)), T.StoneDark)
-		WorldKit.Torch(model, pos + Vector3.new(side * (P.ArchWidth / 2 + 3), 0, 3), T.Magenta)
+	local flat = CFrame.Angles(0, 0, math.rad(90))
+	local m = NanoKit.Model(root, "HoloTower")
+	NanoKit.Cylinder(m, "Plaza", 0.3, P.Radius * 2, CFrame.new(pos + Vector3.new(0, 0.15, 0)) * flat, N.ConcreteDark, M.Concrete)
+	NanoKit.Cylinder(m, "PlazaRing", 0.08, P.Radius * 2 - 1, CFrame.new(pos + Vector3.new(0, 0.32, 0)) * flat, N.Cyan, M.Neon).CanCollide = false
+	NanoKit.Cylinder(m, "PlazaInner", 0.1, P.Radius * 2 - 1.6, CFrame.new(pos + Vector3.new(0, 0.35, 0)) * flat, N.ConcreteDark, M.Concrete).CanCollide = false
+	NanoKit.Column(m, "Base", 2, 9, pos, N.Graphite, M.Metal)
+	NanoKit.Column(m, "Shaft", 20, 3, pos + Vector3.new(0, 2, 0), N.Steel, M.Metal)
+	local core = NanoKit.Column(m, "Core", 16, 1.2, pos + Vector3.new(0, 4, 0), N.Cyan, M.Neon)
+	core.CanCollide = false
+	NanoKit.Column(m, "CoreGlass", 18, 3.4, pos + Vector3.new(0, 3, 0), N.Glass, M.Glass).Transparency = 0.55
+	NanoKit.Column(m, "Crown", 1.5, 5, pos + Vector3.new(0, 22, 0), N.SteelLight, M.Metal)
+	for i, h in ipairs({ 8, 13, 18 }) do
+		local ring = NanoKit.Cylinder(m, "Ring", 0.4, 8 - i, CFrame.new(pos + Vector3.new(0, h, 0)) * flat * CFrame.Angles(math.rad(i * 15), 0, 0), if i == 2 then N.Magenta else N.Cyan, M.Neon)
+		ring.CanCollide = false
+		ring.Transparency = 0.2
+		NanoKit.Tag(ring, "Spin", { Speed = if i % 2 == 0 then -35 else 45, Axis = "Y" })
 	end
-	local lintel = WorldKit.Brick(model, Vector3.new(P.ArchWidth, 5, 6), CFrame.new(pos + Vector3.new(0, P.ArchHeight + 2.5, 0)), T.StoneLight, "Lintel")
-	WorldKit.SurfaceText(lintel, Enum.NormalId.Back, { { Text = Texts.Portal, Size = 70, Color = T.Gold } }, 50)
-	for _, side in ipairs({ -1, 1 }) do
-		WorldKit.Brick(model, Vector3.new(2, 2, 2), CFrame.new(pos + Vector3.new(side * (P.ArchWidth / 2 - 1), P.ArchHeight + 6, 0)), T.StoneDark, "Merlon")
+	WorldKit.Light(core, N.Cyan, 26, 1.2)
+	-- four hologram boards around the top
+	for i = 0, 3 do
+		local angle = i * math.pi / 2
+		local dir = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		local center = pos + Vector3.new(0, 15.5, 0) + dir * 3.4
+		NanoKit.HoloSign(m, CFrame.lookAt(center, center + dir), Vector2.new(8, 2.4), { { Text = Texts.Title, Size = 40, Color = N.Cyan } }, N.Cyan)
 	end
-	-- Steps up to the portal.
-	WorldKit.Brick(model, Vector3.new(P.ArchWidth + 4, 0.6, 10), CFrame.new(pos + Vector3.new(0, 0.3, 4)), T.StoneDark, "Step")
-
-	local disc = WorldKit.Part(model, {
-		Name = "PortalDisc",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(1, P.Radius * 2, P.Radius * 2),
-		CFrame = CFrame.new(pos + Vector3.new(0, P.Radius + 1, 0)) * CFrame.Angles(0, math.rad(90), 0),
-		Color = T.Magenta,
-		Material = Enum.Material.Neon,
-		Transparency = 0.3,
-		CanCollide = false,
-	})
-	local ring = WorldKit.Part(model, {
-		Name = "PortalRing",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(1.4, P.Radius * 2 + 2, P.Radius * 2 + 2),
-		CFrame = disc.CFrame,
-		Color = T.Purple,
-		Material = Enum.Material.Glass,
-		Transparency = 0.5,
-		CanCollide = false,
-		CanQuery = false,
-	})
-	TweenService:Create(disc, TweenInfo.new(P.SpinSeconds, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), { CFrame = disc.CFrame * CFrame.Angles(math.rad(180), 0, 0) }):Play()
-	TweenService:Create(ring, TweenInfo.new(P.SpinSeconds * 1.6, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), { CFrame = ring.CFrame * CFrame.Angles(math.rad(-180), 0, 0) }):Play()
-
-	local emitter = Instance.new("ParticleEmitter")
-	emitter.Color = ColorSequence.new(T.Magenta, T.Cyan)
-	emitter.LightEmission = 0.6
-	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 0) })
-	emitter.Lifetime = NumberRange.new(1, 1.8)
-	emitter.Speed = NumberRange.new(3, 6)
-	emitter.Rate = 18
-	emitter.SpreadAngle = Vector2.new(180, 180)
-	emitter.Parent = disc
-	WorldKit.Light(disc, T.Magenta, 24, 1.2)
-	disc:SetAttribute("Portal", true)
-	return disc
-end
-
-local function buildNpc()
-	local cf = frame(L.Npc.Offset, SOUTH) -- faces the spawn
-	local model = Instance.new("Model")
-	model.Name = "Guide"
-	model.Parent = root
-	local skin = Color3.fromRGB(255, 205, 150)
-	WorldKit.Brick(model, Vector3.new(2, 2, 1), cf * CFrame.new(0, 3, 0), T.Cyan, "Torso")
-	local head = WorldKit.Brick(model, Vector3.new(1.4, 1.4, 1.4), cf * CFrame.new(0, 4.7, 0), skin, "Head")
-	local face = Instance.new("Decal")
-	face.Texture = "rbxasset://textures/face.png"
-	face.Face = Enum.NormalId.Front
-	face.Parent = head
-	for _, side in ipairs({ -1, 1 }) do
-		-- one arm points north, at the portal
-		WorldKit.Brick(model, Vector3.new(0.9, 2, 0.9), cf * CFrame.new(side * 1.45, 3, 0) * CFrame.Angles(if side > 0 then math.rad(-110) else 0, 0, 0), skin, "Arm")
-		WorldKit.Brick(model, Vector3.new(0.9, 2, 0.9), cf * CFrame.new(side * 0.5, 1, 0), Color3.fromRGB(60, 50, 90), "Leg")
+	-- benches and plant capsules
+	for _, bench in ipairs(L.Benches) do
+		NanoKit.Bench(root, frame(bench.Offset, bench.Facing))
 	end
-	WorldKit.Brick(model, Vector3.new(2.2, 0.6, 2.2), cf * CFrame.new(0, 5.6, 0), T.Gold, "Hat")
-	sign(model, cf * CFrame.new(0, 7.2, 0), Vector3.new(7.5, 1.9, 0.3), { { Text = Texts.Npc, Size = 40, Color = T.Gold } }, true)
-end
-
----------------------------------------------------------------------
--- Polygon (place for test dummies, filled later)
----------------------------------------------------------------------
-
-local function buildPolygon(parent)
-	local PG = L.Polygon
-	local model = Instance.new("Model")
-	model.Name = "Polygon"
-	model.Parent = parent
-	local pos = at(PG.Offset)
-	part(model, "Floor", Vector3.new(PG.Size.X, 0.4, PG.Size.Z), CFrame.new(pos + Vector3.new(0, 0.2, 0)), T.StoneDark, Enum.Material.DiamondPlate)
-	for _, dx in ipairs({ -1, 1 }) do
-		part(model, "Edge", Vector3.new(0.6, 0.5, PG.Size.Z), CFrame.new(pos + Vector3.new(dx * PG.Size.X / 2, 0.25, 0)), T.Cyan, Enum.Material.Neon, { CanCollide = false })
+	for _, offset in ipairs(L.PlantCapsules) do
+		NanoKit.PlantCapsule(root, at(offset))
 	end
-	zoneSign(parent, PG.SignOffset, EAST, Texts.Polygon, T.Cyan)
-	sign(model, frame(PG.Offset, EAST) * CFrame.new(0, 3.2, 0), Vector3.new(9, 2, 0.4), { { Text = Texts.PolygonSoon, Size = 36, Color = T.Gold } }, true)
-	return model
-end
-
----------------------------------------------------------------------
--- Forge (the main visual object of the hub)
----------------------------------------------------------------------
-
-local function buildForge(parent)
-	local F = L.Forge
-	local cf = frame(F.Offset, WEST) -- the open front faces the main path
-	local model = Instance.new("Model")
-	model.Name = "Forge"
-	model.Parent = parent
-	local brickA = Color3.fromRGB(150, 92, 72)
-	local brickB = Color3.fromRGB(128, 76, 60)
-	local roofColor = Color3.fromRGB(96, 52, 48)
-	local stone = Color3.fromRGB(92, 88, 104)
-
-	-- Shell: floor, back wall, side walls (front third open), posts, beam.
-	WorldKit.Brick(model, Vector3.new(36, 0.6, 30), cf * CFrame.new(0, 0.3, 0), stone, "Floor")
-	WorldKit.Brick(model, Vector3.new(36, 14, 2), cf * CFrame.new(0, 7, 14), brickA, "BackWall")
-	for _, side in ipairs({ -1, 1 }) do
-		WorldKit.Brick(model, Vector3.new(2, 14, 20), cf * CFrame.new(side * 17, 7, 4), brickB, "SideWall")
-		part(model, "Post", Vector3.new(2.4, 14, 2.4), cf * CFrame.new(side * 17, 7, -13.6), WOOD_DARK, Enum.Material.Wood)
-		-- stepped gable
-		for i = 1, 3 do
-			WorldKit.Brick(model, Vector3.new(2, 2.4, 30 - i * 8), cf * CFrame.new(side * 17, 14 + (i - 0.5) * 2.4, 0), if i % 2 == 0 then brickA else brickB, "Gable")
+	local hologram = NanoKit.Prop(m, "Prop_Hologram", frame(P.Offset + Vector3.new(0, 0, P.Radius - 3), SOUTH), 5)
+	if hologram then
+		for _, p in ipairs(Assets.Parts(hologram)) do
+			p.CanCollide = false
 		end
 	end
-	part(model, "Beam", Vector3.new(36, 2, 2.4), cf * CFrame.new(0, 13, -13.6), WOOD_DARK, Enum.Material.Wood)
-	-- Roof: two slopes meeting at the ridge.
-	for _, side in ipairs({ -1, 1 }) do
-		part(model, "Roof", Vector3.new(39, 1, 18.6), cf * CFrame.new(0, 17.9, side * 8.3) * CFrame.Angles(math.rad(side * 24), 0, 0), roofColor, Enum.Material.Slate)
-	end
-	part(model, "Ridge", Vector3.new(39.4, 1, 1.6), cf * CFrame.new(0, 21.7, 0), WOOD_DARK, Enum.Material.Wood)
+end
 
-	-- Hearth (горн) with chimney: fire, smoke and sparks.
-	WorldKit.Brick(model, Vector3.new(12, 8, 6), cf * CFrame.new(-8, 4, 10), stone, "HearthBody")
-	part(model, "Hood", Vector3.new(13, 2, 7), cf * CFrame.new(-8, 9, 9.6), IRON, Enum.Material.Metal)
-	part(model, "Mouth", Vector3.new(7, 3.6, 0.6), cf * CFrame.new(-8, 3.2, 6.9), Color3.fromRGB(25, 18, 20))
-	part(model, "Coals", Vector3.new(6, 0.8, 1.6), cf * CFrame.new(-8, 1.9, 6.6), Color3.fromRGB(60, 30, 25), Enum.Material.Slate)
-	local hearth = part(model, "Hearth", Vector3.new(5, 1.2, 1), cf * CFrame.new(-8, 2.7, 6.5), T.Orange, Enum.Material.Neon, { CanCollide = false })
+---------------------------------------------------------------------
+-- Gates (portal)
+---------------------------------------------------------------------
+
+local function buildGates()
+	local P = L.Portal
+	local cf = frame(P.Offset, SOUTH) -- faces the spawn
+	local m = NanoKit.Model(root, "Gates")
+	-- stepped platform
+	Panel(m, "Step1", Vector3.new(P.Width + 14, 0.6, 14), cf * CFrame.new(0, 0.3, 2), N.ConcreteDark, M.Concrete)
+	Panel(m, "Step2", Vector3.new(P.Width + 8, 0.6, 9), cf * CFrame.new(0, 0.9, 3), N.Steel, M.Plate)
+	-- massive frame
+	for _, side in ipairs({ -1, 1 }) do
+		local x = side * (P.Width / 2 + 2.5)
+		Panel(m, "Pillar", Vector3.new(5, P.Height + 4, 6), cf * CFrame.new(x, (P.Height + 4) / 2 + 1.2, 4), N.Graphite, M.Metal)
+		Panel(m, "PillarFace", Vector3.new(3.4, P.Height, 0.4), cf * CFrame.new(x, P.Height / 2 + 2.6, 0.9), N.Steel, M.Plate)
+		NanoKit.Strip(m, (cf * CFrame.new(x, 2.4, 0.6)).Position, (cf * CFrame.new(x, P.Height + 3, 0.6)).Position, N.Magenta, 0.2)
+		Panel(m, "Buttress", Vector3.new(3, 8, 8), cf * CFrame.new(side * (P.Width / 2 + 6), 5.2, 6) * CFrame.Angles(0, 0, math.rad(side * -8)), N.ConcreteDark, M.Concrete)
+		local lamp = Panel(m, "Lamp", Vector3.new(1, 1, 1), cf * CFrame.new(x, P.Height + 6, 0.4), N.WarmLight, M.Neon, { CanCollide = false })
+		WorldKit.Light(lamp, N.WarmLight, 24, 1.5)
+	end
+	Panel(m, "Lintel", Vector3.new(P.Width + 12, 4, 6), cf * CFrame.new(0, P.Height + 5.2, 4), N.Graphite, M.Metal)
+	Panel(m, "LintelTrim", Vector3.new(P.Width + 13, 0.5, 6.6), cf * CFrame.new(0, P.Height + 7.4, 4), N.SteelLight, M.Plate)
+	local sign = Panel(m, "Sign", Vector3.new(P.Width + 4, 3.4, 0.3), cf * CFrame.new(0, P.Height + 5.2, 0.85), T.PanelDark, M.Smooth)
+	WorldKit.SurfaceText(sign, Enum.NormalId.Front, { { Text = Texts.Portal, Size = 70, Color = N.Gold }, { Text = Texts.PortalSub, Size = 30, Color = N.Cyan } }, 50)
+	NanoKit.Tag(sign, "Flicker")
+	-- dark tunnel behind the field
+	Panel(m, "Tunnel", Vector3.new(P.Width + 2, P.Height + 2, 1), cf * CFrame.new(0, P.Height / 2 + 2, 7.6), Color3.fromRGB(12, 12, 18), M.Smooth)
+	-- the energy field: touching it starts a run (TravelService)
+	local field = Panel(m, "PortalField", Vector3.new(P.Width, P.Height, 0.6), cf * CFrame.new(0, P.Height / 2 + 1.2, 3), N.Magenta, Enum.Material.ForceField, { CanCollide = false, Transparency = 0.15, CastShadow = false })
+	field:SetAttribute("Portal", true)
+	local glow = Panel(m, "FieldGlow", Vector3.new(P.Width - 2, P.Height - 2, 0.2), cf * CFrame.new(0, P.Height / 2 + 1.2, 3.5), N.Cyan, M.Neon, { CanCollide = false, CanTouch = false, Transparency = 0.75, CastShadow = false })
+	NanoKit.Tag(glow, "Pulse", { Period = 2 })
+	WorldKit.Light(field, N.Magenta, 30, 1.6)
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Color = ColorSequence.new(N.Magenta, N.Cyan)
+	emitter.LightEmission = 0.6
+	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	emitter.Lifetime = NumberRange.new(1, 1.8)
+	emitter.Speed = NumberRange.new(1, 3)
+	emitter.Rate = 20
+	emitter.SpreadAngle = Vector2.new(30, 30)
+	emitter.Parent = field
+	-- cargo and props around the gates
+	NanoKit.CargoStack(m, frame(P.Offset + Vector3.new(P.Width / 2 + 12, 0, 6), SOUTH))
+	NanoKit.Prop(m, "Prop_Door", frame(P.Offset + Vector3.new(-(P.Width / 2 + 13), 0, 6), SOUTH), 10)
+	return field
+end
+
+---------------------------------------------------------------------
+-- Fabricator (forge hall)
+---------------------------------------------------------------------
+
+-- Hall with an open front, glass upper walls and a roof; inside: the
+-- reactor core ("Hearth": Glow light, Fire, Sparks), the press table
+-- ("Anvil": Sparks) under a manipulator hammer and the console with the
+-- prompt. CraftService flares the Hearth and the Anvil on a craft.
+local function buildForge()
+	local F = L.Forge
+	local cf = frame(F.Offset, WEST) -- the open front faces the avenue
+	local w, d, h = F.Size.X, F.Size.Y, F.Height
+	local m = NanoKit.Model(root, "Forge")
+	Panel(m, "Floor", Vector3.new(w, 0.6, d), cf * CFrame.new(0, 0.3, 0), N.Steel, M.Plate)
+	NanoKit.Strip(m, (cf * CFrame.new(-w / 2, 0.62, -d / 2 + 0.3)).Position, (cf * CFrame.new(w / 2, 0.62, -d / 2 + 0.3)).Position, N.Magenta, 0.16)
+	-- back + side walls: concrete lower part, glass upper part
+	local walls = {
+		{ CFrame.new(0, 0, d / 2), w }, -- back
+		{ CFrame.new(-w / 2, 0, 0) * CFrame.Angles(0, math.rad(90), 0), d },
+		{ CFrame.new(w / 2, 0, 0) * CFrame.Angles(0, math.rad(90), 0), d },
+	}
+	for _, wall in ipairs(walls) do
+		local wcf = cf * wall[1]
+		Panel(m, "WallLow", Vector3.new(wall[2], h * 0.45, 1), wcf * CFrame.new(0, h * 0.225, 0), N.ConcreteLight, M.Concrete)
+		Panel(m, "WallGlass", Vector3.new(wall[2] - 2, h * 0.5, 0.4), wcf * CFrame.new(0, h * 0.7, 0), N.Glass, M.Glass, { Transparency = 0.55 })
+		Panel(m, "WallBeam", Vector3.new(wall[2], 0.8, 1.2), wcf * CFrame.new(0, h - 0.4, 0), N.Graphite, M.Metal)
+	end
+	for _, dx in ipairs({ -1, 1 }) do
+		for _, dz in ipairs({ -1, 1 }) do
+			NanoKit.Column(m, "Column", h, 1.6, (cf * CFrame.new(dx * (w / 2 - 0.4), 0, dz * (d / 2 - 0.4))).Position, N.Graphite, M.Metal)
+		end
+	end
+	Panel(m, "Roof", Vector3.new(w + 2, 1, d + 2), cf * CFrame.new(0, h + 0.5, 0), N.Graphite, M.Metal)
+	Panel(m, "Skylight", Vector3.new(w * 0.5, 0.3, d * 0.4), cf * CFrame.new(0, h + 1.05, 0), N.Glass, M.Glass, { Transparency = 0.4 })
+	-- front sign on the roof edge
+	local sign = Panel(m, "Sign", Vector3.new(w * 0.7, 3, 0.3), cf * CFrame.new(0, h + 2.6, -d / 2 - 0.4), T.PanelDark, M.Smooth)
+	WorldKit.SurfaceText(sign, Enum.NormalId.Front, { { Text = Texts.Forge, Size = 60, Color = N.Gold }, { Text = Texts.ForgeSub, Size = 26, Color = N.Cyan } }, 50)
+	NanoKit.Tag(sign, "Flicker")
+	-- ceiling lights
+	for _, dx in ipairs({ -0.25, 0.25 }) do
+		local lamp = Panel(m, "CeilingLamp", Vector3.new(w * 0.3, 0.2, 1), cf * CFrame.new(dx * w, h - 0.15, 0), N.WarmLight, M.Neon, { CanCollide = false })
+		downlight(lamp, h + 6, 120, 1.6)
+	end
+
+	-- Reactor core at the back (owner Trainer_Machine if present, else a
+	-- procedural reactor with spinning rings).
+	local coreCf = cf * CFrame.new(0, 0.6, d / 2 - 5)
+	local machine = NanoKit.Prop(m, "Trainer_Machine", coreCf, h * 0.75)
+	local hearthCf = if machine then coreCf * CFrame.new(0, h * 0.4, -3.6) else coreCf * CFrame.new(0, 4.5, 0)
+	local hearth = Panel(m, "Hearth", Vector3.new(2.6, 2.6, 2.6), hearthCf, N.Cyan, M.Neon, { CanCollide = false, Shape = Enum.PartType.Ball, Transparency = 0.1 })
+	if not machine then
+		NanoKit.Column(m, "ReactorBase", 2, 7, coreCf.Position, N.Graphite, M.Metal)
+		NanoKit.Column(m, "ReactorGlass", 6, 4.6, coreCf.Position + Vector3.new(0, 2, 0), N.Glass, M.Glass).Transparency = 0.6
+		NanoKit.Column(m, "ReactorCap", 1.2, 6, coreCf.Position + Vector3.new(0, 8, 0), N.SteelLight, M.Metal)
+		for i = 1, 2 do
+			local ring = NanoKit.Cylinder(m, "ReactorRing", 0.3, 6 + i, CFrame.new(coreCf.Position + Vector3.new(0, 3 + i * 1.5, 0)) * CFrame.Angles(0, 0, math.rad(90)), if i == 1 then N.Cyan else N.Magenta, M.Neon)
+			ring.CanCollide = false
+			NanoKit.Tag(ring, "Spin", { Speed = if i == 1 then 60 else -40, Axis = "Y" })
+		end
+	end
+	local glow = WorldKit.Light(hearth, N.Cyan, 20, 1.6)
+	glow.Name = "Glow"
 	local fire = Instance.new("Fire")
 	fire.Name = "Fire"
-	fire.Color = T.Orange
-	fire.SecondaryColor = T.Gold
+	fire.Color = N.Cyan
+	fire.SecondaryColor = N.Magenta
 	fire.Size = 7
-	fire.Heat = 12
+	fire.Heat = 6
 	fire.Parent = hearth
-	WorldKit.Light(hearth, Color3.fromRGB(255, 160, 80), 26, 1.6).Name = "Glow"
 	local sparks = Instance.new("ParticleEmitter")
 	sparks.Name = "Sparks"
-	sparks.Color = ColorSequence.new(T.Gold, T.Orange)
+	sparks.Color = ColorSequence.new(N.Cyan, Color3.new(1, 1, 1))
 	sparks.LightEmission = 0.8
 	sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(1, 0) })
-	sparks.Lifetime = NumberRange.new(0.6, 1.2)
-	sparks.Speed = NumberRange.new(4, 9)
-	sparks.SpreadAngle = Vector2.new(35, 35)
-	sparks.Acceleration = Vector3.new(0, 6, 0)
-	sparks.Rate = 8
+	sparks.Lifetime = NumberRange.new(0.4, 0.9)
+	sparks.Speed = NumberRange.new(8, 16)
+	sparks.SpreadAngle = Vector2.new(70, 70)
+	sparks.Rate = 0
 	sparks.Parent = hearth
-	WorldKit.Brick(model, Vector3.new(5, 15, 5), cf * CFrame.new(-8, 15.5, 11), stone, "Chimney")
-	local chimneyTop = part(model, "ChimneyTop", Vector3.new(6, 1, 6), cf * CFrame.new(-8, 23.5, 11), Color3.fromRGB(70, 66, 80), Enum.Material.Slate)
-	local smoke = Instance.new("Smoke")
-	smoke.Color = Color3.fromRGB(120, 115, 125)
-	smoke.Opacity = 0.25
-	smoke.RiseVelocity = 6
-	smoke.Size = 3
-	smoke.Parent = chimneyTop
-	-- Bellows and coal.
-	part(model, "Bellows", Vector3.new(3, 1.6, 4.4), cf * CFrame.new(0.6, 1.6, 9.4) * CFrame.Angles(0, math.rad(20), 0), Color3.fromRGB(140, 90, 50), Enum.Material.Fabric)
-	part(model, "BellowsNozzle", Vector3.new(0.6, 0.6, 2), cf * CFrame.new(-1.2, 1.6, 8.4) * CFrame.Angles(0, math.rad(70), 0), IRON, Enum.Material.Metal)
-	for i = 1, 4 do
-		part(model, "Coal", Vector3.new(1.6, 1.2, 1.6), cf * CFrame.new(-15 + (i % 2) * 1.3, 0.9 + math.floor(i / 3) * 0.9, 4 + i * 0.9) * CFrame.Angles(0, i, 0), Color3.fromRGB(35, 32, 40), Enum.Material.Slate)
-	end
+	NanoKit.Tag(hearth, "Pulse", { Period = 1.6 })
 
-	-- Anvil with the hammer: the ProximityPrompt lives here.
-	part(model, "AnvilBlock", Vector3.new(3.4, 1.4, 2.6), cf * CFrame.new(3, 1.3, -3), WOOD, Enum.Material.Wood)
-	part(model, "AnvilWaist", Vector3.new(1.6, 1, 1.4), cf * CFrame.new(3, 2.5, -3), IRON, Enum.Material.Metal)
-	local anvil = part(model, "Anvil", Vector3.new(4.4, 1, 2), cf * CFrame.new(3, 3.5, -3), Color3.fromRGB(58, 58, 70), Enum.Material.Metal)
-	part(model, "AnvilHorn", Vector3.new(1.8, 0.6, 1.2), cf * CFrame.new(6, 3.6, -3), Color3.fromRGB(58, 58, 70), Enum.Material.Metal)
-	part(model, "HammerHandle", Vector3.new(0.35, 2.8, 0.35), cf * CFrame.new(2, 4.5, -3) * CFrame.Angles(0, 0, math.rad(62)), WOOD, Enum.Material.Wood, { CanCollide = false })
-	part(model, "HammerHead", Vector3.new(1.4, 1, 1), cf * CFrame.new(3.3, 5.15, -3) * CFrame.Angles(0, 0, math.rad(62)), IRON, Enum.Material.Metal, { CanCollide = false })
+	-- Press table ("Anvil") under a manipulator hammer
+	local anvilCf = cf * CFrame.new(-5, 0.6, 1)
+	Panel(m, "AnvilBase", Vector3.new(4, 2.4, 3), anvilCf * CFrame.new(0, 1.2, 0), N.Graphite, M.Metal)
+	local anvil = Panel(m, "Anvil", Vector3.new(4.6, 0.6, 3.4), anvilCf * CFrame.new(0, 2.7, 0), N.SteelLight, M.Plate)
+	NanoKit.Strip(m, (anvilCf * CFrame.new(-2.3, 3.02, -1.7)).Position, (anvilCf * CFrame.new(2.3, 3.02, -1.7)).Position, N.Magenta, 0.1)
 	local anvilSparks = sparks:Clone()
-	anvilSparks.Name = "Sparks"
-	anvilSparks.Rate = 0
-	anvilSparks.SpreadAngle = Vector2.new(70, 70)
-	anvilSparks.Speed = NumberRange.new(8, 16)
+	anvilSparks.Color = ColorSequence.new(N.Gold, Color3.new(1, 1, 1))
+	anvilSparks.SpreadAngle = Vector2.new(80, 80)
 	anvilSparks.Parent = anvil
+	NanoKit.Column(m, "ArmPost", h - 1, 1, (anvilCf * CFrame.new(3.4, 0, 1.6)).Position, N.Steel, M.Metal)
+	Panel(m, "Manipulator", Vector3.new(5, 0.8, 0.8), anvilCf * CFrame.new(1, h - 3, 1.6), N.Gold, M.Metal)
+	local hammer = Panel(m, "Hammer", Vector3.new(1.4, 2.2, 1.4), anvilCf * CFrame.new(-1, h - 4.6, 1.6), N.Graphite, M.Metal)
+	NanoKit.Tag(hammer, "Bob", { Amplitude = 0.6, Period = 2.2 })
 
-	-- Props: quench barrel, crates, tool rack.
-	local barrel = part(model, "Barrel", Vector3.new(3.2, 3, 3), cf * CFrame.new(9, 2.1, -6) * CFrame.Angles(0, 0, math.rad(90)), WOOD, Enum.Material.Wood)
-	barrel.Shape = Enum.PartType.Cylinder
-	local water = part(model, "Water", Vector3.new(0.2, 2.6, 2.6), cf * CFrame.new(9, 3.55, -6) * CFrame.Angles(0, 0, math.rad(90)), T.Cyan, Enum.Material.Glass, { Transparency = 0.3, CanCollide = false })
-	water.Shape = Enum.PartType.Cylinder
-	part(model, "Crate", Vector3.new(3, 3, 3), cf * CFrame.new(-14, 2.1, -9), Color3.fromRGB(150, 105, 65), Enum.Material.WoodPlanks)
-	part(model, "Crate", Vector3.new(2.2, 2.2, 2.2), cf * CFrame.new(-13.6, 4.7, -9.2) * CFrame.Angles(0, math.rad(20), 0), Color3.fromRGB(165, 118, 72), Enum.Material.WoodPlanks)
+	-- Console with the prompt (front, near the opening)
+	local consoleCf = cf * CFrame.new(5, 0.6, -6)
+	local console = Panel(m, "ConsoleBase", Vector3.new(3, 3, 1.6), consoleCf * CFrame.new(0, 1.5, 0), N.Graphite, M.Metal)
+	Panel(m, "Screen", Vector3.new(2.8, 1.6, 0.2), consoleCf * CFrame.new(0, 3.6, 0.2) * CFrame.Angles(math.rad(-25), 0, 0), Color3.fromRGB(20, 30, 40), M.Glass)
+	local screenGlow = Panel(m, "ScreenGlow", Vector3.new(2.4, 1.2, 0.05), consoleCf * CFrame.new(0, 3.6, 0.08) * CFrame.Angles(math.rad(-25), 0, 0), N.Cyan, M.Neon, { CanCollide = false, Transparency = 0.5 })
+	NanoKit.Tag(screenGlow, "Flicker")
+	local prompt = WorldKit.Prompt(console, L.Prompts.Forge, "", { Action = "OpenForge" }, 14)
 
-	-- Showcase racks: craftable weapons on the left, armor stands on the right.
-	part(model, "WeaponRack", Vector3.new(0.6, 6, 13), cf * CFrame.new(-15.6, 5.4, -1), WOOD_DARK, Enum.Material.WoodPlanks)
-	for i, weaponId in ipairs(F.SampleWeapons) do
-		local weapon = Config.ItemById.Weapon[weaponId]
-		if weapon then
-			local sample = WeaponBuilder.Build(weapon)
-			sample.Name = "Sample_" .. weaponId
-			WeaponBuilder.SetAnchored(sample, true)
-			sample:PivotTo(cf * CFrame.new(-14.9, 3.1, -6.5 + i * 2.7) * CFrame.Angles(0, math.rad(90), 0))
-			sample.Parent = model
-		end
-	end
-	local stands = Instance.new("Folder")
-	stands.Name = "ArmorStands"
-	stands.Parent = model
-	for i = 1, 3 do
-		local standCf = cf * CFrame.new(14, 0.6, -8 + i * 5) * CFrame.Angles(0, math.rad(-90), 0)
-		local stand = Instance.new("Model")
-		stand.Name = "ArmorStand" .. i
-		stand.Parent = stands
-		part(stand, "Foot", Vector3.new(2, 0.4, 2), standCf * CFrame.new(0, 0.2, 0), WOOD_DARK, Enum.Material.Wood)
-		part(stand, "Pole", Vector3.new(0.4, 2, 0.4), standCf * CFrame.new(0, 1.2, 0), WOOD_DARK, Enum.Material.Wood)
-		part(stand, "Legs", Vector3.new(1.9, 2, 0.9), standCf * CFrame.new(0, 2, 0), WOOD, Enum.Material.Wood)
-		part(stand, "Torso", Vector3.new(2, 2, 1), standCf * CFrame.new(0, 4, 0), WOOD, Enum.Material.Wood)
-		part(stand, "Head", Vector3.new(1.2, 1.2, 1.2), standCf * CFrame.new(0, 5.6, 0), WOOD, Enum.Material.Wood)
-		-- Dress the stand in a craftable set (showcase, not a shop).
-		local setId = F.SampleArmor[i]
-		if setId and Config.ArmorSets[setId] then
-			local armor = ArmorBuilder.BuildSet(setId)
-			armor:PivotTo(standCf * CFrame.new(0, 1, 0))
-			armor.Parent = stand
-		end
-	end
-
-	lantern(model, (cf * CFrame.new(-21, 0, -17)).Position)
-	lantern(model, (cf * CFrame.new(21, 0, -17)).Position)
-	sign(model, cf * CFrame.new(0, 10.4, -15), Vector3.new(17, 3.6, 0.4), { { Text = Texts.Forge, Size = 60, Color = T.Gold } })
-	zoneSign(parent, F.SignOffset, WEST, Texts.Forge, T.Orange)
-	local prompt = WorldKit.Prompt(anvil, L.Prompts.Forge, "", { Action = "OpenForge" }, 16)
-	return prompt, model
+	-- decor: refiner, cargo, pipes, vent
+	NanoKit.Prop(m, "Trainer_Refiner", cf * CFrame.new(w / 2 - 4, 0.6, d / 2 - 4), 7, function(p, c)
+		return NanoKit.CargoStack(p, c)
+	end)
+	NanoKit.CargoStack(m, cf * CFrame.new(-w / 2 + 4, 0.6, d / 2 - 4))
+	NanoKit.Prop(m, "Prop_Pipes", cf * CFrame.new(0, 0.6, d / 2 + 1.5))
+	NanoKit.Vent(m, cf * CFrame.new(w / 2 + 0.6, h * 0.3, 4) * CFrame.Angles(0, math.rad(-90), 0), 2.6)
+	return prompt, m
 end
 
 ---------------------------------------------------------------------
--- Premium showcase, altar, wheel, eggs, leaderboards, fountain
+-- Incubator (pet eggs)
 ---------------------------------------------------------------------
 
-local function buildStore(parent)
-	local cf = frame(L.Store.Offset, WEST)
-	local model = Instance.new("Model")
-	model.Name = "Store"
-	model.Parent = parent
-	local counter = WorldKit.Brick(model, Vector3.new(6, 3, 4), cf * CFrame.new(0, 1.5, 0), Color3.fromRGB(70, 50, 110), "Counter")
-	part(model, "Top", Vector3.new(6.6, 0.4, 4.6), cf * CFrame.new(0, 3.2, 0), T.Gold, Enum.Material.Metal)
-	local gem = part(model, "Gem", Vector3.new(1.6, 1.6, 1.6), cf * CFrame.new(0, 5, 0) * CFrame.Angles(math.rad(45), 0, math.rad(45)), T.Cyan, Enum.Material.Glass, { CanCollide = false, Transparency = 0.1 })
-	TweenService:Create(gem, TweenInfo.new(5, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), { CFrame = gem.CFrame * CFrame.Angles(0, math.rad(180), 0) }):Play()
-	WorldKit.Light(gem, T.Cyan, 12, 1)
-	for _, side in ipairs({ -1, 1 }) do
-		part(model, "Pole", Vector3.new(0.5, 8, 0.5), cf * CFrame.new(side * 3.2, 4, 1.6), T.Gold, Enum.Material.Metal)
+local function egg(parent, cf: CFrame, scale: number, color: Color3)
+	local shell = Panel(parent, "EggShell", Vector3.new(2.6, 3.4, 2.6) * scale, cf, Color3.fromRGB(240, 238, 248), M.Smooth, { Shape = Enum.PartType.Ball, CanCollide = false })
+	for i = 1, 4 do
+		local angle = i * math.pi / 2
+		Panel(parent, "EggLine", Vector3.new(0.12, 2.6, 0.12) * scale, cf * CFrame.new(math.cos(angle) * 1.3 * scale, 0, math.sin(angle) * 1.3 * scale), color, M.Neon, { CanCollide = false })
 	end
+	return shell
+end
+
+local function buildIncubator()
+	local E = L.Egg
+	local cf = frame(E.Offset, EAST)
+	local pos = cf.Position
+	local flat = CFrame.Angles(0, 0, math.rad(90))
+	local m = NanoKit.Model(root, "Egg")
+	NanoKit.Cylinder(m, "Platform", 1, E.Radius * 2, CFrame.new(pos + Vector3.new(0, 0.5, 0)) * flat, N.Graphite, M.Metal)
+	NanoKit.Cylinder(m, "PlatformRing", 0.1, E.Radius * 2 - 0.6, CFrame.new(pos + Vector3.new(0, 1.02, 0)) * flat, N.Magenta, M.Neon).CanCollide = false
+	NanoKit.Cylinder(m, "PlatformTop", 0.12, E.Radius * 2 - 1.2, CFrame.new(pos + Vector3.new(0, 1.05, 0)) * flat, N.Steel, M.Plate).CanCollide = false
+	-- glass dome on ribs
+	local apex = pos + Vector3.new(0, 9, 0)
+	for i = 0, 5 do
+		local angle = i * math.pi / 3
+		local foot = pos + Vector3.new(math.cos(angle) * (E.Radius - 0.6), 1, math.sin(angle) * (E.Radius - 0.6))
+		local length = (apex - foot).Magnitude
+		Panel(m, "Rib", Vector3.new(0.5, 0.5, length), CFrame.lookAt((foot + apex) / 2, apex), N.SteelLight, M.Metal, { CanCollide = false })
+	end
+	Panel(m, "Dome", Vector3.new(E.Radius * 1.7, E.Radius * 1.4, E.Radius * 1.7), CFrame.new(pos + Vector3.new(0, 4, 0)), N.Glass, M.Glass, { Shape = Enum.PartType.Ball, Transparency = 0.82, CanCollide = false, CastShadow = false })
+	-- pedestal with the big egg + halo rings
+	local pedestal = Panel(m, "Pedestal", Vector3.new(4, 2.2, 4), CFrame.new(pos + Vector3.new(0, 2.1, 0)), N.Steel, M.Plate)
+	local big = egg(m, CFrame.new(pos + Vector3.new(0, 5.2, 0)), 1, N.Magenta)
+	NanoKit.Tag(big, "Bob", { Amplitude = 0.35, Period = 2.6 })
+	for i = 1, 2 do
+		local ring = NanoKit.Cylinder(m, "Halo", 0.2, 4.6 + i, CFrame.new(pos + Vector3.new(0, 4.4 + i * 0.9, 0)) * flat * CFrame.Angles(math.rad(i * 20), 0, 0), if i == 1 then N.Magenta else N.Cyan, M.Neon)
+		ring.CanCollide = false
+		ring.Transparency = 0.3
+		NanoKit.Tag(ring, "Spin", { Speed = if i == 1 then 50 else -70, Axis = "Y" })
+	end
+	WorldKit.Light(big, N.Magenta, 18, 1.2)
+	-- incubation pods around
 	for i = 0, 3 do
-		part(model, "Awning", Vector3.new(1.75, 0.3, 5), cf * CFrame.new(-2.63 + i * 1.75, 8.1, 0) * CFrame.Angles(math.rad(10), 0, 0), if i % 2 == 0 then T.Gold else T.Panel, nil, { CanCollide = false })
+		local angle = i * math.pi / 2 + math.pi / 4
+		local p = pos + Vector3.new(math.cos(angle) * (E.Radius - 3.2), 1, math.sin(angle) * (E.Radius - 3.2))
+		NanoKit.Column(m, "PodBase", 0.8, 2.6, p, N.Graphite, M.Metal)
+		NanoKit.Column(m, "Pod", 3, 2.2, p + Vector3.new(0, 0.8, 0), N.Glass, M.Glass).Transparency = 0.6
+		egg(m, CFrame.new(p + Vector3.new(0, 2.2, 0)), 0.45, if i % 2 == 0 then N.Cyan else N.Gold)
+		NanoKit.Column(m, "PodLid", 0.3, 2.4, p + Vector3.new(0, 3.8, 0), N.SteelLight, M.Metal)
 	end
-	sign(model, cf * CFrame.new(0, 1.6, -2.05), Vector3.new(5.6, 2, 0.1), { { Text = Texts.Store, Size = 44, Color = T.Gold }, { Text = "Robux", Size = 22 } })
-	zoneSign(parent, L.Store.SignOffset, WEST, Texts.Premium, T.Gold)
-	return WorldKit.Prompt(counter, L.Prompts.Store, "", { Action = "OpenStore" }, 12)
+	NanoKit.PostSign(m, frame(E.Offset + Vector3.new(E.Radius + 2, 0, E.Radius - 2), EAST), Texts.Pets, N.Magenta, Texts.PetsSub)
+	return WorldKit.Prompt(pedestal, L.Prompts.Egg, "", { Action = "OpenPets" }, 14)
 end
 
-local function buildWheel(parent)
+---------------------------------------------------------------------
+-- Wheel of fortune (the client spins the "Spin" model)
+---------------------------------------------------------------------
+
+local function buildWheel()
 	local cf = frame(L.Wheel.Offset, EAST)
-	local model = Instance.new("Model")
-	model.Name = "Wheel"
-	model.Parent = parent
-	WorldKit.Brick(model, Vector3.new(12, 12, 2), cf * CFrame.new(0, 6, 2), T.StoneB, "Board")
-	-- Everything that turns is one model the client pivots around the disc.
+	local m = NanoKit.Model(root, "Wheel")
+	for _, side in ipairs({ -1, 1 }) do
+		Panel(m, "Strut", Vector3.new(1, 13, 1.4), cf * CFrame.new(side * 6.4, 6.5, 1.6), N.Graphite, M.Metal)
+		NanoKit.Strip(m, (cf * CFrame.new(side * 6.4, 1, 0.85)).Position, (cf * CFrame.new(side * 6.4, 12, 0.85)).Position, N.Gold, 0.12)
+	end
+	Panel(m, "Board", Vector3.new(12, 12, 1), cf * CFrame.new(0, 6.6, 2.2), N.Steel, M.Plate)
 	local spin = Instance.new("Model")
 	spin.Name = "Spin"
-	spin.Parent = model
+	spin.Parent = m
 	local disc = WorldKit.Part(spin, {
 		Name = "Disc",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(0.8, 9, 9),
-		CFrame = cf * CFrame.new(0, 6, 0.6) * CFrame.Angles(0, math.rad(90), 0),
-		Color = Color3.fromRGB(250, 246, 255),
+		CFrame = cf * CFrame.new(0, 6.6, 1) * CFrame.Angles(0, math.rad(90), 0),
+		Color = N.Graphite,
+		Material = M.Metal,
 	})
 	spin.PrimaryPart = disc
-	local colors = { T.Magenta, T.Gold, T.Cyan, T.Green, T.Purple, T.Orange, T.Red, T.Blue }
+	local colors = { N.Magenta, N.Gold, N.Cyan, T.Green, T.Purple, T.Orange, T.Red, T.Blue }
 	for i = 0, 7 do
 		local angle = i * math.pi / 4
 		WorldKit.Part(spin, {
-			Name = "Peg",
-			Size = Vector3.new(1.2, 2.6, 0.5),
-			CFrame = cf * CFrame.new(math.cos(angle) * 3.2, 6 + math.sin(angle) * 3.2, 0.1) * CFrame.Angles(0, 0, angle + math.rad(90)),
+			Name = "Segment",
+			Size = Vector3.new(1.4, 3.2, 0.3),
+			CFrame = cf * CFrame.new(math.cos(angle) * 2.8, 6.6 + math.sin(angle) * 2.8, 0.45) * CFrame.Angles(0, 0, angle + math.rad(90)),
 			Color = colors[i + 1],
+			Material = M.Neon,
 			CanCollide = false,
 		})
 	end
-	WorldKit.Part(model, { Name = "Hub", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1, 1.6, 1.6), CFrame = cf * CFrame.new(0, 6, 0) * CFrame.Angles(0, math.rad(90), 0), Color = T.Gold })
-	WorldKit.Part(model, { Name = "Pointer", Size = Vector3.new(0.8, 1.6, 0.6), CFrame = cf * CFrame.new(0, 11.2, 0.1), Color = T.Red })
-	sign(model, cf * CFrame.new(0, 13.6, 1), Vector3.new(12, 2.8, 0.4), { { Text = Texts.Wheel, Size = 44, Color = T.Gold }, { Name = "Status", Text = Texts.WheelFree, Size = 26, Color = T.Green } })
-	model:SetAttribute("Wheel", true)
+	WorldKit.Part(m, { Name = "Hub", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1, 1.8, 1.8), CFrame = cf * CFrame.new(0, 6.6, 0.4) * CFrame.Angles(0, math.rad(90), 0), Color = N.SteelLight, Material = M.Metal })
+	WorldKit.Part(m, { Name = "Pointer", Size = Vector3.new(0.8, 1.6, 0.6), CFrame = cf * CFrame.new(0, 11.6, 0.4), Color = N.Gold, Material = M.Neon })
+	NanoKit.HoloSign(m, cf * CFrame.new(0, 14.6, 1.6), Vector2.new(12, 2.8), { { Text = Texts.Wheel, Size = 44, Color = N.Gold }, { Name = "Status", Text = Texts.WheelFree, Size = 26, Color = T.Green } }, N.Gold)
+	m:SetAttribute("Wheel", true)
 	return WorldKit.Prompt(disc, L.Prompts.Wheel, "", { Action = "Wheel" }, 14)
 end
 
-local function buildEgg(parent)
-	local cf = frame(L.Egg.Offset, EAST)
-	local model = Instance.new("Model")
-	model.Name = "Egg"
-	model.Parent = parent
-	local ped = WorldKit.Brick(model, Vector3.new(6, 3, 6), cf * CFrame.new(0, 1.5, 0), T.StoneDark, "Pedestal")
-	part(model, "Nest", Vector3.new(4.6, 0.8, 4.6), cf * CFrame.new(0, 3.3, 0), Color3.fromRGB(190, 150, 90), Enum.Material.Fabric)
-	local egg = WorldKit.Part(model, { Name = "EggShell", Shape = Enum.PartType.Ball, Size = Vector3.new(3.5, 4.5, 3.5), CFrame = cf * CFrame.new(0, 5.6, 0), Color = Color3.fromRGB(255, 240, 250) })
-	for i = 1, 5 do
-		local angle = i * math.pi * 2 / 5
-		WorldKit.Part(model, { Name = "Spot", Shape = Enum.PartType.Ball, Size = Vector3.one * 0.9, CFrame = cf * CFrame.new(math.cos(angle) * 1.5, 5.6 + math.sin(i) * 0.8, math.sin(angle) * 1.5), Color = if i % 2 == 0 then T.Magenta else T.Cyan, CanCollide = false })
-	end
-	TweenService:Create(egg, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Position = egg.Position + Vector3.new(0, 0.4, 0) }):Play()
-	zoneSign(parent, L.Egg.Offset + Vector3.new(7, 0, 7), EAST, Texts.Pets, T.Magenta:Lerp(Color3.new(1, 1, 1), 0.4))
-	return WorldKit.Prompt(ped, L.Prompts.Egg, "", { Action = "OpenPets" }, 14)
+---------------------------------------------------------------------
+-- Store kiosk
+---------------------------------------------------------------------
+
+local function buildStore()
+	local cf = frame(L.Store.Offset, WEST)
+	local m = NanoKit.Model(root, "Store")
+	NanoKit.Canopy(m, cf, Vector2.new(9, 7), 8, N.Gold)
+	local counter = Panel(m, "Counter", Vector3.new(6, 3, 2.4), cf * CFrame.new(0, 1.5, 0), N.Graphite, M.Metal)
+	Panel(m, "CounterTop", Vector3.new(6.4, 0.3, 2.8), cf * CFrame.new(0, 3.15, 0), N.Gold, M.Metal)
+	NanoKit.Strip(m, (cf * CFrame.new(-3, 2.6, -1.25)).Position, (cf * CFrame.new(3, 2.6, -1.25)).Position, N.Gold, 0.12)
+	-- hologram (owner Prop_Hologram if present, else a spinning gem)
+	NanoKit.Prop(m, "Prop_Hologram", cf * CFrame.new(0, 3.3, 0), 3, function(p, c)
+		local gem = Panel(p, "Gem", Vector3.new(1.6, 1.6, 1.6), c * CFrame.new(0, 1.6, 0) * CFrame.Angles(math.rad(45), 0, math.rad(45)), N.Cyan, M.Glass, { CanCollide = false, Transparency = 0.15 })
+		NanoKit.Tag(gem, "Spin", { Speed = 60, Axis = "Y" })
+		WorldKit.Light(gem, N.Cyan, 12, 1)
+		return gem
+	end)
+	NanoKit.PostSign(m, frame(L.Store.Offset + Vector3.new(-6, 0, 6), WEST), Texts.Store, N.Gold, "Robux")
+	return WorldKit.Prompt(counter, L.Prompts.Store, "", { Action = "OpenStore" }, 12)
 end
 
-local function buildLeaderboards(parent)
+---------------------------------------------------------------------
+-- Polygon arena (the dummies are placed by PolygonService)
+---------------------------------------------------------------------
+
+local function buildPolygon()
+	local PG = L.Polygon
+	local m = NanoKit.Model(root, "Polygon")
+	local pos = at(PG.Offset)
+	Panel(m, "Floor", Vector3.new(PG.Size.X, 0.4, PG.Size.Z), CFrame.new(pos + Vector3.new(0, 0.2, 0)), N.Graphite, M.Plate)
+	for i = -2, 2 do
+		NanoKit.Strip(m, pos + Vector3.new(-PG.Size.X / 2 + 1, 0.42, i * PG.Size.Z / 5), pos + Vector3.new(PG.Size.X / 2 - 1, 0.42, i * PG.Size.Z / 5), N.Cyan, 0.08)
+	end
+	-- railings on three sides (open towards the avenue, +X)
+	local hx, hz = PG.Size.X / 2, PG.Size.Z / 2
+	NanoKit.Railing(m, pos + Vector3.new(-hx, 0.4, -hz), pos + Vector3.new(hx, 0.4, -hz), 3.2, N.Cyan)
+	NanoKit.Railing(m, pos + Vector3.new(-hx, 0.4, hz), pos + Vector3.new(hx, 0.4, hz), 3.2, N.Cyan)
+	NanoKit.Railing(m, pos + Vector3.new(-hx, 0.4, -hz), pos + Vector3.new(-hx, 0.4, hz), 3.2, N.Cyan)
+	-- floodlight masts
+	for _, dz in ipairs({ -1, 1 }) do
+		local mast = pos + Vector3.new(-hx + 2, 0.4, dz * (hz - 2))
+		NanoKit.Column(m, "Mast", 14, 0.7, mast, N.Graphite, M.Metal)
+		local head = Panel(m, "Floodlight", Vector3.new(2.4, 1, 1.2), CFrame.lookAt(mast + Vector3.new(0, 14, 0), pos), N.SteelLight, M.Metal)
+		local light = Instance.new("SpotLight")
+		light.Face = Enum.NormalId.Front
+		light.Color = N.WarmLight
+		light.Range = 50
+		light.Angle = 70
+		light.Brightness = 2
+		light.Parent = head
+	end
+	-- board on the back railing + a sign by the avenue
+	local boardCenter = pos + Vector3.new(-hx + 0.6, 9, 0)
+	NanoKit.HoloSign(m, CFrame.lookAt(boardCenter, boardCenter + EAST), Vector2.new(14, 4), { { Text = Texts.Polygon, Size = 56, Color = N.Cyan }, { Text = Texts.PolygonSub, Size = 26 } }, N.Cyan)
+	NanoKit.PostSign(root, frame(Vector3.new(-L.AvenueWidth / 2 - 3, 0, PG.Offset.Z + hz + 2), EAST), Texts.Polygon, N.Cyan, Texts.PolygonSub)
+	-- owner decor: weights in the corner
+	NanoKit.Prop(m, "Trainer_Weights", CFrame.lookAt(pos + Vector3.new(-hx + 5, 0.4, hz - 5), pos + Vector3.new(0, 0.4, 0)), 4)
+	return m
+end
+
+---------------------------------------------------------------------
+-- Leaderboards
+---------------------------------------------------------------------
+
+local function buildLeaderboards()
 	local boards = {}
 	for _, def in ipairs(L.Leaderboards) do
 		local cf = frame(def.Offset, EAST)
+		local m = NanoKit.Model(root, "Leaderboard_" .. def.Kind)
 		for _, side in ipairs({ -1, 1 }) do
-			part(parent, "BoardPost", Vector3.new(0.8, 16, 0.8), cf * CFrame.new(side * 8.2, 8, 0.3), WOOD_DARK, Enum.Material.Wood)
+			Panel(m, "Post", Vector3.new(1, 17, 1.2), cf * CFrame.new(side * 8.6, 8.5, 0.4), N.Graphite, M.Metal)
+			NanoKit.Strip(m, (cf * CFrame.new(side * 8.6, 1, -0.25)).Position, (cf * CFrame.new(side * 8.6, 16, -0.25)).Position, N.Gold, 0.12)
 		end
-		part(parent, "BoardFrame", Vector3.new(17, 14.6, 0.4), cf * CFrame.new(0, 8.6, 0.3), T.Gold, Enum.Material.Metal)
-		local board = part(parent, "Leaderboard_" .. def.Kind, Vector3.new(16, 13.6, 0.6), cf * CFrame.new(0, 8.6, 0), T.PanelDark)
-		local lines = { { Name = "Title", Text = def.Title, Size = 34, Color = T.Gold } }
+		Panel(m, "Frame", Vector3.new(17, 14.6, 0.5), cf * CFrame.new(0, 8.8, 0.35), N.Steel, M.Metal)
+		local board = Panel(m, "Board", Vector3.new(16, 13.6, 0.4), cf * CFrame.new(0, 8.8, 0), T.PanelDark, M.Smooth)
+		local lines = { { Name = "Title", Text = def.Title, Size = 34, Color = N.Gold } }
 		for i = 1, Config.Leaderboards.Top do
 			table.insert(lines, { Name = "Row" .. i, Text = i .. ". —", Size = 18 })
 		end
@@ -578,73 +551,66 @@ local function buildLeaderboards(parent)
 	return boards
 end
 
-local function buildFountain(parent)
-	local F = L.Fountain
-	local pos = at(F.Offset)
-	local model = Instance.new("Model")
-	model.Name = "Fountain"
-	model.Parent = parent
-	local flat = CFrame.Angles(0, 0, math.rad(90))
-	WorldKit.Part(model, { Name = "Basin", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.6, F.Radius * 2, F.Radius * 2), CFrame = CFrame.new(pos + Vector3.new(0, 0.8, 0)) * flat, Color = T.StoneDark })
-	WorldKit.Part(model, { Name = "Water", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, F.Radius * 2 - 1.5, F.Radius * 2 - 1.5), CFrame = CFrame.new(pos + Vector3.new(0, 1.5, 0)) * flat, Color = T.Cyan, Material = Enum.Material.Glass, Transparency = 0.3, CanCollide = false })
-	WorldKit.Brick(model, Vector3.new(2.4, 4, 2.4), CFrame.new(pos + Vector3.new(0, 3.5, 0)), T.StoneLight, "Column")
-	WorldKit.Part(model, { Name = "Bowl", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.8, 6, 6), CFrame = CFrame.new(pos + Vector3.new(0, 5.6, 0)) * flat, Color = T.StoneDark })
-	local crystal = WorldKit.Part(model, { Name = "Crystal", Size = Vector3.new(1.8, 3.6, 1.8), CFrame = CFrame.new(pos + Vector3.new(0, 8, 0)) * CFrame.Angles(0, math.rad(45), 0), Color = T.Cyan, Material = Enum.Material.Glass, Transparency = 0.1 })
-	TweenService:Create(crystal, TweenInfo.new(6, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), { CFrame = crystal.CFrame * CFrame.Angles(0, math.rad(180), 0) }):Play()
-	WorldKit.Light(crystal, T.Cyan, 18, 1)
-	local splash = Instance.new("ParticleEmitter")
-	splash.Color = ColorSequence.new(T.Cyan, Color3.new(1, 1, 1))
-	splash.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 0) })
-	splash.Lifetime = NumberRange.new(0.8, 1.4)
-	splash.Speed = NumberRange.new(8, 12)
-	splash.SpreadAngle = Vector2.new(25, 25)
-	splash.Rate = 20
-	splash.Acceleration = Vector3.new(0, -20, 0)
-	splash.Parent = crystal
-end
-
 ---------------------------------------------------------------------
--- Decor
+-- Bridge, floating platforms, drones, cargo, vents, owner props
 ---------------------------------------------------------------------
 
-local function buildTree(parent, position: Vector3)
-	local model = Instance.new("Model")
-	model.Name = "Tree"
-	model.Parent = parent
-	WorldKit.Brick(model, Vector3.new(2, 6, 2), CFrame.new(position + Vector3.new(0, 3, 0)), WOOD, "Trunk")
-	WorldKit.Brick(model, Vector3.new(8, 5, 8), CFrame.new(position + Vector3.new(0, 8, 0)), Color3.fromRGB(70, 190, 100), "Leaves")
-	WorldKit.Brick(model, Vector3.new(5, 4, 5), CFrame.new(position + Vector3.new(0, 12, 0)), Color3.fromRGB(95, 215, 125), "Leaves")
-end
-
-local function buildBush(parent, position: Vector3)
-	WorldKit.Brick(parent, Vector3.new(3, 2.2, 3), CFrame.new(position + Vector3.new(0, 1.1, 0)) * CFrame.Angles(0, math.rad(20), 0), Color3.fromRGB(80, 200, 110), "Bush")
-	WorldKit.Brick(parent, Vector3.new(2, 1.6, 2), CFrame.new(position + Vector3.new(1.2, 1.2, 0.8)), Color3.fromRGB(100, 220, 130), "Bush")
-end
-
-local FLOWERS = { T.Magenta, T.Gold, T.Cyan, T.Red, Color3.new(1, 1, 1) }
-local function buildFlowerBed(parent, position: Vector3)
-	local model = Instance.new("Model")
-	model.Name = "FlowerBed"
-	model.Parent = parent
-	WorldKit.Brick(model, Vector3.new(8, 1, 5), CFrame.new(position + Vector3.new(0, 0.5, 0)), T.StoneDark, "Border")
-	part(model, "Soil", Vector3.new(7, 0.3, 4), CFrame.new(position + Vector3.new(0, 1.1, 0)), Color3.fromRGB(90, 60, 40), Enum.Material.Ground, { CanCollide = false })
-	for i = 1, 6 do
-		local fx = -3 + ((i - 1) % 3) * 3 + (if i > 3 then 0.8 else -0.6)
-		local fz = if i > 3 then 1 else -1
-		part(model, "Stem", Vector3.new(0.25, 1.4, 0.25), CFrame.new(position + Vector3.new(fx, 1.9, fz)), Color3.fromRGB(70, 160, 70), nil, { CanCollide = false })
-		part(model, "Flower", Vector3.new(0.9, 0.7, 0.9), CFrame.new(position + Vector3.new(fx, 2.8, fz)) * CFrame.Angles(0, i, 0), FLOWERS[(i - 1) % #FLOWERS + 1], nil, { CanCollide = false })
+-- Owner props of unknown purpose go into PropSlots by their height.
+local function sizeClass(height: number): string
+	if height < 4 then
+		return "Small"
+	elseif height <= 10 then
+		return "Medium"
 	end
+	return "Large"
 end
 
-local function buildBench(parent, offset: Vector3, dir: Vector3)
-	local cf = frame(offset, dir)
-	local model = Instance.new("Model")
-	model.Name = "Bench"
-	model.Parent = parent
-	part(model, "Seat", Vector3.new(6, 0.5, 2), cf * CFrame.new(0, 1.6, 0), WOOD, Enum.Material.WoodPlanks)
-	part(model, "Back", Vector3.new(6, 1.6, 0.4), cf * CFrame.new(0, 2.8, 0.9) * CFrame.Angles(math.rad(-8), 0, 0), WOOD, Enum.Material.WoodPlanks)
-	for _, side in ipairs({ -1, 1 }) do
-		part(model, "Leg", Vector3.new(0.5, 1.4, 1.8), cf * CFrame.new(side * 2.5, 0.7, 0), IRON, Enum.Material.Metal)
+local function buildDecor()
+	-- bridge across the avenue on two towers
+	local BR = L.Bridge
+	for _, p in ipairs({ BR.From, BR.To }) do
+		NanoKit.Pylon(root, at(p), BR.Height + 4, N.Magenta, 5)
+	end
+	NanoKit.Bridge(root, at(BR.From), at(BR.To), BR.Height, BR.Width, N.Magenta)
+	NanoKit.Cable(root, at(BR.From) + Vector3.new(0, BR.Height + 4, 0), at(L.Portal.Offset) + Vector3.new(-L.Portal.Width / 2, L.Portal.Height + 8, 0), 4)
+	NanoKit.Cable(root, at(BR.To) + Vector3.new(0, BR.Height + 4, 0), at(L.Portal.Offset) + Vector3.new(L.Portal.Width / 2, L.Portal.Height + 8, 0), 4)
+
+	for _, fp in ipairs(L.FloatingPlatforms) do
+		local platform = NanoKit.FloatingPlatform(root, CFrame.new(at(fp.Offset)), fp.Size, N.Cyan)
+		NanoKit.CargoStack(platform, CFrame.new(at(fp.Offset) + Vector3.new(0, fp.Size.Y / 2, 0)))
+	end
+	for _, route in ipairs(L.DroneRoutes) do
+		local points = {}
+		for _, offset in ipairs(route) do
+			table.insert(points, at(offset))
+		end
+		NanoKit.Drone(root, points, 9)
+	end
+	for i, offset in ipairs(L.Cargo) do
+		NanoKit.CargoStack(root, CFrame.new(at(offset)) * CFrame.Angles(0, math.rad(i * 37), 0))
+	end
+	for _, vent in ipairs(L.Vents) do
+		local p = at(vent.Offset) + Vector3.new(0, 5, 0)
+		NanoKit.Vent(root, CFrame.lookAt(p, p + vent.Facing), 3.4)
+	end
+
+	-- owner props of unknown purpose, by size
+	local candidates = { Small = {}, Medium = {}, Large = {} }
+	for _, name in ipairs({ "Prop_Misc_1", "Prop_Misc_2", "Prop_Misc_3", "Prop_Misc_4", "Prop_Pipes" }) do
+		local size = Assets.Size("Props", name)
+		if size then
+			table.insert(candidates[sizeClass(size.Y)], name)
+		end
+	end
+	local used = { Small = 0, Medium = 0, Large = 0 }
+	for _, slot in ipairs(L.PropSlots) do
+		local list = candidates[slot.Size]
+		if #list > 0 then
+			used[slot.Size] += 1
+			NanoKit.Prop(root, list[(used[slot.Size] - 1) % #list + 1], frame(slot.Offset, slot.Facing))
+		elseif slot.Size ~= "Small" then
+			NanoKit.CargoStack(root, frame(slot.Offset, slot.Facing))
+		end
 	end
 end
 
@@ -658,38 +624,34 @@ function HubGenerator.Build()
 	local origin = if spawn then spawn.Position else Vector3.zero
 	local groundY = if spawn then spawn.Position.Y + spawn.Size.Y / 2 else 0
 	base = Vector3.new(origin.X, groundY, origin.Z)
+	if spawn then
+		-- our spawn pad replaces the look of the default grey SpawnLocation
+		spawn.Transparency = 1
+		for _, d in ipairs(spawn:GetChildren()) do
+			if d:IsA("Decal") then
+				d.Transparency = 1
+			end
+		end
+	end
 
-	buildCourtyard()
-	buildPaths()
-	local portal = buildPortal()
-	buildNpc()
-
-	local polygon = buildPolygon(root)
-
-	local forgePrompt, forge = buildForge(root)
-	local storePrompt = buildStore(root)
-	local wheelPrompt = buildWheel(root)
-	local eggPrompt = buildEgg(root)
-	local boards = buildLeaderboards(root)
-	buildFountain(root)
-	for _, offset in ipairs(L.Trees) do
-		buildTree(root, at(offset))
-	end
-	for _, offset in ipairs(L.Bushes) do
-		buildBush(root, at(offset))
-	end
-	for _, offset in ipairs(L.FlowerBeds) do
-		buildFlowerBed(root, at(offset))
-	end
-	for _, bench in ipairs(L.Benches) do
-		buildBench(root, bench.Offset, bench.Facing)
-	end
+	buildPlaza()
+	buildAvenue()
+	buildTower()
+	local portal = buildGates()
+	local forgePrompt, forge = buildForge()
+	local eggPrompt = buildIncubator()
+	local wheelPrompt = buildWheel()
+	local storePrompt = buildStore()
+	local polygon = buildPolygon()
+	local boards = buildLeaderboards()
+	buildDecor()
 
 	root:SetAttribute("Center", base + L.Center)
 	root.Parent = Workspace
 	return {
 		Folder = root,
 		Polygon = polygon,
+		PolygonCenter = at(L.Polygon.Offset),
 		Portal = portal,
 		Forge = forge,
 		ForgePrompt = forgePrompt,
