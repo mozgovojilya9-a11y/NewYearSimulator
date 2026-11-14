@@ -1009,7 +1009,7 @@ Config.Hud = {
 		Hub = "Войди в подземелье!",
 		Fight = "Уничтожь врагов!",
 		Cleared = "Иди дальше!",
-		Done = "Данж пройден! Тренируйся дальше",
+		Done = "Данж пройден! Улучшай снаряжение",
 	},
 	MenuButtons = { -- grid on the left, 2 columns
 		{ Id = "Forge", Icon = "⚒", Label = "Кузница", Color = Color3.fromRGB(255, 120, 40) },
