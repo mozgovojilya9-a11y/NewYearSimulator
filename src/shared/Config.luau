@@ -246,6 +246,11 @@ Config.Loot = {
 	BossLuck = 4, -- boss drops: chances of Rare+ multiplied by this
 	LuckFrom = "Rare", -- luck multiplies this rarity and everything above
 	FloatHeight = 2.4,
+	SpreadRadius = 4.5, -- several drops lie on a circle of this radius around the kill
+	BossSpreadRadius = 7,
+	DetailDistance = 14, -- closer than this the plate shows name + rarity; farther only a small name tag
+	PlateSmall = Vector2.new(120, 26),
+	PlateFull = Vector2.new(160, 46),
 	SpinSeconds = 4,
 	BeamHeight = 14,
 	Texts = {
@@ -956,6 +961,7 @@ Config.Hud = {
 	ShakeCrit = { Amplitude = 0.25, Seconds = 0.15 },
 	ShakeBoss = { Amplitude = 0.8, Seconds = 0.5 },
 	BackKey = Enum.KeyCode.B,
+	BackButton = { Icon = "←", Label = "Назад [B]", Color = Color3.fromRGB(240, 70, 80) }, -- the Travel cell in the dungeon
 	MobileScaleWidth = 1100, -- UIScale = min(1, viewportWidth / this)
 }
 

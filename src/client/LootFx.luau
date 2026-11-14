@@ -40,28 +40,51 @@ local function remove(id)
 	end
 end
 
+-- Name plate. Far away it is a small name tag; within
+-- LOOT.DetailDistance it grows and shows the rarity (see RenderStepped).
 local function plate(anchor: BasePart, material, rarity)
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Plate"
 	gui.Adornee = anchor
-	gui.Size = UDim2.fromOffset(190, 52)
-	gui.StudsOffsetWorldSpace = Vector3.new(0, 2.6, 0)
+	gui.Size = UDim2.fromOffset(LOOT.PlateSmall.X, LOOT.PlateSmall.Y)
+	gui.StudsOffsetWorldSpace = Vector3.new(0, 2.2, 0)
 	gui.AlwaysOnTop = true
 	gui.LightInfluence = 0
-	gui.MaxDistance = 70
+	gui.MaxDistance = 60
 	gui.Parent = anchor
 	local frame = Instance.new("Frame")
 	frame.Size = UDim2.fromScale(1, 1)
 	frame.BackgroundColor3 = Style.Colors.PanelDark
 	frame.BorderSizePixel = 0
 	frame.Parent = gui
-	Style.Corner(frame, UDim.new(0, 10))
-	Style.Stroke(frame, 2.5, rarity.Color)
-	Style.Label(frame, material.Name, 20, Style.Colors.Text, { Position = UDim2.fromOffset(0, 3), Size = UDim2.new(1, 0, 0, 24) })
-	local rarityLabel = Style.Label(frame, rarity.Name, 16, rarity.Color, { Position = UDim2.fromOffset(0, 27), Size = UDim2.new(1, 0, 0, 20) })
+	Style.Corner(frame, UDim.new(0, 8))
+	Style.Stroke(frame, 2, rarity.Color)
+	local nameLabel = Style.Label(frame, material.Name, 15, rarity.Color, { Size = UDim2.fromScale(1, 1), TextScaled = true })
+	local padding = Instance.new("UIPadding")
+	padding.PaddingLeft = UDim.new(0, 6)
+	padding.PaddingRight = UDim.new(0, 6)
+	padding.PaddingTop = UDim.new(0, 3)
+	padding.PaddingBottom = UDim.new(0, 3)
+	padding.Parent = frame
+	local rarityLabel = Style.Label(frame, rarity.Name, 14, rarity.Color, { Position = UDim2.new(0, 0, 0.55, 0), Size = UDim2.fromScale(1, 0.45), TextScaled = true })
+	rarityLabel.Visible = false
 	if rarity.Rainbow then
 		Style.Rainbow(rarityLabel)
 	end
+	return { gui = gui, name = nameLabel, rarity = rarityLabel, detailed = false }
+end
+
+-- Switches a plate between the small tag and the detailed card.
+local function setDetailed(p, detailed: boolean)
+	if p.detailed == detailed then
+		return
+	end
+	p.detailed = detailed
+	local size = if detailed then LOOT.PlateFull else LOOT.PlateSmall
+	p.gui.Size = UDim2.fromOffset(size.X, size.Y)
+	p.rarity.Visible = detailed
+	p.name.Size = if detailed then UDim2.fromScale(1, 0.55) else UDim2.fromScale(1, 1)
+	p.name.TextColor3 = if detailed then Style.Colors.Text else p.rarity.TextColor3
 end
 
 local function spawn(id, materialId, position: Vector3)
@@ -116,7 +139,7 @@ local function spawn(id, materialId, position: Vector3)
 	light.Brightness = 1
 	light.Parent = anchor
 
-	plate(anchor, material, rarity)
+	local namePlate = plate(anchor, material, rarity)
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = LOOT.Texts.Pickup
@@ -151,7 +174,7 @@ local function spawn(id, materialId, position: Vector3)
 		Popups.Shake(0.5, 0.35)
 	end
 
-	drops[id] = { holder = holder, model = model, base = anchor.Position, phase = math.random() * 6, rainbow = if rarity.Rainbow then { beam = beam, light = light } else nil }
+	drops[id] = { holder = holder, model = model, plate = namePlate, base = anchor.Position, phase = math.random() * 6, rainbow = if rarity.Rainbow then { beam = beam, light = light } else nil }
 
 	-- Pop-in.
 	pcall(model.ScaleTo, model, 0.2)
@@ -167,9 +190,15 @@ local function spawn(id, materialId, position: Vector3)
 end
 
 -- Float + spin (+ rainbow for Secret drops).
+local player = Players.LocalPlayer
+
 RunService.RenderStepped:Connect(function()
 	local t = os.clock()
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	for _, drop in pairs(drops) do
+		if root then
+			setDetailed(drop.plate, (root.Position - drop.base).Magnitude <= LOOT.DetailDistance)
+		end
 		local bob = math.sin(t * 2 + drop.phase) * 0.35
 		drop.model:PivotTo(CFrame.new(drop.base + Vector3.new(0, bob, 0)) * CFrame.Angles(0, (t / LOOT.SpinSeconds) * math.pi * 2 + drop.phase, 0))
 		if drop.rainbow then

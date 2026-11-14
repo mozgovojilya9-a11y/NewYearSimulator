@@ -5,16 +5,19 @@
 	all clients see everyone's swings; the local player also swings at
 	once on their own click (Swing.Local) so it feels instant.
 
-	Procedural: the right shoulder Motor6D (R6 "Right Shoulder", R15
-	"RightShoulder") is tweened base -> wind-up -> strike -> base, the
-	torso leans via the root joint, and the weapon's Trail is switched
-	on. Three variants play in turn: overhead, horizontal, thrust
+	Procedural: every frame (RunService.Stepped, after the Animator)
+	the right shoulder (R6 "Right Shoulder", R15 "RightShoulder"; Motor6D
+	or AnimationConstraint) gets a rotation through its Transform:
+	base -> wind-up -> strike -> base; the torso leans via the root
+	joint. C0 is never written (read-only in new rigs). The weapon's
+	Trail is switched on during the swing. Three variants play in turn: overhead, horizontal, thrust
 	(Config.Animations.Swing). If Config.Animations.SwingIds has ids,
 	those animations are played instead.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Style = require(script.Parent.ui.Style)
@@ -24,27 +27,42 @@ local S = Config.Animations.Swing
 
 local Swing = {}
 
-local baseC0 = {} -- [motor] = original C0
+local active = {} -- [character] = { started, variant, shoulder, root }
 local swinging = {} -- [character] = true
 local variantOf = {} -- [character] = index of the next variant
 local tracks = {} -- [character] = { AnimationTrack }
 
-local function joints(character)
-	local upperArm = character:FindFirstChild("RightUpperArm")
-	if upperArm then
-		local lowerTorso = character:FindFirstChild("LowerTorso")
-		return upperArm:FindFirstChild("RightShoulder"), lowerTorso and lowerTorso:FindFirstChild("Root")
+local function findJoint(character, names)
+	for _, name in ipairs(names) do
+		local joint = character:FindFirstChild(name, true)
+		if joint and (joint:IsA("Motor6D") or joint:IsA("AnimationConstraint")) then
+			return joint
+		end
 	end
-	local torso = character:FindFirstChild("Torso")
-	local rootPart = character:FindFirstChild("HumanoidRootPart")
-	return torso and torso:FindFirstChild("Right Shoulder"), rootPart and rootPart:FindFirstChild("RootJoint")
+	return nil
 end
 
--- C0 that turns the joint's child by `world` (a rotation in the parent
--- part's space) whatever the joint's own axes are (R6 joints are rotated).
-local function rotated(base: CFrame, world: CFrame): CFrame
-	local r = base.Rotation
-	return base * (r:Inverse() * world * r)
+-- R15 "RightShoulder" / "Root", R6 "Right Shoulder" / "RootJoint".
+-- Motor6D or (new avatar joints) AnimationConstraint: both have Transform.
+local function joints(character)
+	return findJoint(character, { "RightShoulder", "Right Shoulder" }), findJoint(character, { "Root", "RootJoint" })
+end
+
+-- Rotation of the joint frame inside its parent part (C0 for a Motor6D,
+-- Attachment0 for an AnimationConstraint). Only READ, never written.
+local function jointRotation(joint): CFrame
+	if joint:IsA("Motor6D") then
+		return joint.C0.Rotation
+	end
+	local attachment = joint.Attachment0
+	return if attachment then attachment.CFrame.Rotation else CFrame.identity
+end
+
+-- Transform offset that turns the joint's child by `world` (a rotation
+-- in the parent part's space) whatever the joint's own axes are.
+local function offsetFor(joint, world: CFrame): CFrame
+	local r = jointRotation(joint)
+	return r:Inverse() * world * r
 end
 
 local function pose(key): CFrame
@@ -115,35 +133,84 @@ local function play(character)
 		swinging[character] = nil
 		return
 	end
-	local variant = S.Variants[index]
-	baseC0[shoulder] = baseC0[shoulder] or shoulder.C0
-	local armBase = baseC0[shoulder]
-	local rootBase
-	if rootJoint then
-		baseC0[rootJoint] = baseC0[rootJoint] or rootJoint.C0
-		rootBase = baseC0[rootJoint]
-	end
-
-	-- wind-up
-	Style.Tween(shoulder, S.WindSeconds, { C0 = rotated(armBase, pose(variant.Wind)) }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	if rootJoint then
-		Style.Tween(rootJoint, S.WindSeconds, { C0 = rotated(rootBase, CFrame.Angles(math.rad(variant.Lean * 0.4), math.rad(-(variant.Twist or 0)), 0)) })
-	end
-	task.wait(S.WindSeconds)
-	-- strike
-	Style.Tween(shoulder, S.StrikeSeconds, { C0 = rotated(armBase, pose(variant.Strike)) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	if rootJoint then
-		Style.Tween(rootJoint, S.StrikeSeconds, { C0 = rotated(rootBase, CFrame.Angles(math.rad(-variant.Lean), math.rad(variant.Twist or 0), 0)) })
-	end
-	task.wait(S.StrikeSeconds)
-	-- back
-	Style.Tween(shoulder, S.ReturnSeconds, { C0 = armBase }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	if rootJoint then
-		Style.Tween(rootJoint, S.ReturnSeconds, { C0 = rootBase })
-	end
-	task.wait(S.ReturnSeconds)
+	active[character] = {
+		started = os.clock(),
+		variant = S.Variants[index],
+		shoulder = shoulder,
+		root = rootJoint,
+	}
+	task.wait(S.WindSeconds + S.StrikeSeconds + S.ReturnSeconds)
 	swinging[character] = nil
 end
+
+---------------------------------------------------------------------
+-- Procedural pose, applied every frame on top of the Animator
+---------------------------------------------------------------------
+
+local function quadOut(t)
+	return 1 - (1 - t) * (1 - t)
+end
+local function quadIn(t)
+	return t * t
+end
+
+-- Arm and torso rotations (parent space) at time t of a swing, or nil
+-- when the swing is over.
+local function sample(swing, t: number): (CFrame?, CFrame?)
+	local v = swing.variant
+	local wind, strike = pose(v.Wind), pose(v.Strike)
+	local leanWind = CFrame.Angles(math.rad(v.Lean * 0.4), math.rad(-(v.Twist or 0)), 0)
+	local leanStrike = CFrame.Angles(math.rad(-v.Lean), math.rad(v.Twist or 0), 0)
+	if t < S.WindSeconds then
+		local a = quadOut(t / S.WindSeconds)
+		return CFrame.identity:Lerp(wind, a), CFrame.identity:Lerp(leanWind, a)
+	end
+	t -= S.WindSeconds
+	if t < S.StrikeSeconds then
+		local a = quadIn(t / S.StrikeSeconds)
+		return wind:Lerp(strike, a), leanWind:Lerp(leanStrike, a)
+	end
+	t -= S.StrikeSeconds
+	if t < S.ReturnSeconds then
+		local a = quadOut(t / S.ReturnSeconds)
+		return strike:Lerp(CFrame.identity, a), leanStrike:Lerp(CFrame.identity, a)
+	end
+	return nil, nil
+end
+
+-- The Animator rewrites Transform each frame while it plays something;
+-- when it does not, our last value would stay and pile up. Remember
+-- what we wrote and what the Animator's own value was.
+local written = {} -- [joint] = { mine = CFrame, base = CFrame }
+
+local function apply(joint, rotation: CFrame?)
+	if not joint or not joint.Parent then
+		return
+	end
+	local record = written[joint]
+	local current = joint.Transform
+	local base = if record and current:FuzzyEq(record.mine, 1e-4) then record.base else current
+	if rotation then
+		local mine = offsetFor(joint, rotation) * base
+		joint.Transform = mine
+		written[joint] = { mine = mine, base = base }
+	else
+		joint.Transform = base
+		written[joint] = nil
+	end
+end
+
+RunService.Stepped:Connect(function()
+	local now = os.clock()
+	for character, swing in pairs(active) do
+		local arm, lean = sample(swing, now - swing.started)
+		apply(swing.shoulder, arm)
+		apply(swing.root, lean)
+		if not arm or not character.Parent then
+			active[character] = nil
+		end
+	end
+end)
 
 local lastLocal = 0
 local lastSeen = {} -- [character] = last Swing value handled
@@ -167,6 +234,7 @@ local function watch(character)
 		variantOf[character] = nil
 		tracks[character] = nil
 		lastSeen[character] = nil
+		active[character] = nil
 	end)
 end
 

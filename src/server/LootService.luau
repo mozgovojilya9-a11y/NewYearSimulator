@@ -121,12 +121,14 @@ function LootService.OnKill(player, room: number, isBoss: boolean, position: Vec
 		count = 2
 	end
 	local groundY = DungeonGenerator.GroundY()
+	-- Drops are spread evenly on a circle so their plates never stack.
+	local startAngle = math.random() * math.pi * 2
+	local radius = if count <= 1 then 0 elseif isBoss then LOOT.BossSpreadRadius else LOOT.SpreadRadius
 	for i = 1, count do
 		local minIndex = if isBoss and i == 1 then Config.Rarity[LOOT.BossGuaranteed].Index else nil
 		local materialId = pickMaterial(kind, rollRarity(luck, minIndex))
 		if materialId then
-			local angle = math.random() * math.pi * 2
-			local radius = if count > 1 then 2.5 + math.random() * 2 else 0
+			local angle = startAngle + (i - 1) * math.pi * 2 / count
 			spawnDrop(player, materialId, Vector3.new(position.X + math.cos(angle) * radius, groundY, position.Z + math.sin(angle) * radius))
 		end
 	end

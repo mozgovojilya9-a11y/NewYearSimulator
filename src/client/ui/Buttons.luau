@@ -1,7 +1,7 @@
 --[[
 	Buttons.luau
 	Left 2-column menu grid (with "!" badges), top-right round buttons
-	(settings, sound) and the Back button shown in the dungeon (key B).
+	(settings, sound). In the dungeon the Travel cell becomes "Назад [B]".
 	The top-left corner (Config.Hud.TopLeftReserved) is left empty for
 	the Roblox buttons.
 ]]
@@ -84,10 +84,16 @@ local actions = {
 	end,
 }
 
+local travelUi = nil -- the Travel cell turns into "Назад [B]" in the dungeon
+
 for order, def in ipairs(Config.Hud.MenuButtons) do
-	local button = Style.Button(grid, { Name = def.Id, Color = def.Color, TextSize = 1, ZIndex = 2, LayoutOrder = order, Shadow = false })
-	Style.Label(button, def.Icon, 30, Style.Colors.Text, { Size = UDim2.new(1, 0, 0.6, 0), ZIndex = 3 }):FindFirstChildOfClass("UIStroke").Transparency = 1
-	Style.Label(button, def.Label, 13, Style.Colors.Text, { Position = UDim2.fromScale(0, 0.62), Size = UDim2.new(1, 0, 0.3, 0), TextScaled = true, ZIndex = 3 })
+	local button, setColor = Style.Button(grid, { Name = def.Id, Color = def.Color, TextSize = 1, ZIndex = 2, LayoutOrder = order, Shadow = false })
+	local iconLabel = Style.Label(button, def.Icon, 30, Style.Colors.Text, { Size = UDim2.new(1, 0, 0.6, 0), ZIndex = 3 })
+	iconLabel:FindFirstChildOfClass("UIStroke").Transparency = 1
+	local textLabel = Style.Label(button, def.Label, 13, Style.Colors.Text, { Position = UDim2.fromScale(0, 0.62), Size = UDim2.new(1, 0, 0.3, 0), TextScaled = true, ZIndex = 3 })
+	if def.Id == "Travel" then
+		travelUi = { def = def, icon = iconLabel, text = textLabel, setColor = setColor }
+	end
 
 	local badge = Instance.new("TextLabel")
 	badge.Name = "Badge"
@@ -153,24 +159,19 @@ soundButton.Activated:Connect(function()
 end)
 
 ---------------------------------------------------------------------
--- Back button (dungeon only, key B)
+-- Back (dungeon only, key B): the Travel cell of the grid changes into
+-- a red "Назад [B]" button, so nothing extra overlaps the HUD.
 ---------------------------------------------------------------------
 
-local back = Style.Button(Style.Gui, {
-	Name = "Back",
-	Position = UDim2.fromOffset(16, Config.Hud.TopLeftReserved.Y + 20 + BUTTON * ROWS + GAP * (ROWS - 1) + 12),
-	Size = UDim2.fromOffset(BUTTON * 2 + GAP, 44),
-	Color = Style.Colors.Red,
-	Text = "← Назад  [B]",
-	TextSize = 20,
-})
-back.Visible = false
-back.Activated:Connect(function()
-	go("Hub") -- ends the current run
-end)
-
 local function refreshZone()
-	back.Visible = player:GetAttribute("Zone") == "Dungeon"
+	if not travelUi then
+		return
+	end
+	local inDungeon = player:GetAttribute("Zone") == "Dungeon"
+	local back = Config.Hud.BackButton
+	travelUi.icon.Text = if inDungeon then back.Icon else travelUi.def.Icon
+	travelUi.text.Text = if inDungeon then back.Label else travelUi.def.Label
+	travelUi.setColor(if inDungeon then back.Color else travelUi.def.Color)
 end
 player:GetAttributeChangedSignal("Zone"):Connect(refreshZone)
 refreshZone()
