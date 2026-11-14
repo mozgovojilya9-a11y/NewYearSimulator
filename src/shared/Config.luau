@@ -785,6 +785,22 @@ Config.Assets = {
 	Icons = {},
 }
 
+-- Polygon in the hub: test dummies (no rewards). Damage per hit, DPS and
+-- the combo are shown to the player hitting them (client PolygonHud).
+Config.Polygon = {
+	DummyHeight = 6.5, -- studs (owner Trainer_Dummy / Trainer_Bag are scaled to it)
+	BigScale = 1.6, -- the "Big" dummy
+	Range = 18, -- max studs between the player and the dummy hit
+	ComboGap = 1.5, -- seconds between hits that keep the combo going
+	DpsWindow = 5, -- DPS = damage of the last N seconds / N
+	ResetSeconds = 4, -- the panel resets after this pause
+	Texts = {
+		Title = "ПОЛИГОН",
+		Line = "Удар %s   •   DPS %s   •   Комбо x%d",
+		Best = "Лучший удар %s   •   Всего %s",
+	},
+}
+
 -- DEV panel (only in Studio, never in a published game).
 Config.Dev = {
 	Credits = 100,

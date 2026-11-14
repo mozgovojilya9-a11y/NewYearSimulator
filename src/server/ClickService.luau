@@ -14,6 +14,7 @@
 	  ("Hit", mob, damage, isCrit)         -- DungeonRuns
 	  ("Kill", position, isBoss)           -- DungeonRuns
 	  ("Credits", amount, position)        -- ProgressionService
+	  ("Dummy", model, damage, isCrit)     -- PolygonService (hub dummies)
 	Numbers sent by the client are never used.
 ]]
 
@@ -24,6 +25,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local EquipmentService = require(script.Parent.EquipmentService)
 local PlayerState = require(script.Parent.PlayerState)
+local PolygonService = require(script.Parent.PolygonService)
 local Remotes = require(script.Parent.Remotes)
 local StatService = require(script.Parent.StatService)
 
@@ -55,6 +57,17 @@ local function click(player, target)
 		end
 		if mob then
 			DungeonRuns.Hit(player, mob)
+		end
+	else
+		-- Hub: test dummies on the Polygon (no rewards, numbers only).
+		local dummy = nil
+		if PolygonService.IsDummy(target) and (root.Position - target:GetPivot().Position).Magnitude <= Config.Polygon.Range then
+			dummy = target
+		else
+			dummy = PolygonService.Nearest(root.Position, Config.Click.MeleeRange)
+		end
+		if dummy then
+			PolygonService.Hit(player, dummy)
 		end
 	end
 end
