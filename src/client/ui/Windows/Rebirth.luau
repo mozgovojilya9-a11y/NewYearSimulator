@@ -9,11 +9,13 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Format = require(ReplicatedStorage.Shared.Format)
 local Popups = require(script.Parent.Parent.Popups)
 local Style = require(script.Parent.Parent.Style)
 local Window = require(script.Parent.Window)
 
 local player = Players.LocalPlayer
+local aura = player:WaitForChild("leaderstats"):WaitForChild("Aura")
 local rebirthRequest = ReplicatedStorage:WaitForChild("RebirthRequest")
 
 local Rebirth = {}
@@ -38,7 +40,7 @@ local countLabel = line(1, 22, Style.Colors.Text)
 local multiplierLabel = line(2, 30, Style.Colors.Gold)
 local requirementLabel = line(3, 20, Style.Colors.Cyan)
 local infoLabel = line(4, 16, Style.Colors.Text)
-infoLabel.Text = "Сбросится: Аура и рекорд этапа.\nОстанутся: оружие, броня, материалы, питомцы и множитель (навсегда)."
+infoLabel.Text = "Сбросится: Аура и рекорд этапа.\nОстанутся: уровень, оружие, броня, материалы, питомцы, кредиты и множитель тренировки (навсегда)."
 
 local progress = Instance.new("Frame")
 progress.LayoutOrder = 5
@@ -57,21 +59,23 @@ Style.Corner(fill, UDim.new(0.5, 0))
 
 local button, setColor = Style.Button(content, { Size = UDim2.fromOffset(300, 58), Color = Style.Colors.Green, TextSize = 24, ZIndex = 34, LayoutOrder = 6, Shadow = false })
 
-local required = Config.RebirthRequirement
+local function required(): number
+	return Config.RebirthAura(player:GetAttribute("Rebirths") or 0)
+end
 local confirming = false
 local confirmToken = 0
 
 function Rebirth.CanRebirth(): boolean
-	return (player:GetAttribute("RoomReached") or 0) >= required
+	return aura.Value >= required()
 end
 
 local function refresh()
 	local rebirths = player:GetAttribute("Rebirths") or 0
-	local reached = player:GetAttribute("RoomReached") or 0
+	local need = required()
 	countLabel.Text = "Перерождений: " .. rebirths
-	multiplierLabel.Text = ("Аура и урон: x%s → x%s"):format(tostring(Config.RebirthMultiplier(rebirths)), tostring(Config.RebirthMultiplier(rebirths + 1)))
-	requirementLabel.Text = ("Условие: пройти этап %d (сейчас %d/%d)"):format(required, reached, required)
-	fill.Size = UDim2.fromScale(math.clamp(reached / required, 0, 1), 1)
+	multiplierLabel.Text = ("Тренировка: x%s → x%s"):format(Format.Decimal(Config.RebirthMultiplier(rebirths)), Format.Decimal(Config.RebirthMultiplier(rebirths + 1)))
+	requirementLabel.Text = ("Условие: %s / %s Ауры"):format(Format.Number(aura.Value), Format.Number(need))
+	fill.Size = UDim2.fromScale(math.clamp(aura.Value / need, 0, 1), 1)
 	if confirming then
 		button.Text = "Точно? Нажми ещё раз"
 		setColor(Style.Colors.Gold)
@@ -90,7 +94,7 @@ button.Activated:Connect(function()
 		return
 	end
 	if not Rebirth.CanRebirth() then
-		Popups.Toast(("Сначала пройди этап %d"):format(required), "bad")
+		Popups.Toast(("Нужно %s Ауры"):format(Format.Number(required())), "bad")
 		return
 	end
 	if not confirming then
@@ -123,7 +127,13 @@ button.Activated:Connect(function()
 end)
 
 player:GetAttributeChangedSignal("Rebirths"):Connect(refresh)
-player:GetAttributeChangedSignal("RoomReached"):Connect(refresh)
+local lastAuraRefresh = 0
+aura.Changed:Connect(function()
+	if window.IsOpen() and os.clock() - lastAuraRefresh > 0.25 then
+		lastAuraRefresh = os.clock()
+		refresh()
+	end
+end)
 window.OnOpen = refresh
 refresh()
 

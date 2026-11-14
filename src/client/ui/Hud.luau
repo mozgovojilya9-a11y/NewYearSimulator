@@ -129,7 +129,7 @@ local counters = Instance.new("Frame")
 counters.Name = "Counters"
 counters.AnchorPoint = Vector2.new(0, 1)
 counters.Position = UDim2.new(0, 16, 1, -16)
-counters.Size = UDim2.fromOffset(230, 180)
+counters.Size = UDim2.fromOffset(230, 190)
 counters.BackgroundTransparency = 1
 counters.Parent = Style.Gui
 local countersLayout = Instance.new("UIListLayout")
@@ -138,18 +138,35 @@ countersLayout.Padding = UDim.new(0, 6)
 countersLayout.SortOrder = Enum.SortOrder.LayoutOrder
 countersLayout.Parent = counters
 
-local function counter(order, icon, color)
-	local plate = Style.Plate(counters, { Size = UDim2.new(1, 0, 0, 44) })
+local function counter(order, icon, color, parent: Instance?, size: UDim2?)
+	local plate = Style.Plate(parent or counters, { Size = size or UDim2.new(1, 0, 0, 44) })
 	plate.LayoutOrder = order
-	Style.Label(plate, icon, 26, Style.Colors.Text, { Position = UDim2.fromOffset(8, 0), Size = UDim2.fromOffset(40, 44), ZIndex = 2 }):FindFirstChildOfClass("UIStroke").Transparency = 1
-	local value = Style.Label(plate, "0", 24, color, { Position = UDim2.fromOffset(52, 0), Size = UDim2.new(1, -60, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 2 })
+	Style.Label(plate, icon, 24, Style.Colors.Text, { Position = UDim2.fromOffset(6, 0), Size = UDim2.new(0, 36, 1, 0), ZIndex = 2 }):FindFirstChildOfClass("UIStroke").Transparency = 1
+	local value = Style.Label(plate, "0", 24, color, { Position = UDim2.fromOffset(44, 0), Size = UDim2.new(1, -50, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, TextScaled = true, ZIndex = 2 })
+	local cap = Instance.new("UITextSizeConstraint")
+	cap.MaxTextSize = 24
+	cap.Parent = value
 	local scale = Instance.new("UIScale")
 	scale.Parent = value
 	return value, scale
 end
 
 local auraValue, auraScale = counter(1, "✨", Style.Colors.Gold)
-local rebirthValue = counter(2, "🔁", Style.Colors.Purple)
+-- Credits and rebirths share one row so the column stays short (the
+-- menu grid is above it on small screens).
+local pairRow = Instance.new("Frame")
+pairRow.Name = "CreditsRebirths"
+pairRow.LayoutOrder = 2
+pairRow.Size = UDim2.new(1, 0, 0, 40)
+pairRow.BackgroundTransparency = 1
+pairRow.Parent = counters
+local pairLayout = Instance.new("UIListLayout")
+pairLayout.FillDirection = Enum.FillDirection.Horizontal
+pairLayout.Padding = UDim.new(0, 6)
+pairLayout.SortOrder = Enum.SortOrder.LayoutOrder
+pairLayout.Parent = pairRow
+local creditsValue = counter(1, Config.Credits.Icon, Style.Colors.Cyan, pairRow, UDim2.new(0.62, -3, 1, 0))
+local rebirthValue = counter(2, "🔁", Style.Colors.Purple, pairRow, UDim2.new(0.38, -3, 1, 0))
 
 -- Auto-click toggle: the server clicks for you (on trainers; everywhere with the pass).
 local autoClickRemote = ReplicatedStorage:WaitForChild("AutoClick")
@@ -192,8 +209,10 @@ end)
 
 local function refreshCounters()
 	rebirthValue.Text = tostring(player:GetAttribute("Rebirths") or 0)
+	creditsValue.Text = Format.Number(player:GetAttribute("Credits") or 0)
 end
 player:GetAttributeChangedSignal("Rebirths"):Connect(refreshCounters)
+player:GetAttributeChangedSignal("Credits"):Connect(refreshCounters)
 refreshCounters()
 
 ---------------------------------------------------------------------
@@ -278,7 +297,7 @@ local function refreshProgress()
 	local reached = player:GetAttribute("RoomReached") or 0
 	progressFill.Size = UDim2.fromScale(math.clamp(reached / Config.Dungeon.Rooms, 0, 1), 1)
 	if reached >= Config.Dungeon.Rooms then
-		progressText.Text = "Перерождение доступно!"
+		progressText.Text = "Данж пройден!"
 	else
 		progressText.Text = ("Этап %d/%d"):format(reached, Config.Dungeon.Rooms)
 	end

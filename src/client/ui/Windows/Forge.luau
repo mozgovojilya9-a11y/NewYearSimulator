@@ -33,7 +33,6 @@ local Window = require(script.Parent.Window)
 
 local player = Players.LocalPlayer
 local craftRemote = ReplicatedStorage:WaitForChild("Craft")
-local aura = player:WaitForChild("leaderstats"):WaitForChild("Aura")
 
 local Forge = {}
 
@@ -70,7 +69,8 @@ local function costOf(recipe)
 	return list
 end
 
--- "ok" | "materials" | "aura" | "owned", plus the first missing entry.
+-- "ok" | "materials" | "owned", plus the first missing entry.
+-- (Crafting costs only materials: Aura is power and is never spent.)
 local function stateOf(recipe)
 	if isOwned(recipe) then
 		return "owned"
@@ -79,9 +79,6 @@ local function stateOf(recipe)
 		if entry.have < entry.need then
 			return "materials", entry
 		end
-	end
-	if aura.Value < recipe.Aura then
-		return "aura"
 	end
 	return "ok"
 end
@@ -142,7 +139,7 @@ local function refreshRows()
 		local recipe = row.recipe
 		local state, missing = stateOf(recipe)
 		row.button.Visible = recipe.Kind == tabs.Current
-		row.lock.Visible = state == "materials" or state == "aura"
+		row.lock.Visible = state == "materials"
 		row.stroke.Thickness = if selected == recipe then 4.5 else 2.5
 		row.button.BackgroundColor3 = if selected == recipe then Style.Lighter(Style.Colors.Card, 0.12) else Style.Colors.Card
 		if state == "owned" then
@@ -151,9 +148,6 @@ local function refreshRows()
 		elseif state == "ok" then
 			row.status.Text = "Можно ковать!"
 			row.status.TextColor3 = GREEN
-		elseif state == "aura" then
-			row.status.Text = ("Аура %s/%s"):format(Format.Number(aura.Value), Format.Number(recipe.Aura))
-			row.status.TextColor3 = RED
 		else
 			row.status.Text = ("%s %d/%d"):format(missing.material.Name, missing.have, missing.need)
 			row.status.TextColor3 = RED
@@ -235,12 +229,15 @@ local function refreshDetails()
 		statLabels[2].Text = ("Сейчас: %s (%s)"):format(Format.Number(currentDamage), if current then current.Name else "—")
 		local mine = player:GetAttribute("ClickPower") or 1
 		statLabels[3].Text = ("Твой удар станет около %s"):format(Format.Number(mine / math.max(1, currentDamage) * item.Damage))
+		local currentTraining = if current then current.TrainingMult or 1 else 1
+		local trainingDelta = (item.TrainingMult or 1) - currentTraining
+		statLabels[4].Text = ("✨ Тренировка: x%s%s"):format(Format.Decimal(item.TrainingMult or 1), if math.abs(trainingDelta) < 0.001 then "" else ('  <font color="%s">%s%s</font>'):format(hex(if trainingDelta > 0 then GREEN else RED), if trainingDelta > 0 then "+" else "-", Format.Decimal(math.abs(trainingDelta))))
 	else
 		local current = Config.ItemById.Armor[player:GetAttribute("Equipped" .. item.Slot) or ""]
 		local set = Config.ArmorSets[item.Set]
 		statLabels[1].Text = ("❤ Здоровье: +%d%s"):format(item.Health, delta(item.Health - (if current then current.Health else 0)))
 		statLabels[2].Text = ("🛡 Защита: +%d%%%s"):format(math.floor(item.Defense * 100 + 0.5), delta((item.Defense - (if current then current.Defense else 0)) * 100, "%"))
-		statLabels[3].Text = ("%s: %s"):format(Config.ArmorSlotNames[item.Slot], if current then "сейчас " .. current.Name else "слот пуст")
+		statLabels[3].Text = ("✨ Тренировка: x%s  •  %s: %s"):format(Format.Decimal(item.TrainingMult or 1), Config.ArmorSlotNames[item.Slot], if current then "сейчас " .. current.Name else "слот пуст")
 		statLabels[4].Text = ('<font color="%s">%s (3 части): +%d%% урона</font>'):format(hex(Style.Colors.Gold), set.Name, math.floor(set.Bonus * 100 + 0.5))
 	end
 
@@ -252,11 +249,6 @@ local function refreshDetails()
 			row.chip.BackgroundColor3 = Config.Rarity[entry.material.Rarity].Color
 			row.text.Text = ("%s %s/%s"):format(entry.material.Name, Format.Number(entry.have), Format.Number(entry.need))
 			row.text.TextColor3 = if entry.have >= entry.need then GREEN else RED
-		elseif i == #cost + 1 then
-			row.plate.Visible = true
-			row.chip.BackgroundColor3 = Style.Colors.Gold
-			row.text.Text = ("Аура %s/%s"):format(Format.Number(aura.Value), Format.Number(recipe.Aura))
-			row.text.TextColor3 = if aura.Value >= recipe.Aura then GREEN else RED
 		else
 			row.plate.Visible = false
 		end
@@ -270,7 +262,7 @@ local function refreshDetails()
 		craftButton.Text = "⚒ " .. Texts.Craft
 		setCraftColor(GREEN)
 	else
-		craftButton.Text = if state == "aura" then Texts.NoAura else Texts.Missing
+		craftButton.Text = Texts.Missing
 		setCraftColor(Color3.fromRGB(110, 110, 130))
 	end
 end
@@ -585,7 +577,7 @@ craftButton.Activated:Connect(function()
 	end
 	local state = stateOf(recipe)
 	if state ~= "ok" then
-		Popups.Toast(if state == "owned" then Texts.Owned elseif state == "aura" then Texts.NoAura else Texts.Missing, "bad")
+		Popups.Toast(if state == "owned" then Texts.Owned else Texts.Missing, "bad")
 		return
 	end
 	busy = true
@@ -628,14 +620,6 @@ selectTab("Weapon")
 
 PlayerData.Changed({ "Materials", "OwnedWeapon", "OwnedArmor", "EquippedWeapon", "EquippedHelmet", "EquippedChest", "EquippedLegs", "ClickPower" }, function()
 	if window.IsOpen() then
-		refresh()
-	end
-end)
-local lastAuraRefresh = 0
-aura.Changed:Connect(function()
-	-- Aura changes on every click: refresh at most 4 times a second
-	if window.IsOpen() and os.clock() - lastAuraRefresh > 0.25 then
-		lastAuraRefresh = os.clock()
 		refresh()
 	end
 end)

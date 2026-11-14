@@ -174,6 +174,12 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 		if isCrit then
 			Popups.Shake(Config.Hud.ShakeCrit.Amplitude, Config.Hud.ShakeCrit.Seconds)
 		end
+	elseif kind == "Credits" then
+		local amount, position = ...
+		local at = if typeof(position) == "Vector3" then position + Vector3.new(0, 3, 0) else headPosition()
+		if at then
+			Popups.World(at, "+" .. Format.Number(amount) .. " " .. Config.Credits.Icon, Style.Colors.Cyan, 30, false)
+		end
 	elseif kind == "Kill" then
 		local position, isBoss = ...
 		hitParticles(position, if isBoss then Style.Colors.Gold else Style.Colors.Magenta, if isBoss then 60 else 20)

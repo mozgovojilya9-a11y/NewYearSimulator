@@ -3,7 +3,7 @@
 	The forge. Craft:InvokeServer(recipeId) -> (ok, message).
 
 	The server checks the recipe (Config.Recipes), that the item is not
-	owned yet, the materials and the Aura fee; then takes them, grants
+	owned yet and the materials (no Aura: it is never spent); then takes them, grants
 	the weapon / armor piece and equips it when it is an upgrade. On
 	success the hub forge flares up for everyone nearby: the hearth
 	flashes and sparks fly over the anvil (the craft animation itself is
@@ -70,9 +70,6 @@ local function craft(player, recipeId)
 	end
 	if not PlayerState.HasMaterials(player, recipe.Materials) then
 		return false, Texts.Missing
-	end
-	if not PlayerState.SpendAura(player, recipe.Aura) then
-		return false, Texts.NoAura
 	end
 	for materialId, count in pairs(recipe.Materials) do
 		PlayerState.AddMaterial(player, materialId, -count)

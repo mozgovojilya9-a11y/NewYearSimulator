@@ -85,8 +85,8 @@ local function hatch(player, data, eggId, triple)
 		end
 		count = Config.Hatch.TripleCount
 	end
-	if not PlayerState.SpendAura(player, egg.Cost * count) then
-		return false, "Не хватает Ауры"
+	if not PlayerState.SpendCredits(player, egg.Cost * count) then
+		return false, "Не хватает нано-кредитов"
 	end
 	local results = {}
 	for _ = 1, count do
@@ -97,7 +97,7 @@ local function hatch(player, data, eggId, triple)
 	end
 	local refunded = count - #results
 	if refunded > 0 then -- storage full: the unhatched eggs are refunded
-		PlayerState.SetAura(player, PlayerState.GetAura(player) + egg.Cost * refunded)
+		PlayerState.AddCredits(player, egg.Cost * refunded)
 	end
 	PlayerState.Sync(player)
 	if #results == 0 then

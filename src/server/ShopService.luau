@@ -64,16 +64,7 @@ function ShopService.Handle(player, action, category, id)
 		if shop.Purchasable == false then
 			return false, "Оружие куётся в Кузнице" -- weapons are crafted, never bought
 		end
-		if owned[id] then
-			return false, "Уже куплено"
-		end
-		if item.Cost > 0 and not PlayerState.SpendAura(player, item.Cost) then
-			return false, "Не хватает Ауры"
-		end
-		owned[id] = true
-		data[shop.EquippedKey] = id -- buying equips right away
-		PlayerState.Sync(player)
-		return true, "Куплено: " .. item.Name
+		return false, "Нельзя купить" -- nothing is sold for Aura (Aura is never spent)
 	elseif action == "Equip" then
 		if not owned[id] then
 			return false, if category == "Weapon" then "Сначала выкуй в Кузнице" else "Сначала получи"

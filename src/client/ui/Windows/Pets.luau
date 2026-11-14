@@ -25,7 +25,9 @@ local Window = require(script.Parent.Window)
 
 local player = Players.LocalPlayer
 local petsRemote = ReplicatedStorage:WaitForChild("Pets")
-local aura = player:WaitForChild("leaderstats"):WaitForChild("Aura")
+local function credits(): number
+	return player:GetAttribute("Credits") or 0
+end
 
 local Pets = {}
 
@@ -168,7 +170,7 @@ local function refreshMine()
 		end
 	end
 	mineEmpty.Visible = not any
-	summary.Text = ("Надето %d/%d  •  Аура x%s"):format(equippedTotal, slots, tostring(math.floor((player:GetAttribute("AuraMultiplier") or 1) * 100 + 0.5) / 100))
+	summary.Text = ("Надето %d/%d  •  Тренировка x%s"):format(equippedTotal, slots, tostring(math.floor((player:GetAttribute("AuraMultiplier") or 1) * 100 + 0.5) / 100))
 end
 
 ---------------------------------------------------------------------
@@ -333,10 +335,10 @@ local function refreshEggs()
 	local triple = PlayerData.HasPass("TripleEgg")
 	for _, row in pairs(eggRows) do
 		local cost = row.egg.Cost
-		row.one.Text = "Открыть: " .. Format.Number(cost) .. " ✨"
-		row.setOne(if aura.Value >= cost then Style.Colors.Green else Style.Colors.Red)
-		row.three.Text = if triple then "x3: " .. Format.Number(cost * Config.Hatch.TripleCount) .. " ✨" else "🔒 Открыть 3"
-		row.setThree(if triple and aura.Value >= cost * Config.Hatch.TripleCount then Style.Colors.Purple else Color3.fromRGB(110, 110, 130))
+		row.one.Text = "Открыть: " .. Format.Number(cost) .. " " .. Config.Credits.Icon
+		row.setOne(if credits() >= cost then Style.Colors.Green else Style.Colors.Red)
+		row.three.Text = if triple then "x3: " .. Format.Number(cost * Config.Hatch.TripleCount) .. " " .. Config.Credits.Icon else "🔒 Открыть 3"
+		row.setThree(if triple and credits() >= cost * Config.Hatch.TripleCount then Style.Colors.Purple else Color3.fromRGB(110, 110, 130))
 	end
 end
 
@@ -401,10 +403,8 @@ PlayerData.Changed({ "Pets", "EquippedPets", "PetIndex", "PetSlots", "Passes", "
 		refresh()
 	end
 end)
-local lastAura = 0
-aura.Changed:Connect(function()
-	if window.IsOpen() and os.clock() - lastAura > 0.3 then
-		lastAura = os.clock()
+player:GetAttributeChangedSignal("Credits"):Connect(function()
+	if window.IsOpen() then
 		refreshEggs()
 	end
 end)
@@ -415,7 +415,7 @@ end
 
 -- Is there an egg the player can afford right now? (menu badge)
 function Pets.CanHatch(): boolean
-	return aura.Value >= Config.Eggs[1].Cost
+	return credits() >= Config.Eggs[1].Cost
 end
 
 Pets.Window = window

@@ -16,7 +16,8 @@ Config.DataStoreName = "AuraClicker_v1"
 -- fields missing from an older save. IDs stored in saves (weapons,
 -- pets) must never be renamed without a migration.
 Config.StartingData = {
-	Aura = 0,
+	Aura = 0, -- power: only grows by training, never spent; reset by rebirth
+	Credits = 0, -- "Нано-кредиты": eggs, cosmetics
 	Rebirths = 0,
 	EquippedWeapon = "Stick",
 	OwnedWeapons = { Stick = true }, -- crafted (or legacy bought) weapons
@@ -122,6 +123,22 @@ Config.Stats = {
 	},
 }
 
+-- "Нано-кредиты": the spendable currency (Aura never is). Earned from
+-- mobs (more in deeper rooms, bosses x BossMultiplier), daily reward,
+-- quests, the wheel and level rewards. Spent on eggs (and cosmetics).
+Config.Credits = {
+	Name = "Нано-кредиты",
+	Icon = "💠",
+	PerKill = 2, -- room 1 mob
+	Growth = 1.2, -- x per room: room 10 ~ 10, room 20 ~ 64
+	BossMultiplier = 8,
+}
+
+function Config.KillCredits(room: number, isBoss: boolean): number
+	local c = Config.Credits
+	return math.max(1, math.floor(c.PerKill * c.Growth ^ (math.max(1, room) - 1) * (if isBoss then c.BossMultiplier else 1)))
+end
+
 -- Robux game passes. Id = 0 means "not created yet": buttons show
 -- "Скоро" and nothing is checked. Put the real ids from the Creator
 -- Dashboard here (see README).
@@ -131,7 +148,7 @@ Config.VipAuraMultiplier = 1.5
 Config.GamePasses = {
 	VIP = { Id = 0, Order = 1, Icon = "👑", Name = "VIP", Price = 199, Text = "x1.5 Аура, VIP-тег и VIP-тренажёр x100" },
 	Damage2x = { Id = 0, Order = 2, Icon = "⚔", Name = "x2 Урон", Price = 149, Text = "Навсегда удваивает урон" },
-	Aura2x = { Id = 0, Order = 3, Icon = "✨", Name = "x2 Аура", Price = 149, Text = "Навсегда удваивает всю Ауру" },
+	Aura2x = { Id = 0, Order = 3, Icon = "✨", Name = "x2 Аура", Price = 149, Text = "Навсегда x2 к тренировке Ауры" },
 	AutoClick = { Id = 0, Order = 4, Icon = "⚡", Name = "Авто-клик", Price = 99, Text = "Авто-клик работает везде, не только на тренажёре" },
 	TripleEgg = { Id = 0, Order = 5, Icon = "🥚", Name = "Открытие 3 яиц", Price = 249, Text = "Открывай по 3 яйца сразу" },
 	FastEgg = { Id = 0, Order = 6, Icon = "💨", Name = "Быстрые яйца", Price = 79, Text = "Вылупление в 3 раза быстрее" },
@@ -143,13 +160,14 @@ Config.GamePasses = {
 }
 
 -- Developer Products (bought again and again). Id = 0 -> "Скоро".
--- Kind: Aura (Amount x (1 + record room / 2)), Boost (Boost + Minutes),
+-- Kind: Credits (Amount of Нано-кредиты), Boost (Boost + Minutes),
 -- Chest (Biome, Rolls: random materials of that biome, loot luck x Luck),
 -- Weapon / ArmorSet (exclusive gear, granted once), WheelSkip.
 Config.Products = {
-	{ Key = "AuraSmall", Id = 0, Tab = "Packs", Icon = "✨", Name = "Горсть Ауры", Price = 25, Kind = "Aura", Amount = 2500 },
-	{ Key = "AuraMedium", Id = 0, Tab = "Packs", Icon = "✨", Name = "Мешок Ауры", Price = 79, Kind = "Aura", Amount = 10000 },
-	{ Key = "AuraLarge", Id = 0, Tab = "Packs", Icon = "✨", Name = "Сундук Ауры", Price = 199, Kind = "Aura", Amount = 35000 },
+	-- Aura can't be bought (it is power, earned only by training).
+	{ Key = "CreditsSmall", Id = 0, Tab = "Packs", Icon = "💠", Name = "Горсть кредитов", Price = 25, Kind = "Credits", Amount = 400 },
+	{ Key = "CreditsMedium", Id = 0, Tab = "Packs", Icon = "💠", Name = "Пачка кредитов", Price = 79, Kind = "Credits", Amount = 1500 },
+	{ Key = "CreditsLarge", Id = 0, Tab = "Packs", Icon = "💠", Name = "Сейф кредитов", Price = 199, Kind = "Credits", Amount = 5000 },
 	{ Key = "WheelSkip", Id = 0, Tab = "Packs", Icon = "🎡", Name = "Крутить колесо сейчас", Price = 25, Kind = "WheelSkip" },
 
 	{ Key = "BoostAura15", Id = 0, Tab = "Boosts", Icon = "✨", Name = "x2 Аура · 15 мин", Price = 25, Kind = "Boost", Boost = "Aura", Minutes = 15 },
@@ -179,9 +197,10 @@ for _, product in ipairs(Config.Products) do
 end
 Config.Store = {
 	PurchaseStore = "AuraClicker_Purchases_v1", -- PurchaseId -> granted (idempotent receipts)
+	DuplicateCreditsPerRobux = 20, -- an exclusive you already own turns into credits
 	Tabs = {
 		{ Id = "Passes", Text = "Пассы" },
-		{ Id = "Packs", Text = "Аура" },
+		{ Id = "Packs", Text = "Кредиты" },
 		{ Id = "Boosts", Text = "Бусты" },
 		{ Id = "Chests", Text = "Сундуки" },
 		{ Id = "Exclusive", Text = "Эксклюзив" },
@@ -196,12 +215,17 @@ Config.Dungeon = {
 	MobsMin = 3,
 	MobsMax = 5,
 
-	-- Difficulty curve. "Recommended damage" for room r grows faster than
-	-- a single run can pay for, so the loop is: run -> stuck -> trainers /
-	-- weapons -> deeper run. Mob HP = RecommendedDamage(r) x ClicksToKill.
-	RecommendedBase = 3,
-	RecommendedGrowth = 1.5, -- r1 = 3, r5 ~ 15, r10 ~ 115, r15 ~ 875, r20 ~ 6650
-	ClicksToKill = 8, -- normal mob dies in ~8 clicks at recommended damage
+	-- Difficulty curve, matched to Damage = weapon x PowerMult(Aura):
+	--   room 1  ~ Stick + a minute of training        (Recommended 2)
+	--   room 5  ~ biome 1 weapon + ~5K Aura           (~24)
+	--   room 10 ~ biome 2 weapon + ~100K Aura         (~520)
+	--   room 15 ~ biome 3 weapon + ~2M Aura           (~11K)
+	--   room 20 ~ biome 4 weapon + ~100M Aura         (~250K)
+	-- Mob HP = RecommendedDamage(r) x ClicksToKill: at the recommended
+	-- damage (crit 8% x2 included) a mob takes ~7-8 hits, a boss ~46.
+	RecommendedBase = 2,
+	RecommendedGrowth = 1.85,
+	ClicksToKill = 8,
 	BossClicksToKill = 50,
 
 	-- Personal runs: every portal entry starts a new run from room 1 in
@@ -415,13 +439,14 @@ Config.Weapons = {
 	{ Id = "PatronBlade", Name = "Клинок Покровителя", Rarity = "Epic", Damage = 10, TrainingMult = 1.5, Robux = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
 	{ Id = "CometSword", Name = "Кометный меч", Rarity = "Legendary", Damage = 55, TrainingMult = 1.75, Robux = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 150, 90) },
 	{ Id = "CrownBlade", Name = "Коронный клинок", Rarity = "Mythic", Damage = 300, TrainingMult = 2, Robux = true, Shape = "AuraKatana", Color = Color3.fromRGB(255, 215, 80) },
-	-- Legacy (bought for Aura before crafting existed)
-	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 3, TrainingMult = 1.1, Legacy = true, Shape = "WoodSword", Color = Color3.fromRGB(200, 150, 90) },
-	{ Id = "IronSword", Name = "Железный меч", Rarity = "Rare", Damage = 10, TrainingMult = 1.35, Legacy = true, Shape = "IronSword", Color = Color3.fromRGB(190, 200, 215) },
-	{ Id = "AuraKatana", Name = "Катана Ауры", Rarity = "Epic", Damage = 35, TrainingMult = 1.5, Legacy = true, Shape = "AuraKatana", Color = Color3.fromRGB(190, 110, 255) },
-	{ Id = "StormBlade", Name = "Клинок Бури", Rarity = "Legendary", Damage = 120, TrainingMult = 1.75, Legacy = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
-	{ Id = "EclipseScythe", Name = "Коса Затмения", Rarity = "Legendary", Damage = 450, TrainingMult = 1.75, Legacy = true, Shape = "EclipseScythe", Color = Color3.fromRGB(255, 120, 60) },
-	{ Id = "StarAuraSword", Name = "Меч Звёздной Ауры", Rarity = "Mythic", Damage = 1600, TrainingMult = 2, Legacy = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 230, 120) },
+	-- Legacy (bought for Aura before crafting existed). Damage lowered in
+	-- the Aura-as-power economy so old saves don't one-shot the dungeon.
+	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 2, TrainingMult = 1.1, Legacy = true, Shape = "WoodSword", Color = Color3.fromRGB(200, 150, 90) },
+	{ Id = "IronSword", Name = "Железный меч", Rarity = "Rare", Damage = 4, TrainingMult = 1.35, Legacy = true, Shape = "IronSword", Color = Color3.fromRGB(190, 200, 215) },
+	{ Id = "AuraKatana", Name = "Катана Ауры", Rarity = "Epic", Damage = 8, TrainingMult = 1.5, Legacy = true, Shape = "AuraKatana", Color = Color3.fromRGB(190, 110, 255) },
+	{ Id = "StormBlade", Name = "Клинок Бури", Rarity = "Legendary", Damage = 15, TrainingMult = 1.75, Legacy = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
+	{ Id = "EclipseScythe", Name = "Коса Затмения", Rarity = "Legendary", Damage = 30, TrainingMult = 1.75, Legacy = true, Shape = "EclipseScythe", Color = Color3.fromRGB(255, 120, 60) },
+	{ Id = "StarAuraSword", Name = "Меч Звёздной Ауры", Rarity = "Mythic", Damage = 50, TrainingMult = 2, Legacy = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 230, 120) },
 }
 
 -- Armor: one set per biome, three pieces each (Helmet / Chest / Legs).
@@ -471,39 +496,39 @@ do
 	end
 end
 
--- Forge recipes: materials + an Aura fee -> the item (Id = weapon or
+-- Forge recipes: materials -> the item (Aura is never spent) (Id = weapon or
 -- armor id). Shown in this order inside each tab.
 Config.Recipes = {
 	-- Weapons
-	{ Id = "BoneSword", Kind = "Weapon", Aura = 50, Materials = { Bone = 8 } },
-	{ Id = "SlimeDagger", Kind = "Weapon", Aura = 200, Materials = { Bone = 12, Slime = 6 } },
-	{ Id = "RustCleaver", Kind = "Weapon", Aura = 800, Materials = { Bone = 20, RustyIron = 4 } },
-	{ Id = "SkullMace", Kind = "Weapon", Aura = 3000, Materials = { Bone = 30, Slime = 12, RustyIron = 6, CursedSkull = 1 } },
-	{ Id = "IceBlade", Kind = "Weapon", Aura = 5000, Materials = { Ice = 15, RustyIron = 3 } },
-	{ Id = "YetiClub", Kind = "Weapon", Aura = 10000, Materials = { Ice = 25, YetiFur = 10 } },
-	{ Id = "FrostSpear", Kind = "Weapon", Aura = 20000, Materials = { Ice = 40, YetiFur = 15, FrostCrystal = 6 } },
-	{ Id = "EternalBlade", Kind = "Weapon", Aura = 40000, Materials = { Ice = 60, FrostCrystal = 10, EternalIce = 1 } },
-	{ Id = "ObsidianAxe", Kind = "Weapon", Aura = 60000, Materials = { Obsidian = 30, Ember = 10 } },
-	{ Id = "EmberSword", Kind = "Weapon", Aura = 100000, Materials = { Obsidian = 45, Ember = 20, MagmaCore = 5 } },
-	{ Id = "MagmaHammer", Kind = "Weapon", Aura = 160000, Materials = { Obsidian = 70, MagmaCore = 8, FirePlume = 2 } },
-	{ Id = "PhoenixBlade", Kind = "Weapon", Aura = 250000, Materials = { Obsidian = 100, MagmaCore = 14, FirePlume = 5 } },
-	{ Id = "ShadowKatana", Kind = "Weapon", Aura = 350000, Materials = { DarkShard = 40, ShadowDust = 15 } },
-	{ Id = "DuskScythe", Kind = "Weapon", Aura = 500000, Materials = { DarkShard = 60, ShadowDust = 25, AuraEssence = 8 } },
-	{ Id = "AbyssBlade", Kind = "Weapon", Aura = 750000, Materials = { DarkShard = 90, AuraEssence = 12, AbyssEye = 1 } },
-	{ Id = "AuraReaver", Kind = "Weapon", Aura = 1200000, Materials = { DarkShard = 140, AuraEssence = 20, AbyssEye = 3, EternalIce = 2 } },
+	{ Id = "BoneSword", Kind = "Weapon", Materials = { Bone = 8 } },
+	{ Id = "SlimeDagger", Kind = "Weapon", Materials = { Bone = 12, Slime = 6 } },
+	{ Id = "RustCleaver", Kind = "Weapon", Materials = { Bone = 20, RustyIron = 4 } },
+	{ Id = "SkullMace", Kind = "Weapon", Materials = { Bone = 30, Slime = 12, RustyIron = 6, CursedSkull = 1 } },
+	{ Id = "IceBlade", Kind = "Weapon", Materials = { Ice = 15, RustyIron = 3 } },
+	{ Id = "YetiClub", Kind = "Weapon", Materials = { Ice = 25, YetiFur = 10 } },
+	{ Id = "FrostSpear", Kind = "Weapon", Materials = { Ice = 40, YetiFur = 15, FrostCrystal = 6 } },
+	{ Id = "EternalBlade", Kind = "Weapon", Materials = { Ice = 60, FrostCrystal = 10, EternalIce = 1 } },
+	{ Id = "ObsidianAxe", Kind = "Weapon", Materials = { Obsidian = 30, Ember = 10 } },
+	{ Id = "EmberSword", Kind = "Weapon", Materials = { Obsidian = 45, Ember = 20, MagmaCore = 5 } },
+	{ Id = "MagmaHammer", Kind = "Weapon", Materials = { Obsidian = 70, MagmaCore = 8, FirePlume = 2 } },
+	{ Id = "PhoenixBlade", Kind = "Weapon", Materials = { Obsidian = 100, MagmaCore = 14, FirePlume = 5 } },
+	{ Id = "ShadowKatana", Kind = "Weapon", Materials = { DarkShard = 40, ShadowDust = 15 } },
+	{ Id = "DuskScythe", Kind = "Weapon", Materials = { DarkShard = 60, ShadowDust = 25, AuraEssence = 8 } },
+	{ Id = "AbyssBlade", Kind = "Weapon", Materials = { DarkShard = 90, AuraEssence = 12, AbyssEye = 1 } },
+	{ Id = "AuraReaver", Kind = "Weapon", Materials = { DarkShard = 140, AuraEssence = 20, AbyssEye = 3, EternalIce = 2 } },
 	-- Armor
-	{ Id = "BoneHelmet", Kind = "Armor", Aura = 150, Materials = { Bone = 10, Slime = 3 } },
-	{ Id = "BoneChest", Kind = "Armor", Aura = 400, Materials = { Bone = 18, Slime = 6, RustyIron = 2 } },
-	{ Id = "BoneLegs", Kind = "Armor", Aura = 250, Materials = { Bone = 14, Slime = 4 } },
-	{ Id = "IceHelmet", Kind = "Armor", Aura = 8000, Materials = { Ice = 20, YetiFur = 8 } },
-	{ Id = "IceChest", Kind = "Armor", Aura = 15000, Materials = { Ice = 35, YetiFur = 14, FrostCrystal = 4 } },
-	{ Id = "IceLegs", Kind = "Armor", Aura = 11000, Materials = { Ice = 28, YetiFur = 10, FrostCrystal = 2 } },
-	{ Id = "LavaHelmet", Kind = "Armor", Aura = 80000, Materials = { Obsidian = 35, Ember = 12, MagmaCore = 3 } },
-	{ Id = "LavaChest", Kind = "Armor", Aura = 140000, Materials = { Obsidian = 60, Ember = 20, MagmaCore = 6, FirePlume = 1 } },
-	{ Id = "LavaLegs", Kind = "Armor", Aura = 100000, Materials = { Obsidian = 45, Ember = 15, MagmaCore = 4 } },
-	{ Id = "AbyssHelmet", Kind = "Armor", Aura = 400000, Materials = { DarkShard = 50, ShadowDust = 20, AuraEssence = 5 } },
-	{ Id = "AbyssChest", Kind = "Armor", Aura = 700000, Materials = { DarkShard = 80, ShadowDust = 30, AuraEssence = 10, AbyssEye = 1 } },
-	{ Id = "AbyssLegs", Kind = "Armor", Aura = 500000, Materials = { DarkShard = 60, ShadowDust = 24, AuraEssence = 6 } },
+	{ Id = "BoneHelmet", Kind = "Armor", Materials = { Bone = 10, Slime = 3 } },
+	{ Id = "BoneChest", Kind = "Armor", Materials = { Bone = 18, Slime = 6, RustyIron = 2 } },
+	{ Id = "BoneLegs", Kind = "Armor", Materials = { Bone = 14, Slime = 4 } },
+	{ Id = "IceHelmet", Kind = "Armor", Materials = { Ice = 20, YetiFur = 8 } },
+	{ Id = "IceChest", Kind = "Armor", Materials = { Ice = 35, YetiFur = 14, FrostCrystal = 4 } },
+	{ Id = "IceLegs", Kind = "Armor", Materials = { Ice = 28, YetiFur = 10, FrostCrystal = 2 } },
+	{ Id = "LavaHelmet", Kind = "Armor", Materials = { Obsidian = 35, Ember = 12, MagmaCore = 3 } },
+	{ Id = "LavaChest", Kind = "Armor", Materials = { Obsidian = 60, Ember = 20, MagmaCore = 6, FirePlume = 1 } },
+	{ Id = "LavaLegs", Kind = "Armor", Materials = { Obsidian = 45, Ember = 15, MagmaCore = 4 } },
+	{ Id = "AbyssHelmet", Kind = "Armor", Materials = { DarkShard = 50, ShadowDust = 20, AuraEssence = 5 } },
+	{ Id = "AbyssChest", Kind = "Armor", Materials = { DarkShard = 80, ShadowDust = 30, AuraEssence = 10, AbyssEye = 1 } },
+	{ Id = "AbyssLegs", Kind = "Armor", Materials = { DarkShard = 60, ShadowDust = 24, AuraEssence = 6 } },
 }
 Config.RecipeById = {}
 for order, recipe in ipairs(Config.Recipes) do
@@ -518,13 +543,12 @@ Config.Forge = {
 		Craft = "Выковать",
 		Owned = "Уже выковано ✓",
 		Missing = "Не хватает материалов",
-		NoAura = "Не хватает Ауры",
 		Skip = "Пропустить",
 		Done = "Выковано: %s!",
 	},
 }
 
--- Pets hatch from eggs (Aura) and follow the player. Every equipped pet
+-- Pets hatch from eggs (Нано-кредиты) and follow the player. Every equipped pet
 -- adds Bonus x tier multiplier to all Aura gains (and DamageBonus x
 -- tier to damage). Three equal pets of one tier merge into one of the
 -- next tier. Shape = look built by Shared.PetBuilder. Ids are stored in
@@ -557,14 +581,14 @@ Config.PetSlots = 3 -- equipped at once (+ PetSlotsPass with the pass)
 Config.PetSlotsPass = 3
 Config.PetStorage = 100 -- max pets kept
 
--- Eggs: Aura price and the weight of each pet. Luck (pass / boost)
+-- Eggs: price in Нано-кредиты (Cost) and the weight of each pet. Luck (pass / boost)
 -- multiplies the weight of Epic and better pets.
 Config.Eggs = {
-	{ Id = "Basic", Name = "Обычное яйцо", Cost = 500, Color = Color3.fromRGB(240, 235, 225),
+	{ Id = "Basic", Name = "Обычное яйцо", Cost = 150, Color = Color3.fromRGB(240, 235, 225),
 		Pets = { { Id = "Blob", Weight = 45 }, { Id = "Bunny", Weight = 35 }, { Id = "Bat", Weight = 15 }, { Id = "Spark", Weight = 5 } } },
-	{ Id = "Crystal", Name = "Кристальное яйцо", Cost = 25000, Color = Color3.fromRGB(150, 220, 255),
+	{ Id = "Crystal", Name = "Кристальное яйцо", Cost = 2000, Color = Color3.fromRGB(150, 220, 255),
 		Pets = { { Id = "Bat", Weight = 40 }, { Id = "Spark", Weight = 28 }, { Id = "IceFox", Weight = 22 }, { Id = "Imp", Weight = 8 }, { Id = "Dragon", Weight = 2 } } },
-	{ Id = "Abyss", Name = "Яйцо бездны", Cost = 750000, Color = Color3.fromRGB(170, 80, 255),
+	{ Id = "Abyss", Name = "Яйцо бездны", Cost = 25000, Color = Color3.fromRGB(170, 80, 255),
 		Pets = { { Id = "IceFox", Weight = 35 }, { Id = "Imp", Weight = 28 }, { Id = "Golem", Weight = 22 }, { Id = "Dragon", Weight = 9 }, { Id = "Phoenix", Weight = 5 }, { Id = "AbyssEye", Weight = 1 } } },
 }
 Config.EggById = {}
@@ -578,12 +602,19 @@ Config.Hatch = {
 	LuckFrom = "Epic",
 }
 
--- Rebirth at the hub altar: requires RoomReached >= RebirthRequirement.
--- Resets Aura and the room record; keeps weapons, armor, items, pets.
-Config.RebirthRequirement = 20
+-- Rebirth at the hub altar: requires Aura >= RebirthAura(rebirths).
+-- Resets Aura and the room record; keeps level, weapons, armor, items,
+-- pets, credits. Gives a permanent TRAINING multiplier (Aura gain).
 Config.Rebirth = {
-	MultiplierPerRebirth = 0.25, -- applies to Aura gains AND damage
+	AuraBase = 500000, -- 1st rebirth
+	AuraGrowth = 4, -- each next one needs x this: 2M, 8M, 32M, ...
+	MultiplierPerRebirth = 0.5, -- training x(1 + 0.5 per rebirth)
 }
+
+function Config.RebirthAura(rebirths: number): number
+	local r = Config.Rebirth
+	return r.AuraBase * r.AuraGrowth ^ rebirths
+end
 
 function Config.RebirthMultiplier(rebirths: number): number
 	return 1 + rebirths * Config.Rebirth.MultiplierPerRebirth
@@ -594,10 +625,10 @@ end
 -- (TrainersUnlocked) -- never rename them.
 Config.Trainers = {
 	{ Id = "1", Kind = "Dummy", Name = "Манекен", Multiplier = 1, Color = Color3.fromRGB(90, 230, 110) },
-	{ Id = "2", Kind = "Boulder", Name = "Валун", Multiplier = 3, Aura = 500, Color = Color3.fromRGB(70, 140, 255) },
-	{ Id = "3", Kind = "IceCube", Name = "Ледяной куб", Multiplier = 6, Aura = 5000, Color = Color3.fromRGB(46, 230, 255) },
-	{ Id = "4", Kind = "Mimic", Name = "Сундук-мимик", Multiplier = 12, Aura = 50000, Color = Color3.fromRGB(255, 150, 50) },
-	{ Id = "5", Kind = "Skull", Name = "Гигантский череп", Multiplier = 25, Aura = 500000, Color = Color3.fromRGB(230, 230, 240), Particles = true },
+	{ Id = "2", Kind = "Boulder", Name = "Валун", Multiplier = 3, Aura = 200, Color = Color3.fromRGB(70, 140, 255) },
+	{ Id = "3", Kind = "IceCube", Name = "Ледяной куб", Multiplier = 6, Aura = 2000, Color = Color3.fromRGB(46, 230, 255) },
+	{ Id = "4", Kind = "Mimic", Name = "Сундук-мимик", Multiplier = 12, Aura = 15000, Color = Color3.fromRGB(255, 150, 50) },
+	{ Id = "5", Kind = "Skull", Name = "Гигантский череп", Multiplier = 25, Aura = 100000, Color = Color3.fromRGB(230, 230, 240), Particles = true },
 	{ Id = "6", Kind = "Pumpkin", Name = "Тыква-монстр", Multiplier = 50, Rebirths = 1, Color = Color3.fromRGB(255, 120, 30), Particles = true },
 	{ Id = "7", Kind = "Golem", Name = "Кристальный голем", Multiplier = 100, Rebirths = 2, Color = Color3.fromRGB(150, 80, 255), Particles = true },
 	{ Id = "8", Kind = "Core", Name = "Аура-ядро", Multiplier = 250, Rebirths = 4, Color = Color3.fromRGB(255, 61, 184), Particles = true },
@@ -611,38 +642,38 @@ for _, trainer in ipairs(Config.Trainers) do
 end
 
 -- Engagement loop: things to do every few minutes.
--- Aura rewards scale with the player's record room so they stay relevant.
+-- Rewards are Нано-кредиты (never Aura) and scale with the record room.
 Config.Progression = {
 	Daily = {
 		CooldownHours = 20, -- can claim again after this
 		StreakWindowHours = 48, -- longer gap resets the streak
-		Aura = { 100, 200, 350, 500, 800, 1200, 2500 }, -- day 1..7, x (1 + record/2)
+		Credits = { 25, 40, 60, 90, 130, 180, 300 }, -- day 1..7 (Нано-кредиты), x (1 + record room / 4)
 		Day7Boost = true, -- day 7 also grants a boost
 	},
 	Wheel = {
 		CooldownHours = 4,
-		Prizes = { -- weights sum does not need to be 100
-			{ Kind = "Aura", Amount = 150, Weight = 30, Label = "Аура" },
-			{ Kind = "Aura", Amount = 400, Weight = 22, Label = "Аура+" },
-			{ Kind = "Aura", Amount = 1200, Weight = 10, Label = "Много Ауры" },
+		Prizes = { -- weights sum does not need to be 100; Credits x (1 + record room / 4)
+			{ Kind = "Credits", Amount = 30, Weight = 30, Label = "Кредиты" },
+			{ Kind = "Credits", Amount = 80, Weight = 22, Label = "Кредиты+" },
+			{ Kind = "Credits", Amount = 250, Weight = 10, Label = "Много кредитов" },
 			{ Kind = "Boost", Minutes = 15, Weight = 16, Label = "x2 Аура 15 мин" },
-			{ Kind = "Aura", Amount = 250, Weight = 12, Label = "Аура" },
+			{ Kind = "Credits", Amount = 50, Weight = 12, Label = "Кредиты" },
 			{ Kind = "Egg", Weight = 6, Label = "Яйцо питомца" },
-			{ Kind = "Aura", Amount = 600, Weight = 10, Label = "Аура++" },
+			{ Kind = "Credits", Amount = 120, Weight = 10, Label = "Кредиты++" },
 			{ Kind = "Boost", Minutes = 30, Weight = 4, Label = "x2 Аура 30 мин" },
 		},
 	},
 	Boost = { Multiplier = 2 },
 	Quests = { -- 3 per day are picked from this pool
 		Pool = {
-			{ Id = "kill30", Kind = "Kill", Target = 30, Text = "Убей 30 мобов", Aura = 300 },
-			{ Id = "kill80", Kind = "Kill", Target = 80, Text = "Убей 80 мобов", Aura = 900 },
-			{ Id = "room5", Kind = "Room", Target = 5, Text = "Дойди до этапа 5", Aura = 500 },
-			{ Id = "room10", Kind = "Room", Target = 10, Text = "Дойди до этапа 10", Aura = 1500 },
-			{ Id = "train500", Kind = "Train", Target = 300, Text = "Кликни на тренажёре 300 раз", Aura = 400 },
-			{ Id = "train1500", Kind = "Train", Target = 1000, Text = "Кликни на тренажёре 1000 раз", Aura = 1200 },
-			{ Id = "boss2", Kind = "Boss", Target = 2, Text = "Победи 2 боссов", Aura = 1000 },
-			{ Id = "runs3", Kind = "Run", Target = 3, Text = "Соверши 3 забега", Aura = 350 },
+			{ Id = "kill30", Kind = "Kill", Target = 30, Text = "Убей 30 мобов", Credits = 40 },
+			{ Id = "kill80", Kind = "Kill", Target = 80, Text = "Убей 80 мобов", Credits = 110 },
+			{ Id = "room5", Kind = "Room", Target = 5, Text = "Дойди до этапа 5", Credits = 60 },
+			{ Id = "room10", Kind = "Room", Target = 10, Text = "Дойди до этапа 10", Credits = 180 },
+			{ Id = "train500", Kind = "Train", Target = 300, Text = "Кликни на тренажёре 300 раз", Credits = 50 },
+			{ Id = "train1500", Kind = "Train", Target = 1000, Text = "Кликни на тренажёре 1000 раз", Credits = 150 },
+			{ Id = "boss2", Kind = "Boss", Target = 2, Text = "Победи 2 боссов", Credits = 120 },
+			{ Id = "runs3", Kind = "Run", Target = 3, Text = "Соверши 3 забега", Credits = 45 },
 		},
 		PerDay = 3,
 	},
@@ -651,7 +682,7 @@ Config.Progression = {
 		XpPerBoss = 100, -- x room index
 		XpBase = 100, -- xp to next level = XpBase x level^1.5
 		RewardEvery = 5, -- levels
-		RewardAura = 500, -- x level
+		RewardCredits = 20, -- every RewardEvery levels: x level
 	},
 }
 
@@ -975,7 +1006,7 @@ Config.Hud = {
 		Hub = "Войди в подземелье!",
 		Fight = "Уничтожь врагов!",
 		Cleared = "Иди дальше!",
-		Done = "Данж пройден! Иди к алтарю",
+		Done = "Данж пройден! Тренируйся дальше",
 	},
 	MenuButtons = { -- grid on the left, 2 columns
 		{ Id = "Forge", Icon = "⚒", Label = "Кузница", Color = Color3.fromRGB(255, 120, 40) },

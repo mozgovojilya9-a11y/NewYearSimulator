@@ -3,14 +3,16 @@
 	RebirthRequest:InvokeServer() -> (ok, message). Opened from the hub
 	altar, but the server re-checks everything.
 
-	Requirement: RoomReached >= Config.RebirthRequirement.
-	Resets Aura and the room record; keeps weapons, armor, materials, pets.
-	Rebirths + 1 -> permanent multiplier Config.RebirthMultiplier(n).
+	Requirement: Aura >= Config.RebirthAura(rebirths).
+	Resets Aura and the room record; keeps level, weapons, armor,
+	materials, pets, credits. Rebirths + 1 -> permanent training
+	multiplier Config.RebirthMultiplier(n).
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Format = require(ReplicatedStorage.Shared.Format)
 local DataService = require(script.Parent.DataService)
 local Effects = require(script.Parent.Effects)
 local PlayerState = require(script.Parent.PlayerState)
@@ -24,8 +26,9 @@ local function rebirth(player)
 	if not data or not PlayerState.IsReady(player) then
 		return false, "Данные ещё загружаются"
 	end
-	if data.RoomReached < Config.RebirthRequirement then
-		return false, ("Сначала пройди комнату %d (сейчас: %d)"):format(Config.RebirthRequirement, data.RoomReached)
+	local need = Config.RebirthAura(data.Rebirths)
+	if PlayerState.GetAura(player) < need then
+		return false, ("Нужно %s Ауры (сейчас %s)"):format(Format.Number(need), Format.Number(PlayerState.GetAura(player)))
 	end
 
 	data.Rebirths += 1
@@ -39,7 +42,7 @@ local function rebirth(player)
 		Effects.Burst(root.Position, Color3.fromRGB(200, 140, 255), 120, 40, 1.6)
 	end
 
-	return true, ("Ребёрт %d! Аура навсегда x%s"):format(
+	return true, ("Ребёрт %d! Тренировка навсегда x%s"):format(
 		data.Rebirths,
 		tostring(Config.RebirthMultiplier(data.Rebirths))
 	)

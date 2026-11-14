@@ -40,4 +40,17 @@ function Format.Number(n: number): string
 	return (if negative then "-" else "") .. text .. SUFFIXES[index]
 end
 
+-- Small numbers with up to `digits` decimals (trailing zeros cut):
+-- 1.35 -> "1.35", 2.5 -> "2.5", 3 -> "3". Big ones go through Number.
+function Format.Decimal(n: number, digits: number?): string
+	if math.abs(n) >= 1000 then
+		return Format.Number(n)
+	end
+	local text = ("%." .. (digits or 2) .. "f"):format(n)
+	if text:find(".", 1, true) then
+		text = (text:gsub("0+$", ""):gsub("%.$", ""))
+	end
+	return text
+end
+
 return Format

@@ -5,7 +5,10 @@
 	- wheel of fortune (free spin every N hours),
 	- 3 daily quests picked from a pool (kills, rooms, trainer clicks,
 	  bosses, runs),
-	- player level from XP (every 5 levels a small Aura reward),
+	- player level from XP (every 5 levels a credits reward),
+	- Нано-кредиты for every kill (Config.KillCredits).
+	Rewards are always credits / boosts / pets, never Aura (Aura comes
+	only from training).
 	- temporary x2 Aura boosts (BoostUntil, counted in AuraMultiplier).
 
 	Client: Progression:InvokeServer("Status") -> table;
@@ -33,8 +36,9 @@ local function dayIndex(): number
 	return math.floor(os.time() / 86400)
 end
 
-local function auraScale(data): number
-	return 1 + data.RoomReached / 2
+-- Credits rewards grow with the record room so they stay relevant.
+local function creditScale(data): number
+	return 1 + data.RoomReached / 4
 end
 
 ---------------------------------------------------------------------
@@ -116,9 +120,8 @@ local function addXp(player, data, amount: number)
 		data.Level += 1
 		leveled = true
 		if data.Level % P.Level.RewardEvery == 0 then
-			local reward = P.Level.RewardAura * data.Level
-			PlayerState.GiveAura(player, reward)
-			Remotes.Notify(player, ("🎉 Уровень %d! Награда: +%s Ауры"):format(data.Level, Format.Number(reward)), "gold")
+			local reward = PlayerState.AddCredits(player, P.Level.RewardCredits * data.Level)
+			Remotes.Notify(player, ("🎉 Уровень %d! Награда: +%s нано-кредитов"):format(data.Level, Format.Number(reward)), "gold")
 		else
 			Remotes.Notify(player, ("⬆ Уровень %d!"):format(data.Level), "good")
 		end
@@ -182,15 +185,15 @@ local function status(player)
 	for i, quest in ipairs(data.Quests.List) do
 		local def = questDef(quest.Id)
 		if def then
-			quests[i] = { Text = def.Text, Target = def.Target, Progress = quest.Progress, Claimed = quest.Claimed, Aura = math.floor(def.Aura * auraScale(data)) }
+			quests[i] = { Text = def.Text, Target = def.Target, Progress = quest.Progress, Claimed = quest.Claimed, Credits = math.floor(def.Credits * creditScale(data)) }
 		end
 	end
-	local dailyAura = {}
-	for day, amount in ipairs(P.Daily.Aura) do
-		dailyAura[day] = math.floor(amount * auraScale(data))
+	local dailyCredits = {}
+	for day, amount in ipairs(P.Daily.Credits) do
+		dailyCredits[day] = math.floor(amount * creditScale(data))
 	end
 	return {
-		Daily = { CanClaim = canDaily, NextDay = nextDay, Wait = dailyWait, Streak = streak, Aura = dailyAura },
+		Daily = { CanClaim = canDaily, NextDay = nextDay, Wait = dailyWait, Streak = streak, Credits = dailyCredits },
 		Wheel = { CanSpin = canSpin, Wait = spinWait },
 		Quests = quests,
 		Level = data.Level,
@@ -209,11 +212,10 @@ local function claimDaily(player)
 	if not canClaim then
 		return false, ("Следующая награда через %d ч %d мин"):format(wait // 3600, (wait % 3600) // 60)
 	end
-	local amount = math.floor(P.Daily.Aura[nextDay] * auraScale(data))
-	PlayerState.GiveAura(player, amount)
+	local amount = PlayerState.AddCredits(player, P.Daily.Credits[nextDay] * creditScale(data))
 	data.Daily.LastClaim = os.time()
 	data.Daily.Streak = streak + 1
-	local message = ("День %d: +%s Ауры"):format(nextDay, Format.Number(amount))
+	local message = ("День %d: +%s нано-кредитов"):format(nextDay, Format.Number(amount))
 	if nextDay == 7 and P.Daily.Day7Boost then
 		giveBoost(player, data, 30)
 		message ..= " и x2 Аура на 30 мин!"
@@ -247,17 +249,16 @@ local function spin(player)
 	local prize = P.Wheel.Prizes[index]
 	data.WheelLast = os.time()
 	local message
-	if prize.Kind == "Aura" then
-		local amount = math.floor(prize.Amount * auraScale(data))
-		PlayerState.GiveAura(player, amount)
-		message = "+" .. Format.Number(amount) .. " Ауры"
+	if prize.Kind == "Credits" then
+		local amount = PlayerState.AddCredits(player, prize.Amount * creditScale(data))
+		message = "+" .. Format.Number(amount) .. " нано-кредитов"
 	elseif prize.Kind == "Boost" then
 		giveBoost(player, data, prize.Minutes)
 		message = ("x2 Аура на %d мин"):format(prize.Minutes)
 	else -- Egg: a free hatch of the best egg the player can afford, at least the first one
 		local egg = Config.Eggs[1]
 		for _, candidate in ipairs(Config.Eggs) do
-			if PlayerState.GetAura(player) >= candidate.Cost then
+			if PlayerState.GetCredits(player) >= candidate.Cost then
 				egg = candidate
 			end
 		end
@@ -266,9 +267,8 @@ local function spin(player)
 			PlayerState.Sync(player)
 			message = "Питомец: " .. Config.PetById[petId].Name .. "!"
 		else
-			local amount = math.floor(1000 * auraScale(data))
-			PlayerState.GiveAura(player, amount)
-			message = "Хранилище питомцев полно: +" .. Format.Number(amount) .. " Ауры"
+			local amount = PlayerState.AddCredits(player, egg.Cost)
+			message = "Хранилище питомцев полно: +" .. Format.Number(amount) .. " нано-кредитов"
 		end
 	end
 	ProgressionService.RefreshReady(player)
@@ -293,20 +293,23 @@ local function claimQuest(player, index)
 		return false, "Задание ещё не выполнено"
 	end
 	quest.Claimed = true
-	local amount = math.floor(def.Aura * auraScale(data))
-	PlayerState.GiveAura(player, amount)
+	local amount = PlayerState.AddCredits(player, def.Credits * creditScale(data))
 	ProgressionService.RefreshReady(player)
-	return true, "+" .. Format.Number(amount) .. " Ауры"
+	return true, "+" .. Format.Number(amount) .. " нано-кредитов"
 end
 
 ---------------------------------------------------------------------
 -- Hooks from gameplay
 ---------------------------------------------------------------------
 
-function ProgressionService.OnKill(player, room: number, isBoss: boolean)
+function ProgressionService.OnKill(player, room: number, isBoss: boolean, position: Vector3?)
 	local data = DataService.Get(player)
 	if not data then
 		return
+	end
+	local credits = PlayerState.AddCredits(player, Config.KillCredits(room, isBoss))
+	if credits > 0 then
+		Remotes.Get("ClickHit"):FireClient(player, "Credits", credits, position)
 	end
 	questProgress(player, "Kill", 1)
 	if isBoss then
@@ -317,10 +320,6 @@ end
 
 function ProgressionService.OnRoomCleared(player, room: number)
 	questProgress(player, "Room", room, true)
-	local data = DataService.Get(player)
-	if data and room >= Config.RebirthRequirement and room == Config.RebirthRequirement then
-		Remotes.Notify(player, "🔁 Можно переродиться! Иди к алтарю", "gold")
-	end
 end
 
 function ProgressionService.OnRunStarted(player)

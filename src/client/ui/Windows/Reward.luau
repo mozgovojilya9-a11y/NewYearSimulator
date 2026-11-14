@@ -231,7 +231,7 @@ local function render(s)
 	lastStatus = s
 	-- Daily
 	for day, cell in ipairs(dailyCells) do
-		cell.amount.Text = Format.Number(s.Daily.Aura[day] or 0) .. " ✨"
+		cell.amount.Text = Format.Number(s.Daily.Credits[day] or 0) .. " " .. Config.Credits.Icon
 		local claimed = day <= (s.Daily.Streak % 7) and not (s.Daily.Streak % 7 == 0 and day == 7)
 		local isNext = day == s.Daily.NextDay
 		cell.stroke.Color = if isNext then Style.Colors.Green elseif claimed then Style.Colors.Purple else Style.Colors.Gold
@@ -252,7 +252,7 @@ local function render(s)
 		local q = s.Quests[i]
 		if q then
 			row.card.Visible = true
-			row.text.Text = q.Text .. ("  (+%s ✨)"):format(Format.Number(q.Aura))
+			row.text.Text = q.Text .. ("  (+%s %s)"):format(Format.Number(q.Credits), Config.Credits.Icon)
 			row.fill.Size = UDim2.fromScale(math.clamp(q.Progress / q.Target, 0, 1), 1)
 			row.progressText.Text = ("%d / %d"):format(q.Progress, q.Target)
 			if q.Claimed then

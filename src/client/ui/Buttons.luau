@@ -126,7 +126,7 @@ local function refreshBadges()
 	setBadge("Reward", player:GetAttribute("RewardReady") == true)
 end
 aura.Changed:Connect(refreshBadges)
-for _, attribute in ipairs({ "EquippedPets", "RoomReached", "RewardReady" }) do
+for _, attribute in ipairs({ "EquippedPets", "RoomReached", "RewardReady", "Credits" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshBadges)
 end
 refreshBadges()

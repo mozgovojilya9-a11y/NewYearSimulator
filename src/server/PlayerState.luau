@@ -87,13 +87,37 @@ function PlayerState.SetAura(player, amount: number)
 	end
 end
 
--- Spends Aura if the player can afford it. Returns true on success.
-function PlayerState.SpendAura(player, cost: number): boolean
-	local aura = auraValue(player)
-	if not aura or aura.Value < cost then
+-- (Aura is power and is never spent: there is no SpendAura.)
+
+---------------------------------------------------------------------
+-- Нано-кредиты (the spendable currency)
+---------------------------------------------------------------------
+
+function PlayerState.GetCredits(player): number
+	local data = DataService.Get(player)
+	return if data then data.Credits or 0 else 0
+end
+
+-- Adds credits (amount > 0). Returns the amount added.
+function PlayerState.AddCredits(player, amount: number): number
+	local data = DataService.Get(player)
+	amount = math.floor(amount)
+	if not data or amount <= 0 then
+		return 0
+	end
+	data.Credits = (data.Credits or 0) + amount
+	player:SetAttribute("Credits", data.Credits)
+	return amount
+end
+
+-- Spends credits if the player can afford it. Returns true on success.
+function PlayerState.SpendCredits(player, cost: number): boolean
+	local data = DataService.Get(player)
+	if not data or (data.Credits or 0) < cost then
 		return false
 	end
-	aura.Value -= cost
+	data.Credits -= cost
+	player:SetAttribute("Credits", data.Credits)
 	return true
 end
 
@@ -248,6 +272,7 @@ function PlayerState.Sync(player)
 		return
 	end
 	player:SetAttribute("Rebirths", data.Rebirths)
+	player:SetAttribute("Credits", data.Credits or 0)
 	player:SetAttribute("RoomReached", data.RoomReached)
 	player:SetAttribute("Level", data.Level)
 	player:SetAttribute("Xp", data.Xp)

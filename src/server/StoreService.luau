@@ -69,10 +69,9 @@ local function grant(player, product): string?
 	if not data or not PlayerState.IsReady(player) then
 		return nil
 	end
-	if product.Kind == "Aura" then
-		local amount = math.floor(product.Amount * (1 + data.RoomReached / 2))
-		PlayerState.SetAura(player, PlayerState.GetAura(player) + amount)
-		return ("+%s Ауры!"):format(Format.Number(amount))
+	if product.Kind == "Credits" then
+		local amount = PlayerState.AddCredits(player, product.Amount)
+		return ("+%s нано-кредитов!"):format(Format.Number(amount))
 	elseif product.Kind == "Boost" then
 		PlayerState.AddBoost(player, product.Boost, product.Minutes)
 		return product.Name .. " активирован!"
@@ -94,10 +93,9 @@ local function grant(player, product): string?
 			return nil
 		end
 		if data.OwnedWeapons[weapon.Id] then
-			-- already owned: give Aura instead so the purchase is never wasted
-			local amount = 5000 * product.Price
-			PlayerState.SetAura(player, PlayerState.GetAura(player) + amount)
-			return ("%s уже есть: +%s Ауры"):format(weapon.Name, Format.Number(amount))
+			-- already owned: give credits instead so the purchase is never wasted
+			local amount = PlayerState.AddCredits(player, Config.Store.DuplicateCreditsPerRobux * product.Price)
+			return ("%s уже есть: +%s нано-кредитов"):format(weapon.Name, Format.Number(amount))
 		end
 		data.OwnedWeapons[weapon.Id] = true
 		data.EquippedWeapon = weapon.Id
@@ -116,9 +114,8 @@ local function grant(player, product): string?
 		end
 		PlayerState.Sync(player)
 		if not got then
-			local amount = 5000 * product.Price
-			PlayerState.SetAura(player, PlayerState.GetAura(player) + amount)
-			return ("Сет уже есть: +%s Ауры"):format(Format.Number(amount))
+			local amount = PlayerState.AddCredits(player, Config.Store.DuplicateCreditsPerRobux * product.Price)
+			return ("Сет уже есть: +%s нано-кредитов"):format(Format.Number(amount))
 		end
 		return "Получено: " .. Config.ArmorSets[product.Item].Name .. "!"
 	end

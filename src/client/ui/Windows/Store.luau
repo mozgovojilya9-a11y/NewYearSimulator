@@ -38,8 +38,8 @@ local GREY = Color3.fromRGB(110, 110, 130)
 local cards = {} -- { card, tab, refresh }
 
 local function describe(product): string
-	if product.Kind == "Aura" then
-		return ("+%s Ауры (больше с рекордом этапа)"):format(Format.Number(product.Amount))
+	if product.Kind == "Credits" then
+		return ("+%s %s для яиц и косметики"):format(Format.Number(product.Amount), Config.Credits.Icon)
 	elseif product.Kind == "Boost" then
 		return ("На %d минут, время складывается"):format(product.Minutes)
 	elseif product.Kind == "Chest" then
