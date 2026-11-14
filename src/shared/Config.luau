@@ -186,8 +186,8 @@ Config.Products = {
 	{ Key = "ChestAbyss", Id = 0, Tab = "Chests", Icon = "🌀", Name = "Контейнер Нексуса", Price = 199, Kind = "Chest", Biome = 4, Rolls = 30, Luck = 2 },
 
 	{ Key = "WeaponPatron", Id = 0, Tab = "Exclusive", Icon = "🗡", Name = "Клинок Покровителя", Price = 149, Kind = "Weapon", Item = "PatronBlade" },
-	{ Key = "WeaponComet", Id = 0, Tab = "Exclusive", Icon = "☄", Name = "Кометный меч", Price = 249, Kind = "Weapon", Item = "CometSword" },
-	{ Key = "WeaponCrown", Id = 0, Tab = "Exclusive", Icon = "👑", Name = "Коронный клинок", Price = 399, Kind = "Weapon", Item = "CrownBlade" },
+	{ Key = "WeaponComet", Id = 0, Tab = "Exclusive", Icon = "☄", Name = "Кометное копьё", Price = 249, Kind = "Weapon", Item = "CometSword" },
+	{ Key = "WeaponCrown", Id = 0, Tab = "Exclusive", Icon = "👑", Name = "Коронный излучатель", Price = 399, Kind = "Weapon", Item = "CrownBlade" },
 	{ Key = "ArmorRoyal", Id = 0, Tab = "Exclusive", Icon = "🛡", Name = "Королевский сет", Price = 299, Kind = "ArmorSet", Item = "Royal" },
 }
 Config.ProductById = {} -- [product id] = product (only real ids)
@@ -429,44 +429,46 @@ end
 -- Weapons: Damage is the weapon base (see Config.Damage for the full
 -- formula). One weapon is active. Weapons are CRAFTED at the forge from
 -- materials (Config.Recipes): 4 per biome, each stronger than the last.
--- Shape = model built by Shared.WeaponBuilder. Legacy = bought in an
+-- Class = Blade (Клинок: swords) / Pulse (Импульс: spears) / Gunner
+-- (Стрелок: blasters): picks the owner model (Config.Assets.WeaponModels).
+-- Shape = procedural fallback model (Shared.WeaponBuilder). Legacy = bought in an
 -- older version of the game: still owned and usable, not craftable.
 -- Ids are stored in saves: never rename.
 Config.Weapons = {
-	{ Id = "Stick", Name = "Палка", Rarity = "Common", Damage = 1, Shape = "Stick", Color = Color3.fromRGB(150, 110, 70) },
+	{ Id = "Stick", Name = "Обрезок трубы", Rarity = "Common", Damage = 1, Class = "Blade", Shape = "Stick", Color = Color3.fromRGB(150, 110, 70) },
 	-- 1. Катакомбы
-	{ Id = "BoneSword", Name = "Костяной меч", Rarity = "Common", Damage = 2, Biome = 1, Shape = "BoneSword", Color = Color3.fromRGB(235, 230, 215) },
-	{ Id = "SlimeDagger", Name = "Слизневый кинжал", Rarity = "Uncommon", Damage = 3, Biome = 1, Shape = "SlimeDagger", Color = Color3.fromRGB(110, 235, 120) },
-	{ Id = "RustCleaver", Name = "Ржавый тесак", Rarity = "Rare", Damage = 5, Biome = 1, Shape = "Cleaver", Color = Color3.fromRGB(165, 95, 60) },
-	{ Id = "SkullMace", Name = "Булава Черепов", Rarity = "Epic", Damage = 8, Biome = 1, Shape = "SkullMace", Color = Color3.fromRGB(190, 120, 255) },
+	{ Id = "BoneSword", Name = "Нано-клинок", Rarity = "Common", Damage = 2, Class = "Blade", Biome = 1, Shape = "BoneSword", Color = Color3.fromRGB(235, 230, 215) },
+	{ Id = "SlimeDagger", Name = "Ионное копьё", Rarity = "Uncommon", Damage = 3, Class = "Pulse", Biome = 1, Shape = "SlimeDagger", Color = Color3.fromRGB(110, 235, 120) },
+	{ Id = "RustCleaver", Name = "Плазменный бластер", Rarity = "Rare", Damage = 5, Class = "Gunner", Biome = 1, Shape = "Cleaver", Color = Color3.fromRGB(165, 95, 60) },
+	{ Id = "SkullMace", Name = "Клинок-резак", Rarity = "Epic", Damage = 8, Class = "Blade", Biome = 1, Shape = "SkullMace", Color = Color3.fromRGB(190, 120, 255) },
 	-- 2. Ледяной грот
-	{ Id = "IceBlade", Name = "Ледяной клинок", Rarity = "Uncommon", Damage = 12, Biome = 2, Shape = "IceBlade", Color = Color3.fromRGB(170, 225, 255) },
-	{ Id = "YetiClub", Name = "Дубина йети", Rarity = "Rare", Damage = 18, Biome = 2, Shape = "YetiClub", Color = Color3.fromRGB(240, 245, 250) },
-	{ Id = "FrostSpear", Name = "Морозное копьё", Rarity = "Epic", Damage = 28, Biome = 2, Shape = "FrostSpear", Color = Color3.fromRGB(90, 190, 255) },
-	{ Id = "EternalBlade", Name = "Клинок Вечного льда", Rarity = "Legendary", Damage = 43, Biome = 2, Shape = "EternalBlade", Color = Color3.fromRGB(140, 240, 255) },
+	{ Id = "IceBlade", Name = "Крио-клинок", Rarity = "Uncommon", Damage = 12, Class = "Blade", Biome = 2, Shape = "IceBlade", Color = Color3.fromRGB(170, 225, 255) },
+	{ Id = "YetiClub", Name = "Крио-копьё", Rarity = "Rare", Damage = 18, Class = "Pulse", Biome = 2, Shape = "YetiClub", Color = Color3.fromRGB(240, 245, 250) },
+	{ Id = "FrostSpear", Name = "Крио-бластер", Rarity = "Epic", Damage = 28, Class = "Gunner", Biome = 2, Shape = "FrostSpear", Color = Color3.fromRGB(90, 190, 255) },
+	{ Id = "EternalBlade", Name = "Клинок абсолютного нуля", Rarity = "Legendary", Damage = 43, Class = "Blade", Biome = 2, Shape = "EternalBlade", Color = Color3.fromRGB(140, 240, 255) },
 	-- 3. Лавовая кузня
-	{ Id = "ObsidianAxe", Name = "Обсидиановый топор", Rarity = "Rare", Damage = 66, Biome = 3, Shape = "ObsidianAxe", Color = Color3.fromRGB(60, 45, 80) },
-	{ Id = "EmberSword", Name = "Угольный меч", Rarity = "Epic", Damage = 100, Biome = 3, Shape = "EmberSword", Color = Color3.fromRGB(255, 130, 40) },
-	{ Id = "MagmaHammer", Name = "Лавовый молот", Rarity = "Epic", Damage = 160, Biome = 3, Shape = "MagmaHammer", Color = Color3.fromRGB(255, 110, 30) },
-	{ Id = "PhoenixBlade", Name = "Клинок Феникса", Rarity = "Legendary", Damage = 250, Biome = 3, Shape = "PhoenixBlade", Color = Color3.fromRGB(255, 170, 50) },
+	{ Id = "ObsidianAxe", Name = "Термо-клинок", Rarity = "Rare", Damage = 66, Class = "Blade", Biome = 3, Shape = "ObsidianAxe", Color = Color3.fromRGB(60, 45, 80) },
+	{ Id = "EmberSword", Name = "Плазменное копьё", Rarity = "Epic", Damage = 100, Class = "Pulse", Biome = 3, Shape = "EmberSword", Color = Color3.fromRGB(255, 130, 40) },
+	{ Id = "MagmaHammer", Name = "Магма-пушка", Rarity = "Epic", Damage = 160, Class = "Gunner", Biome = 3, Shape = "MagmaHammer", Color = Color3.fromRGB(255, 110, 30) },
+	{ Id = "PhoenixBlade", Name = "Клинок ядра", Rarity = "Legendary", Damage = 250, Class = "Blade", Biome = 3, Shape = "PhoenixBlade", Color = Color3.fromRGB(255, 170, 50) },
 	-- 4. Бездна ауры
-	{ Id = "ShadowKatana", Name = "Теневая катана", Rarity = "Epic", Damage = 380, Biome = 4, Shape = "ShadowKatana", Color = Color3.fromRGB(120, 90, 170) },
-	{ Id = "DuskScythe", Name = "Коса сумрака", Rarity = "Legendary", Damage = 600, Biome = 4, Shape = "DuskScythe", Color = Color3.fromRGB(170, 80, 255) },
-	{ Id = "AbyssBlade", Name = "Клинок бездны", Rarity = "Legendary", Damage = 920, Biome = 4, Shape = "AbyssBlade", Color = Color3.fromRGB(255, 61, 184) },
-	{ Id = "AuraReaver", Name = "Разрушитель Ауры", Rarity = "Mythic", Damage = 1450, Biome = 4, Shape = "AuraReaver", Color = Color3.fromRGB(255, 230, 120) },
+	{ Id = "ShadowKatana", Name = "Клинок Нексуса", Rarity = "Epic", Damage = 380, Class = "Blade", Biome = 4, Shape = "ShadowKatana", Color = Color3.fromRGB(120, 90, 170) },
+	{ Id = "DuskScythe", Name = "Копьё сингулярности", Rarity = "Legendary", Damage = 600, Class = "Pulse", Biome = 4, Shape = "DuskScythe", Color = Color3.fromRGB(170, 80, 255) },
+	{ Id = "AbyssBlade", Name = "Аннигилятор", Rarity = "Legendary", Damage = 920, Class = "Gunner", Biome = 4, Shape = "AbyssBlade", Color = Color3.fromRGB(255, 61, 184) },
+	{ Id = "AuraReaver", Name = "Разрушитель Нексуса", Rarity = "Mythic", Damage = 1450, Class = "Blade", Biome = 4, Shape = "AuraReaver", Color = Color3.fromRGB(255, 230, 120) },
 	-- Robux exclusives (Config.Products): a bit stronger than the tier they
 	-- become available at, weaker than the next biome's top weapon.
-	{ Id = "PatronBlade", Name = "Клинок Покровителя", Rarity = "Epic", Damage = 10, Robux = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
-	{ Id = "CometSword", Name = "Кометный меч", Rarity = "Legendary", Damage = 55, Robux = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 150, 90) },
-	{ Id = "CrownBlade", Name = "Коронный клинок", Rarity = "Mythic", Damage = 300, Robux = true, Shape = "AuraKatana", Color = Color3.fromRGB(255, 215, 80) },
+	{ Id = "PatronBlade", Name = "Клинок Покровителя", Rarity = "Epic", Damage = 10, Class = "Blade", Robux = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
+	{ Id = "CometSword", Name = "Кометное копьё", Rarity = "Legendary", Damage = 55, Class = "Pulse", Robux = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 150, 90) },
+	{ Id = "CrownBlade", Name = "Коронный излучатель", Rarity = "Mythic", Damage = 300, Class = "Gunner", Robux = true, Shape = "AuraKatana", Color = Color3.fromRGB(255, 215, 80) },
 	-- Legacy (from old versions of the game): still owned and usable,
 	-- not craftable. Damage kept low so old saves don't one-shot the dungeon.
-	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 2, Legacy = true, Shape = "WoodSword", Color = Color3.fromRGB(200, 150, 90) },
-	{ Id = "IronSword", Name = "Железный меч", Rarity = "Rare", Damage = 4, Legacy = true, Shape = "IronSword", Color = Color3.fromRGB(190, 200, 215) },
-	{ Id = "AuraKatana", Name = "Катана Ауры", Rarity = "Epic", Damage = 8, Legacy = true, Shape = "AuraKatana", Color = Color3.fromRGB(190, 110, 255) },
-	{ Id = "StormBlade", Name = "Клинок Бури", Rarity = "Legendary", Damage = 15, Legacy = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
-	{ Id = "EclipseScythe", Name = "Коса Затмения", Rarity = "Legendary", Damage = 30, Legacy = true, Shape = "EclipseScythe", Color = Color3.fromRGB(255, 120, 60) },
-	{ Id = "StarAuraSword", Name = "Меч Звёздной Ауры", Rarity = "Mythic", Damage = 50, Legacy = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 230, 120) },
+	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 2, Class = "Blade", Legacy = true, Shape = "WoodSword", Color = Color3.fromRGB(200, 150, 90) },
+	{ Id = "IronSword", Name = "Железный меч", Rarity = "Rare", Damage = 4, Class = "Blade", Legacy = true, Shape = "IronSword", Color = Color3.fromRGB(190, 200, 215) },
+	{ Id = "AuraKatana", Name = "Катана Ауры", Rarity = "Epic", Damage = 8, Class = "Blade", Legacy = true, Shape = "AuraKatana", Color = Color3.fromRGB(190, 110, 255) },
+	{ Id = "StormBlade", Name = "Клинок Бури", Rarity = "Legendary", Damage = 15, Class = "Blade", Legacy = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
+	{ Id = "EclipseScythe", Name = "Коса Затмения", Rarity = "Legendary", Damage = 30, Class = "Blade", Legacy = true, Shape = "EclipseScythe", Color = Color3.fromRGB(255, 120, 60) },
+	{ Id = "StarAuraSword", Name = "Меч Звёздной Ауры", Rarity = "Mythic", Damage = 50, Class = "Blade", Legacy = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 230, 120) },
 }
 
 -- Armor: one set per biome, three pieces each (Helmet / Chest / Legs).
@@ -476,29 +478,32 @@ Config.Weapons = {
 Config.ArmorSlots = { "Helmet", "Chest", "Legs" }
 Config.ArmorSlotNames = { Helmet = "Шлем", Chest = "Нагрудник", Legs = "Поножи" }
 Config.ArmorSets = {
-	Bone = { Name = "Костяной сет", Biome = 1, Rarity = "Uncommon", Health = 20, Defense = 0.03, Bonus = 0.10, ItemLevel = 20,
-		Style = { Kind = "Bone", Main = Color3.fromRGB(235, 228, 205), Trim = Color3.fromRGB(150, 135, 110), Glow = Color3.fromRGB(110, 235, 120), Material = Enum.Material.SmoothPlastic } },
-	Ice = { Name = "Ледяной сет", Biome = 2, Rarity = "Rare", Health = 45, Defense = 0.05, Bonus = 0.20, ItemLevel = 45,
-		Style = { Kind = "Ice", Main = Color3.fromRGB(150, 215, 255), Trim = Color3.fromRGB(240, 250, 255), Glow = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Ice } },
-	Lava = { Name = "Лавовый сет", Biome = 3, Rarity = "Epic", Health = 90, Defense = 0.07, Bonus = 0.35, ItemLevel = 70,
-		Style = { Kind = "Lava", Main = Color3.fromRGB(50, 38, 42), Trim = Color3.fromRGB(120, 55, 40), Glow = Color3.fromRGB(255, 130, 30), Material = Enum.Material.Slate } },
-	Abyss = { Name = "Сет бездны", Biome = 4, Rarity = "Legendary", Health = 160, Defense = 0.09, Bonus = 0.50, ItemLevel = 95,
-		Style = { Kind = "Abyss", Main = Color3.fromRGB(60, 35, 110), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(255, 61, 184), Material = Enum.Material.Metal } },
+	Bone = { Name = "Сет монтажника", Biome = 1, Rarity = "Uncommon", Health = 20, Defense = 0.03, Bonus = 0.10, ItemLevel = 20,
+		Style = { Kind = "Assembly", Main = Color3.fromRGB(70, 74, 84), Trim = Color3.fromRGB(255, 176, 50), Glow = Color3.fromRGB(255, 190, 70), Visor = Color3.fromRGB(30, 34, 40), Material = Enum.Material.Metal } },
+	Ice = { Name = "Крио-сет", Biome = 2, Rarity = "Rare", Health = 45, Defense = 0.05, Bonus = 0.20, ItemLevel = 45,
+		Style = { Kind = "Cryo", Main = Color3.fromRGB(226, 234, 244), Trim = Color3.fromRGB(120, 150, 180), Glow = Color3.fromRGB(46, 230, 255), Visor = Color3.fromRGB(140, 220, 255), Material = Enum.Material.SmoothPlastic } },
+	Lava = { Name = "Термо-сет", Biome = 3, Rarity = "Epic", Health = 90, Defense = 0.07, Bonus = 0.35, ItemLevel = 70,
+		Style = { Kind = "Thermo", Main = Color3.fromRGB(46, 42, 44), Trim = Color3.fromRGB(110, 70, 50), Glow = Color3.fromRGB(255, 120, 30), Visor = Color3.fromRGB(255, 140, 40), Material = Enum.Material.DiamondPlate } },
+	Abyss = { Name = "Сет Нексуса", Biome = 4, Rarity = "Legendary", Health = 160, Defense = 0.09, Bonus = 0.50, ItemLevel = 95,
+		Style = { Kind = "Nexus", Main = Color3.fromRGB(34, 26, 52), Trim = Color3.fromRGB(110, 70, 190), Glow = Color3.fromRGB(255, 61, 184), Visor = Color3.fromRGB(255, 61, 184), Material = Enum.Material.Metal } },
 	-- Robux exclusive (Config.Products "ArmorRoyal"): between Ice and Lava.
 	Royal = { Name = "Королевский сет", Rarity = "Legendary", Health = 70, Defense = 0.06, Bonus = 0.28, ItemLevel = 60, Robux = true,
-		Style = { Kind = "Abyss", Main = Color3.fromRGB(240, 240, 250), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Metal } },
+		Style = { Kind = "Royal", Main = Color3.fromRGB(240, 240, 248), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(46, 230, 255), Visor = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Metal } },
 }
 Config.ArmorSetOrder = { "Bone", "Ice", "Lava", "Abyss", "Royal" }
 Config.Armor = {}
 do
-	local adjective = { Bone = { "Костяной", "Костяные" }, Ice = { "Ледяной", "Ледяные" }, Lava = { "Лавовый", "Лавовые" }, Royal = { "Королевский", "Королевские" } }
+	local adjective = { Bone = { "Монтажный", "Монтажные" }, Ice = { "Крио-", "Крио-" }, Lava = { "Термо-", "Термо-" }, Royal = { "Королевский", "Королевские" } }
 	local noun = { Helmet = "шлем", Chest = "нагрудник", Legs = "поножи" }
 	local nounCapital = { Helmet = "Шлем", Chest = "Нагрудник", Legs = "Поножи" }
 	for _, setId in ipairs(Config.ArmorSetOrder) do
 		local set = Config.ArmorSets[setId]
 		set.Id = setId
 		for _, slot in ipairs(Config.ArmorSlots) do
-			local name = if setId == "Abyss" then nounCapital[slot] .. " бездны" else adjective[setId][if slot == "Legs" then 2 else 1] .. " " .. noun[slot]
+			local adj = adjective[setId] and adjective[setId][if slot == "Legs" then 2 else 1]
+			local name = if setId == "Abyss" then nounCapital[slot] .. " Нексуса"
+				elseif adj and string.sub(adj, -1) == "-" then adj .. noun[slot]
+				else adj .. " " .. noun[slot]
 			table.insert(Config.Armor, {
 				Id = setId .. slot, -- "BoneHelmet", "IceChest", ... (stored in saves)
 				Name = name,

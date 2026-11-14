@@ -57,4 +57,5 @@ load(modules, "Zone")
 load(modules, "Prompts")
 load(modules, "Cosmetics")
 load(modules, "HubLife")
+load(modules, "ItemFx")
 load(ui, "DevPanel") -- Studio only

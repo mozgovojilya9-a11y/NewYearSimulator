@@ -13,11 +13,12 @@
 	anchored (racks, previews) or welded to a hand (characters).
 
 	Every craftable weapon has its own silhouette in its biome's theme
-	(10-20 parts). Legendary and above glow: a PointLight and a particle
-	emitter. Every weapon carries a disabled Trail along the blade that
-	the client switches on during a swing (Swing.luau).
+	(10-20 parts). The rarity look comes on top (WeaponBuilder.ApplyRarity).
+	Every weapon carries a disabled Trail along the blade that the client
+	switches on during a swing (Swing.luau); from Epic it is bright.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Assets = require(ReplicatedStorage.Shared.Assets)
@@ -39,7 +40,6 @@ local WOODM = Enum.Material.Wood
 local SLATE = Enum.Material.Slate
 local ICE = Enum.Material.Ice
 
-local GLOW_FROM = { Legendary = true, Mythic = true, Secret = true }
 
 local function part(model, name, size, cframe, color, material, transparency)
 	local p = Instance.new("Part")
@@ -576,6 +576,91 @@ local function fromAsset(weapon)
 	return model, handle, glowPart
 end
 
+-- Rarity look (Config rules), on owner and procedural models alike:
+--   Common / Uncommon  no glow at all (neon parts turn into metal)
+--   Rare               glowing inserts in the weapon color
+--   Epic               + glows (light), bright wide swing trail
+--   Legendary          + particles, stronger light
+--   Mythic             + animated rings and lightning (client ItemFx)
+--   Secret             + rainbow glow (client ItemFx)
+function WeaponBuilder.ApplyRarity(model: Model, weapon, handle: BasePart, glowPart: BasePart?, trail: Trail?, top: number)
+	local rarity = Config.Rarity[weapon.Rarity] or Config.Rarity.Common
+	local rank = rarity.Index
+	local R = Config.Rarity
+	local neonParts = {}
+	for _, p in ipairs(model:GetDescendants()) do
+		if p:IsA("BasePart") and p.Material == NEON then
+			table.insert(neonParts, p)
+		end
+	end
+	if rank < R.Rare.Index then
+		for _, p in ipairs(neonParts) do
+			p.Material = METAL
+		end
+		return
+	end
+	-- Rare+: glowing inserts (owner models without neon get a strip)
+	if #neonParts == 0 then
+		local length = math.max(1, top - handle.Position.Y - 1.6)
+		local insert = Instance.new("Part")
+		insert.Name = "Insert"
+		insert.Size = Vector3.new(0.08, length, 0.08)
+		insert.CFrame = handle.CFrame * CFrame.new(0, 1.2 + length / 2, -0.12)
+		insert.Color = weapon.Color
+		insert.Material = NEON
+		insert.CanCollide = false
+		insert.CanQuery = false
+		insert.CanTouch = false
+		insert.Massless = true
+		insert.Parent = model
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = handle
+		weld.Part1 = insert
+		weld.Parent = insert
+		table.insert(neonParts, insert)
+	end
+	for _, p in ipairs(neonParts) do
+		p.Color = weapon.Color
+	end
+	local source = glowPart or neonParts[1] or handle
+	if rank >= R.Epic.Index then
+		local light = Instance.new("PointLight")
+		light.Name = "RarityLight"
+		light.Color = weapon.Color
+		light.Range = if rank >= R.Legendary.Index then 10 else 6
+		light.Brightness = if rank >= R.Legendary.Index then 1.3 else 0.8
+		light.Shadows = false
+		light.Parent = source
+		if trail then
+			trail.Color = ColorSequence.new(rarity.Color:Lerp(WHITE, 0.3), weapon.Color)
+			trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+			trail.LightEmission = 1
+			trail.Lifetime = 0.26
+			trail.WidthScale = NumberSequence.new(1.2, 0.3)
+		end
+	end
+	if rank >= R.Legendary.Index then
+		local emitter = Instance.new("ParticleEmitter")
+		emitter.Name = "Aura"
+		emitter.Color = ColorSequence.new(weapon.Color, WHITE)
+		emitter.LightEmission = 0.7
+		emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0) })
+		emitter.Transparency = NumberSequence.new(0.2, 1)
+		emitter.Lifetime = NumberRange.new(0.5, 1)
+		emitter.Speed = NumberRange.new(0.5, 2)
+		emitter.SpreadAngle = Vector2.new(180, 180)
+		emitter.Rate = if rank >= R.Mythic.Index then 20 else 10
+		emitter.Parent = source
+	end
+	if rank >= R.Mythic.Index then
+		-- the client (ItemFx) adds rotating rings + lightning / rainbow
+		model:SetAttribute("Fx", rarity.Id)
+		model:SetAttribute("FxColor", weapon.Color)
+		model:SetAttribute("FxLength", top - handle.Position.Y)
+		CollectionService:AddTag(model, "ItemFx")
+	end
+end
+
 -- Returns a Model named after the weapon, PrimaryPart "Handle".
 function WeaponBuilder.Build(weapon): Model
 	local model, handle, glowPart = fromAsset(weapon)
@@ -608,35 +693,14 @@ function WeaponBuilder.Build(weapon): Model
 	trail.Attachment0 = a0
 	trail.Attachment1 = a1
 	trail.Color = ColorSequence.new(weapon.Color:Lerp(WHITE, 0.4), weapon.Color)
-	trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
-	trail.Lifetime = 0.18
-	trail.LightEmission = 0.5
+	trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) })
+	trail.Lifetime = 0.16
+	trail.LightEmission = 0.3
 	trail.FaceCamera = false
 	trail.Enabled = false
 	trail.Parent = handle
 
-	-- High tiers glow.
-	if GLOW_FROM[weapon.Rarity] then
-		local source = glowPart or model:FindFirstChild("Blade") or handle
-		local light = Instance.new("PointLight")
-		light.Color = weapon.Color
-		light.Range = 10
-		light.Brightness = 1.2
-		light.Shadows = false
-		light.Parent = source
-		local emitter = Instance.new("ParticleEmitter")
-		emitter.Name = "Aura"
-		emitter.Color = ColorSequence.new(weapon.Color, WHITE)
-		emitter.LightEmission = 0.7
-		emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0) })
-		emitter.Transparency = NumberSequence.new(0.2, 1)
-		emitter.Lifetime = NumberRange.new(0.5, 1)
-		emitter.Speed = NumberRange.new(0.5, 2)
-		emitter.SpreadAngle = Vector2.new(180, 180)
-		emitter.Rate = if weapon.Rarity == "Legendary" then 8 else 16
-		emitter.Parent = source
-	end
-
+	WeaponBuilder.ApplyRarity(model, weapon, handle, glowPart, trail, top)
 	if not isAsset then
 		weldAll(model, handle)
 	end
