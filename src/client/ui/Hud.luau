@@ -107,7 +107,7 @@ local counters = Instance.new("Frame")
 counters.Name = "Counters"
 counters.AnchorPoint = Vector2.new(0, 1)
 counters.Position = UDim2.new(0, 16, 1, -16)
-counters.Size = UDim2.fromOffset(230, 190)
+counters.Size = UDim2.fromOffset(260, 130)
 counters.BackgroundTransparency = 1
 counters.Parent = Style.Gui
 local countersLayout = Instance.new("UIListLayout")
@@ -233,7 +233,7 @@ refreshProgress()
 local levelTrack = Instance.new("Frame")
 levelTrack.Name = "Level"
 levelTrack.LayoutOrder = -1
-levelTrack.Size = UDim2.new(1, 0, 0, 26)
+levelTrack.Size = UDim2.new(1, 0, 0, 28)
 levelTrack.BackgroundColor3 = Style.Colors.PanelDark
 levelTrack.BackgroundTransparency = 0
 levelTrack.ZIndex = 2
@@ -247,7 +247,10 @@ levelFill.ZIndex = 3
 levelFill.Parent = levelTrack
 Style.Corner(levelFill, UDim.new(0.5, 0))
 Style.Gradient(levelFill, Style.Colors.Cyan)
-local levelText = Style.Label(levelTrack, "", 16, Style.Colors.Text, { Size = UDim2.fromScale(1, 1), ZIndex = 4 })
+local levelText = Style.Label(levelTrack, "", 16, Style.Colors.Text, { Position = UDim2.fromOffset(8, 2), Size = UDim2.new(1, -16, 1, -4), TextScaled = true, ZIndex = 4 })
+local levelTextCap = Instance.new("UITextSizeConstraint")
+levelTextCap.MaxTextSize = 16
+levelTextCap.Parent = levelText
 
 local function refreshLevel()
 	local level = player:GetAttribute("Level") or 1
@@ -255,9 +258,10 @@ local function refreshLevel()
 	local xpNext = math.max(1, player:GetAttribute("XpNext") or 100)
 	Style.Tween(levelFill, 0.3, { Size = UDim2.fromScale(math.clamp(xp / xpNext, 0, 1), 1) })
 	local points = player:GetAttribute("SkillPoints") or 0
-	levelText.Text = ("Ур. %d   %s / %s XP"):format(level, Format.Number(xp), Format.Number(xpNext)) .. (if points > 0 then ("   ⭐%d"):format(points) else "")
+	local gearScore = player:GetAttribute("Stat_GearScore") or 0
+	levelText.Text = ("Ур. %d  •  GS %d  •  %s/%s XP"):format(level, gearScore, Format.Number(xp), Format.Number(xpNext)) .. (if points > 0 then ("  ⭐%d"):format(points) else "")
 end
-for _, attribute in ipairs({ "Level", "Xp", "XpNext", "SkillPoints" }) do
+for _, attribute in ipairs({ "Level", "Xp", "XpNext", "SkillPoints", "Stat_GearScore" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshLevel)
 end
 refreshLevel()

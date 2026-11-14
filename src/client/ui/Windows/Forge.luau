@@ -229,12 +229,13 @@ local function refreshDetails()
 		statLabels[2].Text = ("Сейчас: %s (%s)"):format(Format.Number(currentDamage), if current then current.Name else "—")
 		local mine = player:GetAttribute("ClickPower") or 1
 		statLabels[3].Text = ("Твой удар станет около %s"):format(Format.Number(mine / math.max(1, currentDamage) * item.Damage))
+		statLabels[4].Text = ("🔷 Уровень предмета: %d%s"):format(Config.ItemLevelOf(item), delta(Config.ItemLevelOf(item) - Config.ItemLevelOf(current)))
 	else
 		local current = Config.ItemById.Armor[player:GetAttribute("Equipped" .. item.Slot) or ""]
 		local set = Config.ArmorSets[item.Set]
 		statLabels[1].Text = ("❤ Здоровье: +%d%s"):format(item.Health, delta(item.Health - (if current then current.Health else 0)))
 		statLabels[2].Text = ("🛡 Защита: +%d%%%s"):format(math.floor(item.Defense * 100 + 0.5), delta((item.Defense - (if current then current.Defense else 0)) * 100, "%"))
-		statLabels[3].Text = ("%s: %s"):format(Config.ArmorSlotNames[item.Slot], if current then "сейчас " .. current.Name else "слот пуст")
+		statLabels[3].Text = ("🔷 Ур. предмета %d  •  %s: %s"):format(Config.ItemLevelOf(item), Config.ArmorSlotNames[item.Slot], if current then "сейчас " .. current.Name else "слот пуст")
 		statLabels[4].Text = ('<font color="%s">%s (3 части): +%d%% урона</font>'):format(hex(Style.Colors.Gold), set.Name, math.floor(set.Bonus * 100 + 0.5))
 	end
 

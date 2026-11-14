@@ -14,6 +14,12 @@
 	  Luck         x chances of Rare+ drops
 	  Regen        HP per second out of combat
 	  Dash         dash distance (studs)
+	  GearScore    sum of item levels: weapon + 3 armor slots
+	  XpMult       x XP earned (passes, VIP, boosts)
+	  CreditsMult  x Нано-кредиты earned (passes, VIP, boosts)
+
+	Damage = BaseDamage x weapon Damage x LevelMult(level) x set bonus
+	         x pets x passes x boosts (x skills / class later).
 
 	Every system reads stats ONLY through StatService.Get(player).
 	Stats are recomputed on every change (PlayerState.Sync: gear, level,
@@ -50,6 +56,9 @@ local function compute(player)
 		Luck = base.Luck,
 		Regen = base.Regen,
 		Dash = base.Dash,
+		GearScore = 0,
+		XpMult = 1,
+		CreditsMult = 1,
 	}
 	if not data then
 		return stats
@@ -58,10 +67,12 @@ local function compute(player)
 	-- Level
 	local level = data.Level or 1
 	stats.MaxHealth += (level - 1) * base.HealthPerLevel
+	stats.Defense += (level - 1) * base.DefensePerLevel
 
 	-- Weapon
 	local weapon = Config.ItemById.Weapon[data.EquippedWeapon]
 	local weaponDamage = if weapon then weapon.Damage else 1
+	stats.GearScore += Config.ItemLevelOf(weapon)
 
 	-- Armor pieces + set bonus
 	for _, slot in ipairs(Config.ArmorSlots) do
@@ -69,6 +80,7 @@ local function compute(player)
 		if piece then
 			stats.MaxHealth += piece.Health
 			stats.Defense += piece.Defense
+			stats.GearScore += Config.ItemLevelOf(piece)
 		end
 	end
 	stats.Defense = math.min(0.8, stats.Defense)
@@ -97,8 +109,13 @@ local function compute(player)
 		stats.Luck *= 2
 	end
 
-	-- Damage = weapon x bonuses
-	local damage = Config.Click.BaseDamage * weaponDamage * damageMult
+	-- XP and credits multipliers
+	local vip = if Passes.Owns(player, "VIP") then 1 + Config.VipBonus else 1
+	stats.XpMult = vip * (if Passes.Owns(player, "Xp2x") then 2 else 1) * (if PlayerState.BoostActive(player, "Xp") then 2 else 1)
+	stats.CreditsMult = vip * (if Passes.Owns(player, "Credits2x") then 2 else 1) * (if PlayerState.BoostActive(player, "Credits") then 2 else 1)
+
+	-- Damage = weapon x level x bonuses
+	local damage = Config.Click.BaseDamage * weaponDamage * Config.LevelMult(level) * damageMult
 	stats.Damage = math.max(1, math.floor(damage))
 
 	return stats

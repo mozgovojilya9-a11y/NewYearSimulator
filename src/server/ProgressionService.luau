@@ -25,6 +25,7 @@ local DungeonRuns = require(script.Parent.DungeonRuns)
 local PetService = require(script.Parent.PetService)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
+local StatService = require(script.Parent.StatService)
 local Remotes = require(script.Parent.Remotes)
 
 local ProgressionService = {}
@@ -33,6 +34,11 @@ local P = Config.Progression
 
 local function dayIndex(): number
 	return math.floor(os.time() / 86400)
+end
+
+-- Earned credits: x CreditsMult (passes x2 Credits, VIP, x2 boost).
+local function earnCredits(player, amount: number): number
+	return PlayerState.AddCredits(player, amount * StatService.Get(player).CreditsMult)
 end
 
 -- Credits rewards grow with the record room so they stay relevant.
@@ -112,7 +118,7 @@ local xpToNext = Config.XpToNext
 -- Adds XP; on level up: skill points, rewards, stats refresh (damage
 -- and max HP grow with the level), full heal, big banner on the client.
 local function addXp(player, data, amount: number)
-	amount = math.floor(amount)
+	amount = math.floor(amount * StatService.Get(player).XpMult) -- passes, VIP, x2 boost
 	if amount <= 0 then
 		return
 	end
@@ -124,7 +130,7 @@ local function addXp(player, data, amount: number)
 		gained += 1
 		data.SkillPoints = (data.SkillPoints or 0) + P.Level.SkillPointsPerLevel
 		if data.Level % P.Level.RewardEvery == 0 then
-			local reward = PlayerState.AddCredits(player, P.Level.RewardCredits * data.Level)
+			local reward = earnCredits(player, P.Level.RewardCredits * data.Level)
 			Remotes.Notify(player, ("🎉 Награда за уровень %d: +%s нано-кредитов"):format(data.Level, Format.Number(reward)), "gold")
 		end
 	end
@@ -228,7 +234,7 @@ local function claimDaily(player)
 	if not canClaim then
 		return false, ("Следующая награда через %d ч %d мин"):format(wait // 3600, (wait % 3600) // 60)
 	end
-	local amount = PlayerState.AddCredits(player, P.Daily.Credits[nextDay] * creditScale(data))
+	local amount = earnCredits(player, P.Daily.Credits[nextDay] * creditScale(data))
 	data.Daily.LastClaim = os.time()
 	data.Daily.Streak = streak + 1
 	local message = ("День %d: +%s нано-кредитов"):format(nextDay, Format.Number(amount))
@@ -266,7 +272,7 @@ local function spin(player)
 	data.WheelLast = os.time()
 	local message
 	if prize.Kind == "Credits" then
-		local amount = PlayerState.AddCredits(player, prize.Amount * creditScale(data))
+		local amount = earnCredits(player, prize.Amount * creditScale(data))
 		message = "+" .. Format.Number(amount) .. " нано-кредитов"
 	elseif prize.Kind == "Boost" then
 		giveBoost(player, data, prize.Minutes)
@@ -309,7 +315,7 @@ local function claimQuest(player, index)
 		return false, "Задание ещё не выполнено"
 	end
 	quest.Claimed = true
-	local amount = PlayerState.AddCredits(player, def.Credits * creditScale(data))
+	local amount = earnCredits(player, def.Credits * creditScale(data))
 	local xp = P.Level.XpPerQuest * data.Level
 	addXp(player, data, xp)
 	ProgressionService.RefreshReady(player)
@@ -325,7 +331,7 @@ function ProgressionService.OnKill(player, room: number, isBoss: boolean, positi
 	if not data then
 		return
 	end
-	local credits = PlayerState.AddCredits(player, Config.KillCredits(room, isBoss))
+	local credits = earnCredits(player, Config.KillCredits(room, isBoss))
 	if credits > 0 then
 		Remotes.Get("ClickHit"):FireClient(player, "Credits", credits, position)
 	end

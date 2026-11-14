@@ -88,14 +88,41 @@ Config.Stats = {
 	Luck = 1, -- x chances of Rare+ drops
 	Regen = 6, -- HP per second out of combat (after Player.RegenDelay)
 	Dash = 0, -- dash distance in studs (the dash itself comes with classes)
-	HealthPerLevel = 5, -- + max HP per level above 1
+	-- Level: every level above 1 adds these (base stats grow, gear stays
+	-- the main source of power).
+	DamagePerLevel = 0.05, -- damage x(1 + 0.05 per level): lvl 10 x1.45, 30 x2.45, 50 x3.45
+	HealthPerLevel = 6, -- + max HP per level
+	DefensePerLevel = 0.002, -- + defense share per level (lvl 30: +5.8%)
 	-- Names for the UI (Equipment window).
 	Names = {
 		Damage = "Урон", MaxHealth = "Макс. HP", Defense = "Защита", AttackSpeed = "Скорость атаки",
 		CritChance = "Шанс крита", CritDamage = "Крит. урон", Luck = "Удача", Regen = "Регенерация",
-		Dash = "Рывок",
+		Dash = "Рывок", GearScore = "Gear Score",
 	},
 }
+
+-- Damage multiplier of the player's level.
+function Config.LevelMult(level: number): number
+	return 1 + (math.max(1, level) - 1) * Config.Stats.DamagePerLevel
+end
+
+-- Item level ("уровень предмета") of gear. Weapons: from their damage
+-- (Stick 1, biome 1 ~10-29, biome 2 ~35-52, biome 3 ~58-76, biome 4
+-- ~81-99); armor: the ItemLevel of its set. Gear Score = the sum over the
+-- weapon and the three armor slots (empty slot = 0).
+Config.ItemLevel = {
+	WeaponK = 31, -- weapon item level = 1 + WeaponK x log10(Damage)
+}
+
+function Config.ItemLevelOf(item): number
+	if not item then
+		return 0
+	end
+	if item.ItemLevel then
+		return item.ItemLevel
+	end
+	return math.floor(1 + Config.ItemLevel.WeaponK * math.log10(math.max(1, item.Damage or 1)))
+end
 
 -- "Нано-кредиты": the spendable currency. Earned from
 -- mobs (more in deeper rooms, bosses x BossMultiplier), daily reward,
@@ -121,7 +148,7 @@ end
 -- Robux game passes. Id = 0 means "not created yet": buttons show
 -- "Скоро" and nothing is checked. Put the real ids from the Creator
 -- Dashboard here (see README).
-Config.VipBonus = 0.2 -- VIP: +20% XP and credits
+Config.VipBonus = 0.2 -- VIP: +20% XP and credits (passes Xp2x / Credits2x: x2)
 
 -- Order = position in the store. Icon = emoji on the card.
 Config.GamePasses = {
@@ -195,10 +222,12 @@ Config.Dungeon = {
 	-- typical player has when they get there (tools/pacing.py). Mob HP =
 	-- RecommendedDamage(r) x ClicksToKill: at the recommended damage a mob
 	-- takes ~7-8 hits, a boss ~46 (crit 8% x2 included).
-	RecommendedRoom1 = 3, -- room 1: a Stick and a minute of training
+	RecommendedRoom1 = 1, -- room 1: a Stick is enough
 	RampTo = 5, -- rooms 1..RampTo-1 ramp up to the curve below
-	RecommendedBase = 7.6,
-	RecommendedGrowth = 1.91,
+	RecommendedBase = 2.88,
+	RecommendedGrowth = 1.345,
+	LateFrom = 15, -- after this room the curve gets steeper
+	LateGrowth = 1.96,
 	ClicksToKill = 8,
 	BossClicksToKill = 50,
 
@@ -360,14 +389,16 @@ function Config.IsBossRoom(room: number): boolean
 end
 
 -- Damage per click a player "should" have for a room (barrier hint).
--- Damage per hit a player "should" have for a room. Rooms from
--- RampTo on: RecommendedBase x RecommendedGrowth^(room - 1). Rooms before
--- it ramp smoothly (log scale) from RecommendedRoom1, so room 1 is easy
--- right away.
+-- Damage per hit a player "should" have for a room. Three parts:
+--   rooms 1..RampTo-1: smooth ramp (log scale) from RecommendedRoom1,
+--   rooms RampTo..LateFrom: RecommendedBase x RecommendedGrowth^(room - 1),
+--   rooms after LateFrom: x LateGrowth per room (the long-term goal).
 function Config.RecommendedDamage(room: number): number
 	local d = Config.Dungeon
 	local value
-	if room >= d.RampTo then
+	if room > d.LateFrom then
+		value = d.RecommendedBase * d.RecommendedGrowth ^ (d.LateFrom - 1) * d.LateGrowth ^ (room - d.LateFrom)
+	elseif room >= d.RampTo then
 		value = d.RecommendedBase * d.RecommendedGrowth ^ (room - 1)
 	else
 		local target = d.RecommendedBase * d.RecommendedGrowth ^ (d.RampTo - 1)
@@ -441,16 +472,16 @@ Config.Weapons = {
 Config.ArmorSlots = { "Helmet", "Chest", "Legs" }
 Config.ArmorSlotNames = { Helmet = "Шлем", Chest = "Нагрудник", Legs = "Поножи" }
 Config.ArmorSets = {
-	Bone = { Name = "Костяной сет", Biome = 1, Rarity = "Uncommon", Health = 20, Defense = 0.03, Bonus = 0.10,
+	Bone = { Name = "Костяной сет", Biome = 1, Rarity = "Uncommon", Health = 20, Defense = 0.03, Bonus = 0.10, ItemLevel = 20,
 		Style = { Kind = "Bone", Main = Color3.fromRGB(235, 228, 205), Trim = Color3.fromRGB(150, 135, 110), Glow = Color3.fromRGB(110, 235, 120), Material = Enum.Material.SmoothPlastic } },
-	Ice = { Name = "Ледяной сет", Biome = 2, Rarity = "Rare", Health = 45, Defense = 0.05, Bonus = 0.20,
+	Ice = { Name = "Ледяной сет", Biome = 2, Rarity = "Rare", Health = 45, Defense = 0.05, Bonus = 0.20, ItemLevel = 45,
 		Style = { Kind = "Ice", Main = Color3.fromRGB(150, 215, 255), Trim = Color3.fromRGB(240, 250, 255), Glow = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Ice } },
-	Lava = { Name = "Лавовый сет", Biome = 3, Rarity = "Epic", Health = 90, Defense = 0.07, Bonus = 0.35,
+	Lava = { Name = "Лавовый сет", Biome = 3, Rarity = "Epic", Health = 90, Defense = 0.07, Bonus = 0.35, ItemLevel = 70,
 		Style = { Kind = "Lava", Main = Color3.fromRGB(50, 38, 42), Trim = Color3.fromRGB(120, 55, 40), Glow = Color3.fromRGB(255, 130, 30), Material = Enum.Material.Slate } },
-	Abyss = { Name = "Сет бездны", Biome = 4, Rarity = "Legendary", Health = 160, Defense = 0.09, Bonus = 0.50,
+	Abyss = { Name = "Сет бездны", Biome = 4, Rarity = "Legendary", Health = 160, Defense = 0.09, Bonus = 0.50, ItemLevel = 95,
 		Style = { Kind = "Abyss", Main = Color3.fromRGB(60, 35, 110), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(255, 61, 184), Material = Enum.Material.Metal } },
 	-- Robux exclusive (Config.Products "ArmorRoyal"): between Ice and Lava.
-	Royal = { Name = "Королевский сет", Rarity = "Legendary", Health = 70, Defense = 0.06, Bonus = 0.28, Robux = true,
+	Royal = { Name = "Королевский сет", Rarity = "Legendary", Health = 70, Defense = 0.06, Bonus = 0.28, ItemLevel = 60, Robux = true,
 		Style = { Kind = "Abyss", Main = Color3.fromRGB(240, 240, 250), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Metal } },
 }
 Config.ArmorSetOrder = { "Bone", "Ice", "Lava", "Abyss", "Royal" }
@@ -473,6 +504,7 @@ do
 				Rarity = set.Rarity,
 				Health = if slot == "Chest" then math.floor(set.Health * 1.5) else set.Health,
 				Defense = set.Defense,
+				ItemLevel = set.ItemLevel,
 				Color = set.Style.Main,
 			})
 		end
@@ -585,6 +617,26 @@ Config.Hatch = {
 	LuckFrom = "Epic",
 }
 
+-- Pacing model for tools/pacing.py (not used by the game itself): how a
+-- typical active player plays, and the owner's time targets. The tool
+-- simulates dungeon runs (kills -> XP, credits, materials), crafting and
+-- levels with the formulas above; `--tune` suggests XpBase and the room
+-- curve (RecommendedRoom1 / Base / Growth) so that the recommended damage
+-- of a room = the real damage of a player who gets there on time;
+-- `--readme` writes the minute table into README.md.
+Config.Pacing = {
+	HitsPerSecond = 4, -- attack clicks per second while fighting
+	MoveSeconds = 2.5, -- walking to the next mob
+	RoomSeconds = 5, -- walking through a doorway / corridor
+	RunOverhead = 30, -- back to the hub, forge, portal between runs
+	Targets = {
+		Stages = { ["1"] = 1, ["5"] = 15, ["10"] = 60, ["15"] = 120, ["20"] = 420 },
+		Level = 30,
+		LevelMinute = 120,
+	},
+	ReportMinutes = { 1, 3, 5, 10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240, 300, 360, 420 },
+}
+
 -- Engagement loop: things to do every few minutes.
 -- Rewards are Нано-кредиты / XP / boosts and scale with the record room.
 Config.Progression = {
@@ -623,10 +675,10 @@ Config.Progression = {
 	-- Every level: +SkillPointsPerLevel skill point, damage and max HP grow
 	-- (Config.Stats), full heal.
 	--   XP to the next level = XpBase x level^XpExponent:
-	--   lvl 1 -> 12, 5 -> 134, 10 -> 379, 30 -> 1.97K, 50 -> 4.2K
+	--   lvl 1 -> 46, 10 -> 1.45K, 30 -> 7.6K, 50 -> 16K
 	--   (tuned with tools/pacing.py: level ~30 after 2 hours)
 	Level = {
-		XpBase = 12,
+		XpBase = 46,
 		XpExponent = 1.5,
 		XpPerKill = 10, -- x room index
 		XpPerBoss = 80, -- x room index
