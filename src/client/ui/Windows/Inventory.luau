@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local PlayerData = require(script.Parent.Parent.Parent.PlayerData)
+local ItemIcon = require(script.Parent.Parent.ItemIcon)
 local Preview = require(script.Parent.Parent.Preview)
 local Style = require(script.Parent.Parent.Style)
 local Window = require(script.Parent.Window)
@@ -44,7 +45,7 @@ local function makeCard(material)
 	local rarity = Config.Rarity[material.Rarity]
 	local card = Style.Card(grid, rarity.Color, rarity.Rainbow)
 	card.Name = material.Id
-	Preview.Create(card, "Material", material, UDim2.new(1, -16, 0, 76), UDim2.fromOffset(8, 8))
+	ItemIcon.Create(card, "Material", material, UDim2.new(1, -16, 0, 76), UDim2.fromOffset(8, 8))
 	Style.Label(card, material.Name, 15, Style.Colors.Text, { Position = UDim2.fromOffset(4, 88), Size = UDim2.new(1, -8, 0, 20), TextScaled = true, ZIndex = 35 })
 	local rarityLabel = Style.Label(card, rarity.Name, 13, rarity.Color, { Position = UDim2.fromOffset(4, 108), Size = UDim2.new(1, -8, 0, 16), ZIndex = 35 })
 	if rarity.Rainbow then

@@ -27,6 +27,7 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local MaterialBuilder = require(ReplicatedStorage.Shared.MaterialBuilder)
 local PlayerData = require(script.Parent.Parent.Parent.PlayerData)
 local Popups = require(script.Parent.Parent.Popups)
+local ItemIcon = require(script.Parent.Parent.ItemIcon)
 local Preview = require(script.Parent.Parent.Preview)
 local Style = require(script.Parent.Parent.Style)
 local Window = require(script.Parent.Window)
@@ -121,7 +122,7 @@ for _, recipe in ipairs(Config.Recipes) do
 	row.Parent = list
 	Style.Corner(row, UDim.new(0, 12))
 	local stroke = Style.Stroke(row, 2.5, rarity.Color)
-	Preview.Create(row, recipe.Kind, item, UDim2.fromOffset(52, 52), UDim2.fromOffset(7, 7))
+	ItemIcon.Create(row, recipe.Kind, item, UDim2.fromOffset(52, 52), UDim2.fromOffset(7, 7))
 	local name = Style.Label(row, item.Name, 17, rarity.Color, { Position = UDim2.fromOffset(66, 6), Size = UDim2.new(1, -104, 0, 24), TextXAlignment = Enum.TextXAlignment.Left, TextScaled = true, ZIndex = 35 })
 	if rarity.Rainbow then
 		Style.Rainbow(name)

@@ -32,6 +32,8 @@ local function buildFor(category: string, item)
 	return nil
 end
 
+Preview.Build = buildFor -- (category, item) -> Model? (ItemIcon uses it too)
+
 -- Returns the ViewportFrame (or nil when the category has no model).
 function Preview.Create(parent, category: string, item, size: UDim2, position: UDim2)
 	local model = buildFor(category, item)

@@ -19,6 +19,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local PlayerData = require(script.Parent.Parent.Parent.PlayerData)
 local Popups = require(script.Parent.Parent.Popups)
+local ItemIcon = require(script.Parent.Parent.ItemIcon)
 local Preview = require(script.Parent.Parent.Preview)
 local Style = require(script.Parent.Parent.Style)
 local Window = require(script.Parent.Window)
@@ -98,7 +99,7 @@ local function petCard(key, pet, tier)
 	local tierDef = Config.PetTiers[tier]
 	local card = Style.Card(mineGrid, tierDef.Color or rarity.Color, tierDef.Rainbow or rarity.Rainbow)
 	card.Name = key
-	Preview.Create(card, "Pet", { Pet = pet, Tier = tier }, UDim2.new(1, -16, 0, 74), UDim2.fromOffset(8, 8))
+	ItemIcon.Create(card, "Pet", { Pet = pet, Tier = tier }, UDim2.new(1, -16, 0, 74), UDim2.fromOffset(8, 8))
 	local title = (if tierDef.Name ~= "" then tierDef.Name .. " " else "") .. pet.Name
 	Style.Label(card, title, 15, rarity.Color, { Position = UDim2.fromOffset(4, 84), Size = UDim2.new(1, -8, 0, 20), TextScaled = true, ZIndex = 35 })
 	local damage = pet.Damage * tierDef.Multiplier
@@ -360,7 +361,8 @@ for _, pet in ipairs(Config.Pets) do
 	local rarity = Config.Rarity[pet.Rarity]
 	local card = Style.Card(indexGrid, rarity.Color, rarity.Rainbow)
 	card.LayoutOrder = pet.Order
-	local viewport = Preview.Create(card, "Pet", { Pet = pet, Tier = 1 }, UDim2.new(1, -16, 0, 80), UDim2.fromOffset(8, 8))
+	local icon = ItemIcon.Create(card, "Pet", { Pet = pet, Tier = 1 }, UDim2.new(1, -16, 0, 80), UDim2.fromOffset(8, 8))
+	local viewport = icon:FindFirstChildOfClass("ViewportFrame") -- darkened while the pet is unknown
 	local name = Style.Label(card, pet.Name, 14, rarity.Color, { Position = UDim2.fromOffset(4, 92), Size = UDim2.new(1, -8, 0, 20), TextScaled = true, ZIndex = 35 })
 	Style.Label(card, rarity.Name, 13, Style.Colors.Muted, { Position = UDim2.fromOffset(4, 114), Size = UDim2.new(1, -8, 0, 16), ZIndex = 35 })
 	indexCards[pet.Id] = { viewport = viewport, name = name, pet = pet }

@@ -16,6 +16,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local PlayerData = require(script.Parent.Parent.Parent.PlayerData)
 local Popups = require(script.Parent.Parent.Popups)
+local ItemIcon = require(script.Parent.Parent.ItemIcon)
 local Preview = require(script.Parent.Parent.Preview)
 local Style = require(script.Parent.Parent.Style)
 local Window = require(script.Parent.Window)
@@ -132,7 +133,7 @@ local function itemCard(category, item)
 	local rarity = Config.Rarity[item.Rarity] or Config.Rarity.Common
 	local card, stroke = Style.Card(grid, rarity.Color, rarity.Rainbow)
 	card.Name = item.Id
-	Preview.Create(card, category, item, UDim2.new(1, -16, 0, 78), UDim2.fromOffset(8, 8))
+	ItemIcon.Create(card, category, item, UDim2.new(1, -16, 0, 78), UDim2.fromOffset(8, 8))
 	Style.Label(card, item.Name, 15, rarity.Color, { Position = UDim2.fromOffset(4, 88), Size = UDim2.new(1, -8, 0, 20), TextScaled = true, ZIndex = 35 })
 	Style.Label(card, describe(category, item), 14, Style.Colors.Text, { Position = UDim2.fromOffset(4, 108), Size = UDim2.new(1, -8, 0, 18), TextScaled = true, ZIndex = 35 })
 	local button, setColor = Style.Button(card, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -6), Size = UDim2.new(1, -16, 0, 28), Color = Style.Colors.Blue, Text = "Надеть", TextSize = 15, ZIndex = 36, Shadow = false })
@@ -164,7 +165,7 @@ function refresh()
 			ui.icon:ClearAllChildren()
 			Style.Corner(ui.icon, UDim.new(0, 10))
 			if item then
-				Preview.Create(ui.icon, slot.Category, item, UDim2.fromScale(1, 1), UDim2.new())
+				ItemIcon.Create(ui.icon, slot.Category, item, UDim2.fromScale(1, 1), UDim2.new())
 			end
 		end
 		if item then
