@@ -138,7 +138,7 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 	if kind == "Aura" then
 		local gained, isCrit, trainer = ...
 		local color = if isCrit then Style.Colors.Gold else Style.Colors.Cyan
-		local text = (if isCrit then "КРИТ! +" else "+") .. Format.Number(gained)
+		local text = (if isCrit then "КРИТ! +" else "+") .. (if gained < 100 then Format.Decimal(gained, 1) else Format.Number(gained))
 		if trainer and trainer.Parent then
 			local position, object = trainerTop(trainer)
 			Popups.World(position, text, color, if isCrit then 40 else 28, isCrit)
@@ -159,7 +159,7 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 		local trainer, gained = ...
 		if trainer and trainer.Parent then
 			local position = trainerTop(trainer)
-			Popups.World(position + Vector3.new(0, 1, 0), "+" .. Format.Number(gained) .. " ✨", Style.Colors.Green, 30, false)
+			Popups.World(position + Vector3.new(0, 1, 0), "+" .. (if gained < 100 then Format.Decimal(gained, 1) else Format.Number(gained)) .. " ✨", Style.Colors.Green, 34, false)
 			HubFx.Squash(trainer)
 		end
 	elseif kind == "Hit" then

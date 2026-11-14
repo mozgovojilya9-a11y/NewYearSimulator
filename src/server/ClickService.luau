@@ -66,8 +66,9 @@ local function click(player, target)
 			ClickService.OnTrainerClick(player)
 		end
 	end
-	local gained = PlayerState.GiveAura(player, amount)
-	remote:FireClient(player, "Aura", gained, false, if trainer then trainer.model else nil)
+	PlayerState.GiveAura(player, amount)
+	-- The client shows the exact amount (fractions add up on the server).
+	remote:FireClient(player, "Aura", amount, false, if trainer then trainer.model else nil)
 
 	-- Combat: only inside the player's own run.
 	if DungeonRuns.HasRun(player) then

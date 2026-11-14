@@ -940,6 +940,8 @@ Config.HubLayout = {
 		Portal = "ПОДЗЕМЕЛЬЕ",
 		Trainer = "x%s",
 		TrainerOpen = "Встань сюда!",
+		TrainerPerSecond = "+%s Ауры/сек",
+		TrainerAuraProgress = "Аура %s / %s",
 		TrainerLockedAura = "Нужно %s Ауры",
 		TrainerLockedRebirth = "Нужно перерождений: %d",
 		TrainerLockedPass = "Game Pass · %d R$",
@@ -1050,6 +1052,11 @@ Config.Hud = {
 	ToastSeconds = 4,
 	ShakeCrit = { Amplitude = 0.25, Seconds = 0.15 },
 	ShakeBoss = { Amplitude = 0.8, Seconds = 0.5 },
+	-- Bottom progress bar in the hub: the next goal for training.
+	Goals = {
+		Trainer = "До тренажёра «%s» x%s",
+		Rebirth = "До перерождения",
+	},
 	BackKey = Enum.KeyCode.B,
 	BackButton = { Icon = "←", Label = "Назад [B]", Color = Color3.fromRGB(240, 70, 80) }, -- the Travel cell in the dungeon
 	MobileScaleWidth = 1100, -- UIScale = min(1, viewportWidth / this)

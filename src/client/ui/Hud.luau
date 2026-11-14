@@ -72,7 +72,7 @@ local function refreshTrainer()
 	trainerPlate.Visible = def ~= nil
 	if def then
 		local perSecond = (player:GetAttribute("Stat_AuraGain") or 1) * def.Multiplier / Config.Aura.TrainerTickInterval
-		trainerText.Text = Config.HubLayout.Texts.TrainerHud:format(tostring(def.Multiplier), Format.Number(perSecond))
+		trainerText.Text = Config.HubLayout.Texts.TrainerHud:format(tostring(def.Multiplier), Format.Decimal(perSecond, 1))
 	end
 end
 player:GetAttributeChangedSignal("OnTrainer"):Connect(refreshTrainer)
@@ -238,7 +238,7 @@ local function refreshDamage()
 	damageLabel.Text = Format.Number(player:GetAttribute("ClickPower") or 1) .. " Урон"
 	local mult = player:GetAttribute("AuraMultiplier") or 1
 	if mult ~= 1 then
-		damageLabel.Text ..= ("  •  Аура x%s"):format(tostring(math.floor(mult * 100 + 0.5) / 100))
+		damageLabel.Text ..= ("  •  Тренировка x%s"):format(tostring(math.floor(mult * 100 + 0.5) / 100))
 	end
 end
 player:GetAttributeChangedSignal("ClickPower"):Connect(refreshDamage)
@@ -267,7 +267,14 @@ local function bar(order, color, width)
 end
 
 local healthTrack, healthFill, healthText = bar(2, Style.Colors.Red, 320)
-local progressTrack, progressFill, progressText = bar(3, Style.Colors.Orange, 380)
+local progressTrack, progressFill, progressText = bar(3, Style.Colors.Orange, 420)
+progressTrack.Size = UDim2.fromOffset(420, 26)
+progressText.TextScaled = true -- long goal names shrink instead of overflowing
+progressText.Size = UDim2.new(1, -20, 1, -4)
+progressText.Position = UDim2.fromOffset(10, 2)
+local progressCap = Instance.new("UITextSizeConstraint")
+progressCap.MaxTextSize = 16
+progressCap.Parent = progressText
 
 local function refreshHealth()
 	local inDungeon = player:GetAttribute("Zone") == "Dungeon"
@@ -293,16 +300,45 @@ if player.Character then
 end
 refreshHealth()
 
-local function refreshProgress()
-	local reached = player:GetAttribute("RoomReached") or 0
-	progressFill.Size = UDim2.fromScale(math.clamp(reached / Config.Dungeon.Rooms, 0, 1), 1)
-	if reached >= Config.Dungeon.Rooms then
-		progressText.Text = "Данж пройден!"
-	else
-		progressText.Text = ("Этап %d/%d"):format(reached, Config.Dungeon.Rooms)
+-- Next training goal in the hub: the first trainer still locked by
+-- Aura, else the next rebirth. Returns text, need.
+local function nextGoal(): (string, number)
+	local unlocked = {}
+	for id in string.gmatch(player:GetAttribute("TrainersUnlocked") or "1", "[^,]+") do
+		unlocked[id] = true
 	end
+	for _, def in ipairs(Config.Trainers) do
+		if def.Aura and not def.Pass and not unlocked[def.Id] then
+			return Config.Hud.Goals.Trainer:format(def.Name, tostring(def.Multiplier)), def.Aura
+		end
+	end
+	return Config.Hud.Goals.Rebirth, Config.RebirthAura(player:GetAttribute("Rebirths") or 0)
 end
-player:GetAttributeChangedSignal("RoomReached"):Connect(refreshProgress)
+
+-- Bottom bar: in the dungeon the stage progress, in the hub the way to
+-- the next trainer / rebirth (fills with Aura).
+local function refreshProgress()
+	if player:GetAttribute("Zone") == "Dungeon" then
+		local reached = player:GetAttribute("RoomReached") or 0
+		progressFill.Size = UDim2.fromScale(math.clamp(reached / Config.Dungeon.Rooms, 0, 1), 1)
+		progressText.Text = if reached >= Config.Dungeon.Rooms then "Данж пройден!" else ("Рекорд: этап %d/%d"):format(reached, Config.Dungeon.Rooms)
+		return
+	end
+	local text, need = nextGoal()
+	local ratio = math.clamp(aura.Value / math.max(1, need), 0, 1)
+	Style.Tween(progressFill, 0.2, { Size = UDim2.fromScale(ratio, 1) })
+	progressText.Text = ("%s: %s / %s ✨"):format(text, Format.Number(aura.Value), Format.Number(need))
+end
+for _, attribute in ipairs({ "RoomReached", "Zone", "TrainersUnlocked", "Rebirths" }) do
+	player:GetAttributeChangedSignal(attribute):Connect(refreshProgress)
+end
+local lastProgress = 0
+aura.Changed:Connect(function()
+	if os.clock() - lastProgress > 0.15 then
+		lastProgress = os.clock()
+		refreshProgress()
+	end
+end)
 refreshProgress()
 
 ---------------------------------------------------------------------

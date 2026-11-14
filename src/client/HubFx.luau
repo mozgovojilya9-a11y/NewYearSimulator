@@ -4,8 +4,10 @@
 	- trainer objects "breathe" (Model:ScaleTo) and squash on every Aura
 	  tick / click (idle animation),
 	- locked trainers: THIS player sees a solid force-field box around the
-	  territory and the requirement in red on its sign; unlocked ones show
-	  a green invitation (the server decides who actually earns Aura).
+	  territory and the requirement in red on its sign (with progress for
+	  Aura requirements); unlocked ones show "+N Ауры/сек" for THIS
+	  player: Stat_AuraGain x trainer multiplier (the server decides who
+	  actually earns Aura).
 ]]
 
 local Players = game:GetService("Players")
@@ -14,8 +16,10 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Format = require(ReplicatedStorage.Shared.Format)
 
 local player = Players.LocalPlayer
+local aura = player:WaitForChild("leaderstats"):WaitForChild("Aura")
 local hub = Workspace:WaitForChild("Hub")
 local trainers = hub:WaitForChild("Trainers")
 
@@ -99,7 +103,14 @@ local function refreshLocks()
 		local sign = model:FindFirstChild("Sign")
 		local label = sign and sign:FindFirstChild("Req", true)
 		if label then
-			label.Text = if open then Texts.TrainerOpen else (model:GetAttribute("RequireText") or "")
+			if open then
+				local perSecond = (player:GetAttribute("Stat_AuraGain") or 1) * (model:GetAttribute("Multiplier") or 1) / Config.Aura.TrainerTickInterval
+				label.Text = Texts.TrainerPerSecond:format(Format.Decimal(perSecond, 1))
+			elseif model:GetAttribute("RequireAura") and not model:GetAttribute("RequireRebirths") then
+				label.Text = Texts.TrainerAuraProgress:format(Format.Number(aura.Value), Format.Number(model:GetAttribute("RequireAura")))
+			else
+				label.Text = model:GetAttribute("RequireText") or ""
+			end
 			label.TextColor3 = if open then Config.Theme.Green else Config.Theme.Red
 		end
 		local object = model:FindFirstChild("Object")
@@ -112,9 +123,16 @@ local function refreshLocks()
 		end
 	end
 end
-for _, attribute in ipairs({ "TrainersUnlocked", "Rebirths", "Passes" }) do
+for _, attribute in ipairs({ "TrainersUnlocked", "Rebirths", "Passes", "Stat_AuraGain" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshLocks)
 end
+local lastAuraRefresh = 0
+aura.Changed:Connect(function()
+	if os.clock() - lastAuraRefresh > 0.5 then -- Aura changes on every click
+		lastAuraRefresh = os.clock()
+		refreshLocks()
+	end
+end)
 trainers.ChildAdded:Connect(function()
 	task.defer(refreshLocks)
 end)

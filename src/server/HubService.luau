@@ -108,7 +108,8 @@ local function tick(remote)
 		local trainer = HubService.TrainerOf(player)
 		if trainer and PlayerState.IsReady(player) then
 			-- AuraGain = TrainerTickBase x BaseAura(level) x gear x rebirth x pets x passes x boosts
-			local gained = PlayerState.GiveAura(player, StatService.Get(player).AuraGain * trainer.def.Multiplier)
+			local gained = StatService.Get(player).AuraGain * trainer.def.Multiplier
+			PlayerState.GiveAura(player, gained)
 			EquipmentService.Swing(player)
 			remote:FireClient(player, "Tick", trainer.model, gained)
 			if HubService.OnTrainingTick then
