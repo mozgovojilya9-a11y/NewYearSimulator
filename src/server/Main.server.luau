@@ -49,26 +49,35 @@ if Config.World.PurgeWorkspace then
 	purgeWorkspace()
 end
 
+-- Starts one service. An error in it is printed to Output with the
+-- service name and does NOT stop the other services or player setup.
+local function start(name: string, fn, ...)
+	local ok, err = xpcall(fn, debug.traceback, ...)
+	if not ok then
+		warn(("[Main] %s не запустился: %s"):format(name, tostring(err)))
+	end
+end
+
 -- Create every RemoteEvent before any client can look for it.
 Remotes.Init()
-Passes.Init()
+start("Passes", Passes.Init)
 Passes.OnChanged = PlayerState.Sync
-Atmosphere.Init()
+start("Atmosphere", Atmosphere.Init)
 local hub = HubService.Init()
-LeaderboardService.Init(hub.Leaderboards)
-DungeonRuns.Init()
-Bounds.Init(hub)
-MobAI.Init()
-ClickService.Init()
-ShopService.Init()
-CraftService.Init(hub)
-PetService.Init()
-StoreService.Init()
-RebirthService.Init()
-TravelService.Init(hub)
-EquipmentService.Init()
-ProgressionService.Init()
-LootService.Init() -- after ProgressionService: both listen to kills
+start("LeaderboardService", LeaderboardService.Init, hub.Leaderboards)
+start("DungeonRuns", DungeonRuns.Init)
+start("Bounds", Bounds.Init, hub)
+start("MobAI", MobAI.Init)
+start("ClickService", ClickService.Init)
+start("ShopService", ShopService.Init)
+start("CraftService", CraftService.Init, hub)
+start("PetService", PetService.Init)
+start("StoreService", StoreService.Init)
+start("RebirthService", RebirthService.Init)
+start("TravelService", TravelService.Init, hub)
+start("EquipmentService", EquipmentService.Init)
+start("ProgressionService", ProgressionService.Init)
+start("LootService", LootService.Init) -- after ProgressionService: both listen to kills
 ClickService.OnTrainerClick = ProgressionService.OnTrainerClick
 
 local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)

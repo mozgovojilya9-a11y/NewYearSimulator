@@ -21,7 +21,12 @@ local B = Config.Bounds
 
 function Bounds.Init(hub)
 	local groundY = hub.GroundY
-	Workspace.FallenPartsDestroyHeight = groundY + B.DestroyY
+	-- FallenPartsDestroyHeight can only be changed by Studio plugins:
+	-- a game script that sets it throws. Try anyway (harmless), the
+	-- teleport below is what actually keeps players on the map.
+	pcall(function()
+		Workspace.FallenPartsDestroyHeight = groundY + B.DestroyY
+	end)
 
 	task.spawn(function()
 		while true do
