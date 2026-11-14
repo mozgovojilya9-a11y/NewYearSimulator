@@ -49,7 +49,7 @@ local function attack(state, model, root)
 	model:SetAttribute("Telegraph", false)
 	if mobs[model] and model.Parent then
 		local target = playerRoot(state.run)
-		if target and (target.Position - state.root.Position).Magnitude <= M.AttackRange + 2 then
+		if target and (target.Position - state.root.Position).Magnitude - state.reach <= M.AttackRange + 2 then
 			damagePlayer(state.run.player, model:GetAttribute("Damage") or 1)
 		end
 	end
@@ -106,7 +106,7 @@ end
 local function tick()
 	local now = os.clock()
 	for model, state in pairs(mobs) do
-		if not model.Parent or state.humanoid.Health <= 0 then
+		if not model.Parent or state.humanoid.Health <= 0 or model:GetAttribute("Dying") then
 			mobs[model] = nil
 			continue
 		end
@@ -117,7 +117,8 @@ local function tick()
 		if not target then
 			continue
 		end
-		local distance = (target.Position - state.root.Position).Magnitude
+		-- measured from the mob's surface, so big bosses reach as far as small mobs
+		local distance = (target.Position - state.root.Position).Magnitude - state.reach
 		local isBoss = model:GetAttribute("Boss") == true
 
 		if isBoss and distance <= M.AggroRange and now - state.lastSlam >= M.BossSlamEvery then
@@ -158,7 +159,7 @@ function MobAI.Register(run, model)
 		return
 	end
 	pcall(root.SetNetworkOwner, root, nil) -- the server drives mobs
-	mobs[model] = { run = run, humanoid = humanoid, root = root, lastAttack = 0, lastSlam = os.clock(), busy = false }
+	mobs[model] = { run = run, humanoid = humanoid, root = root, reach = math.max(root.Size.X, root.Size.Z) / 2, lastAttack = 0, lastSlam = os.clock(), busy = false }
 end
 
 function MobAI.Unregister(model)

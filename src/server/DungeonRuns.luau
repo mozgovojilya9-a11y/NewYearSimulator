@@ -51,25 +51,19 @@ DungeonRuns.OnRunClosed = nil -- every run end, any reason (LootService clears d
 local function buildMob(run, room, spot)
 	local isBoss = room.IsBoss
 	local def = Config.MobFor(room.Index, spot.Kind)
-	local look = table.clone(def.Look)
-	look.Name = def.Name
-	look.Kind = def.Id
-
 	local facing = Vector3.new(room.Entry.Position.X, spot.Position.Y, room.Entry.Position.Z)
-	local model = MobBuilder.Build(look, if isBoss then Looks.BossScale else 1, CFrame.lookAt(spot.Position, facing))
-	if isBoss then
-		MobBuilder.Decorate(model, look.Crown or Config.Theme.Gold, Looks.BossScale)
-	end
+	local model = MobBuilder.Build(def, if isBoss then Looks.BossScale else 1, CFrame.lookAt(spot.Position, facing))
 	local health = Config.MobHealth(room.Index, isBoss)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	humanoid.MaxHealth = health
 	humanoid.Health = health
 	model:SetAttribute("Room", room.Index)
 	model:SetAttribute("Boss", isBoss)
-	model:SetAttribute("Kind", look.Kind)
+	model:SetAttribute("Kind", def.Id)
+	model:SetAttribute("MobName", def.Name)
 	model:SetAttribute("Damage", Config.MobDamage(room.Index, isBoss))
 	local height = model:GetAttribute("Height") or 6
-	WorldKit.HealthGui(model.PrimaryPart, if isBoss then look.Name else nil, height - (model.PrimaryPart.Position.Y - spot.Position.Y) + 1.5)
+	WorldKit.HealthGui(model.PrimaryPart, if isBoss then def.Name else nil, height - (model.PrimaryPart.Position.Y - spot.Position.Y) + 1.5)
 	WorldKit.UpdateHealth(model.PrimaryPart, health, health)
 	model.Parent = room.Model
 	return model
@@ -338,8 +332,26 @@ local function kill(model)
 	local position = model:GetPivot().Position
 	local isBoss = model:GetAttribute("Boss") == true
 	local kind = model:GetAttribute("Kind")
-	local color = (model:FindFirstChild("Torso") or model.PrimaryPart).Color
-	model:Destroy()
+	local color = model:GetAttribute("Color") or Config.Theme.Magenta
+	-- Clients break the model apart (MobFx) while it still exists.
+	model:SetAttribute("Dying", true)
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = 0
+	end
+	local gui = model.PrimaryPart and model.PrimaryPart:FindFirstChild("HealthGui")
+	if gui then
+		gui.Enabled = false
+	end
+	for _, p in ipairs(model:GetDescendants()) do
+		if p:IsA("BasePart") then
+			p.CanQuery = false
+			p.CanCollide = false
+		end
+	end
+	task.delay(0.15, function()
+		model:Destroy()
+	end)
 	Effects.Burst(position, color, if isBoss then 90 else 25, if isBoss then 35 else 22, if isBoss then 2 else 1)
 
 	local player = run.player
@@ -397,6 +409,7 @@ function DungeonRuns.Hit(player, model)
 	end
 	local damage, isCrit = PlayerState.RollCrit(PlayerState.Damage(player))
 	humanoid.Health = math.max(0, humanoid.Health - damage)
+	model:SetAttribute("Hits", (model:GetAttribute("Hits") or 0) + 1)
 	WorldKit.UpdateHealth(model.PrimaryPart, humanoid.Health, humanoid.MaxHealth)
 	Remotes.Get("ClickHit"):FireClient(player, "Hit", model, damage, isCrit)
 	if humanoid.Health <= 0 then

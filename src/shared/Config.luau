@@ -137,7 +137,7 @@ Config.Dungeon = {
 		DamageGrowth = 1.12, -- r20 ~ 70 per hit (player HP 100)
 		BossDamageMultiplier = 2.5,
 		BossSlamEvery = 6,
-		BossSlamRadius = 12,
+		BossSlamRadius = 16,
 		BossSlamWarning = 1, -- seconds the red circle shows before the hit
 		BossSlamDamageMultiplier = 4,
 	},
@@ -209,7 +209,7 @@ Config.Loot = {
 -- drop; the rarity is rolled first (Config.Rarities), then a material of
 -- that rarity is picked from this list (nearest lower rarity, else the
 -- nearest higher one, when the mob has none of the rolled rarity).
--- Look = block rig parameters for MobBuilder.
+-- The model of every kind is built by MobBuilder (one builder per id).
 Config.Mobs = {
 	Biomes = {
 		{ Kinds = { "ZombieMiner", "SkeletonArcher", "AcidSlime" }, Boss = "SlimeKing" },
@@ -218,41 +218,25 @@ Config.Mobs = {
 		{ Kinds = { "ShadowKnight", "FlyingEye", "AuraGhost" }, Boss = "AbyssLord" },
 	},
 	Defs = {
-		ZombieMiner = { Name = "Зомби-шахтёр", Drops = { "Bone", "RustyIron", "CursedSkull", "CatacombHeart" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(110, 170, 100), HeadScale = 1.2, Scale = 1 } },
-		SkeletonArcher = { Name = "Скелет-лучник", Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(240, 240, 230), Thin = true, EyeColor = Color3.fromRGB(46, 230, 255), Scale = 1.05 } },
-		AcidSlime = { Name = "Кислотный слизень", Drops = { "Slime", "RustyIron", "CursedSkull", "CatacombHeart" },
-			Look = { Shape = "Jelly", Color = Color3.fromRGB(150, 240, 70), Transparency = 0.35, Scale = 1 } },
-		SlimeKing = { Name = "Король Слизней", Boss = true, Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" },
-			Look = { Shape = "Jelly", Color = Color3.fromRGB(60, 220, 100), Transparency = 0.35, Scale = 1, Crown = Color3.fromRGB(255, 201, 60) } },
+		ZombieMiner = { Name = "Зомби-шахтёр", Drops = { "Bone", "RustyIron", "CursedSkull", "CatacombHeart" } },
+		SkeletonArcher = { Name = "Скелет-лучник", Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" } },
+		AcidSlime = { Name = "Кислотный слизень", Drops = { "Slime", "RustyIron", "CursedSkull", "CatacombHeart" } },
+		SlimeKing = { Name = "Король Слизней", Boss = true, Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" } },
 
-		SnowGolem = { Name = "Снежный голем", Drops = { "Ice", "FrostCrystal", "EternalIce" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(235, 245, 255), HeadScale = 1.1, Scale = 1.2 } },
-		IceSpider = { Name = "Ледяной паук", Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" },
-			Look = { Shape = "Jelly", Color = Color3.fromRGB(120, 200, 255), Transparency = 0.2, Scale = 0.8 } },
-		Yeti = { Name = "Йети", Drops = { "YetiFur", "FrostCrystal", "EternalIce" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(215, 230, 245), HeadScale = 1.3, Scale = 1.3 } },
-		IceBoneLord = { Name = "Ледяной Костяной Лорд", Boss = true, Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(200, 235, 255), Thin = true, EyeColor = Color3.fromRGB(46, 230, 255), Scale = 1.05, Crown = Color3.fromRGB(46, 230, 255) } },
+		SnowGolem = { Name = "Снежный голем", Drops = { "Ice", "FrostCrystal", "EternalIce" } },
+		IceSpider = { Name = "Ледяной паук", Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" } },
+		Yeti = { Name = "Йети", Drops = { "YetiFur", "FrostCrystal", "EternalIce" } },
+		IceBoneLord = { Name = "Ледяной Костяной Лорд", Boss = true, Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" } },
 
-		FireImp = { Name = "Огненный бес", Drops = { "Ember", "Obsidian", "FirePlume", "VolcanoHeart" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(240, 80, 50), HeadScale = 1.4, Scale = 0.85 } },
-		MagmaGolem = { Name = "Магма-голем", Drops = { "Obsidian", "MagmaCore", "FirePlume", "VolcanoHeart" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(90, 50, 45), Outline = Color3.fromRGB(255, 120, 30), Scale = 1.3 } },
-		GoblinSmith = { Name = "Гоблин-кузнец", Drops = { "Obsidian", "Ember", "MagmaCore", "VolcanoHeart" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(110, 170, 70), HeadScale = 1.5, Scale = 1 } },
-		FireChief = { Name = "Огненный Вождь", Boss = true, Drops = { "Obsidian", "Ember", "MagmaCore", "FirePlume", "VolcanoHeart" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(230, 90, 40), HeadScale = 1.5, Scale = 1, Crown = Color3.fromRGB(255, 150, 50) } },
+		FireImp = { Name = "Огненный бес", Drops = { "Ember", "Obsidian", "FirePlume", "VolcanoHeart" } },
+		MagmaGolem = { Name = "Магма-голем", Drops = { "Obsidian", "MagmaCore", "FirePlume", "VolcanoHeart" } },
+		GoblinSmith = { Name = "Гоблин-кузнец", Drops = { "Obsidian", "Ember", "MagmaCore", "VolcanoHeart" } },
+		FireChief = { Name = "Огненный Вождь", Boss = true, Drops = { "Obsidian", "Ember", "MagmaCore", "FirePlume", "VolcanoHeart" } },
 
-		ShadowKnight = { Name = "Теневой рыцарь", Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(35, 28, 55), Outline = Color3.fromRGB(170, 80, 255), EyeColor = Color3.fromRGB(255, 61, 184), Scale = 1.15 } },
-		FlyingEye = { Name = "Летающий глаз", Drops = { "DarkShard", "AuraEssence", "AbyssEye" },
-			Look = { Shape = "Jelly", Color = Color3.fromRGB(200, 120, 255), Transparency = 0.1, Scale = 0.8 } },
-		AuraGhost = { Name = "Аура-призрак", Drops = { "ShadowDust", "AuraEssence", "AbyssEye" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(150, 110, 220), Thin = true, EyeColor = Color3.fromRGB(255, 255, 255), Scale = 1.1 } },
-		AbyssLord = { Name = "Повелитель Бездны", Boss = true, Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" },
-			Look = { Shape = "Humanoid", Color = Color3.fromRGB(20, 14, 36), Outline = Color3.fromRGB(170, 80, 255), EyeColor = Color3.fromRGB(255, 61, 184), Scale = 1.1, Crown = Color3.fromRGB(255, 61, 184) } },
+		ShadowKnight = { Name = "Теневой рыцарь", Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" } },
+		FlyingEye = { Name = "Летающий глаз", Drops = { "DarkShard", "AuraEssence", "AbyssEye" } },
+		AuraGhost = { Name = "Аура-призрак", Drops = { "ShadowDust", "AuraEssence", "AbyssEye" } },
+		AbyssLord = { Name = "Повелитель Бездны", Boss = true, Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" } },
 	},
 }
 for id, def in pairs(Config.Mobs.Defs) do
