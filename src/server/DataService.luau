@@ -80,7 +80,10 @@ function DataService.Load(player)
 
 	if type(data) ~= "table" then
 		data = deepCopy(Config.StartingData)
+		data.SchemaVersion = Config.SchemaVersion -- new player: nothing to migrate
 	else
+		-- Read the version BEFORE backfilling (saves without it are v1).
+		local version = if type(data.SchemaVersion) == "number" then data.SchemaVersion else 1
 		-- Backfill any fields added to StartingData since this player's
 		-- last save, without clobbering their existing progress.
 		for field, defaultValue in pairs(Config.StartingData) do
@@ -89,7 +92,9 @@ function DataService.Load(player)
 				data[field] = if type(defaultValue) == "table" then deepCopy(defaultValue) else defaultValue
 			end
 		end
+		DataService.Migrate(data, version, player)
 	end
+	DataService.Sanitize(data)
 
 	-- Fields of removed systems: dropped so they are never written back.
 	data.OwnedBackpacks = nil
@@ -117,6 +122,72 @@ function DataService.Load(player)
 
 	cache[player.UserId] = data
 	return data
+end
+
+---------------------------------------------------------------------
+-- Migrations: Migrations[v] upgrades a save from version v to v + 1.
+---------------------------------------------------------------------
+
+DataService.Migrations = {
+	-- 1 -> 2: Aura became power (never spent) and Нано-кредиты appeared.
+	-- Aura is kept exactly as it was (Aura spent in the old economy is not
+	-- given back, nothing is taken either). Levels already reached grant
+	-- their skill points now.
+	[1] = function(data)
+		data.Credits = if type(data.Credits) == "number" then data.Credits else 0
+		if type(data.SkillPoints) ~= "number" or data.SkillPoints == 0 then
+			data.SkillPoints = math.max(0, (data.Level or 1) - 1) * Config.Progression.Level.SkillPointsPerLevel
+		end
+	end,
+}
+
+function DataService.Migrate(data, fromVersion: number, player)
+	local version = fromVersion
+	while version < Config.SchemaVersion do
+		local step = DataService.Migrations[version]
+		if step then
+			local ok, err = pcall(step, data)
+			if not ok then
+				warn(("[DataService] migration %d -> %d failed for %s: %s"):format(version, version + 1, player.Name, tostring(err)))
+			end
+		end
+		version += 1
+	end
+	data.SchemaVersion = math.max(version, fromVersion)
+end
+
+-- Repairs broken values so no system ever crashes on a bad save.
+function DataService.Sanitize(data)
+	local function number(field, default)
+		local v = data[field]
+		if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge then
+			data[field] = default
+		end
+	end
+	number("Aura", 0)
+	data.Aura = math.max(0, math.floor(data.Aura))
+	number("Credits", 0)
+	data.Credits = math.max(0, math.floor(data.Credits))
+	number("Rebirths", 0)
+	number("RoomReached", 0)
+	number("Level", 1)
+	data.Level = math.max(1, math.floor(data.Level))
+	number("Xp", 0)
+	number("SkillPoints", 0)
+	for field, default in pairs(Config.StartingData) do
+		if type(default) == "table" and type(data[field]) ~= "table" then
+			data[field] = deepCopy(default)
+		end
+	end
+	if not Config.ItemById.Weapon[data.EquippedWeapon] or not data.OwnedWeapons[data.EquippedWeapon] then
+		data.OwnedWeapons.Stick = true
+		data.EquippedWeapon = "Stick"
+	end
+	for materialId, count in pairs(data.Materials) do
+		if type(count) ~= "number" or count <= 0 then
+			data.Materials[materialId] = nil
+		end
+	end
 end
 
 -- Returns the cached data table for a player, or nil if not loaded.

@@ -43,6 +43,13 @@ Config.StartingData = {
 -- Fields from older versions that are migrated / dropped on load
 -- (DataService): OwnedBackpacks, EquippedBackpack, OwnedPets, EquippedPet.
 
+-- Version of the save format. Bump it when the format changes and add
+-- a step to DataService.Migrations; old saves are upgraded step by step
+-- on load and never lose progress.
+--   1 = everything before the version number existed
+--   2 = Aura is power (never spent), Нано-кредиты, skill points
+Config.SchemaVersion = 2
+
 Config.AutosaveInterval = 120
 
 -- Startup cleanup of the place. Everything in Workspace except these
