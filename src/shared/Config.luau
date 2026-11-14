@@ -83,12 +83,12 @@ Config.Click = {
 -- kept per player, so small gains still add up.
 Config.Aura = {
 	ClickBase = 0.2,
-	TrainerClickBonus = 0.25,
+	TrainerClickBonus = 1, -- every click on a trainer = one more tick (active play ~x6 of standing still)
 	TrainerTickInterval = 1,
 	TrainerTickBase = 1,
 	LevelGrowth = 1.06, -- BaseAura(level): lvl 10 -> x1.7, 25 -> x4, 50 -> x17
 	TrainerCheckInterval = 0.2, -- how often the server looks which trainer a player stands on
-	AutoClickInterval = 0.35, -- server-side auto-click period
+	AutoClickInterval = 0.5, -- server-side auto-click period (AFK ~60% of active play)
 	-- Without the "AutoClick" game pass the auto-click toggle works only
 	-- while standing on a trainer; with the pass it works everywhere.
 	AutoClickFreeOnTrainer = true,
@@ -231,8 +231,10 @@ Config.Dungeon = {
 	--   room 20 ~ biome 4 weapon + ~100M Aura         (~250K)
 	-- Mob HP = RecommendedDamage(r) x ClicksToKill: at the recommended
 	-- damage (crit 8% x2 included) a mob takes ~7-8 hits, a boss ~46.
-	RecommendedBase = 2,
-	RecommendedGrowth = 1.85,
+	RecommendedRoom1 = 3, -- room 1: a Stick and a minute of training
+	RampTo = 5, -- rooms 1..RampTo-1 ramp up to the curve below
+	RecommendedBase = 7.6,
+	RecommendedGrowth = 1.91,
 	ClicksToKill = 8,
 	BossClicksToKill = 50,
 
@@ -394,9 +396,21 @@ function Config.IsBossRoom(room: number): boolean
 end
 
 -- Damage per click a player "should" have for a room (barrier hint).
+-- Damage per hit a player "should" have for a room. Rooms from
+-- RampTo on: RecommendedBase x RecommendedGrowth^(room - 1). Rooms before
+-- it ramp smoothly (log scale) from RecommendedRoom1, so room 1 is easy
+-- right away.
 function Config.RecommendedDamage(room: number): number
 	local d = Config.Dungeon
-	return math.max(1, math.floor(d.RecommendedBase * d.RecommendedGrowth ^ (room - 1)))
+	local value
+	if room >= d.RampTo then
+		value = d.RecommendedBase * d.RecommendedGrowth ^ (room - 1)
+	else
+		local target = d.RecommendedBase * d.RecommendedGrowth ^ (d.RampTo - 1)
+		local a = (room - 1) / (d.RampTo - 1)
+		value = math.exp(math.log(d.RecommendedRoom1) * (1 - a) + math.log(target) * a)
+	end
+	return math.max(1, math.floor(value))
 end
 
 function Config.MobHealth(room: number, isBoss: boolean): number
@@ -612,11 +626,15 @@ Config.Hatch = {
 
 -- Rebirth at the hub altar: requires Aura >= RebirthAura(rebirths).
 -- Resets Aura and the room record; keeps level, weapons, armor, items,
--- pets, credits. Gives a permanent TRAINING multiplier (Aura gain).
+-- pets, credits. Gives a permanent TRAINING multiplier (Aura gain):
+-- x MultiplierBase per rebirth, felt right away.
+-- Costs: the first ones are a table (fast start, see Config.Pacing),
+-- after them every rebirth costs LateGrowth x the previous one.
+-- Tuned with tools/pacing.py (README "Темп прокачки").
 Config.Rebirth = {
-	AuraBase = 500000, -- 1st rebirth
-	AuraGrowth = 4, -- each next one needs x this: 2M, 8M, 32M, ...
-	MultiplierPerRebirth = 0.5, -- training x(1 + 0.5 per rebirth)
+	Costs = { 8800, 120000, 280000, 1300000, 3700000, 21000000, 59000000, 150000000 },
+	LateGrowth = 5.7,
+	MultiplierBase = 1.5, -- training x1.5, x2.25, x3.4, ... (x1.5 per rebirth)
 }
 
 function Config.XpToNext(level: number): number
@@ -624,13 +642,18 @@ function Config.XpToNext(level: number): number
 	return math.floor(l.XpBase * math.max(1, level) ^ l.XpExponent)
 end
 
+-- Aura needed for the NEXT rebirth when `rebirths` are already done.
 function Config.RebirthAura(rebirths: number): number
 	local r = Config.Rebirth
-	return r.AuraBase * r.AuraGrowth ^ rebirths
+	local n = rebirths + 1
+	if n <= #r.Costs then
+		return r.Costs[n]
+	end
+	return r.Costs[#r.Costs] * r.LateGrowth ^ (n - #r.Costs)
 end
 
 function Config.RebirthMultiplier(rebirths: number): number
-	return 1 + rebirths * Config.Rebirth.MultiplierPerRebirth
+	return Config.Rebirth.MultiplierBase ^ rebirths
 end
 
 -- Hub trainers. Requirements: Aura (remembered forever once reached),
@@ -638,13 +661,13 @@ end
 -- (TrainersUnlocked) -- never rename them.
 Config.Trainers = {
 	{ Id = "1", Kind = "Dummy", Name = "Манекен", Multiplier = 1, Color = Color3.fromRGB(90, 230, 110) },
-	{ Id = "2", Kind = "Boulder", Name = "Валун", Multiplier = 3, Aura = 200, Color = Color3.fromRGB(70, 140, 255) },
-	{ Id = "3", Kind = "IceCube", Name = "Ледяной куб", Multiplier = 6, Aura = 2000, Color = Color3.fromRGB(46, 230, 255) },
-	{ Id = "4", Kind = "Mimic", Name = "Сундук-мимик", Multiplier = 12, Aura = 15000, Color = Color3.fromRGB(255, 150, 50) },
-	{ Id = "5", Kind = "Skull", Name = "Гигантский череп", Multiplier = 25, Aura = 100000, Color = Color3.fromRGB(230, 230, 240), Particles = true },
-	{ Id = "6", Kind = "Pumpkin", Name = "Тыква-монстр", Multiplier = 50, Rebirths = 1, Color = Color3.fromRGB(255, 120, 30), Particles = true },
-	{ Id = "7", Kind = "Golem", Name = "Кристальный голем", Multiplier = 100, Rebirths = 2, Color = Color3.fromRGB(150, 80, 255), Particles = true },
-	{ Id = "8", Kind = "Core", Name = "Аура-ядро", Multiplier = 250, Rebirths = 4, Color = Color3.fromRGB(255, 61, 184), Particles = true },
+	{ Id = "2", Kind = "Boulder", Name = "Валун", Multiplier = 3, Aura = 300, Color = Color3.fromRGB(70, 140, 255) },
+	{ Id = "3", Kind = "IceCube", Name = "Ледяной куб", Multiplier = 6, Aura = 1700, Color = Color3.fromRGB(46, 230, 255) },
+	{ Id = "4", Kind = "Mimic", Name = "Сундук-мимик", Multiplier = 12, Aura = 4700, Color = Color3.fromRGB(255, 150, 50) },
+	{ Id = "5", Kind = "Skull", Name = "Гигантский череп", Multiplier = 25, Rebirths = 1, Color = Color3.fromRGB(230, 230, 240), Particles = true },
+	{ Id = "6", Kind = "Pumpkin", Name = "Тыква-монстр", Multiplier = 50, Rebirths = 3, Color = Color3.fromRGB(255, 120, 30), Particles = true },
+	{ Id = "7", Kind = "Golem", Name = "Кристальный голем", Multiplier = 100, Rebirths = 5, Color = Color3.fromRGB(150, 80, 255), Particles = true },
+	{ Id = "8", Kind = "Core", Name = "Аура-ядро", Multiplier = 250, Rebirths = 8, Color = Color3.fromRGB(255, 61, 184), Particles = true },
 	{ Id = "VIP", Kind = "Throne", Name = "VIP-трон", Multiplier = 100, Pass = "VIP", Premium = true, Color = Color3.fromRGB(255, 201, 60), Particles = true },
 	{ Id = "Gold", Kind = "Idol", Name = "Золотой идол", Multiplier = 500, Pass = "GoldTrainer", Premium = true, Color = Color3.fromRGB(255, 215, 80), Particles = true },
 	{ Id = "Abyss", Kind = "AbyssPortal", Name = "Портал бездны", Multiplier = 1000, Pass = "AbyssTrainer", Premium = true, Color = Color3.fromRGB(170, 80, 255), Particles = true },
@@ -653,6 +676,47 @@ Config.TrainerById = {}
 for _, trainer in ipairs(Config.Trainers) do
 	Config.TrainerById[trainer.Id] = trainer
 end
+
+-- Pacing model for tools/pacing.py (not used by the game itself): how
+-- an "active player" plays, and the owner's time targets the numbers
+-- above are tuned to. Run `python3 tools/pacing.py --tune` to get
+-- suggested trainer thresholds, rebirth costs, XpBase and the room
+-- curve; `--readme` writes the minute table into README.md.
+Config.Pacing = {
+	ActiveCps = 5, -- clicks per second while actively training
+	TrainShare = 0.8, -- share of the time on a trainer (the rest: dungeon)
+	KillsPerMinute = 10, -- in the dungeon, mobs of the record room
+	-- The weapon a player has crafted by the time of a record room.
+	Weapons = {
+		{ Stage = 0, Id = "Stick" },
+		{ Stage = 2, Id = "BoneSword" },
+		{ Stage = 3, Id = "SlimeDagger" },
+		{ Stage = 4, Id = "RustCleaver" },
+		{ Stage = 5, Id = "SkullMace" },
+		{ Stage = 7, Id = "IceBlade" },
+		{ Stage = 8, Id = "YetiClub" },
+		{ Stage = 9, Id = "FrostSpear" },
+		{ Stage = 10, Id = "EternalBlade" },
+		{ Stage = 11, Id = "ObsidianAxe" },
+		{ Stage = 12, Id = "EmberSword" },
+		{ Stage = 13, Id = "MagmaHammer" },
+		{ Stage = 15, Id = "PhoenixBlade" },
+		{ Stage = 16, Id = "ShadowKatana" },
+		{ Stage = 17, Id = "DuskScythe" },
+		{ Stage = 18, Id = "AbyssBlade" },
+		{ Stage = 20, Id = "AuraReaver" },
+	},
+	-- Owner's targets (minutes of active play from zero).
+	Targets = {
+		Rebirths = { 5, 12, 20, 30, 45, 63, 87, 117, 157, 227, 347, 547 }, -- 1..8 fast, then x1.7 longer each
+		EarlyRebirths = 8, -- these get their own cost in Config.Rebirth.Costs
+		Trainers = { ["2"] = 1, ["3"] = 2.5, ["4"] = 4 }, -- Aura-gated ones
+		Stages = { ["1"] = 2, ["5"] = 15, ["10"] = 60, ["15"] = 120, ["20"] = 300 },
+		Level = 30,
+		LevelMinute = 120,
+	},
+	ReportMinutes = { 1, 2, 3, 4, 5, 8, 12, 15, 20, 25, 30, 40, 45, 50, 60, 63, 75, 87, 100, 110, 117, 120, 150, 180, 240, 300 },
+}
 
 -- Engagement loop: things to do every few minutes.
 -- Rewards are Нано-кредиты (never Aura) and scale with the record room.
@@ -694,9 +758,10 @@ Config.Progression = {
 	-- Every level: +SkillPointsPerLevel skill point, BaseAura grows
 	-- (Config.Aura.LevelGrowth) and max HP grows (Config.Stats.HealthPerLevel).
 	--   XP to the next level = XpBase x level^XpExponent:
-	--   lvl 1 -> 60, 5 -> 670, 10 -> 1.9K, 25 -> 7.5K, 50 -> 21K
+	--   lvl 1 -> 12, 5 -> 134, 10 -> 379, 30 -> 1.97K, 50 -> 4.2K
+	--   (tuned with tools/pacing.py: level ~30 after 2 hours)
 	Level = {
-		XpBase = 60,
+		XpBase = 12,
 		XpExponent = 1.5,
 		XpPerKill = 10, -- x room index
 		XpPerBoss = 80, -- x room index

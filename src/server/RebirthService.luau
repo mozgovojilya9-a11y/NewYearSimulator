@@ -44,7 +44,7 @@ local function rebirth(player)
 
 	return true, ("Ребёрт %d! Тренировка навсегда x%s"):format(
 		data.Rebirths,
-		tostring(Config.RebirthMultiplier(data.Rebirths))
+		Format.Decimal(Config.RebirthMultiplier(data.Rebirths))
 	)
 end
 
