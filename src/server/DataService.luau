@@ -218,6 +218,17 @@ function DataService.Sanitize(data)
 	end
 end
 
+-- Replaces a player's progress with a fresh start (DEV panel only).
+function DataService.Reset(player)
+	if cache[player.UserId] then
+		local data = deepCopy(Config.StartingData)
+		data.SchemaVersion = Config.SchemaVersion
+		cache[player.UserId] = data
+		return data
+	end
+	return nil
+end
+
 -- Returns the cached data table for a player, or nil if not loaded.
 function DataService.Get(player)
 	return cache[player.UserId]

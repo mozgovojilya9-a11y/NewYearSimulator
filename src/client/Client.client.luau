@@ -55,3 +55,4 @@ load(modules, "LootFx")
 load(modules, "Zone")
 load(modules, "Prompts")
 load(modules, "Cosmetics")
+load(ui, "DevPanel") -- Studio only

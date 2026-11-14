@@ -15,6 +15,7 @@ local Bounds = require(script.Parent.Bounds)
 local ClickService = require(script.Parent.ClickService)
 local CraftService = require(script.Parent.CraftService)
 local DataService = require(script.Parent.DataService)
+local DevService = require(script.Parent.DevService)
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local EquipmentService = require(script.Parent.EquipmentService)
 local HubService = require(script.Parent.HubService)
@@ -78,6 +79,7 @@ start("TravelService", TravelService.Init, hub)
 start("EquipmentService", EquipmentService.Init)
 start("ProgressionService", ProgressionService.Init)
 start("LootService", LootService.Init) -- after ProgressionService: both listen to kills
+start("DevService", DevService.Init) -- Studio only
 
 local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)
 

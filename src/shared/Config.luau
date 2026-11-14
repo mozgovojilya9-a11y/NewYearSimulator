@@ -750,6 +750,12 @@ for order, piece in ipairs(Config.Armor) do
 	Config.ItemById.Armor[piece.Id] = piece
 end
 
+-- DEV panel (only in Studio, never in a published game).
+Config.Dev = {
+	Credits = 100,
+	Materials = 10, -- of every material
+}
+
 -- All remotes live directly in ReplicatedStorage, created by the server.
 Config.Remotes = {
 	ClickHit = "RemoteEvent", -- C->S (mob or nil) on every attack click; S->C ("Hit"|"Kill"|"Credits", ...)

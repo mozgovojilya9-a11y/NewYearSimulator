@@ -117,8 +117,11 @@ local xpToNext = Config.XpToNext
 
 -- Adds XP; on level up: skill points, rewards, stats refresh (damage
 -- and max HP grow with the level), full heal, big banner on the client.
-local function addXp(player, data, amount: number)
-	amount = math.floor(amount * StatService.Get(player).XpMult) -- passes, VIP, x2 boost
+local function addXp(player, data, amount: number, raw: boolean?)
+	if not raw then
+		amount *= StatService.Get(player).XpMult -- passes, VIP, x2 boost
+	end
+	amount = math.floor(amount)
 	if amount <= 0 then
 		return
 	end
@@ -153,6 +156,19 @@ function ProgressionService.AddXp(player, amount: number)
 	if data then
 		addXp(player, data, amount)
 	end
+end
+
+-- Exactly `count` level ups (DEV panel): the missing XP is added raw.
+function ProgressionService.GrantLevels(player, count: number)
+	local data = DataService.Get(player)
+	if not data then
+		return
+	end
+	local need = xpToNext(data.Level) - data.Xp
+	for i = 1, count - 1 do
+		need += xpToNext(data.Level + i)
+	end
+	addXp(player, data, need, true)
 end
 
 ---------------------------------------------------------------------
