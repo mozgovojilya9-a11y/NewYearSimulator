@@ -81,6 +81,7 @@ start("EquipmentService", EquipmentService.Init)
 start("ProgressionService", ProgressionService.Init)
 start("LootService", LootService.Init) -- after ProgressionService: both listen to kills
 ClickService.OnTrainerClick = ProgressionService.OnTrainerClick
+HubService.OnTrainingTick = ProgressionService.OnTrainingTick
 
 local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)
 

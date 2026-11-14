@@ -28,6 +28,8 @@ local StatService = require(script.Parent.StatService)
 
 local HubService = {}
 
+HubService.OnTrainingTick = nil -- set by Main: a little XP for training (ProgressionService)
+
 local A = Config.Aura
 
 local hub
@@ -109,6 +111,9 @@ local function tick(remote)
 			local gained = PlayerState.GiveAura(player, StatService.Get(player).AuraGain * trainer.def.Multiplier)
 			EquipmentService.Swing(player)
 			remote:FireClient(player, "Tick", trainer.model, gained)
+			if HubService.OnTrainingTick then
+				HubService.OnTrainingTick(player)
+			end
 		end
 	end
 end

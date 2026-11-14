@@ -333,12 +333,28 @@ local function refreshLevel()
 	local xp = player:GetAttribute("Xp") or 0
 	local xpNext = math.max(1, player:GetAttribute("XpNext") or 100)
 	Style.Tween(levelFill, 0.3, { Size = UDim2.fromScale(math.clamp(xp / xpNext, 0, 1), 1) })
-	levelText.Text = ("Ур. %d   %s / %s XP"):format(level, Format.Number(xp), Format.Number(xpNext))
+	local points = player:GetAttribute("SkillPoints") or 0
+	levelText.Text = ("Ур. %d   %s / %s XP"):format(level, Format.Number(xp), Format.Number(xpNext)) .. (if points > 0 then ("   ⭐%d"):format(points) else "")
 end
-for _, attribute in ipairs({ "Level", "Xp", "XpNext" }) do
+for _, attribute in ipairs({ "Level", "Xp", "XpNext", "SkillPoints" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshLevel)
 end
 refreshLevel()
+
+-- Level up: big banner, flash, sound.
+local levelUpRemote = ReplicatedStorage:WaitForChild("LevelUp")
+local LT = Config.Progression.Level.Texts
+levelUpRemote.OnClientEvent:Connect(function(level, points)
+	level = tonumber(level) or 1
+	task.wait(0.1) -- let the new MaxHealth attribute arrive
+	local lines = {
+		LT.Points:format(tonumber(points) or 1),
+		LT.Growth:format(Format.Decimal(Config.BaseAura(level)), Format.Number(player:GetAttribute("MaxHealth") or Config.Player.Health)),
+	}
+	Popups.Banner(LT.Title, ("Ур. %d"):format(level), lines, Style.Colors.Gold)
+	Popups.Flash(Style.Colors.Gold)
+	Style.PlaySound(Config.Sounds.Forged, 1.2, 0.7)
+end)
 
 local boostLabel = Style.Label(Style.Gui, "", 20, Style.Colors.Gold, {
 	Name = "Boost",

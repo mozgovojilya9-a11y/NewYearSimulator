@@ -1,7 +1,8 @@
 --[[
 	Popups.luau
 	Floating damage numbers in the world, toasts on the right edge of
-	the screen, full-screen fade (teleports) and camera shake.
+	the screen, a big centered banner (level up), full-screen fade
+	(teleports) and camera shake.
 ]]
 
 local Players = game:GetService("Players")
@@ -196,6 +197,58 @@ function Popups.Flash(color: Color3)
 	Style.Tween(flash, 0.7, { BackgroundTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	task.delay(0.75, function()
 		flash:Destroy()
+	end)
+end
+
+-- Big centered banner (level up and other big moments): title, a huge
+-- line and up to two small lines. Pops in, holds, fades out.
+local bannerToken = 0
+function Popups.Banner(title: string, big: string, lines: { string }?, color: Color3?)
+	color = color or Style.Colors.Gold
+	bannerToken += 1
+	local token = bannerToken
+	local old = Style.Gui:FindFirstChild("Banner")
+	if old then
+		old:Destroy()
+	end
+	local plate = Instance.new("Frame")
+	plate.Name = "Banner"
+	plate.AnchorPoint = Vector2.new(0.5, 0.5)
+	plate.Position = UDim2.fromScale(0.5, 0.36)
+	plate.Size = UDim2.fromOffset(440, 190)
+	plate.BackgroundColor3 = Style.Colors.PanelDark
+	plate.ZIndex = 80
+	plate.Parent = Style.Gui
+	Style.Corner(plate, UDim.new(0, 18))
+	Style.Stroke(plate, 4, color)
+	local glow = Instance.new("UIGradient")
+	glow.Rotation = 90
+	glow.Color = ColorSequence.new(Style.Lighter(Style.Colors.PanelDark, 0.12), Style.Colors.PanelDark)
+	glow.Parent = plate
+	Style.Label(plate, title, 30, color, { Position = UDim2.fromOffset(0, 12), Size = UDim2.new(1, 0, 0, 36), ZIndex = 81 })
+	Style.Label(plate, big, 64, Style.Colors.Text, { Position = UDim2.fromOffset(0, 50), Size = UDim2.new(1, 0, 0, 70), ZIndex = 81 })
+	for i, line in ipairs(lines or {}) do
+		Style.Label(plate, line, 18, if i == 1 then Style.Colors.Cyan else Style.Colors.Muted, { Position = UDim2.fromOffset(0, 120 + (i - 1) * 26), Size = UDim2.new(1, 0, 0, 24), ZIndex = 81 })
+	end
+	local scale = Instance.new("UIScale")
+	scale.Scale = 0.3
+	scale.Parent = plate
+	Style.Tween(scale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
+	task.delay(2.8, function()
+		if token ~= bannerToken or not plate.Parent then
+			return
+		end
+		Style.Tween(scale, 0.25, { Scale = 0.6 })
+		for _, d in ipairs(plate:GetDescendants()) do
+			if d:IsA("TextLabel") then
+				Style.Tween(d, 0.25, { TextTransparency = 1 })
+			elseif d:IsA("UIStroke") then
+				Style.Tween(d, 0.25, { Transparency = 1 })
+			end
+		end
+		Style.Tween(plate, 0.25, { BackgroundTransparency = 1 })
+		task.wait(0.3)
+		plate:Destroy()
 	end)
 end
 

@@ -35,6 +35,7 @@ Config.StartingData = {
 	Quests = { Day = 0, List = {} },
 	Level = 1,
 	Xp = 0,
+	SkillPoints = 0, -- 1 per level up; spent in the skill tree (later)
 	BoostUntil = 0, -- x2 Aura boost (wheel, daily, products)
 	Boosts = { Damage = 0, Loot = 0 }, -- other boosts: os.time() they end
 	LastSeen = 0, -- os.time() of the last save
@@ -611,6 +612,11 @@ Config.Rebirth = {
 	MultiplierPerRebirth = 0.5, -- training x(1 + 0.5 per rebirth)
 }
 
+function Config.XpToNext(level: number): number
+	local l = Config.Progression.Level
+	return math.floor(l.XpBase * math.max(1, level) ^ l.XpExponent)
+end
+
 function Config.RebirthAura(rebirths: number): number
 	local r = Config.Rebirth
 	return r.AuraBase * r.AuraGrowth ^ rebirths
@@ -677,12 +683,27 @@ Config.Progression = {
 		},
 		PerDay = 3,
 	},
+	-- Player level. XP: kills, bosses, quests and a little for training.
+	-- Every level: +SkillPointsPerLevel skill point, BaseAura grows
+	-- (Config.Aura.LevelGrowth) and max HP grows (Config.Stats.HealthPerLevel).
+	--   XP to the next level = XpBase x level^XpExponent:
+	--   lvl 1 -> 60, 5 -> 670, 10 -> 1.9K, 25 -> 7.5K, 50 -> 21K
 	Level = {
+		XpBase = 60,
+		XpExponent = 1.5,
 		XpPerKill = 10, -- x room index
-		XpPerBoss = 100, -- x room index
-		XpBase = 100, -- xp to next level = XpBase x level^1.5
+		XpPerBoss = 80, -- x room index
+		XpPerQuest = 40, -- x player level, when a quest reward is claimed
+		TrainingXp = 1, -- XP every TrainingXpTicks trainer ticks
+		TrainingXpTicks = 5,
+		SkillPointsPerLevel = 1,
 		RewardEvery = 5, -- levels
 		RewardCredits = 20, -- every RewardEvery levels: x level
+		Texts = {
+			Title = "Новый уровень!",
+			Points = "+%d очко навыка",
+			Growth = "База Ауры x%s  •  Макс. HP %s",
+		},
 	},
 }
 
@@ -758,6 +779,7 @@ Config.Remotes = {
 	Loot = "RemoteEvent", -- S->C ("Spawn", id, materialId, position, lifetime) | ("Picked", id, materialId, total) | ("Remove", id) | ("Clear"); C->S (id) pick up
 	Announce = "RemoteEvent", -- S->all (text, color) system chat line + toast
 	StoreNotify = "RemoteEvent", -- S->C (text) after a Robux purchase was granted
+	LevelUp = "RemoteEvent", -- S->C (level, skillPoints gained) big "Новый уровень!" banner
 }
 
 ---------------------------------------------------------------------

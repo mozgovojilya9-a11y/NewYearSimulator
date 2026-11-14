@@ -108,29 +108,60 @@ end
 -- Levels
 ---------------------------------------------------------------------
 
-local function xpToNext(level: number): number
-	return math.floor(P.Level.XpBase * level ^ 1.5)
-end
+local xpToNext = Config.XpToNext
 
+-- Adds XP; on level up: skill points, rewards, stats refresh (BaseAura
+-- and max HP grow with the level), big banner on the client.
 local function addXp(player, data, amount: number)
+	amount = math.floor(amount)
+	if amount <= 0 then
+		return
+	end
 	data.Xp += amount
-	local leveled = false
+	local gained = 0
 	while data.Xp >= xpToNext(data.Level) do
 		data.Xp -= xpToNext(data.Level)
 		data.Level += 1
-		leveled = true
+		gained += 1
+		data.SkillPoints = (data.SkillPoints or 0) + P.Level.SkillPointsPerLevel
 		if data.Level % P.Level.RewardEvery == 0 then
 			local reward = PlayerState.AddCredits(player, P.Level.RewardCredits * data.Level)
-			Remotes.Notify(player, ("🎉 Уровень %d! Награда: +%s нано-кредитов"):format(data.Level, Format.Number(reward)), "gold")
-		else
-			Remotes.Notify(player, ("⬆ Уровень %d!"):format(data.Level), "good")
+			Remotes.Notify(player, ("🎉 Награда за уровень %d: +%s нано-кредитов"):format(data.Level, Format.Number(reward)), "gold")
 		end
 	end
-	if leveled then
-		PlayerState.Sync(player)
+	if gained > 0 then
+		PlayerState.Sync(player) -- recomputes stats: BaseAura, max HP
+		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.Health > 0 then
+			task.defer(function()
+				humanoid.Health = humanoid.MaxHealth -- a level up heals
+			end)
+		end
+		Remotes.Get("LevelUp"):FireClient(player, data.Level, gained * P.Level.SkillPointsPerLevel)
 	else
 		player:SetAttribute("Xp", data.Xp)
 	end
+end
+
+function ProgressionService.AddXp(player, amount: number)
+	local data = DataService.Get(player)
+	if data then
+		addXp(player, data, amount)
+	end
+end
+
+-- Training gives a little XP: TrainingXp every TrainingXpTicks ticks.
+local trainingTicks = {} -- [player] = ticks since the last XP
+Players.PlayerRemoving:Connect(function(player)
+	trainingTicks[player] = nil
+end)
+function ProgressionService.OnTrainingTick(player)
+	local ticks = (trainingTicks[player] or 0) + 1
+	if ticks >= P.Level.TrainingXpTicks then
+		ticks = 0
+		ProgressionService.AddXp(player, P.Level.TrainingXp)
+	end
+	trainingTicks[player] = ticks
 end
 
 ---------------------------------------------------------------------
@@ -294,8 +325,10 @@ local function claimQuest(player, index)
 	end
 	quest.Claimed = true
 	local amount = PlayerState.AddCredits(player, def.Credits * creditScale(data))
+	local xp = P.Level.XpPerQuest * data.Level
+	addXp(player, data, xp)
 	ProgressionService.RefreshReady(player)
-	return true, "+" .. Format.Number(amount) .. " нано-кредитов"
+	return true, ("+%s нано-кредитов, +%s XP"):format(Format.Number(amount), Format.Number(xp))
 end
 
 ---------------------------------------------------------------------
