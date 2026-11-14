@@ -180,10 +180,10 @@ Config.Products = {
 	{ Key = "BoostLoot15", Id = 0, Tab = "Boosts", Icon = "💎", Name = "x2 Удача добычи · 15 мин", Price = 29, Kind = "Boost", Boost = "Loot", Minutes = 15 },
 	{ Key = "BoostLoot60", Id = 0, Tab = "Boosts", Icon = "💎", Name = "x2 Удача добычи · 60 мин", Price = 79, Kind = "Boost", Boost = "Loot", Minutes = 60 },
 
-	{ Key = "ChestCatacombs", Id = 0, Tab = "Chests", Icon = "💀", Name = "Сундук Катакомб", Price = 49, Kind = "Chest", Biome = 1, Rolls = 30, Luck = 2 },
-	{ Key = "ChestIce", Id = 0, Tab = "Chests", Icon = "❄", Name = "Сундук Ледяного грота", Price = 99, Kind = "Chest", Biome = 2, Rolls = 30, Luck = 2 },
-	{ Key = "ChestLava", Id = 0, Tab = "Chests", Icon = "🔥", Name = "Сундук Лавовой кузни", Price = 149, Kind = "Chest", Biome = 3, Rolls = 30, Luck = 2 },
-	{ Key = "ChestAbyss", Id = 0, Tab = "Chests", Icon = "🌀", Name = "Сундук Бездны", Price = 199, Kind = "Chest", Biome = 4, Rolls = 30, Luck = 2 },
+	{ Key = "ChestCatacombs", Id = 0, Tab = "Chests", Icon = "💀", Name = "Контейнер цеха", Price = 49, Kind = "Chest", Biome = 1, Rolls = 30, Luck = 2 },
+	{ Key = "ChestIce", Id = 0, Tab = "Chests", Icon = "❄", Name = "Контейнер криолаборатории", Price = 99, Kind = "Chest", Biome = 2, Rolls = 30, Luck = 2 },
+	{ Key = "ChestLava", Id = 0, Tab = "Chests", Icon = "🔥", Name = "Контейнер реактора", Price = 149, Kind = "Chest", Biome = 3, Rolls = 30, Luck = 2 },
+	{ Key = "ChestAbyss", Id = 0, Tab = "Chests", Icon = "🌀", Name = "Контейнер Нексуса", Price = 199, Kind = "Chest", Biome = 4, Rolls = 30, Luck = 2 },
 
 	{ Key = "WeaponPatron", Id = 0, Tab = "Exclusive", Icon = "🗡", Name = "Клинок Покровителя", Price = 149, Kind = "Weapon", Item = "PatronBlade" },
 	{ Key = "WeaponComet", Id = 0, Tab = "Exclusive", Icon = "☄", Name = "Кометный меч", Price = 249, Kind = "Weapon", Item = "CometSword" },
@@ -259,28 +259,28 @@ Config.Dungeon = {
 -- into Config.DungeonLayout.Biomes. Shape = mini-model built from Parts
 -- by Shared.MaterialBuilder. Ids are stored in saves: never rename.
 Config.Materials = {
-	-- 1. Катакомбы
-	{ Id = "Bone", Name = "Кость", Biome = 1, Rarity = "Common", Shape = "Bone", Color = Color3.fromRGB(235, 230, 215) },
-	{ Id = "Slime", Name = "Слизь", Biome = 1, Rarity = "Uncommon", Shape = "Blob", Color = Color3.fromRGB(110, 235, 120) },
-	{ Id = "RustyIron", Name = "Ржавое железо", Biome = 1, Rarity = "Rare", Shape = "Ingot", Color = Color3.fromRGB(165, 95, 60) },
-	{ Id = "CursedSkull", Name = "Проклятый череп", Biome = 1, Rarity = "Epic", Shape = "Skull", Color = Color3.fromRGB(190, 120, 255) },
-	{ Id = "CatacombHeart", Name = "Сердце катакомб", Biome = 1, Rarity = "Secret", Shape = "Heart", Color = Color3.fromRGB(255, 90, 160) },
-	-- 2. Ледяной грот
-	{ Id = "Ice", Name = "Лёд", Biome = 2, Rarity = "Common", Shape = "Cube", Color = Color3.fromRGB(170, 225, 255) },
-	{ Id = "YetiFur", Name = "Мех йети", Biome = 2, Rarity = "Uncommon", Shape = "Fur", Color = Color3.fromRGB(240, 245, 250) },
-	{ Id = "FrostCrystal", Name = "Морозный кристалл", Biome = 2, Rarity = "Rare", Shape = "Crystal", Color = Color3.fromRGB(90, 190, 255) },
-	{ Id = "EternalIce", Name = "Вечный лёд", Biome = 2, Rarity = "Legendary", Shape = "Star", Color = Color3.fromRGB(140, 240, 255) },
-	-- 3. Лавовая кузня
-	{ Id = "Obsidian", Name = "Обсидиан", Biome = 3, Rarity = "Common", Shape = "Shards", Color = Color3.fromRGB(45, 35, 60) },
-	{ Id = "Ember", Name = "Тлеющий уголь", Biome = 3, Rarity = "Uncommon", Shape = "Coal", Color = Color3.fromRGB(255, 130, 40) },
-	{ Id = "MagmaCore", Name = "Магма-ядро", Biome = 3, Rarity = "Rare", Shape = "Core", Color = Color3.fromRGB(255, 110, 30) },
-	{ Id = "FirePlume", Name = "Огненное перо", Biome = 3, Rarity = "Epic", Shape = "Feather", Color = Color3.fromRGB(255, 170, 50) },
-	{ Id = "VolcanoHeart", Name = "Сердце вулкана", Biome = 3, Rarity = "Mythic", Shape = "Heart", Color = Color3.fromRGB(255, 80, 40) },
-	-- 4. Бездна ауры
-	{ Id = "DarkShard", Name = "Осколок тьмы", Biome = 4, Rarity = "Common", Shape = "Shards", Color = Color3.fromRGB(70, 40, 120) },
-	{ Id = "ShadowDust", Name = "Теневая пыль", Biome = 4, Rarity = "Uncommon", Shape = "Dust", Color = Color3.fromRGB(120, 90, 170) },
-	{ Id = "AuraEssence", Name = "Аура-эссенция", Biome = 4, Rarity = "Rare", Shape = "Vial", Color = Color3.fromRGB(255, 61, 184) },
-	{ Id = "AbyssEye", Name = "Глаз бездны", Biome = 4, Rarity = "Legendary", Shape = "Eye", Color = Color3.fromRGB(170, 80, 255) },
+	-- 1. Сборочный цех
+	{ Id = "Bone", Name = "Болт", Biome = 1, Rarity = "Common", Shape = "Bone", Color = Color3.fromRGB(235, 230, 215) },
+	{ Id = "Slime", Name = "Смазка", Biome = 1, Rarity = "Uncommon", Shape = "Blob", Color = Color3.fromRGB(110, 235, 120) },
+	{ Id = "RustyIron", Name = "Ржавая пластина", Biome = 1, Rarity = "Rare", Shape = "Ingot", Color = Color3.fromRGB(165, 95, 60) },
+	{ Id = "CursedSkull", Name = "Чип управления", Biome = 1, Rarity = "Epic", Shape = "Skull", Color = Color3.fromRGB(190, 120, 255) },
+	{ Id = "CatacombHeart", Name = "Сердце фабрики", Biome = 1, Rarity = "Secret", Shape = "Heart", Color = Color3.fromRGB(255, 90, 160) },
+	-- 2. Криолаборатория
+	{ Id = "Ice", Name = "Криогель", Biome = 2, Rarity = "Common", Shape = "Cube", Color = Color3.fromRGB(170, 225, 255) },
+	{ Id = "YetiFur", Name = "Термоизоляция", Biome = 2, Rarity = "Uncommon", Shape = "Fur", Color = Color3.fromRGB(240, 245, 250) },
+	{ Id = "FrostCrystal", Name = "Крио-кристалл", Biome = 2, Rarity = "Rare", Shape = "Crystal", Color = Color3.fromRGB(90, 190, 255) },
+	{ Id = "EternalIce", Name = "Вечный хладагент", Biome = 2, Rarity = "Legendary", Shape = "Star", Color = Color3.fromRGB(140, 240, 255) },
+	-- 3. Плавильный реактор
+	{ Id = "Obsidian", Name = "Шлак", Biome = 3, Rarity = "Common", Shape = "Shards", Color = Color3.fromRGB(45, 35, 60) },
+	{ Id = "Ember", Name = "Раскалённая окалина", Biome = 3, Rarity = "Uncommon", Shape = "Coal", Color = Color3.fromRGB(255, 130, 40) },
+	{ Id = "MagmaCore", Name = "Плазменное ядро", Biome = 3, Rarity = "Rare", Shape = "Core", Color = Color3.fromRGB(255, 110, 30) },
+	{ Id = "FirePlume", Name = "Огненный конденсатор", Biome = 3, Rarity = "Epic", Shape = "Feather", Color = Color3.fromRGB(255, 170, 50) },
+	{ Id = "VolcanoHeart", Name = "Сердце реактора", Biome = 3, Rarity = "Mythic", Shape = "Heart", Color = Color3.fromRGB(255, 80, 40) },
+	-- 4. Ядро Нексуса
+	{ Id = "DarkShard", Name = "Осколок данных", Biome = 4, Rarity = "Common", Shape = "Shards", Color = Color3.fromRGB(70, 40, 120) },
+	{ Id = "ShadowDust", Name = "Квантовая пыль", Biome = 4, Rarity = "Uncommon", Shape = "Dust", Color = Color3.fromRGB(120, 90, 170) },
+	{ Id = "AuraEssence", Name = "Эссенция Нексуса", Biome = 4, Rarity = "Rare", Shape = "Vial", Color = Color3.fromRGB(255, 61, 184) },
+	{ Id = "AbyssEye", Name = "Око Нексуса", Biome = 4, Rarity = "Legendary", Shape = "Eye", Color = Color3.fromRGB(170, 80, 255) },
 }
 Config.MaterialById = {}
 for order, material in ipairs(Config.Materials) do
@@ -315,38 +315,42 @@ Config.Loot = {
 	},
 }
 
--- Mobs: 3 kinds + a boss per biome. Drops = materials this mob can
--- drop; the rarity is rolled first (Config.Rarities), then a material of
--- that rarity is picked from this list (nearest lower rarity, else the
--- nearest higher one, when the mob has none of the rolled rarity).
--- The model of every kind is built by MobBuilder (one builder per id).
+-- Mobs of the Nano-factory: 3 kinds + a boss per biome. Asset = owner
+-- model (GameAssets/Mobs, MobBuilder); one model can serve several mobs:
+-- Height in studs (bosses x Config.MobLooks.BossScale), Tint = color the
+-- parts lean to (TintAmount 0..1), Glow = color of neon parts, Turn =
+-- degrees to turn the model if it faces backwards. No model -> the
+-- procedural mob Builder. Drops = materials this mob can drop; the rarity
+-- is rolled first (Config.Rarities), then a material of that rarity is
+-- picked from this list (nearest lower rarity, else the nearest higher).
 Config.Mobs = {
 	Biomes = {
-		{ Kinds = { "ZombieMiner", "SkeletonArcher", "AcidSlime" }, Boss = "SlimeKing" },
-		{ Kinds = { "SnowGolem", "IceSpider", "Yeti" }, Boss = "IceBoneLord" },
-		{ Kinds = { "FireImp", "MagmaGolem", "GoblinSmith" }, Boss = "FireChief" },
-		{ Kinds = { "ShadowKnight", "FlyingEye", "AuraGhost" }, Boss = "AbyssLord" },
+		{ Kinds = { "SpiderBot", "Assembler", "Loader" }, Boss = "ForemanMech" },
+		{ Kinds = { "CryoBot", "CryoAndroid", "FrostSpider" }, Boss = "CryoOverseer" },
+		{ Kinds = { "Smelter", "HeavyMech", "SlagBot" }, Boss = "MoltenColossus" },
+		{ Kinds = { "NexusSentinel", "NexusDrone", "PhaseAndroid" }, Boss = "Juggernaut" },
 	},
 	Defs = {
-		ZombieMiner = { Name = "Зомби-шахтёр", Drops = { "Bone", "RustyIron", "CursedSkull", "CatacombHeart" } },
-		SkeletonArcher = { Name = "Скелет-лучник", Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" } },
-		AcidSlime = { Name = "Кислотный слизень", Drops = { "Slime", "RustyIron", "CursedSkull", "CatacombHeart" } },
-		SlimeKing = { Name = "Король Слизней", Boss = true, Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" } },
-
-		SnowGolem = { Name = "Снежный голем", Drops = { "Ice", "FrostCrystal", "EternalIce" } },
-		IceSpider = { Name = "Ледяной паук", Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" } },
-		Yeti = { Name = "Йети", Drops = { "YetiFur", "FrostCrystal", "EternalIce" } },
-		IceBoneLord = { Name = "Ледяной Костяной Лорд", Boss = true, Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" } },
-
-		FireImp = { Name = "Огненный бес", Drops = { "Ember", "Obsidian", "FirePlume", "VolcanoHeart" } },
-		MagmaGolem = { Name = "Магма-голем", Drops = { "Obsidian", "MagmaCore", "FirePlume", "VolcanoHeart" } },
-		GoblinSmith = { Name = "Гоблин-кузнец", Drops = { "Obsidian", "Ember", "MagmaCore", "VolcanoHeart" } },
-		FireChief = { Name = "Огненный Вождь", Boss = true, Drops = { "Obsidian", "Ember", "MagmaCore", "FirePlume", "VolcanoHeart" } },
-
-		ShadowKnight = { Name = "Теневой рыцарь", Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" } },
-		FlyingEye = { Name = "Летающий глаз", Drops = { "DarkShard", "AuraEssence", "AbyssEye" } },
-		AuraGhost = { Name = "Аура-призрак", Drops = { "ShadowDust", "AuraEssence", "AbyssEye" } },
-		AbyssLord = { Name = "Повелитель Бездны", Boss = true, Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" } },
+		-- 1. Сборочный цех
+		SpiderBot = { Name = "Паукобот", Asset = "Mob_SpiderBot", Height = 3.6, Builder = "IceSpider", Drops = { "Bone", "Slime", "RustyIron", "CatacombHeart" } },
+		Assembler = { Name = "Робот-сборщик", Asset = "Mob_Robot", Height = 5.5, Builder = "ZombieMiner", Drops = { "Bone", "RustyIron", "CursedSkull", "CatacombHeart" } },
+		Loader = { Name = "Бот-погрузчик", Asset = "Mob_Bot2", Height = 5, Builder = "SkeletonArcher", Drops = { "Slime", "Bone", "CursedSkull", "CatacombHeart" } },
+		ForemanMech = { Name = "Мех-бригадир", Boss = true, Asset = "Mob_Mech", Height = 6, Tint = Color3.fromRGB(255, 170, 60), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "SlimeKing", Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" } },
+		-- 2. Криолаборатория
+		CryoBot = { Name = "Крио-бот", Asset = "Mob_BlueBot", Height = 5, Glow = Color3.fromRGB(120, 230, 255), Builder = "SnowGolem", Drops = { "Ice", "FrostCrystal", "EternalIce" } },
+		CryoAndroid = { Name = "Крио-андроид", Asset = "Mob_Android", Height = 6, Tint = Color3.fromRGB(170, 220, 255), TintAmount = 0.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "Yeti", Drops = { "YetiFur", "FrostCrystal", "EternalIce" } },
+		FrostSpider = { Name = "Ледяной паукобот", Asset = "Mob_SpiderBot", Height = 4.2, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider", Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" } },
+		CryoOverseer = { Name = "Крио-надзиратель", Boss = true, Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(150, 210, 255), TintAmount = 0.45, Glow = Color3.fromRGB(46, 230, 255), Builder = "IceBoneLord", Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" } },
+		-- 3. Плавильный реактор
+		Smelter = { Name = "Андроид-плавильщик", Asset = "Mob_RedAndroid", Height = 6, Glow = Color3.fromRGB(255, 140, 40), Builder = "FireImp", Drops = { "Ember", "Obsidian", "FirePlume", "VolcanoHeart" } },
+		HeavyMech = { Name = "Тяжёлый мех", Asset = "Mob_Mech", Height = 6.5, Tint = Color3.fromRGB(90, 70, 60), TintAmount = 0.4, Glow = Color3.fromRGB(255, 120, 30), Builder = "MagmaGolem", Drops = { "Obsidian", "MagmaCore", "FirePlume", "VolcanoHeart" } },
+		SlagBot = { Name = "Шлакобот", Asset = "Mob_Bot2", Height = 5, Tint = Color3.fromRGB(255, 130, 40), TintAmount = 0.4, Glow = Color3.fromRGB(255, 160, 60), Builder = "GoblinSmith", Drops = { "Obsidian", "Ember", "MagmaCore", "VolcanoHeart" } },
+		MoltenColossus = { Name = "Плавильный колосс", Boss = true, Asset = "Mob_Android", Height = 6.2, Tint = Color3.fromRGB(255, 110, 30), TintAmount = 0.45, Glow = Color3.fromRGB(255, 150, 40), Builder = "FireChief", Drops = { "Obsidian", "Ember", "MagmaCore", "FirePlume", "VolcanoHeart" } },
+		-- 4. Ядро Нексуса
+		NexusSentinel = { Name = "Страж Нексуса", Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(120, 60, 200), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight", Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" } },
+		NexusDrone = { Name = "Дрон Нексуса", Asset = "Mob_Robot", Height = 5.5, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.45, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye", Drops = { "DarkShard", "AuraEssence", "AbyssEye" } },
+		PhaseAndroid = { Name = "Фазовый андроид", Asset = "Mob_RedAndroid", Height = 6, Tint = Color3.fromRGB(170, 80, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost", Drops = { "ShadowDust", "AuraEssence", "AbyssEye" } },
+		Juggernaut = { Name = "Джаггернаут", Boss = true, Asset = "Boss_Juggernaut", Height = 6.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord", Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" } },
 	},
 }
 for id, def in pairs(Config.Mobs.Defs) do
@@ -1058,46 +1062,58 @@ Config.DungeonLayout = {
 	DoorHeight = 12,
 	CorridorLength = 20,
 	MerlonSize = 2,
-	MaxPartsPerRoom = 150, -- design budget (tiles are capped to respect it)
-	TorchesPerWall = 2, -- torches on each side wall of a room
+	MaxPartsPerRoom = 220, -- design budget of one room
+	LampRows = 2, -- ceiling light rows per room (warm downlights)
+	MonitorsPerWall = 2,
+	Ceiling = true, -- closed halls: industrial half-dark under warm lamps
 
-	-- One biome per 5 rooms.
+	-- Nano-factory: one biome per 5 rooms. Walls (StoneA/B) are lighter
+	-- than the floor (Floor/FloorB) so edges read at a glance; Metal =
+	-- pipes / frames, Accent = thin neon lines, Light = lamp color, Glow =
+	-- the biome's "hot" color (molten channel, cryo tanks, data cores).
+	-- Atmosphere / Lighting tint the haze and the ambient per biome.
 	Biomes = {
-		-- Walls (StoneA/B) are clearly lighter than the floor (Floor/FloorB),
-		-- so edges read at a glance. Atmosphere tints the haze per biome.
-		{ Name = "Неоновые катакомбы", StoneA = Color3.fromRGB(120, 118, 140), StoneB = Color3.fromRGB(100, 98, 122), Floor = Color3.fromRGB(58, 56, 72), FloorB = Color3.fromRGB(46, 44, 58), Accent = Color3.fromRGB(100, 255, 90), Light = Color3.fromRGB(150, 255, 140),
-			Atmosphere = { Color = Color3.fromRGB(150, 185, 150), Decay = Color3.fromRGB(80, 120, 80) },
-			Lighting = { Ambient = Color3.fromRGB(115, 125, 115), OutdoorAmbient = Color3.fromRGB(120, 135, 120) } },
-		{ Name = "Ледяной грот", StoneA = Color3.fromRGB(175, 215, 245), StoneB = Color3.fromRGB(150, 195, 235), Floor = Color3.fromRGB(80, 125, 175), FloorB = Color3.fromRGB(65, 105, 155), Accent = Color3.fromRGB(46, 230, 255), Light = Color3.fromRGB(140, 230, 255),
-			Atmosphere = { Color = Color3.fromRGB(170, 210, 245), Decay = Color3.fromRGB(100, 150, 210) },
-			Lighting = { Ambient = Color3.fromRGB(120, 135, 150), OutdoorAmbient = Color3.fromRGB(130, 145, 165) } },
-		{ Name = "Лавовая кузня", StoneA = Color3.fromRGB(165, 75, 60), StoneB = Color3.fromRGB(140, 60, 50), Floor = Color3.fromRGB(75, 30, 30), FloorB = Color3.fromRGB(60, 22, 24), Accent = Color3.fromRGB(255, 140, 40), Light = Color3.fromRGB(255, 160, 80),
-			Atmosphere = { Color = Color3.fromRGB(215, 150, 110), Decay = Color3.fromRGB(150, 80, 50) },
-			Lighting = { Ambient = Color3.fromRGB(140, 115, 105), OutdoorAmbient = Color3.fromRGB(150, 120, 110) } },
-		{ Name = "Бездна ауры", StoneA = Color3.fromRGB(140, 105, 210), StoneB = Color3.fromRGB(118, 85, 185), Floor = Color3.fromRGB(55, 32, 100), FloorB = Color3.fromRGB(44, 25, 85), Accent = Color3.fromRGB(255, 201, 60), Light = Color3.fromRGB(215, 170, 255),
-			Atmosphere = { Color = Color3.fromRGB(175, 150, 225), Decay = Color3.fromRGB(110, 80, 170) },
-			Lighting = { Ambient = Color3.fromRGB(125, 115, 145), OutdoorAmbient = Color3.fromRGB(135, 125, 155) } },
+		{ Name = "Сборочный цех", Theme = "Assembly",
+			StoneA = Color3.fromRGB(128, 130, 138), StoneB = Color3.fromRGB(108, 110, 118), Floor = Color3.fromRGB(62, 64, 70), FloorB = Color3.fromRGB(52, 54, 60),
+			Metal = Color3.fromRGB(70, 74, 84), Accent = Color3.fromRGB(255, 190, 60), Light = Color3.fromRGB(255, 222, 180), Glow = Color3.fromRGB(255, 170, 50),
+			Atmosphere = { Color = Color3.fromRGB(140, 130, 115), Decay = Color3.fromRGB(80, 70, 60) },
+			Lighting = { Ambient = Color3.fromRGB(92, 88, 82), OutdoorAmbient = Color3.fromRGB(80, 78, 76) } },
+		{ Name = "Криолаборатория", Theme = "Cryo",
+			StoneA = Color3.fromRGB(176, 196, 214), StoneB = Color3.fromRGB(150, 172, 192), Floor = Color3.fromRGB(64, 78, 96), FloorB = Color3.fromRGB(54, 66, 84),
+			Metal = Color3.fromRGB(90, 104, 122), Accent = Color3.fromRGB(46, 230, 255), Light = Color3.fromRGB(220, 240, 255), Glow = Color3.fromRGB(120, 230, 255),
+			Atmosphere = { Color = Color3.fromRGB(150, 180, 205), Decay = Color3.fromRGB(80, 105, 135) },
+			Lighting = { Ambient = Color3.fromRGB(84, 92, 104), OutdoorAmbient = Color3.fromRGB(80, 88, 100) } },
+		{ Name = "Плавильный реактор", Theme = "Smelter",
+			StoneA = Color3.fromRGB(122, 104, 96), StoneB = Color3.fromRGB(102, 86, 80), Floor = Color3.fromRGB(56, 46, 44), FloorB = Color3.fromRGB(46, 38, 36),
+			Metal = Color3.fromRGB(70, 60, 58), Accent = Color3.fromRGB(255, 120, 40), Light = Color3.fromRGB(255, 200, 150), Glow = Color3.fromRGB(255, 110, 30),
+			Atmosphere = { Color = Color3.fromRGB(170, 120, 95), Decay = Color3.fromRGB(110, 60, 40) },
+			Lighting = { Ambient = Color3.fromRGB(100, 82, 74), OutdoorAmbient = Color3.fromRGB(88, 74, 68) } },
+		{ Name = "Ядро Нексуса", Theme = "Nexus",
+			StoneA = Color3.fromRGB(96, 92, 120), StoneB = Color3.fromRGB(80, 76, 104), Floor = Color3.fromRGB(40, 38, 56), FloorB = Color3.fromRGB(32, 30, 46),
+			Metal = Color3.fromRGB(58, 54, 78), Accent = Color3.fromRGB(255, 61, 184), Light = Color3.fromRGB(230, 210, 255), Glow = Color3.fromRGB(46, 230, 255),
+			Atmosphere = { Color = Color3.fromRGB(130, 115, 160), Decay = Color3.fromRGB(70, 55, 105) },
+			Lighting = { Ambient = Color3.fromRGB(86, 80, 102), OutdoorAmbient = Color3.fromRGB(78, 72, 96) } },
 	},
 	BossBarrierColor = Color3.fromRGB(255, 61, 184),
 
 	Texts = {
 		Enemies = "%d/%d врагов",
 		Stage = "Этап %d",
-		Recommended = "Рекомендуемый урон: %s",
+		Recommended = "Рекомендовано: %s",
 		Boss = "БИТВА С БОССОМ",
 		Cleared = "Пройдено!",
 		Entrance = "ЭТАП %d",
 		RunDied = "Ты пал в бою",
 		RunLeft = "Забег завершён",
 		RunWon = "Подземелье пройдено!",
-		RunSummary = "Дошёл до этапа %d  •  заработано %s Ауры  •  рекорд %d",
+		RunSummary = "Дошёл до этапа %d  •  получено %s кредитов  •  рекорд %d",
 		NewRecord = "Новый рекорд этапа!",
 	},
 }
 
 -- Mob presentation shared by every kind (the kinds: Config.Mobs).
 Config.MobLooks = {
-	BossScale = 2.5,
+	BossScale = 2.6, -- bosses = Height x this (Juggernaut and three regular models)
 	KindsPerBiome = 3,
 	-- HP bar above a mob, sized in studs. Normal mobs: shown only after the
 	-- first hit, drawn in depth (a nearer bar hides a farther one) and only

@@ -1,7 +1,10 @@
 --[[
 	MobBuilder.luau
-	Detailed dungeon mobs built from Parts (20-40 each): 3 kinds + a boss
-	per biome (Config.Mobs). No assets.
+	Dungeon mobs: 3 kinds + a boss per biome (Config.Mobs). A mob with an
+	Asset uses the owner model (GameAssets/Mobs, Shared.Assets.Body):
+	scaled to Height (bosses x Config.MobLooks.BossScale), recolored
+	(Tint / Glow), welded onto the rig below. Without the model the
+	procedural mob of its Builder (20-40 Parts) is built instead.
 
 	Rig: an invisible collidable HumanoidRootPart carries a Humanoid
 	(R15 mode, HipHeight) so Humanoid:MoveTo walks the mob (MobAI). An
@@ -14,6 +17,10 @@
 	Part names never match Roblox limb names (Head, Torso...), so the
 	Humanoid does not fight over their collisions.
 ]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Assets = require(ReplicatedStorage.Shared.Assets)
 
 local MobBuilder = {}
 
@@ -739,11 +746,53 @@ end
 
 ---------------------------------------------------------------------
 
+-- Owner model on the rig: an invisible collidable root (Humanoid walks
+-- it) and the Core (MobFx animates it: bob, lean, recoil); every part of
+-- the model is welded to the Core.
+local function fromAsset(def, scale: number, origin: CFrame): Model?
+	if not def.Asset then
+		return nil
+	end
+	local height = (def.Height or 5) * scale
+	local body, size = Assets.Body(def.Asset, height)
+	if not body or not size then
+		return nil
+	end
+	for _, p in ipairs(Assets.Parts(body)) do
+		if p.Material == NEON then
+			if def.Glow then
+				p.Color = def.Glow
+			end
+		elseif def.Tint then
+			p.Color = p.Color:Lerp(def.Tint, def.TintAmount or 0.35)
+		end
+	end
+	local width = math.max(1.2, math.min(size.X, size.Z) * 0.6)
+	local rig = Rig.new(def.Name, 1, origin, V(width, height * 0.6, width), height * 0.5)
+	body:PivotTo(origin * R(0, def.Turn or 0, 0) * body:GetPivot())
+	for _, p in ipairs(Assets.Parts(body)) do
+		p.Anchored = false
+		p.Massless = true
+		p.CanCollide = false
+		p.CanQuery = true
+		p.CanTouch = false
+		weld(rig.core, p)
+	end
+	body.Name = "Body"
+	body.Parent = rig.model
+	local model = rig:finish(height, def.Glow or def.Tint or rgb(255, 61, 184), def.Float)
+	model:SetAttribute("Asset", def.Asset)
+	return model
+end
+
 -- def: Config.Mobs.Defs entry. cframe: ground level, -Z = facing.
 -- Returns the Model (PrimaryPart = HumanoidRootPart).
 function MobBuilder.Build(def, scale: number, cframe: CFrame): Model
-	local build = builders[def.Id] or builders.ZombieMiner
-	local model = build(def.Name, scale * (def.Scale or 1), cframe)
+	local model = fromAsset(def, scale, cframe)
+	if not model then
+		local build = builders[def.Builder or def.Id] or builders.ZombieMiner
+		model = build(def.Name, scale * (def.Scale or 1), cframe)
+	end
 	model:SetAttribute("Kind", def.Id)
 	if def.Boss then
 		-- every boss has an aura of particles
@@ -761,6 +810,16 @@ function MobBuilder.Build(def, scale: number, cframe: CFrame): Model
 		light.Range = 26
 		light.Brightness = 1.2
 		light.Parent = model.PrimaryPart
+		-- glowing outline so a boss reads as a boss from across the arena
+		local outline = Instance.new("Highlight")
+		outline.Name = "BossOutline"
+		outline.FillTransparency = 1
+		outline.OutlineColor = model:GetAttribute("Color")
+		outline.OutlineTransparency = 0.2
+		outline.DepthMode = Enum.HighlightDepthMode.Occluded
+		outline.Parent = model
+		emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.2), NumberSequenceKeypoint.new(1, 0) })
+		emitter.Rate = 20
 	end
 	return model
 end

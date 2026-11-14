@@ -6,21 +6,28 @@
 	(Workspace.Dungeon.Lanes.Lane_k) and destroyed when passed, so a run
 	only ever holds the current and the next room.
 
-	Rooms are open-top brick boxes with tiled floors; the exit is a
-	translucent Barrier part carrying a SurfaceGui with the enemy counter.
-	All gameplay rules live in DungeonRuns.
+	"Нано-фабрика": closed factory halls (plate floors, concrete panel
+	walls with pipes, monitors and lamps, a ceiling with warm lamp rows),
+	a conveyor, the biome's machine and owner props; boss rooms are round
+	arenas with a column ring and a boss platform. The exit is an energy
+	field Barrier with the hologram counter (SurfaceGui). All gameplay
+	rules live in DungeonRuns.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
+local Assets = require(ReplicatedStorage.Shared.Assets)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local NanoKit = require(script.Parent.NanoKit)
 local WorldKit = require(script.Parent.WorldKit)
 
 local DungeonGenerator = {}
 
 local L = Config.DungeonLayout
+local M = NanoKit.Materials
+local Panel = NanoKit.Panel
 local D = Config.Dungeon
 local Texts = L.Texts
 
@@ -91,7 +98,7 @@ local function barrierLines(index, isBoss, total)
 	local lines = {
 		{ Name = "Enemies", Text = Texts.Enemies:format(0, total), Size = 90 },
 		{ Name = "Stage", Text = Texts.Stage:format(index), Size = 44, Color = Config.Theme.Gold },
-		{ Name = "Recommended", Text = Texts.Recommended:format(Format.Number(Config.RecommendedDamage(index))), Size = 30 },
+		{ Name = "Recommended", Text = Texts.Recommended:format(Format.Number(Config.RecommendedDamage(index))), Size = 34 },
 	}
 	if isBoss then
 		table.insert(lines, 1, { Name = "BossLine", Text = Texts.Boss, Size = 60, Color = Config.Theme.Magenta })
@@ -134,6 +141,185 @@ local function boundBox(model: Model, x: number, zFront: number, zBack: number, 
 	return bounds
 end
 
+---------------------------------------------------------------------
+-- Factory kit (walls, ceilings, machinery)
+---------------------------------------------------------------------
+
+-- Straight wall from `a` to `b` (ground points, inner face toward
+-- `inward`): plates with seams, a pipe run, monitors, wall lamps. A door
+-- gap of L.DoorWidth in the middle when `door` is true.
+local function factoryWall(parent, biome, a: Vector3, b: Vector3, inward: Vector3, door: boolean)
+	local h, t = L.WallHeight, L.WallThickness
+	local length = (b - a).Magnitude
+	local dir = (b - a).Unit
+	local pieces = {}
+	if door then
+		local gapStart = length / 2 - L.DoorWidth / 2
+		table.insert(pieces, { 0, gapStart })
+		table.insert(pieces, { gapStart + L.DoorWidth, length })
+	else
+		table.insert(pieces, { 0, length })
+	end
+	for _, piece in ipairs(pieces) do
+		local from, to = piece[1], piece[2]
+		local segLength = to - from
+		local count = math.max(1, math.floor(segLength / 8))
+		local seg = segLength / count
+		for i = 0, count - 1 do
+			local c = a + dir * (from + seg * (i + 0.5))
+			local cf = CFrame.lookAt(c + Vector3.new(0, h / 2, 0), c + Vector3.new(0, h / 2, 0) + inward)
+			Panel(parent, "WallPanel", Vector3.new(seg - 0.25, h, t), cf * CFrame.new(0, 0, t / 2), if i % 2 == 0 then biome.StoneA else biome.StoneB, M.Concrete)
+			Panel(parent, "Seam", Vector3.new(0.5, h, t + 0.3), cf * CFrame.new(seg / 2, 0, t / 2), biome.Metal, M.Metal)
+			Panel(parent, "Plinth", Vector3.new(seg, 1.2, 0.5), cf * CFrame.new(0, -h / 2 + 0.6, -0.2), biome.Metal, M.Plate)
+		end
+		-- pipe run at two heights + an accent line
+		local p0, p1 = a + dir * from + inward * 0.6, a + dir * to + inward * 0.6
+		for k, y in ipairs({ h * 0.62, h * 0.7 }) do
+			local mid = (p0 + p1) / 2 + Vector3.new(0, y, 0)
+			NanoKit.Cylinder(parent, "Pipe", segLength, if k == 1 then 0.9 else 0.6, CFrame.lookAt(mid, mid + dir) * CFrame.Angles(0, math.rad(90), 0), biome.Metal, M.Metal).CanCollide = false
+		end
+		NanoKit.Strip(parent, p0 + Vector3.new(0, 1.3, 0) - inward * 0.3, p1 + Vector3.new(0, 1.3, 0) - inward * 0.3, biome.Accent, 0.12)
+	end
+	-- monitors and wall lamps on the longest piece
+	local longest = pieces[1]
+	for _, piece in ipairs(pieces) do
+		if piece[2] - piece[1] > longest[2] - longest[1] then
+			longest = piece
+		end
+	end
+	local span = longest[2] - longest[1]
+	if span > 10 then
+		for k = 1, L.MonitorsPerWall do
+			local c = a + dir * (longest[1] + span * k / (L.MonitorsPerWall + 1)) + inward * 0.35
+			local cf = CFrame.lookAt(c + Vector3.new(0, h * 0.4, 0), c + Vector3.new(0, h * 0.4, 0) + inward)
+			Panel(parent, "MonitorFrame", Vector3.new(4.2, 2.6, 0.4), cf, biome.Metal, M.Metal)
+			local screen = Panel(parent, "Monitor", Vector3.new(3.8, 2.2, 0.1), cf * CFrame.new(0, 0, -0.22), biome.Glow, M.Neon, { CanCollide = false, Transparency = 0.55 })
+			NanoKit.Tag(screen, "Flicker")
+			NanoKit.Tag(screen, "Pulse", { Period = 3 + k })
+			local lampPos = c + dir * (span / (L.MonitorsPerWall + 1) / 2) + Vector3.new(0, h * 0.82, 0)
+			local lamp = Panel(parent, "WallLamp", Vector3.new(1.6, 0.5, 0.8), CFrame.lookAt(lampPos, lampPos + inward) * CFrame.new(0, 0, -0.3), biome.Light, M.Neon, { CanCollide = false })
+			local light = Instance.new("SpotLight")
+			light.Face = Enum.NormalId.Bottom
+			light.Color = biome.Light
+			light.Range = h + 4
+			light.Angle = 100
+			light.Brightness = 1.4
+			light.Parent = lamp
+		end
+	end
+end
+
+-- Closed ceiling with lamp rows (warm downlights) and a cable or two.
+local function factoryCeiling(parent, biome, center: Vector3, width: number, depth: number)
+	local h = L.WallHeight
+	Panel(parent, "Ceiling", Vector3.new(width + L.WallThickness * 2, 1, depth + L.WallThickness * 2), CFrame.new(center + Vector3.new(0, h + 0.5, 0)), biome.Metal, M.Plate)
+	for i = 1, math.floor(width / 10) do
+		Panel(parent, "Girder", Vector3.new(1, 1.4, depth), CFrame.new(center + Vector3.new(-width / 2 + i * 10, h - 0.7, 0)), biome.Metal, M.Metal, { CanCollide = false })
+	end
+	for r = 1, L.LampRows do
+		local x = center.X - width / 2 + width * r / (L.LampRows + 1)
+		for k = 1, 2 do
+			local z = center.Z - depth / 2 + depth * k / 3
+			local lamp = Panel(parent, "CeilingLamp", Vector3.new(3, 0.3, 1.4), CFrame.new(x, groundY + h - 1.6, z), biome.Light, M.Neon, { CanCollide = false })
+			Panel(parent, "LampHood", Vector3.new(3.6, 0.6, 2), CFrame.new(x, groundY + h - 1.2, z), biome.Metal, M.Metal, { CanCollide = false })
+			Panel(parent, "LampRod", Vector3.new(0.2, 1.2, 0.2), CFrame.new(x, groundY + h - 0.4, z), biome.Metal, M.Metal, { CanCollide = false })
+			local light = Instance.new("SpotLight")
+			light.Face = Enum.NormalId.Bottom
+			light.Color = biome.Light
+			light.Range = h + 6
+			light.Angle = 120
+			light.Brightness = 2.2
+			light.Shadows = true
+			light.Parent = lamp
+		end
+	end
+	NanoKit.Cable(parent, center + Vector3.new(-width / 2 + 2, h - 1, -depth / 2 + 3), center + Vector3.new(width / 2 - 2, h - 1, -depth / 2 + 6), 2.5, biome.Metal)
+end
+
+-- Conveyor along one side wall with crates riding on it.
+local function conveyor(parent, biome, from: Vector3, to: Vector3)
+	local length = (to - from).Magnitude
+	local cf = CFrame.lookAt((from + to) / 2 + Vector3.new(0, 1.4, 0), to + Vector3.new(0, 1.4, 0))
+	Panel(parent, "ConveyorFrame", Vector3.new(4, 1.2, length), cf * CFrame.new(0, -0.6, 0), biome.Metal, M.Metal)
+	Panel(parent, "Belt", Vector3.new(3.4, 0.2, length), cf * CFrame.new(0, 0.1, 0), Color3.fromRGB(30, 30, 34), M.Smooth)
+	for _, side in ipairs({ -1, 1 }) do
+		NanoKit.Strip(parent, (cf * CFrame.new(side * 1.9, 0.05, -length / 2)).Position, (cf * CFrame.new(side * 1.9, 0.05, length / 2)).Position, biome.Accent, 0.1)
+	end
+	for i = 1, 3 do
+		NanoKit.Crate(parent, cf * CFrame.new(0, 0.2, -length / 2 + length * i / 4) * CFrame.Angles(0, math.rad(i * 20), 0), Vector3.new(2.2, 2.2, 2.2))
+	end
+end
+
+-- The biome's signature machine in a room corner.
+local function machine(parent, biome, cf: CFrame)
+	local theme = biome.Theme
+	if theme == "Cryo" then
+		for k = -1, 1, 2 do
+			local p = (cf * CFrame.new(k * 2.2, 0, 0)).Position
+			NanoKit.Column(parent, "TankBase", 1, 3.2, p, biome.Metal, M.Metal)
+			local tank = NanoKit.Column(parent, "Tank", 7, 2.8, p + Vector3.new(0, 1, 0), biome.Glow, M.Glass)
+			tank.Transparency = 0.45
+			NanoKit.Column(parent, "TankCap", 0.8, 3.2, p + Vector3.new(0, 8, 0), biome.Metal, M.Metal)
+			WorldKit.Light(tank, biome.Glow, 12, 0.8)
+		end
+	elseif theme == "Smelter" then
+		NanoKit.Column(parent, "Crucible", 4, 6, cf.Position, biome.Metal, M.Metal)
+		local melt = NanoKit.Column(parent, "Melt", 0.3, 5, cf.Position + Vector3.new(0, 4, 0), biome.Glow, M.Neon)
+		melt.CanCollide = false
+		NanoKit.Tag(melt, "Pulse", { Period = 1.8 })
+		WorldKit.Light(melt, biome.Glow, 22, 1.6)
+		local fire = Instance.new("Fire")
+		fire.Color = biome.Glow
+		fire.SecondaryColor = Color3.fromRGB(255, 220, 120)
+		fire.Size = 5
+		fire.Heat = 4
+		fire.Parent = melt
+	elseif theme == "Nexus" then
+		local core = Panel(parent, "DataCore", Vector3.new(3, 3, 3), cf * CFrame.new(0, 5, 0) * CFrame.Angles(math.rad(45), math.rad(45), 0), biome.Glow, M.Neon, { CanCollide = false, Transparency = 0.2 })
+		NanoKit.Tag(core, "Spin", { Speed = 50, Axis = "Y" })
+		NanoKit.Column(parent, "CorePylon", 2.5, 4, cf.Position, biome.Metal, M.Metal)
+		WorldKit.Light(core, biome.Glow, 20, 1.4)
+	else -- Assembly: robotic arm over a workbench
+		Panel(parent, "Bench", Vector3.new(6, 2.6, 3), cf * CFrame.new(0, 1.3, 0), biome.Metal, M.Plate)
+		NanoKit.Column(parent, "ArmBase", 3, 1.4, (cf * CFrame.new(2, 2.6, 0)).Position, biome.Accent, M.Metal)
+		Panel(parent, "ArmUpper", Vector3.new(0.8, 4, 0.8), cf * CFrame.new(1.2, 6.5, 0) * CFrame.Angles(0, 0, math.rad(30)), biome.Accent, M.Metal)
+		local tool = Panel(parent, "ArmTool", Vector3.new(0.6, 1.4, 0.6), cf * CFrame.new(-0.4, 7.8, 0), biome.Metal, M.Metal)
+		NanoKit.Tag(tool, "Bob", { Amplitude = 0.5, Period = 1.4 })
+	end
+end
+
+-- Owner props (crates, barrels, misc) in the front corners and on the
+-- wall opposite the conveyor (`side` = the conveyor's side).
+local function scatterProps(parent, center: Vector3, size: number, index: number, side: number)
+	local rng = Random.new(D.Seed + index * 31)
+	local spots = {
+		CFrame.new(center + Vector3.new(-size / 2 + 9, 0, size / 2 - 5)),
+		CFrame.new(center + Vector3.new(size / 2 - 9, 0, size / 2 - 5)),
+		CFrame.new(center + Vector3.new(-side * (size / 2 - 4), 0, 0)),
+	}
+	for k, cf in ipairs(spots) do
+		local roll = rng:NextInteger(1, 3)
+		if roll == 1 then
+			NanoKit.CargoStack(parent, cf * CFrame.Angles(0, math.rad(rng:NextInteger(0, 3) * 90), 0))
+		elseif roll == 2 then
+			NanoKit.Barrel(parent, cf)
+			NanoKit.Barrel(parent, cf * CFrame.new(2.4, 0, 0.6))
+		else
+			local name = "Prop_Misc_" .. ((index + k) % 4 + 1)
+			local size3 = Assets.Size("Props", name)
+			if size3 and size3.Y <= L.WallHeight - 3 and math.max(size3.X, size3.Z) <= 12 then
+				NanoKit.Prop(parent, name, cf)
+			else
+				NanoKit.CargoStack(parent, cf)
+			end
+		end
+	end
+end
+
+---------------------------------------------------------------------
+-- Corridor, room, boss arena
+---------------------------------------------------------------------
+
 function DungeonGenerator.BuildCorridor(parent: Instance, index: number, x: number)
 	local biome = biomeFor(index)
 	local length = L.CorridorLength
@@ -143,14 +329,54 @@ function DungeonGenerator.BuildCorridor(parent: Instance, index: number, x: numb
 	local model = Instance.new("Model")
 	model.Name = ("Corridor%02d"):format(index)
 	model.Parent = parent
-	WorldKit.TiledFloor(model, Vector3.new(x, groundY, z), width, length, L.TileSize, biome.Floor, biome.FloorB, 12)
-	local h = L.DoorHeight + 2
-	for _, dir in ipairs({ -1, 1 }) do
-		local wx = x + dir * (width / 2 + L.WallThickness / 2)
-		WorldKit.CastleWall(model, Vector3.new(wx, groundY, zStart), Vector3.new(wx, groundY, zStart - length), h, L.WallThickness, biome.StoneA, biome.StoneB, 0)
+	local center = Vector3.new(x, groundY, z)
+	Panel(model, "Floor", Vector3.new(width, 1, length), CFrame.new(center + Vector3.new(0, -0.5, 0)), biome.Floor, M.Plate)
+	for _, side in ipairs({ -1, 1 }) do
+		NanoKit.Strip(model, center + Vector3.new(side * (width / 2 - 1), 0.05, length / 2), center + Vector3.new(side * (width / 2 - 1), 0.05, -length / 2), biome.Accent, 0.16)
+		local wx = x + side * (width / 2 + L.WallThickness / 2)
+		Panel(model, "Wall", Vector3.new(L.WallThickness, L.DoorHeight + 2, length), CFrame.new(wx, groundY + (L.DoorHeight + 2) / 2, z), biome.StoneB, M.Concrete)
+		local mid = Vector3.new(x + side * (width / 2 - 0.5), groundY + L.DoorHeight - 2, z)
+		NanoKit.Cylinder(model, "Pipe", length, 0.8, CFrame.lookAt(mid, mid + Vector3.new(0, 0, -1)) * CFrame.Angles(0, math.rad(90), 0), biome.Metal, M.Metal).CanCollide = false
 	end
+	Panel(model, "Roof", Vector3.new(width + L.WallThickness * 2, 1, length), CFrame.new(x, groundY + L.DoorHeight + 2.5, z), biome.Metal, M.Plate)
+	local lamp = Panel(model, "Lamp", Vector3.new(2.4, 0.3, 1.2), CFrame.new(x, groundY + L.DoorHeight + 1.8, z), biome.Light, M.Neon, { CanCollide = false })
+	local light = Instance.new("SpotLight")
+	light.Face = Enum.NormalId.Bottom
+	light.Color = biome.Light
+	light.Range = L.DoorHeight + 6
+	light.Angle = 120
+	light.Brightness = 1.8
+	light.Parent = lamp
 	boundBox(model, x, zStart, zStart - length, width / 2, false, false, false)
 	return model
+end
+
+-- Boss arena: round hall inside the square room, ring of columns, raised
+-- boss platform, hologram ring above.
+local function bossArena(model, biome, center: Vector3, size: number)
+	local r = size * 0.42
+	local flat = CFrame.Angles(0, 0, math.rad(90))
+	NanoKit.Cylinder(model, "ArenaFloor", 0.3, r * 2, CFrame.new(center + Vector3.new(0, 0.15, 0)) * flat, biome.FloorB, M.Plate)
+	NanoKit.Cylinder(model, "ArenaRing", 0.08, r * 2 - 1, CFrame.new(center + Vector3.new(0, 0.32, 0)) * flat, L.BossBarrierColor, M.Neon).CanCollide = false
+	NanoKit.Cylinder(model, "ArenaInner", 0.1, r * 2 - 1.8, CFrame.new(center + Vector3.new(0, 0.35, 0)) * flat, biome.FloorB, M.Plate).CanCollide = false
+	-- boss platform
+	NanoKit.Cylinder(model, "BossPlatform", 1.2, size * 0.28, CFrame.new(center + Vector3.new(0, 0.6, size * 0.12)) * flat, biome.Metal, M.Metal)
+	NanoKit.Cylinder(model, "BossPlatformGlow", 0.1, size * 0.28 - 0.6, CFrame.new(center + Vector3.new(0, 1.22, size * 0.12)) * flat, biome.Glow, M.Neon).CanCollide = false
+	-- ring of columns with glowing caps
+	for i = 0, 7 do
+		local angle = i * math.pi / 4
+		local p = center + Vector3.new(math.cos(angle) * (r + 2), 0, math.sin(angle) * (r + 2))
+		NanoKit.Column(model, "ArenaColumn", L.WallHeight, 2.2, p, biome.Metal, M.Metal)
+		NanoKit.Column(model, "ColumnBand", 0.4, 2.4, p + Vector3.new(0, 3, 0), biome.Accent, M.Neon).CanCollide = false
+		local cap = NanoKit.Column(model, "ColumnCap", 1, 2.8, p + Vector3.new(0, L.WallHeight - 3, 0), L.BossBarrierColor, M.Neon)
+		cap.CanCollide = false
+		WorldKit.Light(cap, L.BossBarrierColor, 16, 0.8)
+	end
+	-- hologram ring above the platform
+	local holo = NanoKit.Cylinder(model, "HoloRing", 0.3, size * 0.32, CFrame.new(center + Vector3.new(0, L.WallHeight - 3.5, size * 0.12)) * flat, L.BossBarrierColor, M.Neon)
+	holo.CanCollide = false
+	holo.Transparency = 0.4
+	NanoKit.Tag(holo, "Spin", { Speed = 30, Axis = "Y" })
 end
 
 -- Builds room `index` for a lane at x. Returns room info.
@@ -168,80 +394,47 @@ function DungeonGenerator.BuildRoom(parent: Instance, index: number, x: number)
 	model.Name = ("Room%02d"):format(index)
 	model.Parent = parent
 
-	WorldKit.TiledFloor(model, center, size, size, L.TileSize, biome.Floor, biome.FloorB, 64)
+	NanoKit.Floor(model, center, size, size, math.max(8, size / 6), biome.Floor, biome.FloorB, M.Plate)
+	-- guide line from the entrance to the exit
+	NanoKit.Strip(model, Vector3.new(x, groundY + 0.06, zFront - 1), Vector3.new(x, groundY + 0.06, zBack + 1), biome.Accent, 0.22)
 
-	local half = size / 2 + t / 2
-	WorldKit.CastleWall(model, Vector3.new(x - half, groundY, zFront), Vector3.new(x - half, groundY, zBack), h, t, biome.StoneA, biome.StoneB, L.MerlonSize)
-	WorldKit.CastleWall(model, Vector3.new(x + half, groundY, zFront), Vector3.new(x + half, groundY, zBack), h, t, biome.StoneA, biome.StoneB, L.MerlonSize)
-	local gap = { Center = half, Width = L.DoorWidth }
-	WorldKit.CastleWall(model, Vector3.new(x - half, groundY, zFront + t / 2), Vector3.new(x + half, groundY, zFront + t / 2), h, t, biome.StoneA, biome.StoneB, L.MerlonSize, gap)
+	local half = size / 2
 	local isLast = index == D.Rooms
-	WorldKit.CastleWall(model, Vector3.new(x - half, groundY, zBack - t / 2), Vector3.new(x + half, groundY, zBack - t / 2), h, t, biome.StoneA, biome.StoneB, L.MerlonSize, if isLast then nil else gap)
-	local frontLintel = WorldKit.Brick(model, Vector3.new(L.DoorWidth, h - L.DoorHeight, t), CFrame.new(x, groundY + L.DoorHeight + (h - L.DoorHeight) / 2, zFront + t / 2), biome.StoneB, "Lintel")
+	factoryWall(model, biome, Vector3.new(x - half, groundY, zFront), Vector3.new(x - half, groundY, zBack), Vector3.new(1, 0, 0), false)
+	factoryWall(model, biome, Vector3.new(x + half, groundY, zBack), Vector3.new(x + half, groundY, zFront), Vector3.new(-1, 0, 0), false)
+	factoryWall(model, biome, Vector3.new(x + half, groundY, zFront), Vector3.new(x - half, groundY, zFront), Vector3.new(0, 0, -1), true)
+	factoryWall(model, biome, Vector3.new(x - half, groundY, zBack), Vector3.new(x + half, groundY, zBack), Vector3.new(0, 0, 1), not isLast)
+	-- door frames with the stage number over the entrance
+	local frontLintel = Panel(model, "Lintel", Vector3.new(L.DoorWidth, h - L.DoorHeight, t), CFrame.new(x, groundY + L.DoorHeight + (h - L.DoorHeight) / 2, zFront + t / 2), biome.Metal, M.Metal)
 	WorldKit.SurfaceText(frontLintel, Enum.NormalId.Back, { { Text = Texts.Entrance:format(index), Size = 56, Color = biome.Accent } }, 50)
+	for _, z in ipairs({ zFront + t / 2, zBack - t / 2 }) do
+		if z == zFront + t / 2 or not isLast then
+			for _, side in ipairs({ -1, 1 }) do
+				Panel(model, "DoorFrame", Vector3.new(1, L.DoorHeight, t + 0.6), CFrame.new(x + side * (L.DoorWidth / 2 + 0.5), groundY + L.DoorHeight / 2, z), biome.Metal, M.Metal)
+				NanoKit.Strip(model, Vector3.new(x + side * L.DoorWidth / 2, groundY + 0.3, z), Vector3.new(x + side * L.DoorWidth / 2, groundY + L.DoorHeight - 0.3, z), if isBoss then L.BossBarrierColor else biome.Accent, 0.18)
+			end
+		end
+	end
 	if not isLast then
-		WorldKit.Brick(model, Vector3.new(L.DoorWidth, h - L.DoorHeight, t), CFrame.new(x, groundY + L.DoorHeight + (h - L.DoorHeight) / 2, zBack - t / 2), biome.StoneB, "Lintel")
+		Panel(model, "Lintel", Vector3.new(L.DoorWidth, h - L.DoorHeight, t), CFrame.new(x, groundY + L.DoorHeight + (h - L.DoorHeight) / 2, zBack - t / 2), biome.Metal, M.Metal)
 	end
-
-	for _, dx in ipairs({ -1, 1 }) do
-		for _, dz in ipairs({ -1, 1 }) do
-			local lamp = WorldKit.Part(model, {
-				Name = "Lamp",
-				Size = Vector3.new(1, 1, 1),
-				Position = Vector3.new(x + dx * (size / 2 - 1.5), groundY + h * 0.6, center.Z + dz * (size / 2 - 1.5)),
-				Color = biome.Light,
-				Material = Enum.Material.Glass,
-				CanCollide = false,
-			})
-			WorldKit.Light(lamp, biome.Light, size * 0.9, 1.6)
-		end
-		WorldKit.Part(model, {
-			Name = "Trim",
-			Size = Vector3.new(0.25, 0.25, size),
-			Position = Vector3.new(x + dx * (size / 2 - 0.1), groundY + 2.2, center.Z),
-			Color = biome.Accent,
-			Material = Enum.Material.Neon,
-			CanCollide = false,
-			CanQuery = false,
-		})
-	end
-
-	-- Torches on the side walls: warm light so nothing is pitch dark.
-	for _, dx in ipairs({ -1, 1 }) do
-		for i = 1, L.TorchesPerWall do
-			local tz = zFront - size * i / (L.TorchesPerWall + 1)
-			WorldKit.Torch(model, Vector3.new(x + dx * (size / 2 - 1.2), groundY, tz), biome.Accent)
-		end
+	if L.Ceiling then
+		factoryCeiling(model, biome, center, size, size)
 	end
 
 	if isBoss then
-		local arenaR = size * 0.28
-		WorldKit.Part(model, {
-			Name = "Arena",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(1, arenaR * 2, arenaR * 2),
-			CFrame = CFrame.new(center + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-			Color = biome.StoneA,
-			Material = Enum.Material.Plastic,
-			TopSurface = Enum.SurfaceType.Studs,
-		})
-		WorldKit.Part(model, {
-			Name = "ArenaRing",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(0.4, arenaR * 2 + 2, arenaR * 2 + 2),
-			CFrame = CFrame.new(center + Vector3.new(0, 0.8, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-			Color = L.BossBarrierColor,
-			Material = Enum.Material.Neon,
-			Transparency = 0.3,
-			CanCollide = false,
-			CanQuery = false,
-		})
-		for i = 0, 5 do
-			local angle = i * math.pi / 3
-			WorldKit.Brick(model, Vector3.new(2.5, 9, 2.5), CFrame.new(center + Vector3.new(math.cos(angle) * (arenaR + 4), 4.5, math.sin(angle) * (arenaR + 4))), biome.StoneB, "Pillar")
-		end
+		bossArena(model, biome, center, size)
+	else
+		-- machinery: conveyor on one side, the biome machine in a corner,
+		-- owner props along the walls
+		local side = if index % 2 == 0 then 1 else -1
+		conveyor(model, biome, Vector3.new(x + side * (half - 4), groundY, zFront - 6), Vector3.new(x + side * (half - 4), groundY, zBack + 10))
+		machine(model, biome, CFrame.new(Vector3.new(x - side * (half - 6), groundY, zBack + 7)))
+		scatterProps(model, center, size, index, side)
 	end
 
+	-- The barrier: an energy field in the exit doorway with the hologram
+	-- "0/3 врагов · Этап N · Рекомендовано: X" (DungeonRuns updates it).
 	local barrier
 	if not isLast then
 		barrier = WorldKit.Part(model, {
@@ -250,10 +443,12 @@ function DungeonGenerator.BuildRoom(parent: Instance, index: number, x: number)
 			Position = Vector3.new(x, groundY + L.DoorHeight / 2, zBack - t / 2),
 			Color = if isBoss then L.BossBarrierColor else biome.Accent,
 			Material = Enum.Material.ForceField,
-			Transparency = 0.4,
+			Transparency = 0.25,
+			CastShadow = false,
 		})
 		barrier:SetAttribute("Room", index)
 		WorldKit.SurfaceText(barrier, Enum.NormalId.Back, barrierLines(index, isBoss, #info.Spots), 50)
+		WorldKit.Light(barrier, if isBoss then L.BossBarrierColor else biome.Accent, 18, 1)
 	end
 
 	-- Bounds: closed invisible box + the seal of the entrance doorway
@@ -264,8 +459,8 @@ function DungeonGenerator.BuildRoom(parent: Instance, index: number, x: number)
 		Name = "FrontSeal",
 		Size = Vector3.new(L.DoorWidth + 2, L.DoorHeight + 1, 2),
 		Position = Vector3.new(x, groundY + (L.DoorHeight + 1) / 2 - 0.5, zFront + t / 2),
-		Color = biome.StoneB,
-		Material = Enum.Material.Plastic,
+		Color = biome.Metal,
+		Material = M.Plate,
 		Transparency = 1,
 		CanCollide = false,
 		CanQuery = false,
@@ -281,7 +476,11 @@ function DungeonGenerator.BuildRoom(parent: Instance, index: number, x: number)
 	local entryPosition = Vector3.new(x, groundY + 3, zFront - 6)
 	local spots = {}
 	for _, spot in ipairs(info.Spots) do
-		table.insert(spots, { Position = center + spot.Offset, Kind = spot.Kind })
+		local position = center + spot.Offset
+		if isBoss then
+			position += Vector3.new(0, 0.2, 0) -- on top of the boss platform (1.2 high)
+		end
+		table.insert(spots, { Position = position, Kind = spot.Kind })
 	end
 	return {
 		Index = index,
