@@ -224,10 +224,10 @@ Config.Dungeon = {
 	-- takes ~7-8 hits, a boss ~46 (crit 8% x2 included).
 	RecommendedRoom1 = 1, -- room 1: a Stick is enough
 	RampTo = 5, -- rooms 1..RampTo-1 ramp up to the curve below
-	RecommendedBase = 2.88,
-	RecommendedGrowth = 1.345,
+	RecommendedBase = 2.85,
+	RecommendedGrowth = 1.348,
 	LateFrom = 15, -- after this room the curve gets steeper
-	LateGrowth = 1.96,
+	LateGrowth = 1.947,
 	ClicksToKill = 8,
 	BossClicksToKill = 50,
 
@@ -679,10 +679,10 @@ Config.Progression = {
 	-- Every level: +SkillPointsPerLevel skill point, damage and max HP grow
 	-- (Config.Stats), full heal.
 	--   XP to the next level = XpBase x level^XpExponent:
-	--   lvl 1 -> 46, 10 -> 1.45K, 30 -> 7.6K, 50 -> 16K
+	--   lvl 1 -> 49, 10 -> 1.55K, 30 -> 8K, 50 -> 17K
 	--   (tuned with tools/pacing.py: level ~30 after 2 hours)
 	Level = {
-		XpBase = 46,
+		XpBase = 49,
 		XpExponent = 1.5,
 		XpPerKill = 10, -- x room index
 		XpPerBoss = 80, -- x room index
