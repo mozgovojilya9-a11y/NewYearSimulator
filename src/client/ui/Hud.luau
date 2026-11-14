@@ -33,27 +33,44 @@ local objective = Style.Label(Style.Gui, "", 30, Style.Colors.Text, {
 local objectiveScale = Instance.new("UIScale")
 objectiveScale.Parent = objective
 
--- Second line: recommended damage for the room you are in.
-local hintLabel = Style.Label(Style.Gui, "", 20, Style.Colors.Text, {
+-- Second line: your damage vs the room's recommended damage, on its own
+-- dark plate with different wording, so it never blends with the big
+-- "Рекомендуемый урон" text on the barrier behind it.
+local hintPlate = Style.Plate(Style.Gui, {
 	Name = "Hint",
 	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, Config.Hud.TopLeftReserved.Y + 46),
-	Size = UDim2.fromOffset(600, 26),
+	Position = UDim2.new(0.5, 0, 0, Config.Hud.TopLeftReserved.Y + 48),
+	Size = UDim2.fromOffset(0, 32),
 	ZIndex = 5,
 })
-hintLabel.Visible = false
+hintPlate.AutomaticSize = Enum.AutomaticSize.X
+local hintPadding = Instance.new("UIPadding")
+hintPadding.PaddingLeft = UDim.new(0, 14)
+hintPadding.PaddingRight = UDim.new(0, 14)
+hintPadding.Parent = hintPlate
+local hintStroke = hintPlate:FindFirstChildOfClass("UIStroke")
+local hintLabel = Style.Label(hintPlate, "", 18, Style.Colors.Text, {
+	Size = UDim2.fromOffset(0, 32),
+	AutomaticSize = Enum.AutomaticSize.X,
+	ZIndex = 6,
+})
+hintPlate.Visible = false
 
 local hintRoom = nil
 local function refreshHint()
 	if not hintRoom then
-		hintLabel.Visible = false
+		hintPlate.Visible = false
 		return
 	end
 	local recommended = Config.RecommendedDamage(hintRoom)
 	local mine = player:GetAttribute("ClickPower") or 1
-	hintLabel.Text = Config.DungeonLayout.Texts.Recommended:format(Format.Number(recommended)) .. ("  (у тебя %s)"):format(Format.Number(mine))
-	hintLabel.TextColor3 = if mine >= recommended then Style.Colors.Green else Style.Colors.Red
-	hintLabel.Visible = true
+	local enough = mine >= recommended
+	hintLabel.Text = Config.Hud.DamageHint:format(Format.Number(mine), Format.Number(recommended))
+	hintLabel.TextColor3 = if enough then Style.Colors.Green else Style.Colors.Red
+	if hintStroke then
+		hintStroke.Color = if enough then Style.Colors.Green else Style.Colors.Red
+	end
+	hintPlate.Visible = true
 end
 player:GetAttributeChangedSignal("ClickPower"):Connect(refreshHint)
 
@@ -284,7 +301,7 @@ end)
 local boostLabel = Style.Label(Style.Gui, "", 20, Style.Colors.Gold, {
 	Name = "Boost",
 	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, Config.Hud.TopLeftReserved.Y + 74),
+	Position = UDim2.new(0.5, 0, 0, Config.Hud.TopLeftReserved.Y + 86), -- below the damage hint plate
 	Size = UDim2.fromOffset(400, 26),
 	ZIndex = 5,
 })

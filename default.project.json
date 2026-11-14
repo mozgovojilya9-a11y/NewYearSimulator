@@ -18,7 +18,7 @@
     },
     "ServerStorage": {
       "$className": "ServerStorage",
-      "$ignoreUnknownInstances": false
+      "$ignoreUnknownInstances": true
     },
     "Lighting": {
       "$className": "Lighting",

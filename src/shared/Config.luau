@@ -993,7 +993,10 @@ Config.DungeonLayout = {
 Config.MobLooks = {
 	BossScale = 2.5,
 	KindsPerBiome = 3,
-	HealthBar = { MaxDistance = 50, Width = 4.5, Height = 0.9 }, -- studs (BillboardGui scale units)
+	-- HP bar above a mob, sized in studs. Normal mobs: shown only after the
+	-- first hit, drawn in depth (a nearer bar hides a farther one) and only
+	-- within MaxDistance; bosses: always, on top, with the name.
+	HealthBar = { MaxDistance = 35, BossMaxDistance = 80, Width = 3.6, Height = 0.6 },
 }
 
 ---------------------------------------------------------------------
@@ -1020,6 +1023,7 @@ Config.Hud = {
 	ToastSeconds = 4,
 	ShakeCrit = { Amplitude = 0.25, Seconds = 0.15 },
 	ShakeBoss = { Amplitude = 0.8, Seconds = 0.5 },
+	DamageHint = "⚔ Твой урон %s  •  нужно %s", -- HUD plate in the dungeon (not the barrier wording)
 	BackKey = Enum.KeyCode.B,
 	BackButton = { Icon = "←", Label = "Назад [B]", Color = Color3.fromRGB(240, 70, 80) }, -- the Travel cell in the dungeon
 	MobileScaleWidth = 1100, -- UIScale = min(1, viewportWidth / this)

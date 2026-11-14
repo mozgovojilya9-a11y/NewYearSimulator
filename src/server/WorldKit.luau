@@ -279,17 +279,21 @@ function WorldKit.Torch(parent: Instance, position: Vector3, color: Color3?)
 	return post
 end
 
--- Thin HP bar above a part, sized in studs so bars don't overlap.
--- Name is shown only when `name` is given (bosses).
+-- Thin HP bar above a part, sized in studs. With `name` (bosses): name +
+-- bar, always visible and on top. Without (normal mobs): hidden until the
+-- first hit (UpdateHealth), drawn in depth so bars of mobs standing
+-- behind each other don't pile up, short view distance.
 function WorldKit.HealthGui(body: BasePart, name: string?, heightOffset: number)
 	local hb = Config.MobLooks.HealthBar
+	local isBoss = name ~= nil
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "HealthGui"
 	gui.Adornee = body
-	gui.Size = UDim2.new(hb.Width, 0, hb.Height * (if name then 2.2 else 1), 0)
+	gui.Size = if isBoss then UDim2.new(hb.Width * 1.6, 0, hb.Height * 3, 0) else UDim2.new(hb.Width, 0, hb.Height, 0)
 	gui.StudsOffsetWorldSpace = Vector3.new(0, heightOffset, 0)
-	gui.AlwaysOnTop = true
-	gui.MaxDistance = hb.MaxDistance
+	gui.AlwaysOnTop = isBoss
+	gui.MaxDistance = if isBoss then hb.BossMaxDistance else hb.MaxDistance
+	gui.Enabled = isBoss
 	gui.LightInfluence = 0
 	gui.Parent = body
 
@@ -343,6 +347,7 @@ function WorldKit.HealthGui(body: BasePart, name: string?, heightOffset: number)
 	text.TextScaled = true
 	text.TextColor3 = Theme.Text
 	text.ZIndex = 2
+	text.Visible = isBoss -- numbers only on the big boss bar
 	text.Parent = bar
 	local ts = Instance.new("UIStroke")
 	ts.Thickness = 1.5
@@ -357,6 +362,9 @@ function WorldKit.UpdateHealth(body: BasePart, health: number, maxHealth: number
 		return
 	end
 	local ratio = math.clamp(health / maxHealth, 0, 1)
+	if ratio < 1 then
+		gui.Enabled = true -- normal mobs show their bar after the first hit
+	end
 	gui.Bar.Fill.Size = UDim2.fromScale(ratio, 1)
 	gui.Bar.Fill.BackgroundColor3 = BAR_LOW:Lerp(BAR_FULL, ratio)
 	gui.Bar.HpText.Text = Format.Number(health) .. "/" .. Format.Number(maxHealth)

@@ -3,7 +3,9 @@
 	Builds a weapon Model out of Parts for a Config.Weapons entry
 	(weapon.Shape picks the builder). Used for the character's hand and
 	forge racks (server) and ViewportFrames (client), so it lives in
-	Shared and depends on nothing else.
+	Shared. If the owner made a model GameAssets/Weapons/<weapon id>
+	with a part named "Handle" (+Y = along the blade, grip at its
+	center), that cleaned model is used instead (Shared.Assets).
 
 	Convention: PrimaryPart = "Handle"; its +Y axis points along the
 	blade and the grip point is the handle's center. All parts are
@@ -15,6 +17,10 @@
 	emitter. Every weapon carries a disabled Trail along the blade that
 	the client switches on during a swing (Swing.luau).
 ]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Assets = require(ReplicatedStorage.Shared.Assets)
 
 local WeaponBuilder = {}
 
@@ -519,13 +525,52 @@ local function weldAll(model, handle)
 	end
 end
 
+-- The owner's model for this weapon (cleaned), prepared like a built
+-- one: Handle as PrimaryPart, every part loose and welded to it. nil when
+-- there is no usable model.
+local function fromAsset(weapon)
+	local asset = Assets.Get("Weapons", weapon.Id)
+	if not asset then
+		return nil
+	end
+	local handle = asset:FindFirstChild("Handle", true)
+	if not asset:IsA("Model") or not handle or not handle:IsA("BasePart") then
+		warn(("[WeaponBuilder] GameAssets/Weapons/%s: нужна модель с деталью Handle — беру процедурную"):format(weapon.Id))
+		asset:Destroy()
+		return nil
+	end
+	for _, p in ipairs(asset:GetDescendants()) do
+		if p:IsA("BasePart") then
+			p.Anchored = false
+			p.CanCollide = false
+			p.CanQuery = false
+			p.CanTouch = false
+			p.Massless = true
+			if p ~= handle then
+				p.Parent = asset -- flat, so weldAll reaches every part
+			end
+		end
+	end
+	handle.Parent = asset
+	asset.Name = weapon.Id
+	asset.PrimaryPart = handle
+	-- Same frame as the procedural weapons: handle upright at the origin.
+	-- (move the whole model so that handle.CFrame becomes `target`)
+	local target = CFrame.new(0, handle.Size.Y / 2, 0)
+	asset:PivotTo(target * handle.CFrame:Inverse() * asset:GetPivot())
+	return asset, handle
+end
+
 -- Returns a Model named after the weapon, PrimaryPart "Handle".
 function WeaponBuilder.Build(weapon): Model
-	local model = Instance.new("Model")
-	model.Name = weapon.Id
-	local build = builders[weapon.Shape or weapon.Id] or builders.IronSword
-	local handle, glowPart = build(model, weapon)
-	model.PrimaryPart = handle
+	local model, handle, glowPart = fromAsset(weapon)
+	if not model then
+		model = Instance.new("Model")
+		model.Name = weapon.Id
+		local build = builders[weapon.Shape or weapon.Id] or builders.IronSword
+		handle, glowPart = build(model, weapon)
+		model.PrimaryPart = handle
+	end
 
 	-- Highest point of the weapon: the trail runs from above the grip to it.
 	local top = 0

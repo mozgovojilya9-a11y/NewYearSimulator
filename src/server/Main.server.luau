@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local AssetService = require(script.Parent.AssetService)
 local Atmosphere = require(script.Parent.Atmosphere)
 local Bounds = require(script.Parent.Bounds)
 local ClickService = require(script.Parent.ClickService)
@@ -61,6 +62,7 @@ end
 
 -- Create every RemoteEvent before any client can look for it.
 Remotes.Init()
+start("AssetService", AssetService.Init) -- owner models, cleaned, before anything builds
 start("Passes", Passes.Init)
 Passes.OnChanged = PlayerState.Sync
 start("StatService", StatService.Init)
