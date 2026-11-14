@@ -16,7 +16,6 @@ local Style = require(script.Parent.Style)
 local Equipment = require(script.Parent.Windows.Equipment)
 local Forge = require(script.Parent.Windows.Forge)
 local Inventory = require(script.Parent.Windows.Inventory)
-local Rebirth = require(script.Parent.Windows.Rebirth)
 local Reward = require(script.Parent.Windows.Reward)
 local Settings = require(script.Parent.Windows.Settings)
 local Pets = require(script.Parent.Windows.Pets)
@@ -24,7 +23,7 @@ local Store = require(script.Parent.Windows.Store)
 
 local player = Players.LocalPlayer
 local travel = ReplicatedStorage:WaitForChild("Travel")
-local aura = player:WaitForChild("leaderstats"):WaitForChild("Aura")
+player:WaitForChild("leaderstats") -- data loaded
 
 local Buttons = {}
 
@@ -77,7 +76,6 @@ local actions = {
 	Store = function()
 		Store.Open()
 	end,
-	Rebirth = Rebirth.Open,
 	Reward = Reward.Open,
 	Travel = function()
 		go(if player:GetAttribute("Zone") == "Dungeon" then "Hub" else "Dungeon")
@@ -122,10 +120,8 @@ local function setBadge(id, visible)
 end
 local function refreshBadges()
 	setBadge("Pets", Pets.CanHatch() and (player:GetAttribute("EquippedPets") or "") == "")
-	setBadge("Rebirth", Rebirth.CanRebirth())
 	setBadge("Reward", player:GetAttribute("RewardReady") == true)
 end
-aura.Changed:Connect(refreshBadges)
 for _, attribute in ipairs({ "EquippedPets", "RoomReached", "RewardReady", "Credits" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshBadges)
 end

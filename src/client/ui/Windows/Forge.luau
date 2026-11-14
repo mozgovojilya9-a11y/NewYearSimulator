@@ -70,7 +70,7 @@ local function costOf(recipe)
 end
 
 -- "ok" | "materials" | "owned", plus the first missing entry.
--- (Crafting costs only materials: Aura is power and is never spent.)
+-- (Crafting costs only materials.)
 local function stateOf(recipe)
 	if isOwned(recipe) then
 		return "owned"
@@ -229,15 +229,12 @@ local function refreshDetails()
 		statLabels[2].Text = ("Сейчас: %s (%s)"):format(Format.Number(currentDamage), if current then current.Name else "—")
 		local mine = player:GetAttribute("ClickPower") or 1
 		statLabels[3].Text = ("Твой удар станет около %s"):format(Format.Number(mine / math.max(1, currentDamage) * item.Damage))
-		local currentTraining = if current then current.TrainingMult or 1 else 1
-		local trainingDelta = (item.TrainingMult or 1) - currentTraining
-		statLabels[4].Text = ("✨ Тренировка: x%s%s"):format(Format.Decimal(item.TrainingMult or 1), if math.abs(trainingDelta) < 0.001 then "" else ('  <font color="%s">%s%s</font>'):format(hex(if trainingDelta > 0 then GREEN else RED), if trainingDelta > 0 then "+" else "-", Format.Decimal(math.abs(trainingDelta))))
 	else
 		local current = Config.ItemById.Armor[player:GetAttribute("Equipped" .. item.Slot) or ""]
 		local set = Config.ArmorSets[item.Set]
 		statLabels[1].Text = ("❤ Здоровье: +%d%s"):format(item.Health, delta(item.Health - (if current then current.Health else 0)))
 		statLabels[2].Text = ("🛡 Защита: +%d%%%s"):format(math.floor(item.Defense * 100 + 0.5), delta((item.Defense - (if current then current.Defense else 0)) * 100, "%"))
-		statLabels[3].Text = ("✨ Тренировка: x%s  •  %s: %s"):format(Format.Decimal(item.TrainingMult or 1), Config.ArmorSlotNames[item.Slot], if current then "сейчас " .. current.Name else "слот пуст")
+		statLabels[3].Text = ("%s: %s"):format(Config.ArmorSlotNames[item.Slot], if current then "сейчас " .. current.Name else "слот пуст")
 		statLabels[4].Text = ('<font color="%s">%s (3 части): +%d%% урона</font>'):format(hex(Style.Colors.Gold), set.Name, math.floor(set.Bonus * 100 + 0.5))
 	end
 

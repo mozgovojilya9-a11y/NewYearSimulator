@@ -1,6 +1,6 @@
 --[[
 	LeaderboardService.luau
-	Two OrderedDataStore boards shown on the hub wall: top Aura and
+	Two OrderedDataStore boards shown on the hub wall: top level and
 	deepest dungeon room. Scores are pushed on every player save
 	(DataService calls Record); the boards refresh every
 	Config.Leaderboards.RefreshSeconds. Everything is pcall-wrapped:
@@ -22,7 +22,7 @@ local boards = {} -- [kind] = SurfaceGui
 
 local function store(kind)
 	if not stores[kind] then
-		stores[kind] = DataStoreService:GetOrderedDataStore(if kind == "Aura" then L.AuraStore else L.RoomStore)
+		stores[kind] = DataStoreService:GetOrderedDataStore(if kind == "Level" then L.LevelStore else L.RoomStore)
 	end
 	return stores[kind]
 end
@@ -31,7 +31,7 @@ end
 function LeaderboardService.Record(userId: number, data)
 	task.spawn(function()
 		pcall(function()
-			store("Aura"):SetAsync(tostring(userId), math.max(0, math.floor(data.Aura)))
+			store("Level"):SetAsync(tostring(userId), math.max(1, math.floor(data.Level or 1)))
 		end)
 		pcall(function()
 			store("Room"):SetAsync(tostring(userId), math.max(0, math.floor(data.RoomReached)))
@@ -71,7 +71,7 @@ local function refresh(kind)
 		if label then
 			local row = rows[i]
 			if row then
-				local value = if kind == "Aura" then Format.Number(row.value) .. " ✨" else "этап " .. row.value
+				local value = if kind == "Level" then "ур. " .. Format.Number(row.value) else "этап " .. row.value
 				label.Text = ("%d. %s — %s"):format(i, nameFor(tonumber(row.key)), value)
 			else
 				label.Text = i .. ". —"

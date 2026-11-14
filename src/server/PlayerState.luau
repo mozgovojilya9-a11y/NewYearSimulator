@@ -1,13 +1,13 @@
 --[[
 	PlayerState.luau
-	Access to the player's state: Aura, materials, armor, pets, boosts.
-	Every service goes through here instead of poking leaderstats or
-	the data table directly. Final numbers (damage, HP, Aura gain, ...)
-	are computed by StatService, never here.
+	Access to the player's state: credits, level, materials, armor, pets,
+	boosts. Every service goes through here instead of poking the data
+	table directly. Final numbers (damage, HP, ...) are computed by
+	StatService, never here.
 
-	Aura lives in leaderstats.Aura (Main.server mirrors it into the save
-	data). Everything else lives in the DataService table and is pushed
-	to the client as Player attributes by PlayerState.Sync.
+	Everything lives in the DataService table and is pushed to the
+	client as Player attributes by PlayerState.Sync; leaderstats (Level,
+	Room) appear once the data is loaded.
 ]]
 
 local HttpService = game:GetService("HttpService")
@@ -21,13 +21,8 @@ local PlayerState = {}
 
 PlayerState.OnSynced = nil -- set by StatService: recompute stats after every Sync
 
-local function auraValue(player)
-	local leaderstats = player:FindFirstChild("leaderstats")
-	return leaderstats and leaderstats:FindFirstChild("Aura")
-end
-
 function PlayerState.IsReady(player): boolean
-	return DataService.Get(player) ~= nil and auraValue(player) ~= nil
+	return DataService.Get(player) ~= nil and player:FindFirstChild("leaderstats") ~= nil
 end
 
 ---------------------------------------------------------------------
@@ -53,41 +48,6 @@ function PlayerState.ActiveSet(player)
 	end
 	return Config.ArmorSets[setId]
 end
-
--- Adds Aura (already multiplied by the caller: StatService AuraGain).
--- The fraction below 1 is kept per player, so 0.2 + 0.2 + ... adds up.
--- Returns the whole Aura actually added.
-local carry = {} -- [player] = fraction not yet added
-game:GetService("Players").PlayerRemoving:Connect(function(player)
-	carry[player] = nil
-end)
-function PlayerState.GiveAura(player, amount: number): number
-	local aura = auraValue(player)
-	if not aura or amount ~= amount or amount <= 0 then
-		return 0
-	end
-	local total = amount + (carry[player] or 0)
-	local whole = math.floor(total)
-	carry[player] = total - whole
-	if whole > 0 then
-		aura.Value += whole
-	end
-	return whole
-end
-
-function PlayerState.GetAura(player): number
-	local aura = auraValue(player)
-	return if aura then aura.Value else 0
-end
-
-function PlayerState.SetAura(player, amount: number)
-	local aura = auraValue(player)
-	if aura then
-		aura.Value = amount
-	end
-end
-
--- (Aura is power and is never spent: there is no SpendAura.)
 
 ---------------------------------------------------------------------
 -- Нано-кредиты (the spendable currency)
@@ -141,14 +101,13 @@ end
 -- Materials (inventory)
 ---------------------------------------------------------------------
 
--- Timed boosts: "Aura" (BoostUntil), "Damage", "Loot".
+-- Timed boosts: "Xp", "Damage", "Loot", "Credits" (os.time() they end).
 function PlayerState.BoostActive(player, kind: string): boolean
 	local data = DataService.Get(player)
 	if not data then
 		return false
 	end
-	local until_ = if kind == "Aura" then data.BoostUntil else (data.Boosts[kind] or 0)
-	return (until_ or 0) > os.time()
+	return (data.Boosts[kind] or 0) > os.time()
 end
 
 function PlayerState.AddBoost(player, kind: string, minutes: number)
@@ -157,11 +116,7 @@ function PlayerState.AddBoost(player, kind: string, minutes: number)
 		return
 	end
 	local now = os.time()
-	if kind == "Aura" then
-		data.BoostUntil = math.max(now, data.BoostUntil or 0) + minutes * 60
-	else
-		data.Boosts[kind] = math.max(now, data.Boosts[kind] or 0) + minutes * 60
-	end
+	data.Boosts[kind] = math.max(now, data.Boosts[kind] or 0) + minutes * 60
 	PlayerState.Sync(player)
 end
 
@@ -222,22 +177,22 @@ function PlayerState.PetSlots(player): number
 	return Config.PetSlots + (if Passes.Owns(player, "PetSlots") then Config.PetSlotsPass else 0)
 end
 
--- Sum of the equipped pets' bonuses: aura, damage.
+-- Sum of the equipped pets' bonuses (shares): damage, max HP.
 function PlayerState.PetBonus(player): (number, number)
 	local data = DataService.Get(player)
 	if not data then
 		return 0, 0
 	end
-	local aura, damage = 0, 0
+	local damage, health = 0, 0
 	for _, key in ipairs(data.EquippedPets) do
 		local pet, tier = PlayerState.ParsePetKey(key)
 		if pet then
 			local multiplier = Config.PetTiers[tier].Multiplier
-			aura += pet.Bonus * multiplier
-			damage += (pet.DamageBonus or 0) * multiplier
+			damage += (pet.Damage or 0) * multiplier
+			health += (pet.Health or 0) * multiplier
 		end
 	end
-	return aura, damage
+	return damage, health
 end
 
 -- Adds one pet (tier 1). Returns false when the storage is full.
@@ -265,32 +220,26 @@ function PlayerState.GrantPet(player, petId: string): boolean
 end
 
 -- Pushes everything the client UI needs into Player attributes.
--- Call after any change to the data table that is not Aura.
+-- Call after any change to the data table.
 function PlayerState.Sync(player)
 	local data = DataService.Get(player)
 	if not data then
 		return
 	end
-	player:SetAttribute("Rebirths", data.Rebirths)
 	player:SetAttribute("Credits", data.Credits or 0)
 	player:SetAttribute("RoomReached", data.RoomReached)
 	player:SetAttribute("Level", data.Level)
 	player:SetAttribute("Xp", data.Xp)
 	player:SetAttribute("XpNext", Config.XpToNext(data.Level))
 	player:SetAttribute("SkillPoints", data.SkillPoints or 0)
-	player:SetAttribute("BoostUntil", data.BoostUntil or 0)
-	player:SetAttribute("BoostDamage", data.Boosts.Damage or 0)
-	player:SetAttribute("BoostLoot", data.Boosts.Loot or 0)
-	publishMaterials(player, data)
-	local unlocked = {}
-	for id in pairs(data.TrainersUnlocked) do
-		table.insert(unlocked, id)
+	for _, kind in ipairs(Config.BoostKinds) do
+		player:SetAttribute("Boost" .. kind, data.Boosts[kind] or 0)
 	end
-	player:SetAttribute("TrainersUnlocked", table.concat(unlocked, ","))
+	publishMaterials(player, data)
 
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then
-		leaderstats.Rebirths.Value = data.Rebirths
+		leaderstats.Level.Value = data.Level
 		leaderstats.Room.Value = data.RoomReached
 	end
 

@@ -1,8 +1,8 @@
 --[[
 	Hud.luau
-	Objective text (top center), counters (bottom left: Aura, rebirths,
-	pets) and the bottom-center stack: damage, player health (dungeon),
-	and the room progress bar.
+	Objective text (top center), bottom left: credits and the level bar,
+	bottom center: damage, player health (dungeon) and the record room
+	bar; the level-up banner and the boost timer.
 ]]
 
 local Players = game:GetService("Players")
@@ -14,7 +14,7 @@ local Popups = require(script.Parent.Popups)
 local Style = require(script.Parent.Style)
 
 local player = Players.LocalPlayer
-local aura = player:WaitForChild("leaderstats"):WaitForChild("Aura")
+player:WaitForChild("leaderstats") -- data loaded
 local roomState = ReplicatedStorage:WaitForChild("RoomState")
 
 local Hud = {}
@@ -56,28 +56,6 @@ local function refreshHint()
 	hintLabel.Visible = true
 end
 player:GetAttributeChangedSignal("ClickPower"):Connect(refreshHint)
-
--- Trainer plate: shown while the server says we stand on a trainer.
-local trainerPlate = Style.Plate(Style.Gui, {
-	Name = "Trainer",
-	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, Config.Hud.TopLeftReserved.Y + 46),
-	Size = UDim2.fromOffset(380, 40),
-	ZIndex = 5,
-})
-trainerPlate.Visible = false
-local trainerText = Style.Label(trainerPlate, "", 22, Style.Colors.Green, { Size = UDim2.fromScale(1, 1), ZIndex = 6 })
-local function refreshTrainer()
-	local def = Config.TrainerById[player:GetAttribute("OnTrainer") or ""]
-	trainerPlate.Visible = def ~= nil
-	if def then
-		local perSecond = (player:GetAttribute("Stat_AuraGain") or 1) * def.Multiplier / Config.Aura.TrainerTickInterval
-		trainerText.Text = Config.HubLayout.Texts.TrainerHud:format(tostring(def.Multiplier), Format.Decimal(perSecond, 1))
-	end
-end
-player:GetAttributeChangedSignal("OnTrainer"):Connect(refreshTrainer)
-player:GetAttributeChangedSignal("Stat_AuraGain"):Connect(refreshTrainer)
-refreshTrainer()
 
 local currentRoomAlive = nil -- alive count in the room the player is in (nil = unknown)
 local function setObjective(text)
@@ -151,67 +129,11 @@ local function counter(order, icon, color, parent: Instance?, size: UDim2?)
 	return value, scale
 end
 
-local auraValue, auraScale = counter(1, "✨", Style.Colors.Gold)
--- Credits and rebirths share one row so the column stays short (the
--- menu grid is above it on small screens).
-local pairRow = Instance.new("Frame")
-pairRow.Name = "CreditsRebirths"
-pairRow.LayoutOrder = 2
-pairRow.Size = UDim2.new(1, 0, 0, 40)
-pairRow.BackgroundTransparency = 1
-pairRow.Parent = counters
-local pairLayout = Instance.new("UIListLayout")
-pairLayout.FillDirection = Enum.FillDirection.Horizontal
-pairLayout.Padding = UDim.new(0, 6)
-pairLayout.SortOrder = Enum.SortOrder.LayoutOrder
-pairLayout.Parent = pairRow
-local creditsValue = counter(1, Config.Credits.Icon, Style.Colors.Cyan, pairRow, UDim2.new(0.62, -3, 1, 0))
-local rebirthValue = counter(2, "🔁", Style.Colors.Purple, pairRow, UDim2.new(0.38, -3, 1, 0))
-
--- Auto-click toggle: the server clicks for you (on trainers; everywhere with the pass).
-local autoClickRemote = ReplicatedStorage:WaitForChild("AutoClick")
-local autoButton, setAutoColor = Style.Button(counters, { Size = UDim2.new(1, 0, 0, 46), Color = Style.Colors.Red, Text = "Авто-клик: ВЫКЛ", TextSize = 20, LayoutOrder = 0, Shadow = false })
-local autoOn = false
-local function renderAuto()
-	autoButton.Text = "Авто-клик: " .. (if autoOn then "ВКЛ" else "ВЫКЛ")
-	autoButton.TextColor3 = Color3.new(1, 1, 1)
-	setAutoColor(if autoOn then Style.Colors.Green else Style.Colors.Red)
-end
-autoButton.Activated:Connect(function()
-	autoOn = not autoOn
-	autoClickRemote:FireServer(autoOn)
-	renderAuto()
-	if autoOn then
-		Popups.Toast("Авто-клик работает на тренажёре (везде — с пассом «Авто-клик»)", "gold")
-	end
-end)
-renderAuto()
-
-local displayed = Instance.new("NumberValue")
-displayed.Value = aura.Value
-displayed.Changed:Connect(function(v)
-	auraValue.Text = Format.Number(v)
-end)
-auraValue.Text = Format.Number(aura.Value)
-local counterTween
-aura.Changed:Connect(function(newValue)
-	if counterTween then
-		counterTween:Cancel()
-	end
-	if newValue < displayed.Value then
-		displayed.Value = newValue
-		return
-	end
-	counterTween = Style.Tween(displayed, 0.25, { Value = newValue })
-	auraScale.Scale = 1.15
-	Style.Tween(auraScale, 0.2, { Scale = 1 })
-end)
+local creditsValue = counter(1, Config.Credits.Icon, Style.Colors.Cyan)
 
 local function refreshCounters()
-	rebirthValue.Text = tostring(player:GetAttribute("Rebirths") or 0)
 	creditsValue.Text = Format.Number(player:GetAttribute("Credits") or 0)
 end
-player:GetAttributeChangedSignal("Rebirths"):Connect(refreshCounters)
 player:GetAttributeChangedSignal("Credits"):Connect(refreshCounters)
 refreshCounters()
 
@@ -236,13 +158,8 @@ stackLayout.Parent = stack
 local damageLabel = Style.Label(stack, "", 32, Style.Colors.Gold, { LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 38), ZIndex = 3 })
 local function refreshDamage()
 	damageLabel.Text = Format.Number(player:GetAttribute("ClickPower") or 1) .. " Урон"
-	local mult = player:GetAttribute("AuraMultiplier") or 1
-	if mult ~= 1 then
-		damageLabel.Text ..= ("  •  Тренировка x%s"):format(tostring(math.floor(mult * 100 + 0.5) / 100))
-	end
 end
 player:GetAttributeChangedSignal("ClickPower"):Connect(refreshDamage)
-player:GetAttributeChangedSignal("AuraMultiplier"):Connect(refreshDamage)
 refreshDamage()
 
 local function bar(order, color, width)
@@ -300,45 +217,13 @@ if player.Character then
 end
 refreshHealth()
 
--- Next training goal in the hub: the first trainer still locked by
--- Aura, else the next rebirth. Returns text, need.
-local function nextGoal(): (string, number)
-	local unlocked = {}
-	for id in string.gmatch(player:GetAttribute("TrainersUnlocked") or "1", "[^,]+") do
-		unlocked[id] = true
-	end
-	for _, def in ipairs(Config.Trainers) do
-		if def.Aura and not def.Pass and not unlocked[def.Id] then
-			return Config.Hud.Goals.Trainer:format(def.Name, tostring(def.Multiplier)), def.Aura
-		end
-	end
-	return Config.Hud.Goals.Rebirth, Config.RebirthAura(player:GetAttribute("Rebirths") or 0)
-end
-
--- Bottom bar: in the dungeon the stage progress, in the hub the way to
--- the next trainer / rebirth (fills with Aura).
+-- Bottom bar: the record room of the dungeon.
 local function refreshProgress()
-	if player:GetAttribute("Zone") == "Dungeon" then
-		local reached = player:GetAttribute("RoomReached") or 0
-		progressFill.Size = UDim2.fromScale(math.clamp(reached / Config.Dungeon.Rooms, 0, 1), 1)
-		progressText.Text = if reached >= Config.Dungeon.Rooms then "Данж пройден!" else ("Рекорд: этап %d/%d"):format(reached, Config.Dungeon.Rooms)
-		return
-	end
-	local text, need = nextGoal()
-	local ratio = math.clamp(aura.Value / math.max(1, need), 0, 1)
-	Style.Tween(progressFill, 0.2, { Size = UDim2.fromScale(ratio, 1) })
-	progressText.Text = ("%s: %s / %s ✨"):format(text, Format.Number(aura.Value), Format.Number(need))
+	local reached = player:GetAttribute("RoomReached") or 0
+	progressFill.Size = UDim2.fromScale(math.clamp(reached / Config.Dungeon.Rooms, 0, 1), 1)
+	progressText.Text = if reached >= Config.Dungeon.Rooms then "Данж пройден!" else ("Рекорд: этап %d/%d"):format(reached, Config.Dungeon.Rooms)
 end
-for _, attribute in ipairs({ "RoomReached", "Zone", "TrainersUnlocked", "Rebirths" }) do
-	player:GetAttributeChangedSignal(attribute):Connect(refreshProgress)
-end
-local lastProgress = 0
-aura.Changed:Connect(function()
-	if os.clock() - lastProgress > 0.15 then
-		lastProgress = os.clock()
-		refreshProgress()
-	end
-end)
+player:GetAttributeChangedSignal("RoomReached"):Connect(refreshProgress)
 refreshProgress()
 
 ---------------------------------------------------------------------
@@ -385,7 +270,7 @@ levelUpRemote.OnClientEvent:Connect(function(level, points)
 	task.wait(0.1) -- let the new MaxHealth attribute arrive
 	local lines = {
 		LT.Points:format(tonumber(points) or 1),
-		LT.Growth:format(Format.Decimal(Config.BaseAura(level)), Format.Number(player:GetAttribute("MaxHealth") or Config.Player.Health)),
+		LT.Growth:format(Format.Number(player:GetAttribute("ClickPower") or 1), Format.Number(player:GetAttribute("MaxHealth") or Config.Player.Health)),
 	}
 	Popups.Banner(LT.Title, ("Ур. %d"):format(level), lines, Style.Colors.Gold)
 	Popups.Flash(Style.Colors.Gold)
@@ -403,10 +288,10 @@ boostLabel.Visible = false
 task.spawn(function()
 	while true do
 		local parts = {}
-		for _, boost in ipairs({ { "BoostUntil", "Аура" }, { "BoostDamage", "Урон" }, { "BoostLoot", "Удача" } }) do
-			local left = (player:GetAttribute(boost[1]) or 0) - os.time()
+		for _, kind in ipairs(Config.BoostKinds) do
+			local left = (player:GetAttribute("Boost" .. kind) or 0) - os.time()
 			if left > 0 then
-				table.insert(parts, ("x2 %s %d:%02d"):format(boost[2], left // 60, left % 60))
+				table.insert(parts, ("x2 %s %d:%02d"):format(Config.BoostNames[kind], left // 60, left % 60))
 			end
 		end
 		boostLabel.Text = "⚡ " .. table.concat(parts, "   ")

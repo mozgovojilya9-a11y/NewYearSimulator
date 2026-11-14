@@ -97,6 +97,10 @@ function DataService.Load(player)
 	DataService.Sanitize(data)
 
 	-- Fields of removed systems: dropped so they are never written back.
+	data.Aura = nil
+	data.Rebirths = nil
+	data.TrainersUnlocked = nil
+	data.BoostUntil = nil
 	data.OwnedBackpacks = nil
 	data.EquippedBackpack = nil
 	-- Old pets (one of each, one equipped) -> pet stacks.
@@ -139,6 +143,28 @@ DataService.Migrations = {
 			data.SkillPoints = math.max(0, (data.Level or 1) - 1) * Config.Progression.Level.SkillPointsPerLevel
 		end
 	end,
+	-- 2 -> 3: the clicker is gone (action-RPG). Aura, rebirths and
+	-- trainers are removed; their worth becomes Нано-кредиты once
+	-- (Config.Migration), with a message on the next join. The old x2
+	-- Aura boost time moves to the x2 XP boost.
+	[2] = function(data)
+		local m = Config.Migration
+		local aura = if type(data.Aura) == "number" and data.Aura == data.Aura then math.max(0, data.Aura) else 0
+		local rebirths = if type(data.Rebirths) == "number" then math.max(0, data.Rebirths) else 0
+		local credits = math.floor(math.min(m.Max, m.PerAuraDigit * math.log10(aura + 1) + m.PerRebirth * rebirths))
+		if credits > 0 then
+			data.Credits = (if type(data.Credits) == "number" then data.Credits else 0) + credits
+			data.Notice = m.Notice:format(tostring(credits))
+		end
+		data.Boosts = if type(data.Boosts) == "table" then data.Boosts else {}
+		if type(data.BoostUntil) == "number" and data.BoostUntil > (data.Boosts.Xp or 0) then
+			data.Boosts.Xp = data.BoostUntil
+		end
+		data.Aura = nil
+		data.Rebirths = nil
+		data.TrainersUnlocked = nil
+		data.BoostUntil = nil
+	end,
 }
 
 function DataService.Migrate(data, fromVersion: number, player)
@@ -164,11 +190,8 @@ function DataService.Sanitize(data)
 			data[field] = default
 		end
 	end
-	number("Aura", 0)
-	data.Aura = math.max(0, math.floor(data.Aura))
 	number("Credits", 0)
 	data.Credits = math.max(0, math.floor(data.Credits))
-	number("Rebirths", 0)
 	number("RoomReached", 0)
 	number("Level", 1)
 	data.Level = math.max(1, math.floor(data.Level))
@@ -182,6 +205,11 @@ function DataService.Sanitize(data)
 	if not Config.ItemById.Weapon[data.EquippedWeapon] or not data.OwnedWeapons[data.EquippedWeapon] then
 		data.OwnedWeapons.Stick = true
 		data.EquippedWeapon = "Stick"
+	end
+	for _, kind in ipairs(Config.BoostKinds) do
+		if type(data.Boosts[kind]) ~= "number" then
+			data.Boosts[kind] = 0
+		end
 	end
 	for materialId, count in pairs(data.Materials) do
 		if type(count) ~= "number" or count <= 0 then

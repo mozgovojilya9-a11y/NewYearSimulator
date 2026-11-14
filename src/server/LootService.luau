@@ -1,6 +1,6 @@
 --[[
 	LootService.luau
-	Mobs drop MATERIALS (never Aura). Server-authoritative and personal:
+	Mobs drop MATERIALS. Server-authoritative and personal:
 
 	- On every kill the rarity is rolled (Config.Rarities, multiplied by
 	  loot luck for Rare+), then a material of that rarity is picked from

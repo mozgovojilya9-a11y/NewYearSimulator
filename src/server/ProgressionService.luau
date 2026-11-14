@@ -7,9 +7,8 @@
 	  bosses, runs),
 	- player level from XP (every 5 levels a credits reward),
 	- Нано-кредиты for every kill (Config.KillCredits).
-	Rewards are always credits / boosts / pets, never Aura (Aura comes
-	only from training).
-	- temporary x2 Aura boosts (BoostUntil, counted in AuraMultiplier).
+	Rewards are credits / XP / boosts / pets.
+	- temporary x2 XP boosts (Boosts.Xp).
 
 	Client: Progression:InvokeServer("Status") -> table;
 	("ClaimDaily") / ("Spin") / ("ClaimQuest", index) -> ok, message, extra.
@@ -46,7 +45,7 @@ end
 ---------------------------------------------------------------------
 
 local function giveBoost(player, _data, minutes: number)
-	PlayerState.AddBoost(player, "Aura", minutes)
+	PlayerState.AddBoost(player, "Xp", minutes)
 end
 
 ---------------------------------------------------------------------
@@ -110,8 +109,8 @@ end
 
 local xpToNext = Config.XpToNext
 
--- Adds XP; on level up: skill points, rewards, stats refresh (BaseAura
--- and max HP grow with the level), big banner on the client.
+-- Adds XP; on level up: skill points, rewards, stats refresh (damage
+-- and max HP grow with the level), full heal, big banner on the client.
 local function addXp(player, data, amount: number)
 	amount = math.floor(amount)
 	if amount <= 0 then
@@ -130,7 +129,7 @@ local function addXp(player, data, amount: number)
 		end
 	end
 	if gained > 0 then
-		PlayerState.Sync(player) -- recomputes stats: BaseAura, max HP
+		PlayerState.Sync(player) -- recomputes stats: damage, max HP
 		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 		if humanoid and humanoid.Health > 0 then
 			task.defer(function()
@@ -148,20 +147,6 @@ function ProgressionService.AddXp(player, amount: number)
 	if data then
 		addXp(player, data, amount)
 	end
-end
-
--- Training gives a little XP: TrainingXp every TrainingXpTicks ticks.
-local trainingTicks = {} -- [player] = ticks since the last XP
-Players.PlayerRemoving:Connect(function(player)
-	trainingTicks[player] = nil
-end)
-function ProgressionService.OnTrainingTick(player)
-	local ticks = (trainingTicks[player] or 0) + 1
-	if ticks >= P.Level.TrainingXpTicks then
-		ticks = 0
-		ProgressionService.AddXp(player, P.Level.TrainingXp)
-	end
-	trainingTicks[player] = ticks
 end
 
 ---------------------------------------------------------------------
@@ -230,7 +215,7 @@ local function status(player)
 		Level = data.Level,
 		Xp = data.Xp,
 		XpNext = xpToNext(data.Level),
-		BoostUntil = data.BoostUntil,
+		BoostXp = data.Boosts.Xp,
 	}
 end
 
@@ -249,7 +234,7 @@ local function claimDaily(player)
 	local message = ("День %d: +%s нано-кредитов"):format(nextDay, Format.Number(amount))
 	if nextDay == 7 and P.Daily.Day7Boost then
 		giveBoost(player, data, 30)
-		message ..= " и x2 Аура на 30 мин!"
+		message ..= " и x2 Опыт на 30 мин!"
 	end
 	ProgressionService.RefreshReady(player)
 	return true, message, nextDay
@@ -285,7 +270,7 @@ local function spin(player)
 		message = "+" .. Format.Number(amount) .. " нано-кредитов"
 	elseif prize.Kind == "Boost" then
 		giveBoost(player, data, prize.Minutes)
-		message = ("x2 Аура на %d мин"):format(prize.Minutes)
+		message = ("x2 Опыт на %d мин"):format(prize.Minutes)
 	else -- Egg: a free hatch of the best egg the player can afford, at least the first one
 		local egg = Config.Eggs[1]
 		for _, candidate in ipairs(Config.Eggs) do
@@ -359,9 +344,6 @@ function ProgressionService.OnRunStarted(player)
 	questProgress(player, "Run", 1)
 end
 
-function ProgressionService.OnTrainerClick(player)
-	questProgress(player, "Train", 1)
-end
 
 function ProgressionService.Init()
 	local allow = RateLimit.new(0.3)

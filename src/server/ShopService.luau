@@ -1,7 +1,7 @@
 --[[
 	ShopService.luau
 	Buying and equipping items from any Config.Shop category
-	(weapons are equip-only: they are crafted; pets are paid with Aura).
+	(weapons are equip-only: they are crafted; pets are paid with credits).
 
 	Client calls ShopRequest:InvokeServer(action, category, id) where
 	action is "Buy" or "Equip". Returns (ok: boolean, message: string).
@@ -64,7 +64,7 @@ function ShopService.Handle(player, action, category, id)
 		if shop.Purchasable == false then
 			return false, "Оружие куётся в Кузнице" -- weapons are crafted, never bought
 		end
-		return false, "Нельзя купить" -- nothing is sold for Aura (Aura is never spent)
+		return false, "Нельзя купить" -- gear is crafted, never bought
 	elseif action == "Equip" then
 		if not owned[id] then
 			return false, if category == "Weapon" then "Сначала выкуй в Кузнице" else "Сначала получи"

@@ -1,8 +1,8 @@
 --[[
 	StatService.luau
 	The ONE place that turns everything a player has into final numbers.
-	Sources: level, weapon, armor pieces, armor set bonus, pets, rebirths,
-	game passes, boosts (class and skills will plug in here later).
+	Sources: level, weapon, armor pieces, armor set bonus, pets, game
+	passes, boosts (class and skills will plug in here later).
 
 	Stats (all final, ready to use):
 	  Damage       one hit before crit
@@ -14,15 +14,12 @@
 	  Luck         x chances of Rare+ drops
 	  Regen        HP per second out of combat
 	  Dash         dash distance (studs)
-	  TrainingMult x training from gear (weapon x armor pieces)
-	  AuraMultiplier  everything that multiplies training except the level
-	  AuraGain     Aura of one training tick on a x1 trainer
 
 	Every system reads stats ONLY through StatService.Get(player).
-	Stats are recomputed on every change (PlayerState.Sync, Aura change,
-	pass bought, boost started / ended) and pushed to the client as
-	attributes: the old names (ClickPower, MaxHealth, Defense,
-	AuraMultiplier) plus "Stat_<Name>" for every stat and a JSON "Stats".
+	Stats are recomputed on every change (PlayerState.Sync: gear, level,
+	pets, pass bought, boost started / ended) and pushed to the client as
+	attributes: the old names (ClickPower, MaxHealth, Defense) plus
+	"Stat_<Name>" for every stat and a JSON "Stats".
 ]]
 
 local HttpService = game:GetService("HttpService")
@@ -39,11 +36,7 @@ local StatService = {}
 local cache = {} -- [player] = stats table
 local published = {} -- [player] = { [attribute] = value }
 
-local function auraOf(player): number
-	return PlayerState.GetAura(player)
-end
-
--- Pure computation from the save data + the current Aura.
+-- Pure computation from the save data.
 local function compute(player)
 	local data = DataService.Get(player)
 	local base = Config.Stats
@@ -57,9 +50,6 @@ local function compute(player)
 		Luck = base.Luck,
 		Regen = base.Regen,
 		Dash = base.Dash,
-		TrainingMult = 1,
-		AuraMultiplier = 1,
-		AuraGain = 1,
 	}
 	if not data then
 		return stats
@@ -72,9 +62,6 @@ local function compute(player)
 	-- Weapon
 	local weapon = Config.ItemById.Weapon[data.EquippedWeapon]
 	local weaponDamage = if weapon then weapon.Damage else 1
-	if weapon then
-		stats.TrainingMult *= weapon.TrainingMult or 1
-	end
 
 	-- Armor pieces + set bonus
 	for _, slot in ipairs(Config.ArmorSlots) do
@@ -82,7 +69,6 @@ local function compute(player)
 		if piece then
 			stats.MaxHealth += piece.Health
 			stats.Defense += piece.Defense
-			stats.TrainingMult *= piece.TrainingMult or 1
 		end
 	end
 	stats.Defense = math.min(0.8, stats.Defense)
@@ -93,8 +79,9 @@ local function compute(player)
 	end
 
 	-- Pets
-	local petAura, petDamage = PlayerState.PetBonus(player)
+	local petDamage, petHealth = PlayerState.PetBonus(player)
 	damageMult *= 1 + petDamage
+	stats.MaxHealth = math.floor(stats.MaxHealth * (1 + petHealth))
 
 	-- Passes and boosts
 	if Passes.Owns(player, "Damage2x") then
@@ -110,23 +97,9 @@ local function compute(player)
 		stats.Luck *= 2
 	end
 
-	-- Damage = weapon x PowerMult(Aura) x bonuses
-	local damage = Config.Click.BaseDamage * weaponDamage * Config.PowerMult(auraOf(player)) * damageMult
+	-- Damage = weapon x bonuses
+	local damage = Config.Click.BaseDamage * weaponDamage * damageMult
 	stats.Damage = math.max(1, math.floor(damage))
-
-	-- Training: everything except the level-based BaseAura
-	local auraMult = stats.TrainingMult * (1 + petAura) * Config.RebirthMultiplier(data.Rebirths)
-	if PlayerState.BoostActive(player, "Aura") then
-		auraMult *= Config.Progression.Boost.Multiplier
-	end
-	if Passes.Owns(player, "VIP") then
-		auraMult *= Config.VipAuraMultiplier
-	end
-	if Passes.Owns(player, "Aura2x") then
-		auraMult *= 2
-	end
-	stats.AuraMultiplier = auraMult
-	stats.AuraGain = Config.Aura.TrainerTickBase * Config.BaseAura(level) * auraMult
 
 	return stats
 end
@@ -150,7 +123,6 @@ local function publish(player, stats)
 	set(player, "ClickPower", stats.Damage)
 	set(player, "MaxHealth", stats.MaxHealth)
 	set(player, "Defense", round(stats.Defense, 3))
-	set(player, "AuraMultiplier", round(stats.AuraMultiplier, 2))
 	for name, value in pairs(stats) do
 		set(player, "Stat_" .. name, if math.floor(value) == value then value else round(value, 3))
 	end
@@ -192,7 +164,7 @@ function StatService.ClickCooldown(player): number
 end
 
 function StatService.Init()
-	-- Every Sync (gear, pets, level, rebirth, boosts) refreshes stats.
+	-- Every Sync (gear, pets, level, boosts) refreshes stats.
 	PlayerState.OnSynced = StatService.Refresh
 	Players.PlayerRemoving:Connect(function(player)
 		cache[player] = nil

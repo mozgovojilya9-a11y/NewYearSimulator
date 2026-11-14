@@ -6,7 +6,7 @@
 
 	Run ends on: death, "Назад"/leaving, clearing room 20. The best room
 	is kept in RoomReached (record for the leaderboard and rebirth).
-	Mobs give no Aura; loot comes with the drop stage (LootService).
+	Loot comes with the drop stage (LootService).
 	Mob AI / player damage: see MobAI.
 ]]
 

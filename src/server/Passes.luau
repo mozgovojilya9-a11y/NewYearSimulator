@@ -5,7 +5,7 @@
 	UI shows "Скоро"). Ownership is checked once on join
 	(UserOwnsGamePassAsync) and updated instantly after an in-game
 	purchase (PromptGamePassPurchaseFinished). The client reads the
-	"Passes" player attribute ("VIP,AutoClick,...").
+	"Passes" player attribute ("VIP,Xp2x,...").
 ]]
 
 local MarketplaceService = game:GetService("MarketplaceService")

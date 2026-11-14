@@ -2,7 +2,7 @@
 	Main.server.luau
 	Entry point: builds the world, starts every service, wires player
 	join/leave into DataService and exposes progress through leaderstats
-	(Aura, Rebirths, Room). Also runs the autosave.
+	(Level, Room). Also runs the autosave.
 ]]
 
 local Players = game:GetService("Players")
@@ -25,7 +25,6 @@ local PetService = require(script.Parent.PetService)
 local Passes = require(script.Parent.Passes)
 local PlayerState = require(script.Parent.PlayerState)
 local ProgressionService = require(script.Parent.ProgressionService)
-local RebirthService = require(script.Parent.RebirthService)
 local Remotes = require(script.Parent.Remotes)
 local ShopService = require(script.Parent.ShopService)
 local StatService = require(script.Parent.StatService)
@@ -75,13 +74,10 @@ start("ShopService", ShopService.Init)
 start("CraftService", CraftService.Init, hub)
 start("PetService", PetService.Init)
 start("StoreService", StoreService.Init)
-start("RebirthService", RebirthService.Init)
 start("TravelService", TravelService.Init, hub)
 start("EquipmentService", EquipmentService.Init)
 start("ProgressionService", ProgressionService.Init)
 start("LootService", LootService.Init) -- after ProgressionService: both listen to kills
-ClickService.OnTrainerClick = ProgressionService.OnTrainerClick
-HubService.OnTrainingTick = ProgressionService.OnTrainingTick
 
 local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)
 
@@ -99,28 +95,31 @@ local function onPlayerAdded(player)
 
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
-	leaderstats.Parent = player
 
-	local aura = Instance.new("IntValue")
-	aura.Name = "Aura"
-	aura.Value = data.Aura
-	aura.Parent = leaderstats
-
-	local rebirths = Instance.new("IntValue")
-	rebirths.Name = "Rebirths"
-	rebirths.Value = data.Rebirths
-	rebirths.Parent = leaderstats
+	local level = Instance.new("IntValue")
+	level.Name = "Level"
+	level.Value = data.Level
+	level.Parent = leaderstats
 
 	local room = Instance.new("IntValue")
 	room.Name = "Room"
 	room.Value = data.RoomReached
 	room.Parent = leaderstats
 
-	-- Keep the cached data table in sync whenever Aura changes.
-	aura.Changed:Connect(function(newValue)
-		data.Aura = newValue
-		StatService.Refresh(player) -- damage grows with Aura
-	end)
+	-- Parented last: its appearance means "data is loaded" (PlayerState.IsReady,
+	-- clients wait for it).
+	leaderstats.Parent = player
+
+	-- One-time messages from save migrations (e.g. clicker compensation).
+	if type(data.Notice) == "string" and data.Notice ~= "" then
+		local notice = data.Notice
+		data.Notice = nil
+		task.delay(6, function()
+			if player.Parent then
+				Remotes.Notify(player, notice, "gold")
+			end
+		end)
+	end
 
 	PlayerState.Sync(player)
 	task.spawn(Passes.Load, player)

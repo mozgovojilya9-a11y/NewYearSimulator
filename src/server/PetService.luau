@@ -1,7 +1,7 @@
 --[[
 	PetService.luau
 	Pets:InvokeServer(action, ...) -> (ok, message, results?)
-	  ("Hatch", eggId, triple)  pay the egg's Aura price (x3 with the
+	  ("Hatch", eggId, triple)  pay the egg's credits price (x3 with the
 	                            "Open 3" pass) and roll pets by weight;
 	                            results = { petId, ... } for the animation
 	  ("Equip", "petId:tier")   up to PlayerState.PetSlots
@@ -161,7 +161,7 @@ local function equipBest(player, data)
 			for tierText, count in pairs(tiers) do
 				local tier = tonumber(tierText)
 				for _ = 1, count do
-					table.insert(all, { key = petId .. ":" .. tierText, power = pet.Bonus * Config.PetTiers[tier].Multiplier })
+					table.insert(all, { key = petId .. ":" .. tierText, power = (pet.Damage + pet.Health) * Config.PetTiers[tier].Multiplier })
 				end
 			end
 		end

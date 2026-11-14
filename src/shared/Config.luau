@@ -16,9 +16,7 @@ Config.DataStoreName = "AuraClicker_v1"
 -- fields missing from an older save. IDs stored in saves (weapons,
 -- pets) must never be renamed without a migration.
 Config.StartingData = {
-	Aura = 0, -- power: only grows by training, never spent; reset by rebirth
 	Credits = 0, -- "Нано-кредиты": eggs, cosmetics
-	Rebirths = 0,
 	EquippedWeapon = "Stick",
 	OwnedWeapons = { Stick = true }, -- crafted (or legacy bought) weapons
 	OwnedArmor = {}, -- [armorId] = true
@@ -28,7 +26,6 @@ Config.StartingData = {
 	EquippedPets = {}, -- { "petId:tier", ... }
 	PetIndex = {}, -- [petId] = true once hatched
 	RoomReached = 0, -- highest dungeon room cleared (0 = none, 20 = all)
-	TrainersUnlocked = { ["1"] = true }, -- trainer ids whose Aura requirement was reached (permanent)
 	-- Engagement systems (ProgressionService)
 	Daily = { LastClaim = 0, Streak = 0 },
 	WheelLast = 0,
@@ -36,8 +33,7 @@ Config.StartingData = {
 	Level = 1,
 	Xp = 0,
 	SkillPoints = 0, -- 1 per level up; spent in the skill tree (later)
-	BoostUntil = 0, -- x2 Aura boost (wheel, daily, products)
-	Boosts = { Damage = 0, Loot = 0 }, -- other boosts: os.time() they end
+	Boosts = { Xp = 0, Damage = 0, Loot = 0, Credits = 0 }, -- timed x2 boosts: os.time() they end
 	LastSeen = 0, -- os.time() of the last save
 }
 -- Fields from older versions that are migrated / dropped on load
@@ -48,7 +44,19 @@ Config.StartingData = {
 -- on load and never lose progress.
 --   1 = everything before the version number existed
 --   2 = Aura is power (never spent), Нано-кредиты, skill points
-Config.SchemaVersion = 2
+--   3 = action-RPG: Aura, rebirths and trainers removed (credits as
+--       compensation, Config.Migration), x2 boosts in Boosts
+Config.SchemaVersion = 3
+
+-- One-time compensation (schema 2 -> 3) for the removed clicker: Aura and
+-- rebirths turn into Нано-кредиты. Moderate on purpose.
+--   credits = PerAuraDigit x log10(Aura + 1) + PerRebirth x rebirths, capped
+Config.Migration = {
+	PerAuraDigit = 40, -- 1M Aura -> 240
+	PerRebirth = 120, -- 8 rebirths -> 960
+	Max = 3000,
+	Notice = "Игра обновилась: Аура и перерождения убраны. Компенсация: +%s нано-кредитов!",
+}
 
 Config.AutosaveInterval = 120
 
@@ -65,56 +73,14 @@ Config.World = {
 ---------------------------------------------------------------------
 
 Config.Click = {
-	BaseDamage = 1, -- damage of one hit with weapon x1 and no Aura
+	BaseDamage = 1, -- damage of one hit with a weapon of Damage 1
 	Cooldown = 0.1, -- min seconds between accepted clicks at AttackSpeed 1 (anti-macro)
 	Range = 60, -- max studs between player and a clicked mob
 	MeleeRange = 16, -- a click with no target hits the nearest mob within this range
 }
 
--- Aura = the character's POWER. It is never spent on anything. It comes
--- ONLY from training: clicks, auto-click and trainers (mobs never give it).
--- One "training unit" (StatService stat AuraGain) =
---     BaseAura(level) x TrainingMult (weapon x armor pieces)
---     x rebirths x pets x passes x boosts (x class / skills later)
---   standing on a trainer  -> AuraGain x trainer multiplier every TrainerTickInterval s
---   click on a trainer     -> + AuraGain x trainer multiplier x TrainerClickBonus
---   click anywhere else    -> AuraGain x ClickBase
--- Level 1 + Stick + trainer x1 = exactly 1 Aura per tick. Fractions are
--- kept per player, so small gains still add up.
-Config.Aura = {
-	ClickBase = 0.2,
-	TrainerClickBonus = 1, -- every click on a trainer = one more tick (active play ~x6 of standing still)
-	TrainerTickInterval = 1,
-	TrainerTickBase = 1,
-	LevelGrowth = 1.06, -- BaseAura(level): lvl 10 -> x1.7, 25 -> x4, 50 -> x17
-	TrainerCheckInterval = 0.2, -- how often the server looks which trainer a player stands on
-	AutoClickInterval = 0.5, -- server-side auto-click period (AFK ~60% of active play)
-	-- Without the "AutoClick" game pass the auto-click toggle works only
-	-- while standing on a trainer; with the pass it works everywhere.
-	AutoClickFreeOnTrainer = true,
-}
-
-function Config.BaseAura(level: number): number
-	return Config.Aura.LevelGrowth ^ (math.max(1, level) - 1)
-end
-
--- Damage of one hit = weapon Damage x PowerMult(Aura) x armor set bonus
--- x pets x passes x boosts (x class / skills later). PowerMult grows as a
--- power of Aura, so every new trainer is felt in combat:
---   Aura 0 -> x1, 100 -> x2, 1K -> x3.5, 10K -> x7.3, 100K -> x17,
---   1M -> x41, 10M -> x101, 100M -> x252.
-Config.Damage = {
-	PowerScale = 100,
-	PowerExponent = 0.4,
-}
-
-function Config.PowerMult(aura: number): number
-	local power = Config.Damage
-	return 1 + (math.max(0, aura) / power.PowerScale) ^ power.PowerExponent
-end
-
 -- Base character stats before any bonus (StatService adds level, gear,
--- set, pets, rebirths, passes, boosts; class and skills later).
+-- set, pets, passes, boosts; class and skills later).
 Config.Stats = {
 	CritChance = 0.08, -- share of hits that crit
 	CritDamage = 2, -- crit hit = damage x this
@@ -127,11 +93,11 @@ Config.Stats = {
 	Names = {
 		Damage = "Урон", MaxHealth = "Макс. HP", Defense = "Защита", AttackSpeed = "Скорость атаки",
 		CritChance = "Шанс крита", CritDamage = "Крит. урон", Luck = "Удача", Regen = "Регенерация",
-		Dash = "Рывок", TrainingMult = "Тренировка", AuraGain = "Аура за тик",
+		Dash = "Рывок",
 	},
 }
 
--- "Нано-кредиты": the spendable currency (Aura never is). Earned from
+-- "Нано-кредиты": the spendable currency. Earned from
 -- mobs (more in deeper rooms, bosses x BossMultiplier), daily reward,
 -- quests, the wheel and level rewards. Spent on eggs (and cosmetics).
 Config.Credits = {
@@ -142,6 +108,11 @@ Config.Credits = {
 	BossMultiplier = 8,
 }
 
+-- Timed x2 boosts (data.Boosts[kind] = os.time() it ends; wheel, daily
+-- reward and Robux products start them).
+Config.BoostKinds = { "Xp", "Damage", "Loot", "Credits" }
+Config.BoostNames = { Xp = "Опыт", Damage = "Урон", Loot = "Удача", Credits = "Кредиты" }
+
 function Config.KillCredits(room: number, isBoss: boolean): number
 	local c = Config.Credits
 	return math.max(1, math.floor(c.PerKill * c.Growth ^ (math.max(1, room) - 1) * (if isBoss then c.BossMultiplier else 1)))
@@ -150,21 +121,19 @@ end
 -- Robux game passes. Id = 0 means "not created yet": buttons show
 -- "Скоро" and nothing is checked. Put the real ids from the Creator
 -- Dashboard here (see README).
-Config.VipAuraMultiplier = 1.5
+Config.VipBonus = 0.2 -- VIP: +20% XP and credits
 
 -- Order = position in the store. Icon = emoji on the card.
 Config.GamePasses = {
-	VIP = { Id = 0, Order = 1, Icon = "👑", Name = "VIP", Price = 199, Text = "x1.5 Аура, VIP-тег и VIP-тренажёр x100" },
+	VIP = { Id = 0, Order = 1, Icon = "👑", Name = "VIP", Price = 199, Text = "+20% опыта и кредитов, VIP-тег" },
 	Damage2x = { Id = 0, Order = 2, Icon = "⚔", Name = "x2 Урон", Price = 149, Text = "Навсегда удваивает урон" },
-	Aura2x = { Id = 0, Order = 3, Icon = "✨", Name = "x2 Аура", Price = 149, Text = "Навсегда x2 к тренировке Ауры" },
-	AutoClick = { Id = 0, Order = 4, Icon = "⚡", Name = "Авто-клик", Price = 99, Text = "Авто-клик работает везде, не только на тренажёре" },
+	Xp2x = { Id = 0, Order = 3, Icon = "⭐", Name = "x2 Опыт", Price = 149, Text = "Навсегда удваивает опыт" },
+	Credits2x = { Id = 0, Order = 4, Icon = "💠", Name = "x2 Кредиты", Price = 149, Text = "Навсегда удваивает нано-кредиты" },
 	TripleEgg = { Id = 0, Order = 5, Icon = "🥚", Name = "Открытие 3 яиц", Price = 249, Text = "Открывай по 3 яйца сразу" },
 	FastEgg = { Id = 0, Order = 6, Icon = "💨", Name = "Быстрые яйца", Price = 79, Text = "Вылупление в 3 раза быстрее" },
 	Luck = { Id = 0, Order = 7, Icon = "🍀", Name = "Удача x2", Price = 199, Text = "x2 шанс эпических и лучше питомцев" },
 	LootLuck = { Id = 0, Order = 8, Icon = "💎", Name = "Удача добычи x2", Price = 199, Text = "x2 шанс редких материалов с мобов" },
 	PetSlots = { Id = 0, Order = 9, Icon = "🐾", Name = "+3 слота питомцев", Price = 99, Text = "Носи на 3 питомца больше" },
-	GoldTrainer = { Id = 0, Order = 10, Icon = "🏆", Name = "Золотой тренажёр", Price = 299, Text = "Доступ к тренажёру x500" },
-	AbyssTrainer = { Id = 0, Order = 11, Icon = "🌀", Name = "Тренажёр бездны", Price = 499, Text = "Доступ к тренажёру x1000" },
 }
 
 -- Developer Products (bought again and again). Id = 0 -> "Скоро".
@@ -172,14 +141,13 @@ Config.GamePasses = {
 -- Chest (Biome, Rolls: random materials of that biome, loot luck x Luck),
 -- Weapon / ArmorSet (exclusive gear, granted once), WheelSkip.
 Config.Products = {
-	-- Aura can't be bought (it is power, earned only by training).
 	{ Key = "CreditsSmall", Id = 0, Tab = "Packs", Icon = "💠", Name = "Горсть кредитов", Price = 25, Kind = "Credits", Amount = 400 },
 	{ Key = "CreditsMedium", Id = 0, Tab = "Packs", Icon = "💠", Name = "Пачка кредитов", Price = 79, Kind = "Credits", Amount = 1500 },
 	{ Key = "CreditsLarge", Id = 0, Tab = "Packs", Icon = "💠", Name = "Сейф кредитов", Price = 199, Kind = "Credits", Amount = 5000 },
 	{ Key = "WheelSkip", Id = 0, Tab = "Packs", Icon = "🎡", Name = "Крутить колесо сейчас", Price = 25, Kind = "WheelSkip" },
 
-	{ Key = "BoostAura15", Id = 0, Tab = "Boosts", Icon = "✨", Name = "x2 Аура · 15 мин", Price = 25, Kind = "Boost", Boost = "Aura", Minutes = 15 },
-	{ Key = "BoostAura60", Id = 0, Tab = "Boosts", Icon = "✨", Name = "x2 Аура · 60 мин", Price = 69, Kind = "Boost", Boost = "Aura", Minutes = 60 },
+	{ Key = "BoostXp15", Id = 0, Tab = "Boosts", Icon = "⭐", Name = "x2 Опыт · 15 мин", Price = 25, Kind = "Boost", Boost = "Xp", Minutes = 15 },
+	{ Key = "BoostXp60", Id = 0, Tab = "Boosts", Icon = "⭐", Name = "x2 Опыт · 60 мин", Price = 69, Kind = "Boost", Boost = "Xp", Minutes = 60 },
 	{ Key = "BoostDamage15", Id = 0, Tab = "Boosts", Icon = "⚔", Name = "x2 Урон · 15 мин", Price = 29, Kind = "Boost", Boost = "Damage", Minutes = 15 },
 	{ Key = "BoostDamage60", Id = 0, Tab = "Boosts", Icon = "⚔", Name = "x2 Урон · 60 мин", Price = 79, Kind = "Boost", Boost = "Damage", Minutes = 60 },
 	{ Key = "BoostLoot15", Id = 0, Tab = "Boosts", Icon = "💎", Name = "x2 Удача добычи · 15 мин", Price = 29, Kind = "Boost", Boost = "Loot", Minutes = 15 },
@@ -223,14 +191,10 @@ Config.Dungeon = {
 	MobsMin = 3,
 	MobsMax = 5,
 
-	-- Difficulty curve, matched to Damage = weapon x PowerMult(Aura):
-	--   room 1  ~ Stick + a minute of training        (Recommended 2)
-	--   room 5  ~ biome 1 weapon + ~5K Aura           (~24)
-	--   room 10 ~ biome 2 weapon + ~100K Aura         (~520)
-	--   room 15 ~ biome 3 weapon + ~2M Aura           (~11K)
-	--   room 20 ~ biome 4 weapon + ~100M Aura         (~250K)
-	-- Mob HP = RecommendedDamage(r) x ClicksToKill: at the recommended
-	-- damage (crit 8% x2 included) a mob takes ~7-8 hits, a boss ~46.
+	-- Difficulty curve: "recommended damage" of a room = the damage a
+	-- typical player has when they get there (tools/pacing.py). Mob HP =
+	-- RecommendedDamage(r) x ClicksToKill: at the recommended damage a mob
+	-- takes ~7-8 hits, a boss ~46 (crit 8% x2 included).
 	RecommendedRoom1 = 3, -- room 1: a Stick and a minute of training
 	RampTo = 5, -- rooms 1..RampTo-1 ramp up to the curve below
 	RecommendedBase = 7.6,
@@ -430,65 +394,63 @@ end
 -- Weapons: Damage is the weapon base (see Config.Damage for the full
 -- formula). One weapon is active. Weapons are CRAFTED at the forge from
 -- materials (Config.Recipes): 4 per biome, each stronger than the last.
--- TrainingMult = x to all Aura training while equipped (Config.Aura).
 -- Shape = model built by Shared.WeaponBuilder. Legacy = bought in an
 -- older version of the game: still owned and usable, not craftable.
 -- Ids are stored in saves: never rename.
 Config.Weapons = {
-	{ Id = "Stick", Name = "Палка", Rarity = "Common", Damage = 1, TrainingMult = 1, Shape = "Stick", Color = Color3.fromRGB(150, 110, 70) },
+	{ Id = "Stick", Name = "Палка", Rarity = "Common", Damage = 1, Shape = "Stick", Color = Color3.fromRGB(150, 110, 70) },
 	-- 1. Катакомбы
-	{ Id = "BoneSword", Name = "Костяной меч", Rarity = "Common", Damage = 2, TrainingMult = 1.1, Biome = 1, Shape = "BoneSword", Color = Color3.fromRGB(235, 230, 215) },
-	{ Id = "SlimeDagger", Name = "Слизневый кинжал", Rarity = "Uncommon", Damage = 3, TrainingMult = 1.2, Biome = 1, Shape = "SlimeDagger", Color = Color3.fromRGB(110, 235, 120) },
-	{ Id = "RustCleaver", Name = "Ржавый тесак", Rarity = "Rare", Damage = 5, TrainingMult = 1.35, Biome = 1, Shape = "Cleaver", Color = Color3.fromRGB(165, 95, 60) },
-	{ Id = "SkullMace", Name = "Булава Черепов", Rarity = "Epic", Damage = 8, TrainingMult = 1.5, Biome = 1, Shape = "SkullMace", Color = Color3.fromRGB(190, 120, 255) },
+	{ Id = "BoneSword", Name = "Костяной меч", Rarity = "Common", Damage = 2, Biome = 1, Shape = "BoneSword", Color = Color3.fromRGB(235, 230, 215) },
+	{ Id = "SlimeDagger", Name = "Слизневый кинжал", Rarity = "Uncommon", Damage = 3, Biome = 1, Shape = "SlimeDagger", Color = Color3.fromRGB(110, 235, 120) },
+	{ Id = "RustCleaver", Name = "Ржавый тесак", Rarity = "Rare", Damage = 5, Biome = 1, Shape = "Cleaver", Color = Color3.fromRGB(165, 95, 60) },
+	{ Id = "SkullMace", Name = "Булава Черепов", Rarity = "Epic", Damage = 8, Biome = 1, Shape = "SkullMace", Color = Color3.fromRGB(190, 120, 255) },
 	-- 2. Ледяной грот
-	{ Id = "IceBlade", Name = "Ледяной клинок", Rarity = "Uncommon", Damage = 12, TrainingMult = 1.5, Biome = 2, Shape = "IceBlade", Color = Color3.fromRGB(170, 225, 255) },
-	{ Id = "YetiClub", Name = "Дубина йети", Rarity = "Rare", Damage = 18, TrainingMult = 1.69, Biome = 2, Shape = "YetiClub", Color = Color3.fromRGB(240, 245, 250) },
-	{ Id = "FrostSpear", Name = "Морозное копьё", Rarity = "Epic", Damage = 28, TrainingMult = 1.88, Biome = 2, Shape = "FrostSpear", Color = Color3.fromRGB(90, 190, 255) },
-	{ Id = "EternalBlade", Name = "Клинок Вечного льда", Rarity = "Legendary", Damage = 43, TrainingMult = 2.19, Biome = 2, Shape = "EternalBlade", Color = Color3.fromRGB(140, 240, 255) },
+	{ Id = "IceBlade", Name = "Ледяной клинок", Rarity = "Uncommon", Damage = 12, Biome = 2, Shape = "IceBlade", Color = Color3.fromRGB(170, 225, 255) },
+	{ Id = "YetiClub", Name = "Дубина йети", Rarity = "Rare", Damage = 18, Biome = 2, Shape = "YetiClub", Color = Color3.fromRGB(240, 245, 250) },
+	{ Id = "FrostSpear", Name = "Морозное копьё", Rarity = "Epic", Damage = 28, Biome = 2, Shape = "FrostSpear", Color = Color3.fromRGB(90, 190, 255) },
+	{ Id = "EternalBlade", Name = "Клинок Вечного льда", Rarity = "Legendary", Damage = 43, Biome = 2, Shape = "EternalBlade", Color = Color3.fromRGB(140, 240, 255) },
 	-- 3. Лавовая кузня
-	{ Id = "ObsidianAxe", Name = "Обсидиановый топор", Rarity = "Rare", Damage = 66, TrainingMult = 2.03, Biome = 3, Shape = "ObsidianAxe", Color = Color3.fromRGB(60, 45, 80) },
-	{ Id = "EmberSword", Name = "Угольный меч", Rarity = "Epic", Damage = 100, TrainingMult = 2.25, Biome = 3, Shape = "EmberSword", Color = Color3.fromRGB(255, 130, 40) },
-	{ Id = "MagmaHammer", Name = "Лавовый молот", Rarity = "Epic", Damage = 160, TrainingMult = 2.25, Biome = 3, Shape = "MagmaHammer", Color = Color3.fromRGB(255, 110, 30) },
-	{ Id = "PhoenixBlade", Name = "Клинок Феникса", Rarity = "Legendary", Damage = 250, TrainingMult = 2.62, Biome = 3, Shape = "PhoenixBlade", Color = Color3.fromRGB(255, 170, 50) },
+	{ Id = "ObsidianAxe", Name = "Обсидиановый топор", Rarity = "Rare", Damage = 66, Biome = 3, Shape = "ObsidianAxe", Color = Color3.fromRGB(60, 45, 80) },
+	{ Id = "EmberSword", Name = "Угольный меч", Rarity = "Epic", Damage = 100, Biome = 3, Shape = "EmberSword", Color = Color3.fromRGB(255, 130, 40) },
+	{ Id = "MagmaHammer", Name = "Лавовый молот", Rarity = "Epic", Damage = 160, Biome = 3, Shape = "MagmaHammer", Color = Color3.fromRGB(255, 110, 30) },
+	{ Id = "PhoenixBlade", Name = "Клинок Феникса", Rarity = "Legendary", Damage = 250, Biome = 3, Shape = "PhoenixBlade", Color = Color3.fromRGB(255, 170, 50) },
 	-- 4. Бездна ауры
-	{ Id = "ShadowKatana", Name = "Теневая катана", Rarity = "Epic", Damage = 380, TrainingMult = 2.62, Biome = 4, Shape = "ShadowKatana", Color = Color3.fromRGB(120, 90, 170) },
-	{ Id = "DuskScythe", Name = "Коса сумрака", Rarity = "Legendary", Damage = 600, TrainingMult = 3.06, Biome = 4, Shape = "DuskScythe", Color = Color3.fromRGB(170, 80, 255) },
-	{ Id = "AbyssBlade", Name = "Клинок бездны", Rarity = "Legendary", Damage = 920, TrainingMult = 3.06, Biome = 4, Shape = "AbyssBlade", Color = Color3.fromRGB(255, 61, 184) },
-	{ Id = "AuraReaver", Name = "Разрушитель Ауры", Rarity = "Mythic", Damage = 1450, TrainingMult = 3.5, Biome = 4, Shape = "AuraReaver", Color = Color3.fromRGB(255, 230, 120) },
+	{ Id = "ShadowKatana", Name = "Теневая катана", Rarity = "Epic", Damage = 380, Biome = 4, Shape = "ShadowKatana", Color = Color3.fromRGB(120, 90, 170) },
+	{ Id = "DuskScythe", Name = "Коса сумрака", Rarity = "Legendary", Damage = 600, Biome = 4, Shape = "DuskScythe", Color = Color3.fromRGB(170, 80, 255) },
+	{ Id = "AbyssBlade", Name = "Клинок бездны", Rarity = "Legendary", Damage = 920, Biome = 4, Shape = "AbyssBlade", Color = Color3.fromRGB(255, 61, 184) },
+	{ Id = "AuraReaver", Name = "Разрушитель Ауры", Rarity = "Mythic", Damage = 1450, Biome = 4, Shape = "AuraReaver", Color = Color3.fromRGB(255, 230, 120) },
 	-- Robux exclusives (Config.Products): a bit stronger than the tier they
 	-- become available at, weaker than the next biome's top weapon.
-	{ Id = "PatronBlade", Name = "Клинок Покровителя", Rarity = "Epic", Damage = 10, TrainingMult = 1.5, Robux = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
-	{ Id = "CometSword", Name = "Кометный меч", Rarity = "Legendary", Damage = 55, TrainingMult = 1.75, Robux = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 150, 90) },
-	{ Id = "CrownBlade", Name = "Коронный клинок", Rarity = "Mythic", Damage = 300, TrainingMult = 2, Robux = true, Shape = "AuraKatana", Color = Color3.fromRGB(255, 215, 80) },
-	-- Legacy (bought for Aura before crafting existed). Damage lowered in
-	-- the Aura-as-power economy so old saves don't one-shot the dungeon.
-	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 2, TrainingMult = 1.1, Legacy = true, Shape = "WoodSword", Color = Color3.fromRGB(200, 150, 90) },
-	{ Id = "IronSword", Name = "Железный меч", Rarity = "Rare", Damage = 4, TrainingMult = 1.35, Legacy = true, Shape = "IronSword", Color = Color3.fromRGB(190, 200, 215) },
-	{ Id = "AuraKatana", Name = "Катана Ауры", Rarity = "Epic", Damage = 8, TrainingMult = 1.5, Legacy = true, Shape = "AuraKatana", Color = Color3.fromRGB(190, 110, 255) },
-	{ Id = "StormBlade", Name = "Клинок Бури", Rarity = "Legendary", Damage = 15, TrainingMult = 1.75, Legacy = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
-	{ Id = "EclipseScythe", Name = "Коса Затмения", Rarity = "Legendary", Damage = 30, TrainingMult = 1.75, Legacy = true, Shape = "EclipseScythe", Color = Color3.fromRGB(255, 120, 60) },
-	{ Id = "StarAuraSword", Name = "Меч Звёздной Ауры", Rarity = "Mythic", Damage = 50, TrainingMult = 2, Legacy = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 230, 120) },
+	{ Id = "PatronBlade", Name = "Клинок Покровителя", Rarity = "Epic", Damage = 10, Robux = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
+	{ Id = "CometSword", Name = "Кометный меч", Rarity = "Legendary", Damage = 55, Robux = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 150, 90) },
+	{ Id = "CrownBlade", Name = "Коронный клинок", Rarity = "Mythic", Damage = 300, Robux = true, Shape = "AuraKatana", Color = Color3.fromRGB(255, 215, 80) },
+	-- Legacy (from old versions of the game): still owned and usable,
+	-- not craftable. Damage kept low so old saves don't one-shot the dungeon.
+	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 2, Legacy = true, Shape = "WoodSword", Color = Color3.fromRGB(200, 150, 90) },
+	{ Id = "IronSword", Name = "Железный меч", Rarity = "Rare", Damage = 4, Legacy = true, Shape = "IronSword", Color = Color3.fromRGB(190, 200, 215) },
+	{ Id = "AuraKatana", Name = "Катана Ауры", Rarity = "Epic", Damage = 8, Legacy = true, Shape = "AuraKatana", Color = Color3.fromRGB(190, 110, 255) },
+	{ Id = "StormBlade", Name = "Клинок Бури", Rarity = "Legendary", Damage = 15, Legacy = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
+	{ Id = "EclipseScythe", Name = "Коса Затмения", Rarity = "Legendary", Damage = 30, Legacy = true, Shape = "EclipseScythe", Color = Color3.fromRGB(255, 120, 60) },
+	{ Id = "StarAuraSword", Name = "Меч Звёздной Ауры", Rarity = "Mythic", Damage = 50, Legacy = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 230, 120) },
 }
 
 -- Armor: one set per biome, three pieces each (Helmet / Chest / Legs).
 -- Health adds to the base Config.Player.Health, Defense is the share of
 -- incoming damage removed. Wearing all 3 pieces of a set gives its
--- Bonus (damage multiplier). TrainingMult: every piece multiplies Aura
--- training by it. Style = look built by Shared.ArmorBuilder.
+-- Bonus (damage multiplier). Style = look built by Shared.ArmorBuilder.
 Config.ArmorSlots = { "Helmet", "Chest", "Legs" }
 Config.ArmorSlotNames = { Helmet = "Шлем", Chest = "Нагрудник", Legs = "Поножи" }
 Config.ArmorSets = {
-	Bone = { Name = "Костяной сет", Biome = 1, Rarity = "Uncommon", Health = 20, Defense = 0.03, Bonus = 0.10, TrainingMult = 1.05,
+	Bone = { Name = "Костяной сет", Biome = 1, Rarity = "Uncommon", Health = 20, Defense = 0.03, Bonus = 0.10,
 		Style = { Kind = "Bone", Main = Color3.fromRGB(235, 228, 205), Trim = Color3.fromRGB(150, 135, 110), Glow = Color3.fromRGB(110, 235, 120), Material = Enum.Material.SmoothPlastic } },
-	Ice = { Name = "Ледяной сет", Biome = 2, Rarity = "Rare", Health = 45, Defense = 0.05, Bonus = 0.20, TrainingMult = 1.1,
+	Ice = { Name = "Ледяной сет", Biome = 2, Rarity = "Rare", Health = 45, Defense = 0.05, Bonus = 0.20,
 		Style = { Kind = "Ice", Main = Color3.fromRGB(150, 215, 255), Trim = Color3.fromRGB(240, 250, 255), Glow = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Ice } },
-	Lava = { Name = "Лавовый сет", Biome = 3, Rarity = "Epic", Health = 90, Defense = 0.07, Bonus = 0.35, TrainingMult = 1.15,
+	Lava = { Name = "Лавовый сет", Biome = 3, Rarity = "Epic", Health = 90, Defense = 0.07, Bonus = 0.35,
 		Style = { Kind = "Lava", Main = Color3.fromRGB(50, 38, 42), Trim = Color3.fromRGB(120, 55, 40), Glow = Color3.fromRGB(255, 130, 30), Material = Enum.Material.Slate } },
-	Abyss = { Name = "Сет бездны", Biome = 4, Rarity = "Legendary", Health = 160, Defense = 0.09, Bonus = 0.50, TrainingMult = 1.25,
+	Abyss = { Name = "Сет бездны", Biome = 4, Rarity = "Legendary", Health = 160, Defense = 0.09, Bonus = 0.50,
 		Style = { Kind = "Abyss", Main = Color3.fromRGB(60, 35, 110), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(255, 61, 184), Material = Enum.Material.Metal } },
 	-- Robux exclusive (Config.Products "ArmorRoyal"): between Ice and Lava.
-	Royal = { Name = "Королевский сет", Rarity = "Legendary", Health = 70, Defense = 0.06, Bonus = 0.28, TrainingMult = 1.15, Robux = true,
+	Royal = { Name = "Королевский сет", Rarity = "Legendary", Health = 70, Defense = 0.06, Bonus = 0.28, Robux = true,
 		Style = { Kind = "Abyss", Main = Color3.fromRGB(240, 240, 250), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Metal } },
 }
 Config.ArmorSetOrder = { "Bone", "Ice", "Lava", "Abyss", "Royal" }
@@ -511,14 +473,13 @@ do
 				Rarity = set.Rarity,
 				Health = if slot == "Chest" then math.floor(set.Health * 1.5) else set.Health,
 				Defense = set.Defense,
-				TrainingMult = set.TrainingMult, -- per piece: a full set = TrainingMult^3
 				Color = set.Style.Main,
 			})
 		end
 	end
 end
 
--- Forge recipes: materials -> the item (Aura is never spent) (Id = weapon or
+-- Forge recipes: materials -> the item (Id = weapon or
 -- armor id). Shown in this order inside each tab.
 Config.Recipes = {
 	-- Weapons
@@ -570,22 +531,22 @@ Config.Forge = {
 	},
 }
 
--- Pets hatch from eggs (Нано-кредиты) and follow the player. Every equipped pet
--- adds Bonus x tier multiplier to all Aura gains (and DamageBonus x
--- tier to damage). Three equal pets of one tier merge into one of the
+-- Pets hatch from eggs (Нано-кредиты) and follow the player. Every
+-- equipped pet adds small stat bonuses x its tier multiplier: Damage and
+-- Health are shares (0.02 = +2% damage). Three equal pets of one tier merge into one of the
 -- next tier. Shape = look built by Shared.PetBuilder. Ids are stored in
 -- saves: never rename.
 Config.Pets = {
-	{ Id = "Blob", Name = "Слизнячок", Rarity = "Common", Bonus = 0.05, Shape = "Blob", Color = Color3.fromRGB(110, 235, 120), Size = 1.3 },
-	{ Id = "Bunny", Name = "Ушастик", Rarity = "Common", Bonus = 0.07, Shape = "Ears", Color = Color3.fromRGB(245, 235, 240), Size = 1.3 },
-	{ Id = "Bat", Name = "Летучая мышка", Rarity = "Uncommon", Bonus = 0.12, Shape = "Wings", Color = Color3.fromRGB(120, 90, 170), Size = 1.3 },
-	{ Id = "Spark", Name = "Искорка", Rarity = "Rare", Bonus = 0.2, Shape = "Star", Color = Color3.fromRGB(255, 220, 90), Size = 1.4 },
-	{ Id = "IceFox", Name = "Ледяной лис", Rarity = "Rare", Bonus = 0.25, Shape = "Ears", Color = Color3.fromRGB(170, 225, 255), Size = 1.5 },
-	{ Id = "Imp", Name = "Бесёнок", Rarity = "Epic", Bonus = 0.4, DamageBonus = 0.05, Shape = "Horns", Color = Color3.fromRGB(240, 90, 60), Size = 1.5 },
-	{ Id = "Golem", Name = "Мини-голем", Rarity = "Epic", Bonus = 0.45, DamageBonus = 0.08, Shape = "Crystal", Color = Color3.fromRGB(150, 80, 255), Size = 1.6 },
-	{ Id = "Dragon", Name = "Дракончик Ауры", Rarity = "Legendary", Bonus = 0.8, DamageBonus = 0.15, Shape = "Wings", Color = Color3.fromRGB(170, 90, 255), Size = 2 },
-	{ Id = "Phoenix", Name = "Феникс", Rarity = "Legendary", Bonus = 1, DamageBonus = 0.2, Shape = "Wings", Color = Color3.fromRGB(255, 150, 40), Size = 2 },
-	{ Id = "AbyssEye", Name = "Око бездны", Rarity = "Mythic", Bonus = 2, DamageBonus = 0.4, Shape = "Eye", Color = Color3.fromRGB(255, 61, 184), Size = 2 },
+	{ Id = "Blob", Name = "Слизнячок", Rarity = "Common", Damage = 0.02, Health = 0.03, Shape = "Blob", Color = Color3.fromRGB(110, 235, 120), Size = 1.3 },
+	{ Id = "Bunny", Name = "Ушастик", Rarity = "Common", Damage = 0.02, Health = 0.04, Shape = "Ears", Color = Color3.fromRGB(245, 235, 240), Size = 1.3 },
+	{ Id = "Bat", Name = "Летучая мышка", Rarity = "Uncommon", Damage = 0.03, Health = 0.05, Shape = "Wings", Color = Color3.fromRGB(120, 90, 170), Size = 1.3 },
+	{ Id = "Spark", Name = "Искорка", Rarity = "Rare", Damage = 0.05, Health = 0.06, Shape = "Star", Color = Color3.fromRGB(255, 220, 90), Size = 1.4 },
+	{ Id = "IceFox", Name = "Ледяной лис", Rarity = "Rare", Damage = 0.05, Health = 0.08, Shape = "Ears", Color = Color3.fromRGB(170, 225, 255), Size = 1.5 },
+	{ Id = "Imp", Name = "Бесёнок", Rarity = "Epic", Damage = 0.08, Health = 0.08, Shape = "Horns", Color = Color3.fromRGB(240, 90, 60), Size = 1.5 },
+	{ Id = "Golem", Name = "Мини-голем", Rarity = "Epic", Damage = 0.07, Health = 0.12, Shape = "Crystal", Color = Color3.fromRGB(150, 80, 255), Size = 1.6 },
+	{ Id = "Dragon", Name = "Дракончик Ауры", Rarity = "Legendary", Damage = 0.12, Health = 0.12, Shape = "Wings", Color = Color3.fromRGB(170, 90, 255), Size = 2 },
+	{ Id = "Phoenix", Name = "Феникс", Rarity = "Legendary", Damage = 0.14, Health = 0.14, Shape = "Wings", Color = Color3.fromRGB(255, 150, 40), Size = 2 },
+	{ Id = "AbyssEye", Name = "Око бездны", Rarity = "Mythic", Damage = 0.2, Health = 0.2, Shape = "Eye", Color = Color3.fromRGB(255, 61, 184), Size = 2 },
 }
 Config.PetById = {}
 for order, pet in ipairs(Config.Pets) do
@@ -595,8 +556,8 @@ end
 
 Config.PetTiers = {
 	{ Name = "", Multiplier = 1 },
-	{ Name = "Золотой", Multiplier = 3, Color = Color3.fromRGB(255, 201, 60) },
-	{ Name = "Радужный", Multiplier = 10, Color = Color3.fromRGB(255, 120, 220), Rainbow = true },
+	{ Name = "Золотой", Multiplier = 1.6, Color = Color3.fromRGB(255, 201, 60) },
+	{ Name = "Радужный", Multiplier = 2.5, Color = Color3.fromRGB(255, 120, 220), Rainbow = true },
 }
 Config.PetMerge = 3 -- equal pets merged into one of the next tier
 Config.PetSlots = 3 -- equipped at once (+ PetSlotsPass with the pass)
@@ -624,102 +585,8 @@ Config.Hatch = {
 	LuckFrom = "Epic",
 }
 
--- Rebirth at the hub altar: requires Aura >= RebirthAura(rebirths).
--- Resets Aura and the room record; keeps level, weapons, armor, items,
--- pets, credits. Gives a permanent TRAINING multiplier (Aura gain):
--- x MultiplierBase per rebirth, felt right away.
--- Costs: the first ones are a table (fast start, see Config.Pacing),
--- after them every rebirth costs LateGrowth x the previous one.
--- Tuned with tools/pacing.py (README "Темп прокачки").
-Config.Rebirth = {
-	Costs = { 8800, 120000, 280000, 1300000, 3700000, 21000000, 59000000, 150000000 },
-	LateGrowth = 5.7,
-	MultiplierBase = 1.5, -- training x1.5, x2.25, x3.4, ... (x1.5 per rebirth)
-}
-
-function Config.XpToNext(level: number): number
-	local l = Config.Progression.Level
-	return math.floor(l.XpBase * math.max(1, level) ^ l.XpExponent)
-end
-
--- Aura needed for the NEXT rebirth when `rebirths` are already done.
-function Config.RebirthAura(rebirths: number): number
-	local r = Config.Rebirth
-	local n = rebirths + 1
-	if n <= #r.Costs then
-		return r.Costs[n]
-	end
-	return r.Costs[#r.Costs] * r.LateGrowth ^ (n - #r.Costs)
-end
-
-function Config.RebirthMultiplier(rebirths: number): number
-	return Config.Rebirth.MultiplierBase ^ rebirths
-end
-
--- Hub trainers. Requirements: Aura (remembered forever once reached),
--- Rebirths, or a game pass (Premium). Ids are stored in saves
--- (TrainersUnlocked) -- never rename them.
-Config.Trainers = {
-	{ Id = "1", Kind = "Dummy", Name = "Манекен", Multiplier = 1, Color = Color3.fromRGB(90, 230, 110) },
-	{ Id = "2", Kind = "Boulder", Name = "Валун", Multiplier = 3, Aura = 300, Color = Color3.fromRGB(70, 140, 255) },
-	{ Id = "3", Kind = "IceCube", Name = "Ледяной куб", Multiplier = 6, Aura = 1700, Color = Color3.fromRGB(46, 230, 255) },
-	{ Id = "4", Kind = "Mimic", Name = "Сундук-мимик", Multiplier = 12, Aura = 4700, Color = Color3.fromRGB(255, 150, 50) },
-	{ Id = "5", Kind = "Skull", Name = "Гигантский череп", Multiplier = 25, Rebirths = 1, Color = Color3.fromRGB(230, 230, 240), Particles = true },
-	{ Id = "6", Kind = "Pumpkin", Name = "Тыква-монстр", Multiplier = 50, Rebirths = 3, Color = Color3.fromRGB(255, 120, 30), Particles = true },
-	{ Id = "7", Kind = "Golem", Name = "Кристальный голем", Multiplier = 100, Rebirths = 5, Color = Color3.fromRGB(150, 80, 255), Particles = true },
-	{ Id = "8", Kind = "Core", Name = "Аура-ядро", Multiplier = 250, Rebirths = 8, Color = Color3.fromRGB(255, 61, 184), Particles = true },
-	{ Id = "VIP", Kind = "Throne", Name = "VIP-трон", Multiplier = 100, Pass = "VIP", Premium = true, Color = Color3.fromRGB(255, 201, 60), Particles = true },
-	{ Id = "Gold", Kind = "Idol", Name = "Золотой идол", Multiplier = 500, Pass = "GoldTrainer", Premium = true, Color = Color3.fromRGB(255, 215, 80), Particles = true },
-	{ Id = "Abyss", Kind = "AbyssPortal", Name = "Портал бездны", Multiplier = 1000, Pass = "AbyssTrainer", Premium = true, Color = Color3.fromRGB(170, 80, 255), Particles = true },
-}
-Config.TrainerById = {}
-for _, trainer in ipairs(Config.Trainers) do
-	Config.TrainerById[trainer.Id] = trainer
-end
-
--- Pacing model for tools/pacing.py (not used by the game itself): how
--- an "active player" plays, and the owner's time targets the numbers
--- above are tuned to. Run `python3 tools/pacing.py --tune` to get
--- suggested trainer thresholds, rebirth costs, XpBase and the room
--- curve; `--readme` writes the minute table into README.md.
-Config.Pacing = {
-	ActiveCps = 5, -- clicks per second while actively training
-	TrainShare = 0.8, -- share of the time on a trainer (the rest: dungeon)
-	KillsPerMinute = 10, -- in the dungeon, mobs of the record room
-	-- The weapon a player has crafted by the time of a record room.
-	Weapons = {
-		{ Stage = 0, Id = "Stick" },
-		{ Stage = 2, Id = "BoneSword" },
-		{ Stage = 3, Id = "SlimeDagger" },
-		{ Stage = 4, Id = "RustCleaver" },
-		{ Stage = 5, Id = "SkullMace" },
-		{ Stage = 7, Id = "IceBlade" },
-		{ Stage = 8, Id = "YetiClub" },
-		{ Stage = 9, Id = "FrostSpear" },
-		{ Stage = 10, Id = "EternalBlade" },
-		{ Stage = 11, Id = "ObsidianAxe" },
-		{ Stage = 12, Id = "EmberSword" },
-		{ Stage = 13, Id = "MagmaHammer" },
-		{ Stage = 15, Id = "PhoenixBlade" },
-		{ Stage = 16, Id = "ShadowKatana" },
-		{ Stage = 17, Id = "DuskScythe" },
-		{ Stage = 18, Id = "AbyssBlade" },
-		{ Stage = 20, Id = "AuraReaver" },
-	},
-	-- Owner's targets (minutes of active play from zero).
-	Targets = {
-		Rebirths = { 5, 12, 20, 30, 45, 63, 87, 117, 157, 227, 347, 547 }, -- 1..8 fast, then x1.7 longer each
-		EarlyRebirths = 8, -- these get their own cost in Config.Rebirth.Costs
-		Trainers = { ["2"] = 1, ["3"] = 2.5, ["4"] = 4 }, -- Aura-gated ones
-		Stages = { ["1"] = 2, ["5"] = 15, ["10"] = 60, ["15"] = 120, ["20"] = 300 },
-		Level = 30,
-		LevelMinute = 120,
-	},
-	ReportMinutes = { 1, 2, 3, 4, 5, 8, 12, 15, 20, 25, 30, 40, 45, 50, 60, 63, 75, 87, 100, 110, 117, 120, 150, 180, 240, 300 },
-}
-
 -- Engagement loop: things to do every few minutes.
--- Rewards are Нано-кредиты (never Aura) and scale with the record room.
+-- Rewards are Нано-кредиты / XP / boosts and scale with the record room.
 Config.Progression = {
 	Daily = {
 		CooldownHours = 20, -- can claim again after this
@@ -733,30 +600,28 @@ Config.Progression = {
 			{ Kind = "Credits", Amount = 30, Weight = 30, Label = "Кредиты" },
 			{ Kind = "Credits", Amount = 80, Weight = 22, Label = "Кредиты+" },
 			{ Kind = "Credits", Amount = 250, Weight = 10, Label = "Много кредитов" },
-			{ Kind = "Boost", Minutes = 15, Weight = 16, Label = "x2 Аура 15 мин" },
+			{ Kind = "Boost", Minutes = 15, Weight = 16, Label = "x2 Опыт 15 мин" },
 			{ Kind = "Credits", Amount = 50, Weight = 12, Label = "Кредиты" },
 			{ Kind = "Egg", Weight = 6, Label = "Яйцо питомца" },
 			{ Kind = "Credits", Amount = 120, Weight = 10, Label = "Кредиты++" },
-			{ Kind = "Boost", Minutes = 30, Weight = 4, Label = "x2 Аура 30 мин" },
+			{ Kind = "Boost", Minutes = 30, Weight = 4, Label = "x2 Опыт 30 мин" },
 		},
 	},
-	Boost = { Multiplier = 2 },
+	Boost = { Multiplier = 2 }, -- every timed boost (Config.BoostKinds) doubles its stat
 	Quests = { -- 3 per day are picked from this pool
 		Pool = {
 			{ Id = "kill30", Kind = "Kill", Target = 30, Text = "Убей 30 мобов", Credits = 40 },
 			{ Id = "kill80", Kind = "Kill", Target = 80, Text = "Убей 80 мобов", Credits = 110 },
 			{ Id = "room5", Kind = "Room", Target = 5, Text = "Дойди до этапа 5", Credits = 60 },
 			{ Id = "room10", Kind = "Room", Target = 10, Text = "Дойди до этапа 10", Credits = 180 },
-			{ Id = "train500", Kind = "Train", Target = 300, Text = "Кликни на тренажёре 300 раз", Credits = 50 },
-			{ Id = "train1500", Kind = "Train", Target = 1000, Text = "Кликни на тренажёре 1000 раз", Credits = 150 },
 			{ Id = "boss2", Kind = "Boss", Target = 2, Text = "Победи 2 боссов", Credits = 120 },
 			{ Id = "runs3", Kind = "Run", Target = 3, Text = "Соверши 3 забега", Credits = 45 },
 		},
 		PerDay = 3,
 	},
 	-- Player level. XP: kills, bosses, quests and a little for training.
-	-- Every level: +SkillPointsPerLevel skill point, BaseAura grows
-	-- (Config.Aura.LevelGrowth) and max HP grows (Config.Stats.HealthPerLevel).
+	-- Every level: +SkillPointsPerLevel skill point, damage and max HP grow
+	-- (Config.Stats), full heal.
 	--   XP to the next level = XpBase x level^XpExponent:
 	--   lvl 1 -> 12, 5 -> 134, 10 -> 379, 30 -> 1.97K, 50 -> 4.2K
 	--   (tuned with tools/pacing.py: level ~30 after 2 hours)
@@ -766,15 +631,13 @@ Config.Progression = {
 		XpPerKill = 10, -- x room index
 		XpPerBoss = 80, -- x room index
 		XpPerQuest = 40, -- x player level, when a quest reward is claimed
-		TrainingXp = 1, -- XP every TrainingXpTicks trainer ticks
-		TrainingXpTicks = 5,
 		SkillPointsPerLevel = 1,
 		RewardEvery = 5, -- levels
 		RewardCredits = 20, -- every RewardEvery levels: x level
 		Texts = {
 			Title = "Новый уровень!",
 			Points = "+%d очко навыка",
-			Growth = "База Ауры x%s  •  Макс. HP %s",
+			Growth = "Урон %s  •  Макс. HP %s",
 		},
 	},
 }
@@ -809,7 +672,7 @@ Config.Animations = {
 
 -- Leaderboards (OrderedDataStore). Scores are written on every save.
 Config.Leaderboards = {
-	AuraStore = "AuraClicker_TopAura_v1",
+	LevelStore = "AuraClicker_TopLevel_v1",
 	RoomStore = "AuraClicker_TopRoom_v1",
 	RefreshSeconds = 60,
 	Top = 10,
@@ -837,14 +700,12 @@ end
 
 -- All remotes live directly in ReplicatedStorage, created by the server.
 Config.Remotes = {
-	ClickHit = "RemoteEvent", -- C->S (mob or nil) on every click; S->C ("Aura"|"Tick"|"Hit"|"Kill", ...)
+	ClickHit = "RemoteEvent", -- C->S (mob or nil) on every attack click; S->C ("Hit"|"Kill"|"Credits", ...)
 	ShopRequest = "RemoteFunction", -- ("Equip", "Weapon"|"Armor", id) | ("Unequip", "Armor", slot) | pets -> ok, message
 	Craft = "RemoteFunction", -- (recipeId) -> ok, message
 	Pets = "RemoteFunction", -- ("Hatch", eggId, triple) | ("Equip"|"Unequip"|"Merge", key) | ("EquipBest") -> ok, message, results
-	RebirthRequest = "RemoteFunction", -- () -> ok, message
 	Travel = "RemoteFunction", -- ("Hub") | ("Room", n) -> ok, message
 	Notify = "RemoteEvent", -- S->C (text, kind) toast
-	AutoClick = "RemoteEvent", -- C->S (enabled: boolean)
 	RoomState = "RemoteEvent", -- S->C (room, alive, total) for the player's own run
 	RunEnded = "RemoteEvent", -- S->C (reason, room, auraEarned, record, isNewRecord)
 	Progression = "RemoteFunction", -- ("Status") | ("ClaimDaily") | ("Spin") | ("ClaimQuest", index) -> ok, payload
@@ -940,11 +801,11 @@ Config.Lighting = {
 -- west is -X. Top view:
 --
 --                 [ PORTAL ]
---     TRAINERS        |          FORGE
---     (2 rows of 4)   |      (big building)
---     Eggs        [FOUNTAIN]     Premium showcase
---     Wheel           |      (Robux trainers, store)
---     Leaderboards [ SPAWN ]     Rebirth altar
+--     POLYGON         |          FORGE
+--     (test dummies)  |      (big building)
+--     Eggs        [FOUNTAIN]     Premium kiosk
+--     Wheel           |
+--     Leaderboards [ SPAWN ]
 Config.HubLayout = {
 	Name = "Цитадель Ауры",
 	Size = 176, -- courtyard side (square)
@@ -964,14 +825,10 @@ Config.HubLayout = {
 	Portal = { Offset = Vector3.new(0, 0, -138), Radius = 7, ArchWidth = 22, ArchHeight = 20, SpinSeconds = 6 },
 	Fountain = { Offset = Vector3.new(0, 0, -52), Radius = 7, PlazaRadius = 17 },
 
-	-- Trainers: a square "territory" each. Regular ones stand west of the
-	-- path in 2 rows of 4 (step 20) facing the path, premium ones east.
-	TrainerSize = 12,
-	TrainerSpots = {
-		["1"] = Vector3.new(-38, 0, -76), ["2"] = Vector3.new(-38, 0, -96), ["3"] = Vector3.new(-38, 0, -116), ["4"] = Vector3.new(-38, 0, -136),
-		["5"] = Vector3.new(-60, 0, -76), ["6"] = Vector3.new(-60, 0, -96), ["7"] = Vector3.new(-60, 0, -116), ["8"] = Vector3.new(-60, 0, -136),
-		VIP = Vector3.new(50, 0, -24), Gold = Vector3.new(50, 0, -44), Abyss = Vector3.new(50, 0, -64),
-	},
+	-- Polygon (west of the path): the place for test dummies (damage and
+	-- combos, no rewards; models from GameAssets/Trainers later). For now
+	-- only its paved area and sign.
+	Polygon = { Offset = Vector3.new(-49, 0, -106), Size = Vector3.new(44, 0, 72), SignOffset = Vector3.new(-25, 0, -63) },
 
 	-- The forge: the main visual object of the hub (north-east). Samples
 	-- on its racks are a showcase of craftable gear, not a shop.
@@ -981,12 +838,11 @@ Config.HubLayout = {
 		SampleWeapons = { "BoneSword", "FrostSpear", "MagmaHammer", "AbyssBlade" },
 		SampleArmor = { "Bone", "Lava", "Abyss" }, -- armor sets on the three stands
 	},
-	Store = { Offset = Vector3.new(36, 0, -55), SignOffset = Vector3.new(30, 0, -33) }, -- premium kiosk beside the Robux trainers
+	Store = { Offset = Vector3.new(36, 0, -55), SignOffset = Vector3.new(30, 0, -33) }, -- premium kiosk
 	Egg = { Offset = Vector3.new(-46, 0, -28) },
 	Wheel = { Offset = Vector3.new(-46, 0, -50) },
-	Altar = { Offset = Vector3.new(48, 0, 6) },
 	Leaderboards = { -- free-standing boards west of the spawn, facing it
-		{ Offset = Vector3.new(-44, 0, -4), Kind = "Aura", Title = "Топ Ауры" },
+		{ Offset = Vector3.new(-44, 0, -4), Kind = "Level", Title = "Топ уровней" },
 		{ Offset = Vector3.new(-44, 0, 15), Kind = "Room", Title = "Глубже всех в данже" },
 	},
 	Npc = { Offset = Vector3.new(11, 0, -12) },
@@ -1003,28 +859,18 @@ Config.HubLayout = {
 
 	Texts = {
 		Portal = "ПОДЗЕМЕЛЬЕ",
-		Trainer = "x%s",
-		TrainerOpen = "Встань сюда!",
-		TrainerPerSecond = "+%s Ауры/сек",
-		TrainerAuraProgress = "Аура %s / %s",
-		TrainerLockedAura = "Нужно %s Ауры",
-		TrainerLockedRebirth = "Нужно перерождений: %d",
-		TrainerLockedPass = "Game Pass · %d R$",
-		TrainerSoon = "Скоро",
-		TrainerHud = "Тренажёр x%s  ·  +%s/сек",
-		Trainers = "ТРЕНАЖЁРЫ",
+		Polygon = "ПОЛИГОН",
+		PolygonSoon = "Манекены скоро",
 		Forge = "КУЗНИЦА",
 		Premium = "ПРЕМИУМ",
 		Store = "МАГАЗИН",
 		Pets = "ПИТОМЦЫ",
-		Altar = "АЛТАРЬ ПЕРЕРОЖДЕНИЯ",
 		Wheel = "КОЛЕСО УДАЧИ",
 		WheelFree = "Бесплатное вращение!",
 		Egg = "Яйца питомцев",
 		Npc = "Подземелье там!",
 	},
 	Prompts = {
-		Rebirth = "Переродиться",
 		Forge = "Кузница",
 		Store = "Магазин",
 		Egg = "Питомцы",
@@ -1109,7 +955,6 @@ Config.Hud = {
 		{ Id = "Inventory", Icon = "🎒", Label = "Инвентарь", Color = Color3.fromRGB(70, 140, 255) },
 		{ Id = "Equipment", Icon = "⚔", Label = "Снаряжение", Color = Color3.fromRGB(90, 230, 110) },
 		{ Id = "Pets", Icon = "🐾", Label = "Питомцы", Color = Color3.fromRGB(255, 61, 184) },
-		{ Id = "Rebirth", Icon = "🔁", Label = "Перерождение", Color = Color3.fromRGB(150, 80, 255) },
 		{ Id = "Reward", Icon = "🎁", Label = "Награда", Color = Color3.fromRGB(255, 201, 60) },
 		{ Id = "Store", Icon = "💎", Label = "Магазин", Color = Color3.fromRGB(46, 200, 255) },
 		{ Id = "Travel", Icon = "🚪", Label = "Телепорт", Color = Color3.fromRGB(70, 60, 190) },
@@ -1117,11 +962,6 @@ Config.Hud = {
 	ToastSeconds = 4,
 	ShakeCrit = { Amplitude = 0.25, Seconds = 0.15 },
 	ShakeBoss = { Amplitude = 0.8, Seconds = 0.5 },
-	-- Bottom progress bar in the hub: the next goal for training.
-	Goals = {
-		Trainer = "До тренажёра «%s» x%s",
-		Rebirth = "До перерождения",
-	},
 	BackKey = Enum.KeyCode.B,
 	BackButton = { Icon = "←", Label = "Назад [B]", Color = Color3.fromRGB(240, 70, 80) }, -- the Travel cell in the dungeon
 	MobileScaleWidth = 1100, -- UIScale = min(1, viewportWidth / this)
@@ -1141,7 +981,6 @@ Config.Sounds = {
 	Music = "", -- TODO: your uploaded background music (rbxassetid://...)
 	Hit = "rbxasset://sounds/swordslash.wav",
 	Buy = "rbxasset://sounds/electronicpingshort.wav",
-	Rebirth = "rbxasset://sounds/electronicpingshort.wav",
 	Barrier = "", -- TODO: barrier dissolve
 	Portal = "", -- TODO: portal whoosh
 	BossDeath = "", -- TODO: boss explosion

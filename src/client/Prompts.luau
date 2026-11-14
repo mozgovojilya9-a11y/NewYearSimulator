@@ -3,7 +3,7 @@
 	Custom look for every ProximityPrompt (Style = Custom on the
 	server): a round key button "E" and the action text in the game
 	font. Also routes prompts that only open client windows
-	(Action = OpenForge / OpenStore / OpenPets / RebirthAltar / Wheel).
+	(Action = OpenForge / OpenStore / OpenPets / Wheel).
 ]]
 
 local Players = game:GetService("Players")
@@ -13,7 +13,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Style = require(script.Parent.ui.Style)
 local Forge = require(script.Parent.ui.Windows.Forge)
-local Rebirth = require(script.Parent.ui.Windows.Rebirth)
 local Store = require(script.Parent.ui.Windows.Store)
 local Reward = require(script.Parent.ui.Windows.Reward)
 local Pets = require(script.Parent.ui.Windows.Pets)
@@ -29,7 +28,6 @@ local ACTIONS = {
 		Store.Open()
 	end,
 	OpenPets = Pets.OpenEggs,
-	RebirthAltar = Rebirth.Open,
 	Wheel = Reward.OpenWheel,
 }
 

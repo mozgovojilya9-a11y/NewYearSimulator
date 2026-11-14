@@ -101,9 +101,9 @@ local function petCard(key, pet, tier)
 	Preview.Create(card, "Pet", { Pet = pet, Tier = tier }, UDim2.new(1, -16, 0, 74), UDim2.fromOffset(8, 8))
 	local title = (if tierDef.Name ~= "" then tierDef.Name .. " " else "") .. pet.Name
 	Style.Label(card, title, 15, rarity.Color, { Position = UDim2.fromOffset(4, 84), Size = UDim2.new(1, -8, 0, 20), TextScaled = true, ZIndex = 35 })
-	local bonus = pet.Bonus * tierDef.Multiplier
-	local damage = (pet.DamageBonus or 0) * tierDef.Multiplier
-	Style.Label(card, percent(bonus) .. " Аура" .. (if damage > 0 then "  " .. percent(damage) .. " урон" else ""), 13, Style.Colors.Text, { Position = UDim2.fromOffset(4, 104), Size = UDim2.new(1, -8, 0, 18), TextScaled = true, ZIndex = 35 })
+	local damage = pet.Damage * tierDef.Multiplier
+	local health = pet.Health * tierDef.Multiplier
+	Style.Label(card, percent(damage) .. " урон  " .. percent(health) .. " HP", 13, Style.Colors.Text, { Position = UDim2.fromOffset(4, 104), Size = UDim2.new(1, -8, 0, 18), TextScaled = true, ZIndex = 35 })
 	local count = Style.Label(card, "", 14, Style.Colors.Gold, { Position = UDim2.fromOffset(4, 122), Size = UDim2.new(1, -8, 0, 18), ZIndex = 35 })
 	local equip, setEquipColor = Style.Button(card, { Position = UDim2.fromOffset(6, 142), Size = UDim2.new(1, -12, 0, 24), Color = Style.Colors.Blue, Text = "Надеть", TextSize = 14, ZIndex = 36, Shadow = false })
 	local mergeButton, setMergeColor = Style.Button(card, { Position = UDim2.fromOffset(6, 170), Size = UDim2.new(1, -12, 0, 24), Color = Style.Colors.Purple, Text = "", TextSize = 13, ZIndex = 36, Shadow = false })
@@ -147,7 +147,7 @@ local function refreshMine()
 					local key = petId .. ":" .. tier
 					local ui = petCard(key, pet, tier)
 					ui.card.Visible = true
-					ui.card.LayoutOrder = -(pet.Bonus * Config.PetTiers[tier].Multiplier * 1000)
+					ui.card.LayoutOrder = -math.floor((pet.Damage + pet.Health) * Config.PetTiers[tier].Multiplier * 1000)
 					local on = equipped[key] or 0
 					ui.count.Text = ("x%d%s"):format(n, if on > 0 then ("  •  надето %d"):format(on) else "")
 					if on >= n then
@@ -170,7 +170,7 @@ local function refreshMine()
 		end
 	end
 	mineEmpty.Visible = not any
-	summary.Text = ("Надето %d/%d  •  Тренировка x%s"):format(equippedTotal, slots, tostring(math.floor((player:GetAttribute("AuraMultiplier") or 1) * 100 + 0.5) / 100))
+	summary.Text = ("Надето %d/%d"):format(equippedTotal, slots)
 end
 
 ---------------------------------------------------------------------
@@ -398,7 +398,7 @@ tabs.Changed = function(id)
 end
 selectTab("Mine")
 
-PlayerData.Changed({ "Pets", "EquippedPets", "PetIndex", "PetSlots", "Passes", "AuraMultiplier" }, function()
+PlayerData.Changed({ "Pets", "EquippedPets", "PetIndex", "PetSlots", "Passes" }, function()
 	if window.IsOpen() then
 		refresh()
 	end

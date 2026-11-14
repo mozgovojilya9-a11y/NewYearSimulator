@@ -2,10 +2,9 @@
 	Combat.luau
 	The click. Every click / tap that is not on UI (and while no window
 	is open) is sent to the server as ClickHit:FireServer(mob?) -- the
-	mob under the cursor, if any. The server gives Aura for the click,
-	adds the trainer bonus, hits a mob in the dungeon and answers with
-	"Aura" / "Tick" / "Hit" / "Kill", which become popups, flashes,
-	particles, sounds and camera shake here.
+	mob under the cursor, if any. The server swings the weapon, hits a
+	mob in the dungeon and answers with "Hit" / "Kill" / "Credits",
+	which become popups, flashes, particles, sounds and camera shake here.
 ]]
 
 local Players = game:GetService("Players")
@@ -15,7 +14,6 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
-local HubFx = require(script.Parent.HubFx)
 local Popups = require(script.Parent.ui.Popups)
 local Style = require(script.Parent.ui.Style)
 local Swing = require(script.Parent.Swing)
@@ -121,48 +119,13 @@ local function topOf(model)
 	return model:GetPivot().Position + Vector3.new(0, model:GetExtentsSize().Y / 2, 0)
 end
 
-local function trainerTop(model)
-	local object = model:FindFirstChild("Object") or model
-	local height = object:GetAttribute("Height") or 6
-	local center = model:GetAttribute("Center")
-	local base = if center then Vector3.new(object:GetPivot().Position.X, center.Y, object:GetPivot().Position.Z) else object:GetPivot().Position
-	return base + Vector3.new(0, height + 1.5, 0), object
-end
-
 local function headPosition(): Vector3?
 	local head = player.Character and player.Character:FindFirstChild("Head")
 	return head and head.Position + Vector3.new(0, 2.5, 0)
 end
 
 clickHit.OnClientEvent:Connect(function(kind, ...)
-	if kind == "Aura" then
-		local gained, isCrit, trainer = ...
-		local color = if isCrit then Style.Colors.Gold else Style.Colors.Cyan
-		local text = (if isCrit then "КРИТ! +" else "+") .. (if gained < 100 then Format.Decimal(gained, 1) else Format.Number(gained))
-		if trainer and trainer.Parent then
-			local position, object = trainerTop(trainer)
-			Popups.World(position, text, color, if isCrit then 40 else 28, isCrit)
-			flash(object, isCrit)
-			HubFx.Squash(trainer)
-			hitParticles(object:GetPivot().Position + Vector3.new(0, 2, 0), color, if isCrit then 12 else 4)
-		else
-			local position = headPosition()
-			if position then
-				Popups.World(position, text, color, if isCrit then 34 else 24, isCrit)
-			end
-		end
-		Style.PlaySound(Config.Sounds.Click, if isCrit then 0.7 else 1 + (math.random() - 0.5) * 0.15, 0.35)
-		if isCrit then
-			Popups.Shake(Config.Hud.ShakeCrit.Amplitude, Config.Hud.ShakeCrit.Seconds)
-		end
-	elseif kind == "Tick" then
-		local trainer, gained = ...
-		if trainer and trainer.Parent then
-			local position = trainerTop(trainer)
-			Popups.World(position + Vector3.new(0, 1, 0), "+" .. (if gained < 100 then Format.Decimal(gained, 1) else Format.Number(gained)) .. " ✨", Style.Colors.Green, 34, false)
-			HubFx.Squash(trainer)
-		end
-	elseif kind == "Hit" then
+	if kind == "Hit" then
 		local model, damage, isCrit = ...
 		if not model or not model.Parent then
 			return

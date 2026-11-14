@@ -1,17 +1,17 @@
 --[[
 	HubGenerator.luau
 	Builds the hub, "Цитадель Ауры", at server start (Workspace.Hub).
-	Pure construction from Parts; logic lives in HubService (trainers)
-	and on the client (prompts only open windows).
+	Pure construction from Parts; logic lives in the services and on the
+	client (prompts only open windows).
 
 	Top view (south = spawn, north = portal), see Config.HubLayout:
 
 	                 [ PORTAL ]
-	     TRAINERS        |          FORGE
-	     (2 rows of 4)   |      (big building)
-	     Eggs        [FOUNTAIN]     Premium showcase
-	     Wheel           |      (Robux trainers, store)
-	     Leaderboards [ SPAWN ]     Rebirth altar
+	     POLYGON         |          FORGE
+	     (dummies)       |      (big building)
+	     Eggs        [FOUNTAIN]     Premium kiosk
+	     Wheel           |
+	     Leaderboards [ SPAWN ]
 
 	Every object is built in its own frame `cf` (ground level, -Z = the
 	side that faces the visitor), so it can be turned to face the path.
@@ -27,7 +27,6 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local ArmorBuilder = require(ReplicatedStorage.Shared.ArmorBuilder)
 local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
-local TrainerBuilder = require(script.Parent.TrainerBuilder)
 local WorldKit = require(script.Parent.WorldKit)
 
 local HubGenerator = {}
@@ -225,17 +224,14 @@ local function buildPaths()
 	-- Side paths to every zone.
 	local w = L.SidePathWidth
 	local half = L.PathWidth / 2
-	local trainerZ = L.TrainerSpots["1"].Z
-	strip("PathTrainers", Vector3.new(-half, 0, trainerZ), Vector3.new(L.TrainerSpots["1"].X + L.TrainerSize / 2, 0, trainerZ), w, sideColor)
-	strip("PathTrainerRow", Vector3.new(-27, 0, trainerZ + w / 2), Vector3.new(-27, 0, L.TrainerSpots["4"].Z), w, sideColor)
+	local PG = L.Polygon
+	local polygonEdge = PG.Offset.X + PG.Size.X / 2
+	strip("PathPolygon", Vector3.new(-half, 0, PG.Offset.Z), Vector3.new(polygonEdge, 0, PG.Offset.Z), w, sideColor)
 	strip("PathForge", Vector3.new(half, 0, L.Forge.Offset.Z), Vector3.new(L.Forge.Offset.X - 16, 0, L.Forge.Offset.Z), w, sideColor)
 	strip("PathPets", Vector3.new(-half, 0, L.Egg.Offset.Z), Vector3.new(L.Egg.Offset.X + 5, 0, L.Egg.Offset.Z), w, sideColor)
 	strip("PathWheel", Vector3.new(-F.PlazaRadius + 2, 0, L.Wheel.Offset.Z), Vector3.new(L.Wheel.Offset.X + 4, 0, L.Wheel.Offset.Z), w, sideColor)
-	strip("PathPremium", Vector3.new(F.PlazaRadius - 2, 0, L.Store.Offset.Z), Vector3.new(L.TrainerSpots.Gold.X - L.TrainerSize / 2, 0, L.Store.Offset.Z), w, sideColor)
-	strip("PathAltar", Vector3.new(half, 0, L.Altar.Offset.Z), Vector3.new(L.Altar.Offset.X - 7, 0, L.Altar.Offset.Z), w, sideColor)
+	strip("PathPremium", Vector3.new(F.PlazaRadius - 2, 0, L.Store.Offset.Z), Vector3.new(L.Store.Offset.X - 3, 0, L.Store.Offset.Z), w, sideColor)
 	strip("PathLeaders", Vector3.new(-half, 0, 5), Vector3.new(L.Leaderboards[1].Offset.X + 2, 0, 5), w, sideColor)
-	-- New players are led to the first trainer.
-	chevronLine(Vector3.new(-half - 1, 0, trainerZ), Vector3.new(L.TrainerSpots["1"].X + L.TrainerSize / 2 + 1, 0, trainerZ))
 
 	-- Lanterns on both sides of the main path.
 	local z = zStart - 6
@@ -331,92 +327,21 @@ local function buildNpc()
 end
 
 ---------------------------------------------------------------------
--- Trainers
+-- Polygon (place for test dummies, filled later)
 ---------------------------------------------------------------------
 
--- One trainer = a square territory (the server gives Aura to whoever
--- stands inside it), the big object at its back, a sign at eye height
--- beside it and a lock box the client shows per player.
-local function buildTrainer(parent, def)
-	local offset = L.TrainerSpots[def.Id]
-	local pos = at(offset)
-	local dir = if offset.X < 0 then EAST else WEST -- faces the main path
-	local cf = frame(offset, dir)
-	local S = L.TrainerSize
-
+local function buildPolygon(parent)
+	local PG = L.Polygon
 	local model = Instance.new("Model")
-	model.Name = "Trainer_" .. def.Id
-
-	WorldKit.Part(model, {
-		Name = "Platform",
-		Size = Vector3.new(S, 0.6, S),
-		Position = pos + Vector3.new(0, 0.3, 0),
-		Color = def.Color,
-		Material = Enum.Material.Plastic,
-		TopSurface = Enum.SurfaceType.Studs,
-	})
-	WorldKit.Part(model, {
-		Name = "Rim",
-		Size = Vector3.new(S + 1.2, 0.3, S + 1.2),
-		Position = pos + Vector3.new(0, 0.15, 0),
-		Color = def.Color:Lerp(Color3.new(0, 0, 0), 0.45),
-	})
-	for _, dx in ipairs({ -1, 1 }) do
-		for _, dz in ipairs({ -1, 1 }) do
-			WorldKit.Brick(model, Vector3.new(1, 1.4, 1), CFrame.new(pos + Vector3.new(dx * (S / 2 + 0.1), 0.7, dz * (S / 2 + 0.1))), if def.Premium then T.Gold else T.StoneDark, "Post")
-		end
-	end
-
-	-- The object sits at the back of the territory, facing the path.
-	local object = TrainerBuilder.Build(def, cf * CFrame.new(0, 0.6, S / 2 - 3))
-	object.Name = "Object"
-	object.Parent = model
-	model.PrimaryPart = model.Platform
-	model:SetAttribute("TrainerId", def.Id)
-	model:SetAttribute("Multiplier", def.Multiplier)
-	model:SetAttribute("Center", pos)
-	model:SetAttribute("Half", S / 2)
-
-	-- Requirement line (the client repaints it per player: HubFx).
-	local reqText = Texts.TrainerOpen
-	if def.Pass then
-		local pass = Config.GamePasses[def.Pass]
-		reqText = if pass and pass.Id > 0 then Texts.TrainerLockedPass:format(pass.Price) else Texts.TrainerSoon
-		model:SetAttribute("RequirePass", def.Pass)
-	elseif def.Rebirths then
-		reqText = Texts.TrainerLockedRebirth:format(def.Rebirths)
-		model:SetAttribute("RequireRebirths", def.Rebirths)
-	elseif def.Aura then
-		reqText = Texts.TrainerLockedAura:format(Format.Number(def.Aura))
-		model:SetAttribute("RequireAura", def.Aura)
-	end
-	model:SetAttribute("RequireText", reqText)
-
-	-- Sign: vertical board at eye height beside the territory (south
-	-- side, in the gap between two trainers), facing the path.
-	local signCf = CFrame.lookAt(pos + Vector3.new(0, 0, S / 2 + 4), pos + Vector3.new(0, 0, S / 2 + 4) + dir)
-	part(model, "SignPole", Vector3.new(0.5, 2.6, 0.5), signCf * CFrame.new(0, 1.3, 0), WOOD_DARK, Enum.Material.Wood)
-	sign(model, signCf * CFrame.new(0, 4.6, 0), Vector3.new(7.4, 4.2, 0.4), {
-		{ Name = "Mult", Text = Texts.Trainer:format(tostring(def.Multiplier)) .. " Аура", Size = 56, Color = T.Gold },
-		{ Name = "Title", Text = def.Name, Size = 26 },
-		{ Name = "Req", Text = reqText, Size = 26, Color = T.Green },
-	})
-
-	-- Lock: invisible on the server; a locked-out client makes it solid.
-	WorldKit.Part(model, {
-		Name = "Lock",
-		Size = Vector3.new(S + 0.4, 12, S + 0.4),
-		Position = pos + Vector3.new(0, 6.6, 0),
-		Color = Color3.fromRGB(60, 50, 80),
-		Material = Enum.Material.ForceField,
-		Transparency = 1,
-		CanCollide = false,
-		CanQuery = false,
-		CanTouch = false,
-		CastShadow = false,
-	})
-
+	model.Name = "Polygon"
 	model.Parent = parent
+	local pos = at(PG.Offset)
+	part(model, "Floor", Vector3.new(PG.Size.X, 0.4, PG.Size.Z), CFrame.new(pos + Vector3.new(0, 0.2, 0)), T.StoneDark, Enum.Material.DiamondPlate)
+	for _, dx in ipairs({ -1, 1 }) do
+		part(model, "Edge", Vector3.new(0.6, 0.5, PG.Size.Z), CFrame.new(pos + Vector3.new(dx * PG.Size.X / 2, 0.25, 0)), T.Cyan, Enum.Material.Neon, { CanCollide = false })
+	end
+	zoneSign(parent, PG.SignOffset, EAST, Texts.Polygon, T.Cyan)
+	sign(model, frame(PG.Offset, EAST) * CFrame.new(0, 3.2, 0), Vector3.new(9, 2, 0.4), { { Text = Texts.PolygonSoon, Size = 36, Color = T.Gold } }, true)
 	return model
 end
 
@@ -582,44 +507,6 @@ local function buildStore(parent)
 	return WorldKit.Prompt(counter, L.Prompts.Store, "", { Action = "OpenStore" }, 12)
 end
 
-local function buildAltar(parent)
-	local cf = frame(L.Altar.Offset, WEST)
-	local pos = cf.Position
-	local model = Instance.new("Model")
-	model.Name = "Altar"
-	model.Parent = parent
-	WorldKit.Brick(model, Vector3.new(14, 2, 14), CFrame.new(pos + Vector3.new(0, 1, 0)), T.StoneDark, "Base")
-	WorldKit.Brick(model, Vector3.new(10, 1.5, 10), CFrame.new(pos + Vector3.new(0, 2.75, 0)), T.StoneLight, "Step")
-	local crystal = WorldKit.Part(model, {
-		Name = "Crystal",
-		Size = Vector3.new(3.2, 8, 3.2),
-		CFrame = CFrame.new(pos + Vector3.new(0, 8.5, 0)) * CFrame.Angles(0, math.rad(45), 0),
-		Color = T.Purple,
-		Material = Enum.Material.Glass,
-		Transparency = 0.15,
-	})
-	part(model, "CrystalCore", Vector3.new(1.2, 5, 1.2), crystal.CFrame, T.Magenta, Enum.Material.Neon, { CanCollide = false })
-	TweenService:Create(crystal, TweenInfo.new(8, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), { CFrame = crystal.CFrame * CFrame.Angles(0, math.rad(180), 0) }):Play()
-	WorldKit.Light(crystal, T.Purple, 22, 1.4)
-	for i = 0, 3 do
-		local angle = i * math.pi / 2 + math.pi / 4
-		local p = pos + Vector3.new(math.cos(angle) * 6, 0, math.sin(angle) * 6)
-		WorldKit.Brick(model, Vector3.new(2, 7, 2), CFrame.new(p + Vector3.new(0, 3.5, 0)), T.StoneB, "Pillar")
-		WorldKit.Part(model, { Name = "Rune", Size = Vector3.new(1, 2.4, 0.2), CFrame = CFrame.lookAt(p + Vector3.new(0, 4, 0), pos + Vector3.new(0, 4, 0)) * CFrame.new(0, 0, -1.05), Color = T.Magenta, Material = Enum.Material.Neon, CanCollide = false })
-	end
-	local emitter = Instance.new("ParticleEmitter")
-	emitter.Color = ColorSequence.new(T.Purple, T.Magenta)
-	emitter.LightEmission = 0.6
-	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.3, 0.7), NumberSequenceKeypoint.new(1, 0) })
-	emitter.Lifetime = NumberRange.new(1.5, 2.5)
-	emitter.Speed = NumberRange.new(2, 5)
-	emitter.SpreadAngle = Vector2.new(70, 70)
-	emitter.Rate = 14
-	emitter.Parent = crystal
-	zoneSign(parent, L.Altar.Offset + Vector3.new(-10, 0, 9), WEST, Texts.Altar, T.Purple:Lerp(Color3.new(1, 1, 1), 0.45))
-	return WorldKit.Prompt(crystal, L.Prompts.Rebirth, "", { Action = "RebirthAltar" }, 16)
-end
-
 local function buildWheel(parent)
 	local cf = frame(L.Wheel.Offset, EAST)
 	local model = Instance.new("Model")
@@ -766,9 +653,6 @@ end
 function HubGenerator.Build()
 	root = Instance.new("Folder")
 	root.Name = "Hub"
-	local trainers = Instance.new("Folder")
-	trainers.Name = "Trainers"
-	trainers.Parent = root
 
 	local spawn = Workspace:FindFirstChildWhichIsA("SpawnLocation", true)
 	local origin = if spawn then spawn.Position else Vector3.zero
@@ -780,14 +664,10 @@ function HubGenerator.Build()
 	local portal = buildPortal()
 	buildNpc()
 
-	for _, def in ipairs(Config.Trainers) do
-		buildTrainer(trainers, def)
-	end
-	zoneSign(root, Vector3.new(-25, 0, L.TrainerSpots["1"].Z + 13), EAST, Texts.Trainers, T.Green)
+	local polygon = buildPolygon(root)
 
 	local forgePrompt, forge = buildForge(root)
 	local storePrompt = buildStore(root)
-	local altarPrompt = buildAltar(root)
 	local wheelPrompt = buildWheel(root)
 	local eggPrompt = buildEgg(root)
 	local boards = buildLeaderboards(root)
@@ -809,12 +689,11 @@ function HubGenerator.Build()
 	root.Parent = Workspace
 	return {
 		Folder = root,
-		Trainers = trainers,
+		Polygon = polygon,
 		Portal = portal,
 		Forge = forge,
 		ForgePrompt = forgePrompt,
 		StorePrompt = storePrompt,
-		AltarPrompt = altarPrompt,
 		WheelPrompt = wheelPrompt,
 		EggPrompt = eggPrompt,
 		Leaderboards = boards,
