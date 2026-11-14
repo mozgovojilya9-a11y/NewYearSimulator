@@ -20,6 +20,7 @@ local Rebirth = require(script.Parent.Windows.Rebirth)
 local Reward = require(script.Parent.Windows.Reward)
 local Settings = require(script.Parent.Windows.Settings)
 local Pets = require(script.Parent.Windows.Pets)
+local Store = require(script.Parent.Windows.Store)
 
 local player = Players.LocalPlayer
 local travel = ReplicatedStorage:WaitForChild("Travel")
@@ -73,6 +74,9 @@ local actions = {
 	Inventory = Inventory.Open,
 	Equipment = Equipment.Open,
 	Pets = Pets.Open,
+	Store = function()
+		Store.Open()
+	end,
 	Rebirth = Rebirth.Open,
 	Reward = Reward.Open,
 	Travel = function()

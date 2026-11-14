@@ -11,10 +11,10 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local Popups = require(script.Parent.ui.Popups)
 local Style = require(script.Parent.ui.Style)
 local Forge = require(script.Parent.ui.Windows.Forge)
 local Rebirth = require(script.Parent.ui.Windows.Rebirth)
+local Store = require(script.Parent.ui.Windows.Store)
 local Reward = require(script.Parent.ui.Windows.Reward)
 local Pets = require(script.Parent.ui.Windows.Pets)
 
@@ -26,7 +26,7 @@ local Prompts = {}
 local ACTIONS = {
 	OpenForge = Forge.Open,
 	OpenStore = function()
-		Popups.Toast("Магазин скоро откроется", "gold")
+		Store.Open()
 	end,
 	OpenPets = Pets.OpenEggs,
 	RebirthAltar = Rebirth.Open,

@@ -92,6 +92,12 @@ function PlayerState.Damage(player): number
 	end
 	local _, petDamage = PlayerState.PetBonus(player)
 	damage *= 1 + petDamage
+	if Passes.Owns(player, "Damage2x") then
+		damage *= 2
+	end
+	if PlayerState.BoostActive(player, "Damage") then
+		damage *= 2
+	end
 	return math.max(1, math.floor(damage))
 end
 PlayerState.ClickPower = PlayerState.Damage
@@ -118,6 +124,9 @@ function PlayerState.AuraMultiplier(player): number
 	end
 	if Passes.Owns(player, "VIP") then
 		multiplier *= Config.VipAuraMultiplier
+	end
+	if Passes.Owns(player, "Aura2x") then
+		multiplier *= 2
 	end
 	return multiplier
 end
@@ -189,7 +198,34 @@ function PlayerState.LootLuck(player): number
 	if Passes.Owns(player, "LootLuck") then
 		luck *= 2
 	end
+	if PlayerState.BoostActive(player, "Loot") then
+		luck *= 2
+	end
 	return luck
+end
+
+-- Timed boosts: "Aura" (BoostUntil), "Damage", "Loot".
+function PlayerState.BoostActive(player, kind: string): boolean
+	local data = DataService.Get(player)
+	if not data then
+		return false
+	end
+	local until_ = if kind == "Aura" then data.BoostUntil else (data.Boosts[kind] or 0)
+	return (until_ or 0) > os.time()
+end
+
+function PlayerState.AddBoost(player, kind: string, minutes: number)
+	local data = DataService.Get(player)
+	if not data then
+		return
+	end
+	local now = os.time()
+	if kind == "Aura" then
+		data.BoostUntil = math.max(now, data.BoostUntil or 0) + minutes * 60
+	else
+		data.Boosts[kind] = math.max(now, data.Boosts[kind] or 0) + minutes * 60
+	end
+	PlayerState.Sync(player)
 end
 
 local function publishMaterials(player, data)
@@ -304,6 +340,8 @@ function PlayerState.Sync(player)
 	player:SetAttribute("Xp", data.Xp)
 	player:SetAttribute("XpNext", math.floor(Config.Progression.Level.XpBase * data.Level ^ 1.5))
 	player:SetAttribute("BoostUntil", data.BoostUntil or 0)
+	player:SetAttribute("BoostDamage", data.Boosts.Damage or 0)
+	player:SetAttribute("BoostLoot", data.Boosts.Loot or 0)
 	publishMaterials(player, data)
 	local unlocked = {}
 	for id in pairs(data.TrainersUnlocked) do

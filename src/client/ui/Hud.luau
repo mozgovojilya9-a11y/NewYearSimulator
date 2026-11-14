@@ -331,14 +331,15 @@ local boostLabel = Style.Label(Style.Gui, "", 20, Style.Colors.Gold, {
 boostLabel.Visible = false
 task.spawn(function()
 	while true do
-		local until_ = player:GetAttribute("BoostUntil") or 0
-		local left = until_ - os.time()
-		if left > 0 then
-			boostLabel.Text = ("⚡ x%s Аура  %d:%02d"):format(tostring(Config.Progression.Boost.Multiplier), left // 60, left % 60)
-			boostLabel.Visible = true
-		else
-			boostLabel.Visible = false
+		local parts = {}
+		for _, boost in ipairs({ { "BoostUntil", "Аура" }, { "BoostDamage", "Урон" }, { "BoostLoot", "Удача" } }) do
+			local left = (player:GetAttribute(boost[1]) or 0) - os.time()
+			if left > 0 then
+				table.insert(parts, ("x2 %s %d:%02d"):format(boost[2], left // 60, left % 60))
+			end
 		end
+		boostLabel.Text = "⚡ " .. table.concat(parts, "   ")
+		boostLabel.Visible = #parts > 0
 		task.wait(1)
 	end
 end)

@@ -34,7 +34,8 @@ Config.StartingData = {
 	Quests = { Day = 0, List = {} },
 	Level = 1,
 	Xp = 0,
-	BoostUntil = 0,
+	BoostUntil = 0, -- x2 Aura boost (wheel, daily, products)
+	Boosts = { Damage = 0, Loot = 0 }, -- other boosts: os.time() they end
 	LastSeen = 0, -- os.time() of the last save
 }
 -- Fields from older versions that are migrated / dropped on load
@@ -98,10 +99,65 @@ end
 -- Dashboard here (see README).
 Config.VipAuraMultiplier = 1.5
 
+-- Order = position in the store. Icon = emoji on the card.
 Config.GamePasses = {
-	VIP = { Id = 0, Name = "VIP", Price = 199, Text = "x1.5 Аура, VIP-тег и VIP-тренажёр" },
-	GoldTrainer = { Id = 0, Name = "Золотой тренажёр", Price = 299, Text = "Доступ к тренажёру x500" },
-	AbyssTrainer = { Id = 0, Name = "Тренажёр бездны", Price = 499, Text = "Доступ к тренажёру x1000" },
+	VIP = { Id = 0, Order = 1, Icon = "👑", Name = "VIP", Price = 199, Text = "x1.5 Аура, VIP-тег и VIP-тренажёр x100" },
+	Damage2x = { Id = 0, Order = 2, Icon = "⚔", Name = "x2 Урон", Price = 149, Text = "Навсегда удваивает урон" },
+	Aura2x = { Id = 0, Order = 3, Icon = "✨", Name = "x2 Аура", Price = 149, Text = "Навсегда удваивает всю Ауру" },
+	AutoClick = { Id = 0, Order = 4, Icon = "⚡", Name = "Авто-клик", Price = 99, Text = "Авто-клик работает везде, не только на тренажёре" },
+	TripleEgg = { Id = 0, Order = 5, Icon = "🥚", Name = "Открытие 3 яиц", Price = 249, Text = "Открывай по 3 яйца сразу" },
+	FastEgg = { Id = 0, Order = 6, Icon = "💨", Name = "Быстрые яйца", Price = 79, Text = "Вылупление в 3 раза быстрее" },
+	Luck = { Id = 0, Order = 7, Icon = "🍀", Name = "Удача x2", Price = 199, Text = "x2 шанс эпических и лучше питомцев" },
+	LootLuck = { Id = 0, Order = 8, Icon = "💎", Name = "Удача добычи x2", Price = 199, Text = "x2 шанс редких материалов с мобов" },
+	PetSlots = { Id = 0, Order = 9, Icon = "🐾", Name = "+3 слота питомцев", Price = 99, Text = "Носи на 3 питомца больше" },
+	GoldTrainer = { Id = 0, Order = 10, Icon = "🏆", Name = "Золотой тренажёр", Price = 299, Text = "Доступ к тренажёру x500" },
+	AbyssTrainer = { Id = 0, Order = 11, Icon = "🌀", Name = "Тренажёр бездны", Price = 499, Text = "Доступ к тренажёру x1000" },
+}
+
+-- Developer Products (bought again and again). Id = 0 -> "Скоро".
+-- Kind: Aura (Amount x (1 + record room / 2)), Boost (Boost + Minutes),
+-- Chest (Biome, Rolls: random materials of that biome, loot luck x Luck),
+-- Weapon / ArmorSet (exclusive gear, granted once), WheelSkip.
+Config.Products = {
+	{ Key = "AuraSmall", Id = 0, Tab = "Packs", Icon = "✨", Name = "Горсть Ауры", Price = 25, Kind = "Aura", Amount = 2500 },
+	{ Key = "AuraMedium", Id = 0, Tab = "Packs", Icon = "✨", Name = "Мешок Ауры", Price = 79, Kind = "Aura", Amount = 10000 },
+	{ Key = "AuraLarge", Id = 0, Tab = "Packs", Icon = "✨", Name = "Сундук Ауры", Price = 199, Kind = "Aura", Amount = 35000 },
+	{ Key = "WheelSkip", Id = 0, Tab = "Packs", Icon = "🎡", Name = "Крутить колесо сейчас", Price = 25, Kind = "WheelSkip" },
+
+	{ Key = "BoostAura15", Id = 0, Tab = "Boosts", Icon = "✨", Name = "x2 Аура · 15 мин", Price = 25, Kind = "Boost", Boost = "Aura", Minutes = 15 },
+	{ Key = "BoostAura60", Id = 0, Tab = "Boosts", Icon = "✨", Name = "x2 Аура · 60 мин", Price = 69, Kind = "Boost", Boost = "Aura", Minutes = 60 },
+	{ Key = "BoostDamage15", Id = 0, Tab = "Boosts", Icon = "⚔", Name = "x2 Урон · 15 мин", Price = 29, Kind = "Boost", Boost = "Damage", Minutes = 15 },
+	{ Key = "BoostDamage60", Id = 0, Tab = "Boosts", Icon = "⚔", Name = "x2 Урон · 60 мин", Price = 79, Kind = "Boost", Boost = "Damage", Minutes = 60 },
+	{ Key = "BoostLoot15", Id = 0, Tab = "Boosts", Icon = "💎", Name = "x2 Удача добычи · 15 мин", Price = 29, Kind = "Boost", Boost = "Loot", Minutes = 15 },
+	{ Key = "BoostLoot60", Id = 0, Tab = "Boosts", Icon = "💎", Name = "x2 Удача добычи · 60 мин", Price = 79, Kind = "Boost", Boost = "Loot", Minutes = 60 },
+
+	{ Key = "ChestCatacombs", Id = 0, Tab = "Chests", Icon = "💀", Name = "Сундук Катакомб", Price = 49, Kind = "Chest", Biome = 1, Rolls = 30, Luck = 2 },
+	{ Key = "ChestIce", Id = 0, Tab = "Chests", Icon = "❄", Name = "Сундук Ледяного грота", Price = 99, Kind = "Chest", Biome = 2, Rolls = 30, Luck = 2 },
+	{ Key = "ChestLava", Id = 0, Tab = "Chests", Icon = "🔥", Name = "Сундук Лавовой кузни", Price = 149, Kind = "Chest", Biome = 3, Rolls = 30, Luck = 2 },
+	{ Key = "ChestAbyss", Id = 0, Tab = "Chests", Icon = "🌀", Name = "Сундук Бездны", Price = 199, Kind = "Chest", Biome = 4, Rolls = 30, Luck = 2 },
+
+	{ Key = "WeaponPatron", Id = 0, Tab = "Exclusive", Icon = "🗡", Name = "Клинок Покровителя", Price = 149, Kind = "Weapon", Item = "PatronBlade" },
+	{ Key = "WeaponComet", Id = 0, Tab = "Exclusive", Icon = "☄", Name = "Кометный меч", Price = 249, Kind = "Weapon", Item = "CometSword" },
+	{ Key = "WeaponCrown", Id = 0, Tab = "Exclusive", Icon = "👑", Name = "Коронный клинок", Price = 399, Kind = "Weapon", Item = "CrownBlade" },
+	{ Key = "ArmorRoyal", Id = 0, Tab = "Exclusive", Icon = "🛡", Name = "Королевский сет", Price = 299, Kind = "ArmorSet", Item = "Royal" },
+}
+Config.ProductById = {} -- [product id] = product (only real ids)
+Config.ProductByKey = {}
+for _, product in ipairs(Config.Products) do
+	Config.ProductByKey[product.Key] = product
+	if product.Id > 0 then
+		Config.ProductById[product.Id] = product
+	end
+end
+Config.Store = {
+	PurchaseStore = "AuraClicker_Purchases_v1", -- PurchaseId -> granted (idempotent receipts)
+	Tabs = {
+		{ Id = "Passes", Text = "Пассы" },
+		{ Id = "Packs", Text = "Аура" },
+		{ Id = "Boosts", Text = "Бусты" },
+		{ Id = "Chests", Text = "Сундуки" },
+		{ Id = "Exclusive", Text = "Эксклюзив" },
+	},
 }
 
 Config.Dungeon = {
@@ -321,6 +377,11 @@ Config.Weapons = {
 	{ Id = "DuskScythe", Name = "Коса сумрака", Rarity = "Legendary", Damage = 600, Biome = 4, Shape = "DuskScythe", Color = Color3.fromRGB(170, 80, 255) },
 	{ Id = "AbyssBlade", Name = "Клинок бездны", Rarity = "Legendary", Damage = 920, Biome = 4, Shape = "AbyssBlade", Color = Color3.fromRGB(255, 61, 184) },
 	{ Id = "AuraReaver", Name = "Разрушитель Ауры", Rarity = "Mythic", Damage = 1450, Biome = 4, Shape = "AuraReaver", Color = Color3.fromRGB(255, 230, 120) },
+	-- Robux exclusives (Config.Products): a bit stronger than the tier they
+	-- become available at, weaker than the next biome's top weapon.
+	{ Id = "PatronBlade", Name = "Клинок Покровителя", Rarity = "Epic", Damage = 10, Robux = true, Shape = "StormBlade", Color = Color3.fromRGB(90, 200, 255) },
+	{ Id = "CometSword", Name = "Кометный меч", Rarity = "Legendary", Damage = 55, Robux = true, Shape = "StarAuraSword", Color = Color3.fromRGB(255, 150, 90) },
+	{ Id = "CrownBlade", Name = "Коронный клинок", Rarity = "Mythic", Damage = 300, Robux = true, Shape = "AuraKatana", Color = Color3.fromRGB(255, 215, 80) },
 	-- Legacy (bought for Aura before crafting existed)
 	{ Id = "WoodSword", Name = "Деревянный меч", Rarity = "Common", Damage = 3, Legacy = true, Shape = "WoodSword", Color = Color3.fromRGB(200, 150, 90) },
 	{ Id = "IronSword", Name = "Железный меч", Rarity = "Rare", Damage = 10, Legacy = true, Shape = "IronSword", Color = Color3.fromRGB(190, 200, 215) },
@@ -345,11 +406,14 @@ Config.ArmorSets = {
 		Style = { Kind = "Lava", Main = Color3.fromRGB(50, 38, 42), Trim = Color3.fromRGB(120, 55, 40), Glow = Color3.fromRGB(255, 130, 30), Material = Enum.Material.Slate } },
 	Abyss = { Name = "Сет бездны", Biome = 4, Rarity = "Legendary", Health = 160, Defense = 0.09, Bonus = 0.50,
 		Style = { Kind = "Abyss", Main = Color3.fromRGB(60, 35, 110), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(255, 61, 184), Material = Enum.Material.Metal } },
+	-- Robux exclusive (Config.Products "ArmorRoyal"): between Ice and Lava.
+	Royal = { Name = "Королевский сет", Rarity = "Legendary", Health = 70, Defense = 0.06, Bonus = 0.28, Robux = true,
+		Style = { Kind = "Abyss", Main = Color3.fromRGB(240, 240, 250), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Metal } },
 }
-Config.ArmorSetOrder = { "Bone", "Ice", "Lava", "Abyss" }
+Config.ArmorSetOrder = { "Bone", "Ice", "Lava", "Abyss", "Royal" }
 Config.Armor = {}
 do
-	local adjective = { Bone = { "Костяной", "Костяные" }, Ice = { "Ледяной", "Ледяные" }, Lava = { "Лавовый", "Лавовые" } }
+	local adjective = { Bone = { "Костяной", "Костяные" }, Ice = { "Ледяной", "Ледяные" }, Lava = { "Лавовый", "Лавовые" }, Royal = { "Королевский", "Королевские" } }
 	local noun = { Helmet = "шлем", Chest = "нагрудник", Legs = "поножи" }
 	local nounCapital = { Helmet = "Шлем", Chest = "Нагрудник", Legs = "Поножи" }
 	for _, setId in ipairs(Config.ArmorSetOrder) do
@@ -627,6 +691,7 @@ Config.Remotes = {
 	Progression = "RemoteFunction", -- ("Status") | ("ClaimDaily") | ("Spin") | ("ClaimQuest", index) -> ok, payload
 	Loot = "RemoteEvent", -- S->C ("Spawn", id, materialId, position, lifetime) | ("Picked", id, materialId, total) | ("Remove", id) | ("Clear"); C->S (id) pick up
 	Announce = "RemoteEvent", -- S->all (text, color) system chat line + toast
+	StoreNotify = "RemoteEvent", -- S->C (text) after a Robux purchase was granted
 }
 
 ---------------------------------------------------------------------
@@ -884,6 +949,7 @@ Config.Hud = {
 		{ Id = "Pets", Icon = "🐾", Label = "Питомцы", Color = Color3.fromRGB(255, 61, 184) },
 		{ Id = "Rebirth", Icon = "🔁", Label = "Перерождение", Color = Color3.fromRGB(150, 80, 255) },
 		{ Id = "Reward", Icon = "🎁", Label = "Награда", Color = Color3.fromRGB(255, 201, 60) },
+		{ Id = "Store", Icon = "💎", Label = "Магазин", Color = Color3.fromRGB(46, 200, 255) },
 		{ Id = "Travel", Icon = "🚪", Label = "Телепорт", Color = Color3.fromRGB(70, 60, 190) },
 	},
 	ToastSeconds = 4,

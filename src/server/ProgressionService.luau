@@ -41,11 +41,8 @@ end
 -- Boosts
 ---------------------------------------------------------------------
 
-local function giveBoost(player, data, minutes: number)
-	local now = os.time()
-	local base = math.max(now, data.BoostUntil or 0)
-	data.BoostUntil = base + minutes * 60
-	PlayerState.Sync(player)
+local function giveBoost(player, _data, minutes: number)
+	PlayerState.AddBoost(player, "Aura", minutes)
 end
 
 ---------------------------------------------------------------------

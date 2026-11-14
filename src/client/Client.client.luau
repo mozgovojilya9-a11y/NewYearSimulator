@@ -31,6 +31,7 @@ require(windows:WaitForChild("Pets")) -- waits for leaderstats
 require(windows:WaitForChild("Inventory"))
 require(windows:WaitForChild("Forge"))
 require(windows:WaitForChild("Equipment"))
+require(windows:WaitForChild("Store"))
 require(windows:WaitForChild("Rebirth"))
 require(windows:WaitForChild("Reward"))
 require(windows:WaitForChild("Settings"))
