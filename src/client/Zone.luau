@@ -36,7 +36,11 @@ local atmosphere = Lighting:WaitForChild("Atmosphere", 10)
 local function applyLighting(presetName: string)
 	local p = Config.Lighting[presetName]
 	local t = Config.Lighting.TransitionSeconds
-	Style.Tween(Lighting, t, { ClockTime = p.ClockTime, Brightness = p.Brightness, ExposureCompensation = p.ExposureCompensation, Ambient = p.Ambient, OutdoorAmbient = p.OutdoorAmbient })
+	Style.Tween(Lighting, t, {
+		ClockTime = p.ClockTime, Brightness = p.Brightness, ExposureCompensation = p.ExposureCompensation,
+		Ambient = p.Ambient, OutdoorAmbient = p.OutdoorAmbient,
+		EnvironmentDiffuseScale = p.EnvironmentDiffuseScale, EnvironmentSpecularScale = p.EnvironmentSpecularScale,
+	})
 	if bloom then
 		Style.Tween(bloom, t, { Intensity = p.Bloom })
 	end
@@ -44,7 +48,7 @@ local function applyLighting(presetName: string)
 		Style.Tween(cc, t, { Saturation = p.Saturation, Contrast = p.Contrast, TintColor = p.Tint })
 	end
 	if atmosphere then
-		Style.Tween(atmosphere, t, { Density = p.Atmosphere.Density, Color = p.Atmosphere.Color, Decay = p.Atmosphere.Decay, Glare = p.Atmosphere.Glare, Haze = p.Atmosphere.Haze })
+		Style.Tween(atmosphere, t, { Density = p.Atmosphere.Density, Offset = p.Atmosphere.Offset, Color = p.Atmosphere.Color, Decay = p.Atmosphere.Decay, Glare = p.Atmosphere.Glare, Haze = p.Atmosphere.Haze })
 	end
 end
 

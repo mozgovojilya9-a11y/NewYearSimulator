@@ -863,26 +863,33 @@ for index, rarity in ipairs(Config.Rarities) do
 	Config.Rarity[rarity.Id] = rarity
 end
 
--- Lighting presets. The server applies Hub at start; the client tweens
--- between presets when the player's "Zone" attribute changes. Rules:
--- no glow wash (Bloom <= 0.05), neutral haze, ambient never black.
+-- Lighting presets for LightingStyle = Realistic (+ PrioritizeLightingQuality;
+-- the owner switches it on in Studio, the server also tries). The server
+-- applies Hub at start; the client tweens between presets when the
+-- player's "Zone" attribute changes. Rules: Bloom <= 0.05, light color
+-- correction, soft shadows, a light Atmosphere, ambient never black.
+--   Hub: clear sky with haze, warm white sun.
+--   Dungeon: industrial half-dark under ceilings, warm lamps (each biome
+--   tints the haze and the ambient: Config.DungeonLayout.Biomes[i]).
 Config.Lighting = {
 	TransitionSeconds = 1,
-	BloomSize = 24,
-	BloomThreshold = 1.2, -- only the very brightest neon pixels may glow
+	BloomSize = 18,
+	BloomThreshold = 1.4, -- only the very brightest pixels may glow
+	ShadowSoftness = 0.3,
+	Clouds = { Cover = 0.45, Density = 0.55, Color = Color3.fromRGB(245, 248, 255) },
 	Hub = {
-		ClockTime = 14, Brightness = 2, ExposureCompensation = 0,
-		Ambient = Color3.fromRGB(125, 125, 135), OutdoorAmbient = Color3.fromRGB(140, 140, 150),
-		Saturation = 0.1, Contrast = 0, Tint = Color3.fromRGB(255, 255, 255), Bloom = 0.03,
-		Atmosphere = { Density = 0.2, Color = Color3.fromRGB(200, 220, 255), Decay = Color3.fromRGB(160, 190, 235), Glare = 0, Haze = 0.3 },
+		ClockTime = 14.5, Brightness = 3, ExposureCompensation = 0,
+		Ambient = Color3.fromRGB(70, 72, 82), OutdoorAmbient = Color3.fromRGB(128, 132, 142),
+		EnvironmentDiffuseScale = 1, EnvironmentSpecularScale = 1,
+		Saturation = 0.05, Contrast = 0.05, Tint = Color3.fromRGB(255, 251, 244), Bloom = 0.04,
+		Atmosphere = { Density = 0.3, Offset = 0.15, Color = Color3.fromRGB(199, 210, 226), Decay = Color3.fromRGB(106, 122, 145), Glare = 0.15, Haze = 1.2 },
 	},
 	Dungeon = {
-		ClockTime = 14, Brightness = 1.6, ExposureCompensation = 0,
-		-- Ambient / OutdoorAmbient / Atmosphere colors come from the biome
-		-- the player stands in (Config.DungeonLayout.Biomes[i].Lighting).
-		Ambient = Color3.fromRGB(120, 120, 130), OutdoorAmbient = Color3.fromRGB(125, 125, 135),
-		Saturation = 0.1, Contrast = 0, Tint = Color3.fromRGB(255, 255, 255), Bloom = 0.03,
-		Atmosphere = { Density = 0.3, Color = Color3.fromRGB(150, 160, 180), Decay = Color3.fromRGB(90, 100, 130), Glare = 0, Haze = 0.6 },
+		ClockTime = 14.5, Brightness = 1.4, ExposureCompensation = 0.25,
+		Ambient = Color3.fromRGB(86, 82, 80), OutdoorAmbient = Color3.fromRGB(72, 72, 80),
+		EnvironmentDiffuseScale = 0.7, EnvironmentSpecularScale = 1,
+		Saturation = 0, Contrast = 0.08, Tint = Color3.fromRGB(255, 244, 228), Bloom = 0.05,
+		Atmosphere = { Density = 0.42, Offset = 0, Color = Color3.fromRGB(120, 114, 108), Decay = Color3.fromRGB(62, 56, 54), Glare = 0, Haze = 2 },
 	},
 }
 
