@@ -362,17 +362,17 @@ Config.Mobs = {
 		SpiderBot = { Name = "Паукобот", Asset = "Mob_SpiderBot", Height = 3.6, Builder = "IceSpider", Drops = { "Bone", "Slime", "RustyIron", "CatacombHeart" } },
 		Assembler = { Name = "Робот-сборщик", Asset = "Mob_Robot", Height = 5.5, Builder = "ZombieMiner", Drops = { "Bone", "RustyIron", "CursedSkull", "CatacombHeart" } },
 		Loader = { Name = "Бот-погрузчик", Asset = "Mob_Bot2", Height = 5, Builder = "SkeletonArcher", Drops = { "Slime", "Bone", "CursedSkull", "CatacombHeart" } },
-		ForemanMech = { Name = "Мех-бригадир", Boss = true, Asset = "Mob_Mech", Height = 6, Tint = Color3.fromRGB(255, 170, 60), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "SlimeKing", Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" } },
+		ForemanMech = { Name = "Мех-бригадир", Boss = true, Asset = "Boss_Foreman", Turn = 90, AltAsset = "Mob_Mech", Height = 6, Tint = Color3.fromRGB(255, 170, 60), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "SlimeKing", Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" } },
 		-- 2. Криолаборатория
 		CryoBot = { Name = "Крио-бот", Asset = "Mob_BlueBot", Height = 5, Glow = Color3.fromRGB(120, 230, 255), Builder = "SnowGolem", Drops = { "Ice", "FrostCrystal", "EternalIce" } },
 		CryoAndroid = { Name = "Крио-андроид", Asset = "Mob_Android", Height = 6, Tint = Color3.fromRGB(170, 220, 255), TintAmount = 0.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "Yeti", Drops = { "YetiFur", "FrostCrystal", "EternalIce" } },
 		FrostSpider = { Name = "Ледяной паукобот", Asset = "Mob_SpiderBot", Height = 4.2, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider", Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" } },
-		CryoOverseer = { Name = "Крио-надзиратель", Boss = true, Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(150, 210, 255), TintAmount = 0.45, Glow = Color3.fromRGB(46, 230, 255), Builder = "IceBoneLord", Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" } },
+		CryoOverseer = { Name = "Крио-надзиратель", Boss = true, Asset = "Boss_Cryo", AltAsset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(150, 210, 255), TintAmount = 0.45, Glow = Color3.fromRGB(46, 230, 255), Builder = "IceBoneLord", Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" } },
 		-- 3. Плавильный реактор
 		Smelter = { Name = "Андроид-плавильщик", Asset = "Mob_RedAndroid", Height = 6, Glow = Color3.fromRGB(255, 140, 40), Builder = "FireImp", Drops = { "Ember", "Obsidian", "FirePlume", "VolcanoHeart" } },
 		HeavyMech = { Name = "Тяжёлый мех", Asset = "Mob_Mech", Height = 6.5, Tint = Color3.fromRGB(90, 70, 60), TintAmount = 0.4, Glow = Color3.fromRGB(255, 120, 30), Builder = "MagmaGolem", Drops = { "Obsidian", "MagmaCore", "FirePlume", "VolcanoHeart" } },
 		SlagBot = { Name = "Шлакобот", Asset = "Mob_Bot2", Height = 5, Tint = Color3.fromRGB(255, 130, 40), TintAmount = 0.4, Glow = Color3.fromRGB(255, 160, 60), Builder = "GoblinSmith", Drops = { "Obsidian", "Ember", "MagmaCore", "VolcanoHeart" } },
-		MoltenColossus = { Name = "Плавильный колосс", Boss = true, Asset = "Mob_Android", Height = 6.2, Tint = Color3.fromRGB(255, 110, 30), TintAmount = 0.45, Glow = Color3.fromRGB(255, 150, 40), Builder = "FireChief", Drops = { "Obsidian", "Ember", "MagmaCore", "FirePlume", "VolcanoHeart" } },
+		MoltenColossus = { Name = "Плавильный колосс", Boss = true, Asset = "Boss_Molten", AltAsset = "Mob_Android", Height = 6.2, Tint = Color3.fromRGB(255, 110, 30), TintAmount = 0.45, Glow = Color3.fromRGB(255, 150, 40), Builder = "FireChief", Drops = { "Obsidian", "Ember", "MagmaCore", "FirePlume", "VolcanoHeart" } },
 		-- 4. Ядро Нексуса
 		NexusSentinel = { Name = "Страж Нексуса", Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(120, 60, 200), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight", Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" } },
 		NexusDrone = { Name = "Дрон Нексуса", Asset = "Mob_Robot", Height = 5.5, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.45, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye", Drops = { "DarkShard", "AuraEssence", "AbyssEye" } },
@@ -1041,7 +1041,7 @@ Config.Assets = {
 	-- Names the game looks for (AssetService reports the missing ones).
 	Expected = {
 		Weapons = { "Weapon_Sword_1", "Weapon_Sword_2", "Weapon_Spear_1", "Weapon_Spear_2", "Weapon_Blaster_1", "Weapon_Blaster_2", "Weapon_Blaster_3" },
-		Mobs = { "Boss_Juggernaut", "Mob_SpiderBot", "Mob_Mech", "Mob_RedAndroid", "Mob_Overseer", "Mob_Robot", "Mob_Android", "Mob_BlueBot", "Mob_Bot2" },
+		Mobs = { "Boss_Juggernaut", "Boss_Foreman", "Boss_Cryo", "Boss_Molten", "Mob_SpiderBot", "Mob_Mech", "Mob_RedAndroid", "Mob_Overseer", "Mob_Robot", "Mob_Android", "Mob_BlueBot", "Mob_Bot2" },
 		Props = { "Prop_Crate", "Prop_Door", "Prop_Lamp", "Prop_Pipes", "Prop_Hologram", "Prop_Barrel", "Prop_Misc_1", "Prop_Misc_2", "Prop_Misc_3", "Prop_Misc_4" },
 		Trainers = { "Trainer_Dummy", "Trainer_Bag", "Trainer_Machine", "Trainer_Refiner", "Trainer_Weights" },
 	},
@@ -1532,23 +1532,27 @@ Config.DungeonLayout = {
 	-- pipes / frames, Accent = thin neon lines, Light = lamp color, Glow =
 	-- the biome's "hot" color (molten channel, cryo tanks, data cores).
 	-- Atmosphere / Lighting tint the haze and the ambient per biome.
+	-- WallMaterial / FloorMaterial / PanelMaterial = the biome's surfaces;
+	-- Decor = its side-wall set (Assembly: conveyor, Cryo: cryo tanks and
+	-- frost, Smelter: molten channel under grating, Nexus: server racks
+	-- and data pillars).
 	Biomes = {
-		{ Name = "Сборочный цех", Theme = "Assembly",
+		{ Name = "Сборочный цех", Theme = "Assembly", WallMaterial = Enum.Material.Concrete, FloorMaterial = Enum.Material.DiamondPlate, PanelMaterial = Enum.Material.Metal, Decor = "Assembly",
 			StoneA = Color3.fromRGB(128, 130, 138), StoneB = Color3.fromRGB(108, 110, 118), Floor = Color3.fromRGB(62, 64, 70), FloorB = Color3.fromRGB(52, 54, 60),
 			Metal = Color3.fromRGB(70, 74, 84), Accent = Color3.fromRGB(255, 190, 60), Light = Color3.fromRGB(255, 222, 180), Glow = Color3.fromRGB(255, 170, 50),
 			Atmosphere = { Color = Color3.fromRGB(140, 130, 115), Decay = Color3.fromRGB(80, 70, 60) },
 			Lighting = { Ambient = Color3.fromRGB(92, 88, 82), OutdoorAmbient = Color3.fromRGB(80, 78, 76) } },
-		{ Name = "Криолаборатория", Theme = "Cryo",
+		{ Name = "Криолаборатория", Theme = "Cryo", WallMaterial = Enum.Material.SmoothPlastic, FloorMaterial = Enum.Material.SmoothPlastic, PanelMaterial = Enum.Material.Glass, Decor = "Cryo",
 			StoneA = Color3.fromRGB(176, 196, 214), StoneB = Color3.fromRGB(150, 172, 192), Floor = Color3.fromRGB(64, 78, 96), FloorB = Color3.fromRGB(54, 66, 84),
 			Metal = Color3.fromRGB(90, 104, 122), Accent = Color3.fromRGB(46, 230, 255), Light = Color3.fromRGB(220, 240, 255), Glow = Color3.fromRGB(120, 230, 255),
 			Atmosphere = { Color = Color3.fromRGB(150, 180, 205), Decay = Color3.fromRGB(80, 105, 135) },
 			Lighting = { Ambient = Color3.fromRGB(84, 92, 104), OutdoorAmbient = Color3.fromRGB(80, 88, 100) } },
-		{ Name = "Плавильный реактор", Theme = "Smelter",
+		{ Name = "Плавильный реактор", Theme = "Smelter", WallMaterial = Enum.Material.Metal, FloorMaterial = Enum.Material.DiamondPlate, PanelMaterial = Enum.Material.Metal, Decor = "Smelter",
 			StoneA = Color3.fromRGB(122, 104, 96), StoneB = Color3.fromRGB(102, 86, 80), Floor = Color3.fromRGB(56, 46, 44), FloorB = Color3.fromRGB(46, 38, 36),
 			Metal = Color3.fromRGB(70, 60, 58), Accent = Color3.fromRGB(255, 120, 40), Light = Color3.fromRGB(255, 200, 150), Glow = Color3.fromRGB(255, 110, 30),
 			Atmosphere = { Color = Color3.fromRGB(170, 120, 95), Decay = Color3.fromRGB(110, 60, 40) },
 			Lighting = { Ambient = Color3.fromRGB(100, 82, 74), OutdoorAmbient = Color3.fromRGB(88, 74, 68) } },
-		{ Name = "Ядро Нексуса", Theme = "Nexus",
+		{ Name = "Ядро Нексуса", Theme = "Nexus", WallMaterial = Enum.Material.Foil, FloorMaterial = Enum.Material.SmoothPlastic, PanelMaterial = Enum.Material.Foil, Decor = "Nexus",
 			StoneA = Color3.fromRGB(96, 92, 120), StoneB = Color3.fromRGB(80, 76, 104), Floor = Color3.fromRGB(40, 38, 56), FloorB = Color3.fromRGB(32, 30, 46),
 			Metal = Color3.fromRGB(58, 54, 78), Accent = Color3.fromRGB(255, 61, 184), Light = Color3.fromRGB(230, 210, 255), Glow = Color3.fromRGB(46, 230, 255),
 			Atmosphere = { Color = Color3.fromRGB(130, 115, 160), Decay = Color3.fromRGB(70, 55, 105) },

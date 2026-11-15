@@ -168,7 +168,7 @@ local function factoryWall(parent, biome, a: Vector3, b: Vector3, inward: Vector
 		for i = 0, count - 1 do
 			local c = a + dir * (from + seg * (i + 0.5))
 			local cf = CFrame.lookAt(c + Vector3.new(0, h / 2, 0), c + Vector3.new(0, h / 2, 0) + inward)
-			Panel(parent, "WallPanel", Vector3.new(seg - 0.25, h, t), cf * CFrame.new(0, 0, t / 2), if i % 2 == 0 then biome.StoneA else biome.StoneB, M.Concrete)
+			Panel(parent, "WallPanel", Vector3.new(seg - 0.25, h, t), cf * CFrame.new(0, 0, t / 2), if i % 2 == 0 then biome.StoneA else biome.StoneB, if i % 2 == 0 then biome.WallMaterial or M.Concrete else biome.PanelMaterial or M.Concrete)
 			Panel(parent, "Seam", Vector3.new(0.5, h, t + 0.3), cf * CFrame.new(seg / 2, 0, t / 2), biome.Metal, M.Metal)
 			Panel(parent, "Plinth", Vector3.new(seg, 1.2, 0.5), cf * CFrame.new(0, -h / 2 + 0.6, -0.2), biome.Metal, M.Plate)
 		end
@@ -288,6 +288,76 @@ local function machine(parent, biome, cf: CFrame)
 	end
 end
 
+-- The biome's side-wall set (from -> to along a side wall, `side` = which
+-- wall): every biome reads differently at a glance.
+local function biomeDecor(parent, biome, from: Vector3, to: Vector3, side: number)
+	local kind = biome.Decor or "Assembly"
+	local length = (to - from).Magnitude
+	local dir = (to - from).Unit
+	local cf = CFrame.lookAt((from + to) / 2, to)
+	if kind == "Cryo" then
+		-- cryo tanks with frozen robots inside + frost on the floor
+		local count = math.max(2, math.floor(length / 9))
+		for i = 1, count do
+			local p = from + dir * (length * (i - 0.5) / count)
+			NanoKit.Column(parent, "TankBase", 1, 4, p, biome.Metal, M.Metal)
+			local tank = NanoKit.Column(parent, "CryoTank", 7.5, 3.4, p + Vector3.new(0, 1, 0), biome.Glow, M.Smooth)
+			tank.Transparency = 0.6
+			tank.CanCollide = true
+			Panel(parent, "Frozen", Vector3.new(1.2, 3.6, 0.8), CFrame.new(p + Vector3.new(0, 4.4, 0)), biome.Metal, M.Metal, { CanCollide = false })
+			NanoKit.Column(parent, "TankCap", 1, 4, p + Vector3.new(0, 8.5, 0), biome.Metal, M.Metal)
+			if i % 2 == 1 then
+				WorldKit.Light(tank, biome.Glow, 14, 0.7)
+			end
+			-- frost patch
+			local frost = NanoKit.Cylinder(parent, "Frost", 0.06, 6 + (i % 2) * 2, CFrame.new(p + Vector3.new(-side * 4, 0.03, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(225, 240, 255), M.Smooth)
+			frost.CanCollide = false
+			frost.Transparency = 0.35
+		end
+	elseif kind == "Smelter" then
+		-- molten channel along the wall under a steel grating
+		Panel(parent, "ChannelBed", Vector3.new(3.2, 0.3, length), cf * CFrame.new(0, 0.05, 0), Color3.fromRGB(30, 22, 20), M.Metal, { CanCollide = false })
+		local melt = Panel(parent, "Melt", Vector3.new(2.4, 0.12, length), cf * CFrame.new(0, 0.22, 0), biome.Glow, M.Neon, { CanCollide = false, CastShadow = false })
+		NanoKit.Tag(melt, "Pulse", { Period = 2.4 })
+		for z = -length / 2 + 1, length / 2 - 1, 1.6 do
+			Panel(parent, "Grate", Vector3.new(3.4, 0.2, 0.3), cf * CFrame.new(0, 0.36, z), biome.Metal, M.Metal)
+		end
+		for _, k in ipairs({ -0.3, 0.3 }) do
+			local light = Panel(parent, "MeltLight", Vector3.new(0.4, 0.4, 0.4), cf * CFrame.new(0, 1, length * k), biome.Glow, M.Smooth, { CanCollide = false, Transparency = 1 })
+			WorldKit.Light(light, biome.Glow, 18, 1.2)
+		end
+		-- crucibles on the channel ends
+		for _, k in ipairs({ -1, 1 }) do
+			local p = (cf * CFrame.new(-side * 4.5, 0, k * (length / 2 - 4))).Position
+			NanoKit.Column(parent, "Crucible", 3.2, 4.4, p, biome.Metal, M.Metal)
+			local top = NanoKit.Column(parent, "CrucibleMelt", 0.2, 3.6, p + Vector3.new(0, 3.1, 0), biome.Glow, M.Neon)
+			top.CanCollide = false
+			NanoKit.Column(parent, "CrucibleRim", 0.4, 4.8, p + Vector3.new(0, 3, 0), biome.Metal, M.Metal)
+		end
+	elseif kind == "Nexus" then
+		-- server racks along the wall + floating data pillars
+		local count = math.max(3, math.floor(length / 5))
+		for i = 1, count do
+			local p = from + dir * (length * (i - 0.5) / count) + Vector3.new(side * 0.8, 0, 0)
+			local rack = Panel(parent, "ServerRack", Vector3.new(2.4, 9, 3.4), CFrame.lookAt(p + Vector3.new(0, 4.5, 0), p + Vector3.new(-side, 4.5, 0)), biome.Metal, M.Foil)
+			for r = 1, 6 do
+				local led = Panel(parent, "RackLed", Vector3.new(0.1, 0.12, 2.4), rack.CFrame * CFrame.new(0, -4.5 + r * 1.3, -1.25) * CFrame.Angles(0, math.rad(90), 0), if (i + r) % 3 == 0 then biome.Accent else biome.Glow, M.Neon, { CanCollide = false })
+				local _ = led
+			end
+		end
+		for _, k in ipairs({ -0.25, 0.25 }) do
+			local p = (cf * CFrame.new(-side * 7, 0, length * k)).Position
+			NanoKit.Column(parent, "PillarBase", 1, 3, p, biome.Metal, M.Foil)
+			local cube = Panel(parent, "DataCube", Vector3.new(1.8, 1.8, 1.8), CFrame.new(p + Vector3.new(0, 4, 0)) * CFrame.Angles(math.rad(45), 0, math.rad(45)), biome.Glow, M.Glass, { CanCollide = false, Transparency = 0.25 })
+			NanoKit.Tag(cube, "Spin", { Speed = 40, Axis = "Y" })
+			NanoKit.Tag(cube, "Bob", { Amplitude = 0.5, Period = 2.6 })
+			WorldKit.Light(cube, biome.Glow, 14, 0.9)
+		end
+	else
+		conveyor(parent, biome, from, to)
+	end
+end
+
 -- Owner props (crates, barrels, misc) in the front corners and on the
 -- wall opposite the conveyor (`side` = the conveyor's side).
 local function scatterProps(parent, center: Vector3, size: number, index: number, side: number)
@@ -305,13 +375,7 @@ local function scatterProps(parent, center: Vector3, size: number, index: number
 			NanoKit.Barrel(parent, cf)
 			NanoKit.Barrel(parent, cf * CFrame.new(2.4, 0, 0.6))
 		else
-			local name = "Prop_Misc_" .. ((index + k) % 4 + 1)
-			local size3 = Assets.Size("Props", name)
-			if size3 and size3.Y <= L.WallHeight - 3 and math.max(size3.X, size3.Z) <= 12 then
-				NanoKit.Prop(parent, name, cf)
-			else
-				NanoKit.CargoStack(parent, cf)
-			end
+			NanoKit.CargoStack(parent, cf * CFrame.Angles(0, math.rad(90), 0))
 		end
 	end
 end
@@ -394,7 +458,7 @@ function DungeonGenerator.BuildRoom(parent: Instance, index: number, x: number)
 	model.Name = ("Room%02d"):format(index)
 	model.Parent = parent
 
-	NanoKit.Floor(model, center, size, size, math.max(8, size / 6), biome.Floor, biome.FloorB, M.Plate)
+	NanoKit.Floor(model, center, size, size, math.max(8, size / 6), biome.Floor, biome.FloorB, biome.FloorMaterial or M.Plate)
 	-- guide line from the entrance to the exit
 	NanoKit.Strip(model, Vector3.new(x, groundY + 0.06, zFront - 1), Vector3.new(x, groundY + 0.06, zBack + 1), biome.Accent, 0.22)
 
@@ -428,7 +492,7 @@ function DungeonGenerator.BuildRoom(parent: Instance, index: number, x: number)
 		-- machinery: conveyor on one side, the biome machine in a corner,
 		-- owner props along the walls
 		local side = if index % 2 == 0 then 1 else -1
-		conveyor(model, biome, Vector3.new(x + side * (half - 4), groundY, zFront - 6), Vector3.new(x + side * (half - 4), groundY, zBack + 10))
+		biomeDecor(model, biome, Vector3.new(x + side * (half - 4), groundY, zFront - 6), Vector3.new(x + side * (half - 4), groundY, zBack + 10), side)
 		machine(model, biome, CFrame.new(Vector3.new(x - side * (half - 6), groundY, zBack + 7)))
 		scatterProps(model, center, size, index, side)
 	end

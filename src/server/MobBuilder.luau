@@ -755,6 +755,14 @@ local function fromAsset(def, scale: number, origin: CFrame): Model?
 	end
 	local height = (def.Height or 5) * scale
 	local body, size = Assets.Body(def.Asset, height)
+	local own = body ~= nil -- the def's own model: keep its textures as made
+	local turn = def.Turn or 0
+	if (not body or not size) and def.AltAsset then
+		-- the boss's own model (Studio AI, GameAssets/Mobs) is missing: an
+		-- enlarged regular robot instead
+		body, size = Assets.Body(def.AltAsset, height)
+		turn = def.AltTurn or 0
+	end
 	if not body or not size then
 		return nil
 	end
@@ -763,13 +771,13 @@ local function fromAsset(def, scale: number, origin: CFrame): Model?
 			if def.Glow then
 				p.Color = def.Glow
 			end
-		elseif def.Tint then
+		elseif def.Tint and not (own and def.AltAsset) then
 			p.Color = p.Color:Lerp(def.Tint, def.TintAmount or 0.35)
 		end
 	end
 	local width = math.max(1.2, math.min(size.X, size.Z) * 0.6)
 	local rig = Rig.new(def.Name, 1, origin, V(width, height * 0.6, width), height * 0.5)
-	body:PivotTo(origin * R(0, def.Turn or 0, 0) * body:GetPivot())
+	body:PivotTo(origin * R(0, turn, 0) * body:GetPivot())
 	for _, p in ipairs(Assets.Parts(body)) do
 		p.Anchored = false
 		p.Massless = true

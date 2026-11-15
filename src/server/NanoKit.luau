@@ -241,14 +241,27 @@ function NanoKit.Prop(parent, name: string, cf: CFrame, height: number?, fallbac
 	return nil
 end
 
+-- Always our own crate: the owner's Prop_Crate (10 studs, cyan neon
+-- edges, noisy texture) read as "cyan grids" in rooms and is not used.
 function NanoKit.Crate(parent, cf: CFrame, size: Vector3?)
-	return NanoKit.Prop(parent, "Prop_Crate", cf, nil, function(p, c)
-		return crate(p, c, size or Vector3.new(3, 3, 3))
-	end)
+	return crate(parent, cf, size or Vector3.new(3, 3, 3))
 end
 
 function NanoKit.Barrel(parent, cf: CFrame)
-	return NanoKit.Prop(parent, "Prop_Barrel", cf, nil, function(p, c)
+	local owner = Assets.Prop("Prop_Barrel", 3.2)
+	if owner then
+		-- the owner's barrel without its cyan neon rings (they fight every biome)
+		for _, d in ipairs(owner:GetDescendants()) do
+			if d:IsA("BasePart") and d.Material == NEON then
+				d.Material = METAL
+				d.Color = N.Graphite
+			end
+		end
+		Assets.PlaceOnGround(owner, cf)
+		owner.Parent = parent
+		return owner
+	end
+	return NanoKit.Prop(parent, "Prop_Barrel", cf, 3.2, function(p, c)
 		local m = model(p, "Barrel")
 		column(m, "Body", 3.2, 2.2, c.Position, N.SteelLight, METAL)
 		for _, y in ipairs({ 0.5, 2.7 }) do
