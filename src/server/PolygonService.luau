@@ -93,12 +93,36 @@ end
 
 -- A hit on a dummy: real damage roll, reported to this player only.
 function PolygonService.Hit(player, model)
-	if not dummies[model] then
-		return
-	end
 	local damage, isCrit = StatService.RollHit(player)
+	return PolygonService.Damage(player, model, damage, isCrit)
+end
+
+-- A ready-made amount of damage (abilities, class attacks).
+function PolygonService.Damage(player, model, damage: number, isCrit: boolean?)
+	if not dummies[model] then
+		return 0
+	end
+	damage = math.max(1, math.floor(damage))
 	model:SetAttribute("Hits", (model:GetAttribute("Hits") or 0) + 1)
-	Remotes.Get("ClickHit"):FireClient(player, "Dummy", model, damage, isCrit)
+	Remotes.Get("ClickHit"):FireClient(player, "Dummy", model, damage, isCrit == true)
+	return damage
+end
+
+-- Dummies within `range` of `position`, nearest first.
+function PolygonService.Near(position: Vector3, range: number)
+	local list = {}
+	for model in pairs(dummies) do
+		if model.Parent then
+			local distance = (model:GetPivot().Position - position).Magnitude - 1.5
+			if distance <= range then
+				table.insert(list, { model = model, distance = distance })
+			end
+		end
+	end
+	table.sort(list, function(a, b)
+		return a.distance < b.distance
+	end)
+	return list
 end
 
 function PolygonService.Init(hub)

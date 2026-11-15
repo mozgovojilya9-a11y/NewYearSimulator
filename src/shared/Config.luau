@@ -29,7 +29,9 @@ Config.StartingData = {
 	Quests = { Day = 0, List = {} },
 	Level = 1,
 	Xp = 0,
-	SkillPoints = 0, -- 1 per level up; spent in the skill tree (later)
+	SkillPoints = 0, -- old field (points are now Config.Skills.PointsAtLevel per class)
+	Class = "", -- "" until the player picks one (class selection screen)
+	Classes = {}, -- [classId] = { Skills = { [nodeId] = rank }, Loadout = { Q = nodeId, ... }, Resets = n }
 	Boosts = { Xp = 0, Damage = 0, Loot = 0, Credits = 0 }, -- timed x2 boosts: os.time() they end
 	LastSeen = 0, -- os.time() of the last save
 }
@@ -45,7 +47,8 @@ Config.StartingData = {
 --   3 = action-RPG: Aura, rebirths and trainers removed (credits as
 --       compensation, Config.Migration), x2 boosts in Boosts
 --   4 = pets removed (credits as compensation, Config.PetMigration)
-Config.SchemaVersion = 4
+--   5 = gear above the player's progress replaced (Config.ItemMigration)
+Config.SchemaVersion = 5
 
 -- One-time compensation (schema 2 -> 3) for the removed clicker: Aura and
 -- rebirths turn into Нано-кредиты. Moderate on purpose.
@@ -55,6 +58,19 @@ Config.Migration = {
 	PerRebirth = 120, -- 8 rebirths -> 960
 	Max = 3000,
 	Notice = "Игра обновилась: Аура и перерождения убраны. Компенсация: +%s нано-кредитов!",
+}
+
+-- Schema 4 -> 5: gear from old versions that is stronger than the
+-- player's progress (e.g. a biome-4 weapon with the record at room 0)
+-- one-shot the dungeon. The allowed biome = RoomReached // RoomsPerBiome + 1;
+-- weapons above the strongest normal weapon of that biome and armor sets
+-- of a later biome are replaced by the best of the allowed biome (same
+-- class / slot), plus credits per replaced item. Robux items stay.
+Config.ItemMigration = {
+	RoomsPerBiome = 5,
+	ByRarity = { Common = 20, Uncommon = 40, Rare = 80, Epic = 160, Legendary = 320, Mythic = 600, Secret = 1000 },
+	Max = 8000,
+	Notice = "Старое снаряжение пересчитано под новый баланс. Компенсация: +%s нано-кредитов!",
 }
 
 -- One-time compensation (schema 3 -> 4) for the removed pets: every pet
@@ -383,6 +399,300 @@ Config.Player = {
 	RegenDelay = 4, -- seconds without being hit before regen starts (rate: Stats.Regen)
 }
 
+---------------------------------------------------------------------
+-- CLASSES, COMBAT, SKILL TREES
+---------------------------------------------------------------------
+
+-- Exactly 3 classes. Weapon models follow the class (Config.Assets.
+-- WeaponModels[Class]); any owned weapon works with any class, its look
+-- and the attack style come from the class. Tags = role tags on the
+-- class card (Icon + Text), Difficulty 1..5, Key = 3 node ids shown as
+-- the "key abilities" on the selection screen.
+Config.Classes = {
+	{
+		Id = "Blade", Name = "Клинок", Icon = "sword", Color = Color3.fromRGB(46, 200, 255),
+		Short = "Ближний бой: нано-меч и энергощит. Комбо из 3 ударов, блок.",
+		Text = "Боец ближнего боя. Держит удар энергощитом, рубит комбо из трёх ударов, третий бьёт по дуге. Блок [F] снимает 70% урона.",
+		Tags = { { Icon = "shield", Text = "Танк" }, { Icon = "sword", Text = "Урон" }, { Icon = "bolt", Text = "Контроль" } },
+		Difficulty = 2,
+		Key = { "Blade_A3", "Blade_D1", "Blade_C1" },
+	},
+	{
+		Id = "Pulse", Name = "Импульс", Icon = "spear", Color = Color3.fromRGB(255, 61, 184),
+		Short = "Энерго-копьё: 2 удара и удар на 360°, рывок с ударом.",
+		Text = "Подвижный боец с энерго-копьём. Два быстрых укола и третий удар на 360° по всем вокруг. Рывок [Shift] бьёт всех на пути.",
+		Tags = { { Icon = "burst", Text = "Область" }, { Icon = "dash", Text = "Мобильность" }, { Icon = "flame", Text = "Бурст" } },
+		Difficulty = 3,
+		Key = { "Pulse_A3", "Pulse_A6", "Pulse_C3" },
+	},
+	{
+		Id = "Gunner", Name = "Стрелок", Icon = "blaster", Color = Color3.fromRGB(255, 201, 60),
+		Short = "Плазменный бластер: каждый 3-й выстрел залп, заряженный выстрел.",
+		Text = "Бьёт издалека. Каждый третий выстрел — залп по нескольким целям. Зажми атаку, чтобы зарядить мощный выстрел. Турели и ловушки.",
+		Tags = { { Icon = "target", Text = "Точность" }, { Icon = "dash", Text = "Дистанция" }, { Icon = "sword", Text = "Урон" } },
+		Difficulty = 3,
+		Key = { "Gunner_A1", "Gunner_A3", "Gunner_S3" },
+	},
+}
+Config.ClassById = {}
+for order, class in ipairs(Config.Classes) do
+	class.Order = order
+	Config.ClassById[class.Id] = class
+end
+
+-- Basic attacks, block, dash (numbers of the class mechanics).
+Config.Combat = {
+	Blade = { Range = 10, Combo = { 1, 1, 1.6 }, ComboWindow = 1.4, ThirdArc = 7 }, -- 3rd hit also hits mobs within ThirdArc of the target
+	Pulse = { Range = 12, Combo = { 1, 1.1, 1.3 }, ComboWindow = 1.4, ThirdRadius = 11 }, -- 3rd hit: everyone around
+	Gunner = { Range = 70, VolleyEvery = 3, VolleyTargets = 3, VolleyMult = 0.8, ChargeSeconds = 0.9, ChargeMult = 3 },
+	Block = { Reduction = 0.7, WalkSpeed = 8, Key = Enum.KeyCode.F },
+	Dash = { Distance = 16, Cooldown = 4, Seconds = 0.22, PulseMult = 1.4, Width = 6 },
+	AutoAim = 26, -- abilities without a target hit the nearest enemy within this range
+	MaxStun = 4, -- seconds
+	SlowFactor = 0.45, -- slowed mobs move at this share of their speed
+	OnHitStun = 0.8, -- seconds of a StunOnHit proc
+	OnHitSlow = 2,
+	FxColor = Color3.fromRGB(46, 230, 255),
+	Texts = {
+		NeedClass = "Сначала выбери класс",
+		Cooldown = "Перезарядка",
+		NoTarget = "Нет цели рядом",
+		Learned = "Изучено: %s",
+		Reset = "Навыки сброшены",
+	},
+}
+
+-- Skill points and reset.
+Config.Skills = {
+	PointsAtLevel = function(level: number): number
+		return math.max(1, level) -- 1 point at level 1, +1 per level
+	end,
+	ResetCost = function(level: number): number
+		return 100 + 15 * level -- Нано-кредиты; the first reset of each class is free
+	end,
+	Slots = { "Q", "E", "R" }, -- active abilities equipped at once
+	-- Node layout in a branch (8 nodes): row / column on the grid and the
+	-- node that must be learned first. Position 8 is the capstone (crown).
+	Layout = {
+		{ Row = 0, Col = 0 },
+		{ Row = 1, Col = -1, Needs = 1 },
+		{ Row = 1, Col = 1, Needs = 1 },
+		{ Row = 2, Col = -1, Needs = 2 },
+		{ Row = 2, Col = 1, Needs = 3 },
+		{ Row = 3, Col = -1, Needs = 4 },
+		{ Row = 3, Col = 1, Needs = 5 },
+		{ Row = 4, Col = 0, NeedsAny = { 6, 7 } },
+	},
+	Levels = { 1, 3, 5, 8, 10, 15, 20, 30 }, -- unlock level by position
+	Branches = {
+		{ Id = "A", Name = "Атака", Icon = "sword" },
+		{ Id = "D", Name = "Защита", Icon = "shield" },
+		{ Id = "C", Name = "Контроль", Icon = "vortex" },
+		{ Id = "S", Name = "Выживание", Icon = "plus" },
+	},
+	-- Stat names of passives (shown on the node card).
+	StatNames = {
+		DamagePct = "Урон", HealthPct = "Макс. HP", Defense = "Защита", CritChance = "Шанс крита",
+		CritDamage = "Крит. урон", AttackSpeed = "Скорость атаки", Regen = "Регенерация, HP/с", Dash = "Рывок, studs",
+		Lifesteal = "Вампиризм", Thorns = "Отражение урона", ComboBonus = "Урон 3-го удара", BlockBonus = "Сила блока",
+		SlowOnHit = "Шанс замедлить", StunOnHit = "Шанс оглушить", ControlPct = "Длительность контроля",
+		AbilityPct = "Урон приёмов", CooldownPct = "Быстрее перезарядка", LowHpDamage = "Урон при HP < 35%",
+		CheatDeath = "Спасение от смерти", DashPower = "Урон рывка", ChargeBonus = "Урон заряженного выстрела",
+		VolleyBonus = "Целей в залпе", Luck = "Удача",
+	},
+	-- Stats shown as whole numbers (others are percents).
+	FlatStats = { Regen = true, Dash = true, VolleyBonus = true, CheatDeath = true },
+	CheatDeathCooldown = 120, -- seconds between two saves of "Феникс"-like capstones
+	LowHp = 0.35,
+}
+
+-- Ability kinds (AbilityService):
+--   Strike  one target in front (Range), Power x hit
+--   Shot    one target far away (Range), Power x hit, a plasma beam
+--   Spin    everyone within Radius, Power x hit (Hits times)
+--   Wave    a cone in front (Range), Power x hit + slow Duration
+--   Volley  up to Targets enemies in front (Range), Power x hit each
+--   Stun    one target (Range): Power x hit + stun Duration
+--   Pull    everyone within Radius flies to you + stun Duration, Power x hit
+--   Quake   everyone within Radius: Power x hit + stun Duration
+--   Trap    an area under the nearest enemy: Power x hit per second + slow, Duration
+--   Barrage an area under the nearest enemy (Radius): Power x hit
+--   Turret  a turret for Duration: Power x hit every second to the nearest enemy (Range)
+--   Shield  -Value share of incoming damage for Duration (+ Heal share of max HP)
+--   Rage    +Value damage for Duration
+--   Haste   +Value attack speed for Duration
+--   Heal    +Value share of max HP
+-- Every number list is per rank (rank 1, 2, 3). Cooldowns in seconds.
+local function tree(classId: string, branches)
+	local nodes = {}
+	for b, list in ipairs(branches) do
+		local branch = Config.Skills.Branches[b]
+		for position, def in ipairs(list) do
+			def.Id = classId .. "_" .. branch.Id .. position
+			def.Class = classId
+			def.Branch = branch.Id
+			def.Position = position
+			def.Level = def.Level or Config.Skills.Levels[position]
+			def.Kind = if position == 8 then "Capstone" elseif def.Ability then "Active" else "Passive"
+			def.Active = def.Ability ~= nil
+			table.insert(nodes, def)
+		end
+	end
+	return nodes
+end
+
+local function P(name, icon, maxRank, stats, text)
+	return { Name = name, Icon = icon, MaxRank = maxRank, Stats = stats, Text = text }
+end
+local function A(name, icon, maxRank, ability, text)
+	ability.Name = name
+	return { Name = name, Icon = icon, MaxRank = maxRank, Ability = ability, Text = text }
+end
+
+Config.SkillTrees = {
+	Blade = tree("Blade", {
+		{ -- Атака
+			A("Рассекающий удар", "slash", 3, { Kind = "Strike", Power = { 1.8, 2.2, 2.6 }, Cooldown = { 6, 5, 4 }, Range = 11 }, "Мощный удар по врагу перед тобой."),
+			P("Острота", "sword", 3, { DamagePct = { 0.04, 0.08, 0.12 } }, "Весь урон выше."),
+			A("Круговой удар", "spin", 3, { Kind = "Spin", Power = { 1.2, 1.6, 2.0 }, Cooldown = { 10, 8, 6 }, Radius = 10 }, "Наносит урон всем врагам вокруг тебя."),
+			P("Мастер комбо", "combo", 2, { ComboBonus = { 0.25, 0.5 } }, "Третий удар комбо бьёт сильнее."),
+			P("Холодный расчёт", "target", 2, { CritChance = { 0.04, 0.08 } }, "Чаще критические удары."),
+			A("Ярость клинка", "flame", 3, { Kind = "Rage", Value = { 0.25, 0.35, 0.45 }, Duration = { 6, 6, 7 }, Cooldown = { 20, 18, 16 } }, "На время весь урон выше."),
+			P("Казнь", "skull", 2, { CritDamage = { 0.25, 0.5 } }, "Криты бьют больнее."),
+			A("Буря клинков", "burst", 1, { Kind = "Spin", Power = { 3.2 }, Hits = 3, Cooldown = { 25 }, Radius = 14 }, "Три круговых удара подряд по всем вокруг."),
+		},
+		{ -- Защита
+			A("Энергощит", "shield", 3, { Kind = "Shield", Value = { 0.4, 0.5, 0.6 }, Duration = { 3, 3.5, 4 }, Cooldown = { 14, 12, 10 } }, "Щит снимает часть урона."),
+			P("Броня", "shield", 3, { Defense = { 0.03, 0.06, 0.09 } }, "Защита выше."),
+			P("Стойкость", "heart", 3, { HealthPct = { 0.06, 0.12, 0.18 } }, "Больше здоровья."),
+			P("Отражение", "wave", 2, { Thorns = { 0.15, 0.3 } }, "Часть полученного урона бьёт обратно."),
+			P("Мастер блока", "shield", 2, { BlockBonus = { 0.05, 0.1 } }, "Блок [F] снимает ещё больше урона."),
+			A("Бастион", "chevron", 2, { Kind = "Shield", Value = { 0.7, 0.8 }, Heal = { 0.1, 0.15 }, Duration = { 3, 4 }, Cooldown = { 30, 26 } }, "Мощный щит и немного лечения."),
+			P("Закалка", "plus", 2, { HealthPct = { 0.1, 0.2 } }, "Ещё больше здоровья."),
+			A("Неуязвимость", "crown", 1, { Kind = "Shield", Value = { 1 }, Duration = { 3 }, Cooldown = { 45 } }, "3 секунды без урона."),
+		},
+		{ -- Контроль
+			A("Оглушающий удар", "bolt", 3, { Kind = "Stun", Power = { 1.2, 1.4, 1.6 }, Duration = { 1, 1.5, 2 }, Cooldown = { 10, 9, 8 }, Range = 11 }, "Удар оглушает врага."),
+			P("Подсечка", "trap", 3, { SlowOnHit = { 0.1, 0.2, 0.3 } }, "Удары могут замедлить врага."),
+			A("Притяжение", "vortex", 2, { Kind = "Pull", Power = { 0.6, 0.8 }, Duration = { 0.6, 1 }, Cooldown = { 15, 12 }, Radius = 14 }, "Стягивает врагов к тебе."),
+			P("Шоковый клинок", "bolt", 2, { StunOnHit = { 0.05, 0.1 } }, "Удары могут оглушить врага."),
+			A("Ударная волна", "wave", 2, { Kind = "Wave", Power = { 1.5, 2.0 }, Duration = { 2, 3 }, Cooldown = { 12, 10 }, Range = 16 }, "Волна перед тобой бьёт и замедляет."),
+			P("Цепь контроля", "chevron", 2, { ControlPct = { 0.25, 0.5 } }, "Оглушение и замедление дольше."),
+			A("Разлом", "trap", 2, { Kind = "Trap", Power = { 0.4, 0.6 }, Duration = { 4, 5 }, Cooldown = { 18, 15 }, Radius = 9 }, "Разлом под врагом жжёт и замедляет."),
+			A("Землетрясение", "crown", 1, { Kind = "Quake", Power = { 2.5 }, Duration = { 2.5 }, Cooldown = { 35 }, Radius = 16 }, "Удар по земле оглушает всех вокруг."),
+		},
+		{ -- Выживание
+			P("Регенерация", "regen", 3, { Regen = { 3, 6, 9 } }, "Здоровье восстанавливается быстрее."),
+			P("Вампиризм", "heart", 3, { Lifesteal = { 0.02, 0.04, 0.06 } }, "Удары лечат тебя."),
+			A("Второе дыхание", "plus", 2, { Kind = "Heal", Value = { 0.2, 0.3 }, Cooldown = { 30, 25 } }, "Мгновенно лечит."),
+			P("Быстрые ноги", "dash", 2, { Dash = { 4, 8 } }, "Рывок дальше."),
+			P("Живучесть", "heart", 2, { HealthPct = { 0.08, 0.16 } }, "Больше здоровья."),
+			P("Адреналин", "flame", 2, { LowHpDamage = { 0.2, 0.4 } }, "Урон выше, когда здоровья мало."),
+			P("Темп", "chevron", 2, { AttackSpeed = { 0.06, 0.12 } }, "Атакуешь быстрее."),
+			P("Феникс", "crown", 1, { CheatDeath = { 1 } }, "Смертельный удар оставляет 50% HP (раз в 2 минуты)."),
+		},
+	}),
+	Pulse = tree("Pulse", {
+		{ -- Атака
+			A("Удар импульса", "spear", 3, { Kind = "Strike", Power = { 1.7, 2.1, 2.5 }, Cooldown = { 6, 5, 4 }, Range = 13 }, "Мощный выпад копьём."),
+			P("Резонанс", "sword", 3, { DamagePct = { 0.04, 0.08, 0.12 } }, "Весь урон выше."),
+			A("Энерговихрь", "spin", 3, { Kind = "Spin", Power = { 1.3, 1.7, 2.1 }, Cooldown = { 10, 8, 6 }, Radius = 12 }, "Вихрь бьёт всех вокруг."),
+			P("Перегрузка", "flame", 2, { CritDamage = { 0.25, 0.5 } }, "Криты бьют больнее."),
+			P("Пробой", "bolt", 2, { AbilityPct = { 0.1, 0.2 } }, "Приёмы бьют сильнее."),
+			A("Энергокопьё", "arrow", 3, { Kind = "Wave", Power = { 1.8, 2.2, 2.6 }, Duration = { 0.5, 0.5, 0.5 }, Cooldown = { 12, 10, 9 }, Range = 20 }, "Луч энергии пронзает врагов в линию."),
+			P("Накал", "target", 2, { CritChance = { 0.04, 0.08 } }, "Чаще критические удары."),
+			A("Сверхновая", "burst", 1, { Kind = "Spin", Power = { 4 }, Cooldown = { 28 }, Radius = 18 }, "Огромный взрыв энергии вокруг."),
+		},
+		{ -- Защита
+			A("Кинетический щит", "shield", 3, { Kind = "Shield", Value = { 0.35, 0.45, 0.55 }, Duration = { 3, 3.5, 4 }, Cooldown = { 14, 12, 10 } }, "Щит снимает часть урона."),
+			P("Плотность", "shield", 3, { Defense = { 0.03, 0.06, 0.09 } }, "Защита выше."),
+			P("Энергоядро", "heart", 3, { HealthPct = { 0.05, 0.1, 0.15 } }, "Больше здоровья."),
+			P("Отдача", "wave", 2, { Thorns = { 0.15, 0.3 } }, "Часть полученного урона бьёт обратно."),
+			P("Поглощение", "regen", 2, { Lifesteal = { 0.02, 0.04 } }, "Удары лечат тебя."),
+			A("Отражающее поле", "chevron", 2, { Kind = "Shield", Value = { 0.6, 0.75 }, Heal = { 0.1, 0.15 }, Duration = { 3, 4 }, Cooldown = { 28, 24 } }, "Мощный щит и немного лечения."),
+			P("Стабилизатор", "plus", 2, { HealthPct = { 0.1, 0.2 } }, "Ещё больше здоровья."),
+			A("Абсолютное поле", "crown", 1, { Kind = "Shield", Value = { 1 }, Duration = { 3 }, Cooldown = { 45 } }, "3 секунды без урона."),
+		},
+		{ -- Контроль
+			A("Электрошок", "bolt", 3, { Kind = "Stun", Power = { 1.2, 1.4, 1.6 }, Duration = { 1, 1.5, 2 }, Cooldown = { 10, 9, 8 }, Range = 13 }, "Разряд оглушает врага."),
+			P("Вязкое поле", "trap", 3, { SlowOnHit = { 0.1, 0.2, 0.3 } }, "Удары могут замедлить врага."),
+			A("Гравиколодец", "vortex", 2, { Kind = "Pull", Power = { 0.7, 0.9 }, Duration = { 0.8, 1.2 }, Cooldown = { 15, 12 }, Radius = 16 }, "Стягивает врагов в одну точку."),
+			P("Разряд", "bolt", 2, { StunOnHit = { 0.05, 0.1 } }, "Удары могут оглушить врага."),
+			A("Импульсная волна", "wave", 2, { Kind = "Wave", Power = { 1.4, 1.9 }, Duration = { 2, 3 }, Cooldown = { 12, 10 }, Range = 18 }, "Волна бьёт и замедляет врагов перед тобой."),
+			P("Длительность", "chevron", 2, { ControlPct = { 0.25, 0.5 } }, "Оглушение и замедление дольше."),
+			A("Энергосеть", "trap", 2, { Kind = "Trap", Power = { 0.4, 0.6 }, Duration = { 4, 5 }, Cooldown = { 18, 15 }, Radius = 10 }, "Сеть под врагом жжёт и замедляет."),
+			A("Коллапс", "crown", 1, { Kind = "Quake", Power = { 2.6 }, Duration = { 2.5 }, Cooldown = { 35 }, Radius = 18 }, "Гравитационный удар оглушает всех вокруг."),
+		},
+		{ -- Выживание
+			P("Подзарядка", "regen", 3, { Regen = { 3, 6, 9 } }, "Здоровье восстанавливается быстрее."),
+			P("Вектор", "dash", 3, { Dash = { 3, 6, 9 } }, "Рывок дальше."),
+			A("Восстановление", "plus", 2, { Kind = "Heal", Value = { 0.2, 0.3 }, Cooldown = { 30, 25 } }, "Мгновенно лечит."),
+			P("Таран", "arrow", 2, { DashPower = { 0.5, 1 } }, "Рывок бьёт сильнее."),
+			P("Живучесть", "heart", 2, { HealthPct = { 0.08, 0.16 } }, "Больше здоровья."),
+			P("Манёвр", "chevron", 2, { AttackSpeed = { 0.06, 0.12 } }, "Атакуешь быстрее."),
+			P("Ускоритель", "reset", 2, { CooldownPct = { 0.08, 0.16 } }, "Приёмы перезаряжаются быстрее."),
+			P("Бессмертие", "crown", 1, { CheatDeath = { 1 } }, "Смертельный удар оставляет 50% HP (раз в 2 минуты)."),
+		},
+	}),
+	Gunner = tree("Gunner", {
+		{ -- Атака
+			A("Прицельный выстрел", "target", 3, { Kind = "Shot", Power = { 2.0, 2.5, 3.0 }, Cooldown = { 6, 5, 4 }, Range = 80 }, "Мощный выстрел по одной цели."),
+			P("Калибровка", "sword", 3, { DamagePct = { 0.04, 0.08, 0.12 } }, "Весь урон выше."),
+			A("Залп", "volley", 3, { Kind = "Volley", Power = { 1.2, 1.5, 1.8 }, Targets = 5, Cooldown = { 10, 9, 8 }, Range = 60 }, "Бьёт по пяти целям сразу."),
+			P("Бронебойность", "skull", 2, { CritDamage = { 0.25, 0.5 } }, "Криты бьют больнее."),
+			P("Заряд", "charge", 2, { ChargeBonus = { 0.5, 1 } }, "Заряженный выстрел сильнее."),
+			A("Шквал", "flame", 3, { Kind = "Haste", Value = { 0.3, 0.45, 0.6 }, Duration = { 5, 6, 6 }, Cooldown = { 20, 18, 16 } }, "На время стреляешь намного быстрее."),
+			P("Снайпер", "eye", 2, { CritChance = { 0.05, 0.1 } }, "Чаще критические выстрелы."),
+			A("Орбитальный удар", "burst", 1, { Kind = "Barrage", Power = { 4 }, Cooldown = { 28 }, Radius = 12, Range = 70 }, "Удар с орбиты по области у врага."),
+		},
+		{ -- Защита
+			A("Энергобарьер", "shield", 3, { Kind = "Shield", Value = { 0.35, 0.45, 0.55 }, Duration = { 3, 3.5, 4 }, Cooldown = { 14, 12, 10 } }, "Барьер снимает часть урона."),
+			P("Покрытие", "shield", 3, { Defense = { 0.03, 0.06, 0.09 } }, "Защита выше."),
+			P("Запас прочности", "heart", 3, { HealthPct = { 0.05, 0.1, 0.15 } }, "Больше здоровья."),
+			P("Отражатель", "wave", 2, { Thorns = { 0.15, 0.3 } }, "Часть полученного урона бьёт обратно."),
+			P("Отступление", "dash", 2, { Dash = { 4, 8 } }, "Рывок дальше."),
+			A("Укрытие", "chevron", 2, { Kind = "Shield", Value = { 0.6, 0.75 }, Heal = { 0.1, 0.15 }, Duration = { 3, 4 }, Cooldown = { 28, 24 } }, "Мощный барьер и немного лечения."),
+			P("Закалка", "plus", 2, { HealthPct = { 0.1, 0.2 } }, "Ещё больше здоровья."),
+			A("Купол", "crown", 1, { Kind = "Shield", Value = { 1 }, Duration = { 3 }, Cooldown = { 45 } }, "3 секунды без урона."),
+		},
+		{ -- Контроль
+			A("Шоковая пуля", "bolt", 3, { Kind = "Stun", Power = { 1.2, 1.4, 1.6 }, Duration = { 1, 1.5, 2 }, Cooldown = { 10, 9, 8 }, Range = 70 }, "Выстрел оглушает врага."),
+			P("Криопатрон", "trap", 3, { SlowOnHit = { 0.1, 0.2, 0.3 } }, "Выстрелы могут замедлить врага."),
+			A("Ловушка", "trap", 2, { Kind = "Trap", Power = { 0.5, 0.7 }, Duration = { 5, 6 }, Cooldown = { 16, 13 }, Radius = 9 }, "Ловушка под врагом жжёт и замедляет."),
+			P("Оглушение", "bolt", 2, { StunOnHit = { 0.05, 0.1 } }, "Выстрелы могут оглушить врага."),
+			A("Импульсная граната", "burst", 2, { Kind = "Barrage", Power = { 1.6, 2.1 }, Cooldown = { 12, 10 }, Radius = 9, Range = 60 }, "Граната бьёт по области у врага."),
+			P("Контроль", "chevron", 2, { ControlPct = { 0.25, 0.5 } }, "Оглушение и замедление дольше."),
+			A("Грависеть", "vortex", 2, { Kind = "Pull", Power = { 0.5, 0.7 }, Duration = { 0.8, 1.2 }, Cooldown = { 16, 13 }, Radius = 16 }, "Стягивает врагов к тебе."),
+			A("ЭМИ-взрыв", "crown", 1, { Kind = "Quake", Power = { 2.4 }, Duration = { 2.5 }, Cooldown = { 35 }, Radius = 18 }, "ЭМИ оглушает всех вокруг."),
+		},
+		{ -- Выживание (инженер)
+			A("Аптечка", "plus", 3, { Kind = "Heal", Value = { 0.15, 0.22, 0.3 }, Cooldown = { 30, 27, 24 } }, "Мгновенно лечит."),
+			P("Регенерация", "regen", 3, { Regen = { 3, 6, 9 } }, "Здоровье восстанавливается быстрее."),
+			A("Турель", "turret", 3, { Kind = "Turret", Power = { 0.5, 0.7, 0.9 }, Duration = { 8, 10, 12 }, Cooldown = { 20, 18, 16 }, Range = 40 }, "Ставит турель, которая стреляет сама."),
+			P("Охотник", "heart", 2, { Lifesteal = { 0.02, 0.04 } }, "Выстрелы лечат тебя."),
+			P("Инженерия", "drone", 2, { AbilityPct = { 0.1, 0.2 } }, "Приёмы и турели бьют сильнее."),
+			P("Перезарядка", "reset", 2, { CooldownPct = { 0.08, 0.16 } }, "Приёмы перезаряжаются быстрее."),
+			P("Широкий залп", "volley", 2, { VolleyBonus = { 1, 2 } }, "Залп каждого 3-го выстрела бьёт больше целей."),
+			A("Боевой дрон", "crown", 1, { Kind = "Turret", Power = { 1.4 }, Duration = { 15 }, Cooldown = { 30 }, Range = 50, Drone = true }, "Дрон летает рядом и стреляет."),
+		},
+	}),
+}
+Config.SkillById = {}
+for _, nodes in pairs(Config.SkillTrees) do
+	for _, node in ipairs(nodes) do
+		Config.SkillById[node.Id] = node
+	end
+end
+
+-- The value of a per-rank list at `rank` (lists shorter than the rank
+-- repeat their last value).
+function Config.RankValue(list, rank: number)
+	if type(list) ~= "table" then
+		return list
+	end
+	return list[math.clamp(rank, 1, #list)]
+end
+
 -- Map bounds: nobody can leave the playable area. Invisible walls rise
 -- HubWallExtra studs above the castle walls; every dungeon room and
 -- corridor is a closed invisible box (walls overlap by Overlap studs).
@@ -670,6 +980,8 @@ end
 Config.Equipment = {
 	GripR6 = CFrame.new(0, -1, -0.6) * CFrame.Angles(math.rad(-90), 0, 0),
 	GripR15 = CFrame.new(0, -0.3, -0.6) * CFrame.Angles(math.rad(-90), 0, 0),
+	-- Клинок's energy shield on the left forearm (rim part; X = disc axis)
+	Shield = { Size = 2.6, Color = Color3.fromRGB(46, 200, 255), Offset = CFrame.new(-0.35, 0, 0) },
 }
 
 -- Weapon swing. Procedural by default: the right shoulder Motor6D goes
@@ -803,6 +1115,8 @@ Config.Remotes = {
 	Announce = "RemoteEvent", -- S->all (text, color) system chat line + toast
 	StoreNotify = "RemoteEvent", -- S->C (text) after a Robux purchase was granted
 	LevelUp = "RemoteEvent", -- S->C (level, skillPoints gained) big "Новый уровень!" banner
+	Class = "RemoteFunction", -- ("Choose", classId) | ("Learn", nodeId) | ("Reset") | ("Equip", slot, nodeId|nil) -> ok, message
+	Ability = "RemoteEvent", -- C->S ("Use", slot, aim) | ("Dash", direction) | ("Block", on) | ("Charge"); S->C ("Dash", direction, distance, seconds); S->all ("Fx", kind, ...)
 }
 
 ---------------------------------------------------------------------
@@ -1136,7 +1450,7 @@ Config.Hud = {
 	ToastSeconds = 4,
 	ShakeCrit = { Amplitude = 0.25, Seconds = 0.15 },
 	ShakeBoss = { Amplitude = 0.8, Seconds = 0.5 },
-	DamageHint = "Твой урон %s  •  нужно %s", -- HUD plate in the dungeon (not the barrier wording)
+	DamageHint = "Твой урон %s  •  этап %d: нужно %s", -- HUD plate in the dungeon: the room you stand in or your next record room
 	BackKey = Enum.KeyCode.B,
 	MobileScaleWidth = 1100, -- UIScale = min(1, viewportWidth / this)
 }
@@ -1167,6 +1481,7 @@ Config.Ui = {
 		{ Slot = "E", Key = Enum.KeyCode.E },
 		{ Slot = "R", Key = Enum.KeyCode.R },
 		{ Slot = "Dash", Key = Enum.KeyCode.LeftShift, Label = "Shift", Icon = "dash" },
+		{ Slot = "Block", Key = Enum.KeyCode.F, Label = "F", Icon = "shield", Class = "Blade" }, -- hold
 	},
 	AbilitySize = 62,
 	HealthWidth = 420,

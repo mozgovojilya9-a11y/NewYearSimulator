@@ -352,10 +352,13 @@ local function refreshHint()
 		hintPlate.Visible = false
 		return
 	end
-	local recommended = Config.RecommendedDamage(hintRoom)
+	-- the goal is the next record room when the current one is far below it
+	local reached = player:GetAttribute("RoomReached") or 0
+	local goal = math.max(hintRoom, math.min(Config.Dungeon.Rooms, reached + 1))
+	local recommended = Config.RecommendedDamage(goal)
 	local mine = player:GetAttribute("ClickPower") or 1
 	local enough = mine >= recommended
-	hintLabel.Text = Config.Hud.DamageHint:format(Format.Number(mine), Format.Number(recommended))
+	hintLabel.Text = Config.Hud.DamageHint:format(Format.Number(mine), goal, Format.Number(recommended))
 	hintLabel.TextColor3 = if enough then C.Green else Color3.fromRGB(240, 110, 100)
 	hintPlate.Visible = true
 end
@@ -522,17 +525,27 @@ end
 
 local function refreshLoadout()
 	local loadout = decode("Loadout") or {}
+	local classId = player:GetAttribute("Class") or ""
+	local shown = 0
 	for slot, ui in pairs(slots) do
+		local visible = ui.def.Class == nil or ui.def.Class == classId
+		ui.button.Visible = visible
+		if visible then
+			shown += 1
+		end
 		local entry = loadout[slot]
-		local hasDash = slot == "Dash" and (player:GetAttribute("Class") or "") ~= ""
-		local filled = (type(entry) == "table" and entry.Icon ~= nil) or hasDash
-		local iconName = if type(entry) == "table" and entry.Icon then entry.Icon else (if slot == "Dash" then "dash" else "lock")
-		Icons.Set(ui.icon, iconName, if filled then C.Text else C.Line)
-		ui.shape.SetBorder(if filled then C.GoldDim else C.Line)
+		local fixed = (slot == "Dash" or slot == "Block") and classId ~= ""
+		local filled = (type(entry) == "table" and entry.Icon ~= nil) or fixed
+		local iconName = if type(entry) == "table" and entry.Icon then entry.Icon else (ui.def.Icon or "lock")
+		local active = slot == "Block" and player:GetAttribute("Blocking") == true
+		Icons.Set(ui.icon, iconName, if active then C.Gold elseif filled then C.Text else C.Line)
+		ui.shape.SetBorder(if active then C.Gold elseif filled then C.GoldDim else C.Line)
 	end
+	slotRow.Size = UDim2.fromOffset(shown * (S + 8) - 8, S)
 end
 player:GetAttributeChangedSignal("Loadout"):Connect(refreshLoadout)
 player:GetAttributeChangedSignal("Class"):Connect(refreshLoadout)
+player:GetAttributeChangedSignal("Blocking"):Connect(refreshLoadout)
 refreshLoadout()
 
 -- Cooldowns (every frame, cheap).

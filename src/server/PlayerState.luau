@@ -154,6 +154,82 @@ function PlayerState.HasMaterials(player, cost: { [string]: number }): boolean
 	return true
 end
 
+---------------------------------------------------------------------
+-- Class and skills (each class keeps its own tree progress)
+---------------------------------------------------------------------
+
+function PlayerState.ClassOf(player): string
+	local data = DataService.Get(player)
+	local id = data and data.Class or ""
+	return if Config.ClassById[id] then id else ""
+end
+
+-- The record of a class in the save (created on demand).
+function PlayerState.ClassRecord(data, classId: string)
+	data.Classes = if type(data.Classes) == "table" then data.Classes else {}
+	local record = data.Classes[classId]
+	if type(record) ~= "table" then
+		record = {}
+		data.Classes[classId] = record
+	end
+	record.Skills = if type(record.Skills) == "table" then record.Skills else {}
+	record.Loadout = if type(record.Loadout) == "table" then record.Loadout else {}
+	record.Resets = if type(record.Resets) == "number" then record.Resets else 0
+	return record
+end
+
+function PlayerState.SpentPoints(record): number
+	local spent = 0
+	for nodeId, rank in pairs(record.Skills) do
+		if Config.SkillById[nodeId] and type(rank) == "number" then
+			spent += rank
+		end
+	end
+	return spent
+end
+
+-- [nodeId] = rank of the player's current class ({} without a class).
+function PlayerState.SkillRanks(player)
+	local data = DataService.Get(player)
+	local classId = PlayerState.ClassOf(player)
+	if not data or classId == "" then
+		return {}
+	end
+	return PlayerState.ClassRecord(data, classId).Skills
+end
+
+function PlayerState.FreePoints(player): number
+	local data = DataService.Get(player)
+	local classId = PlayerState.ClassOf(player)
+	if not data or classId == "" then
+		return 0
+	end
+	return math.max(0, Config.Skills.PointsAtLevel(data.Level) - PlayerState.SpentPoints(PlayerState.ClassRecord(data, classId)))
+end
+
+local function publishSkills(player, data)
+	local classId = PlayerState.ClassOf(player)
+	player:SetAttribute("Class", classId)
+	player:SetAttribute("SkillPoints", PlayerState.FreePoints(player))
+	local state = { Class = classId, Classes = {} }
+	for _, class in ipairs(Config.Classes) do
+		local record = PlayerState.ClassRecord(data, class.Id)
+		state.Classes[class.Id] = { Skills = record.Skills, Loadout = record.Loadout, Resets = record.Resets, Spent = PlayerState.SpentPoints(record) }
+	end
+	player:SetAttribute("SkillState", HttpService:JSONEncode(state))
+	local loadout = {}
+	if classId ~= "" then
+		local record = PlayerState.ClassRecord(data, classId)
+		for _, slot in ipairs(Config.Skills.Slots) do
+			local node = Config.SkillById[record.Loadout[slot] or ""]
+			if node and (record.Skills[node.Id] or 0) > 0 then
+				loadout[slot] = { Id = node.Id, Icon = node.Icon, Name = node.Name }
+			end
+		end
+	end
+	player:SetAttribute("Loadout", HttpService:JSONEncode(loadout))
+end
+
 -- Pushes everything the client UI needs into Player attributes.
 -- Call after any change to the data table.
 function PlayerState.Sync(player)
@@ -166,7 +242,7 @@ function PlayerState.Sync(player)
 	player:SetAttribute("Level", data.Level)
 	player:SetAttribute("Xp", data.Xp)
 	player:SetAttribute("XpNext", Config.XpToNext(data.Level))
-	player:SetAttribute("SkillPoints", data.SkillPoints or 0)
+	publishSkills(player, data)
 	for _, kind in ipairs(Config.BoostKinds) do
 		player:SetAttribute("Boost" .. kind, data.Boosts[kind] or 0)
 	end

@@ -68,7 +68,7 @@ local function mobFromPart(part)
 	return nil
 end
 
-local function click(ray: Ray)
+local function click(ray: Ray, charged: boolean?)
 	if Window.AnyOpen() then
 		return
 	end
@@ -86,19 +86,156 @@ local function click(ray: Ray)
 		target = result and dummyFromPart(result.Instance)
 	end
 	Swing.Local()
-	clickHit:FireServer(target)
+	clickHit:FireServer(target, charged == true)
 end
+
+---------------------------------------------------------------------
+-- Class controls: Q / E / R abilities, Shift dash, F block (Клинок),
+-- held attack = charged shot (Стрелок). Phones: taps on the HUD slots.
+---------------------------------------------------------------------
+
+local abilityRemote = ReplicatedStorage:WaitForChild("Ability")
+local CB = Config.Combat
+local Hud = require(script.Parent.ui.Hud)
+
+local function classId(): string
+	return player:GetAttribute("Class") or ""
+end
+
+-- Point under the mouse (abilities aim there); nil on touch.
+local function aimPoint(): Vector3?
+	if Style.IsTouch() then
+		return nil
+	end
+	local camera = Workspace.CurrentCamera
+	local mouse = UserInputService:GetMouseLocation()
+	local ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = { player.Character }
+	local result = Workspace:Raycast(ray.Origin, ray.Direction * 300, params)
+	return result and result.Position
+end
+
+local function useSlot(slot: string)
+	if Window.AnyOpen() then
+		return
+	end
+	if slot == "Dash" then
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not humanoid or not root then
+			return
+		end
+		local direction = humanoid.MoveDirection
+		if direction.Magnitude < 0.1 then
+			direction = root.CFrame.LookVector
+		end
+		abilityRemote:FireServer("Dash", direction)
+	elseif slot == "Block" then
+		local on = not player:GetAttribute("Blocking")
+		abilityRemote:FireServer("Block", on)
+	else
+		abilityRemote:FireServer("Use", slot, aimPoint())
+		Swing.Local()
+	end
+end
+Hud.OnAbility = useSlot
+
+-- The server answers a dash with the distance: move our own character
+-- (we own its physics) quickly along the direction.
+abilityRemote.OnClientEvent:Connect(function(kind, direction, distance, seconds)
+	if kind ~= "Dash" then
+		return
+	end
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root or typeof(direction) ~= "Vector3" then
+		return
+	end
+	local attachment = Instance.new("Attachment")
+	attachment.Parent = root
+	local velocity = Instance.new("LinearVelocity")
+	velocity.Attachment0 = attachment
+	velocity.RelativeTo = Enum.ActuatorRelativeTo.World
+	velocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Plane
+	velocity.PrimaryTangentAxis = Vector3.new(1, 0, 0)
+	velocity.SecondaryTangentAxis = Vector3.new(0, 0, 1)
+	velocity.PlaneVelocity = Vector2.new(direction.X, direction.Z) * (distance / seconds)
+	velocity.MaxForce = math.huge
+	velocity.Parent = root
+	Style.PlaySound("Swing", 1.4, 0.4)
+	task.delay(seconds, function()
+		velocity:Destroy()
+		attachment:Destroy()
+	end)
+end)
+
+-- A visible "press E" prompt (loot, NPC, station) wins over the E ability.
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local shownPrompts = 0
+ProximityPromptService.PromptShown:Connect(function(prompt)
+	shownPrompts += 1
+	prompt.PromptHidden:Once(function()
+		shownPrompts = math.max(0, shownPrompts - 1)
+	end)
+end)
+
+local chargeStart = nil -- os.clock() while the Стрелок holds the attack
+local chargeRay = nil
 
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then
 		return -- the click landed on a button / window
 	end
+	for _, def in ipairs(Config.Ui.AbilitySlots) do
+		if input.KeyCode == def.Key and not (input.KeyCode == Enum.KeyCode.E and shownPrompts > 0) then
+			if def.Slot == "Block" then
+				if classId() == "Blade" then
+					abilityRemote:FireServer("Block", true)
+				end
+			else
+				useSlot(def.Slot)
+			end
+			return
+		end
+	end
 	local camera = Workspace.CurrentCamera
+	local ray
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		local mouse = UserInputService:GetMouseLocation()
-		click(camera:ViewportPointToRay(mouse.X, mouse.Y))
+		ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
 	elseif input.UserInputType == Enum.UserInputType.Touch then
-		click(camera:ScreenPointToRay(input.Position.X, input.Position.Y))
+		ray = camera:ScreenPointToRay(input.Position.X, input.Position.Y)
+	end
+	if not ray then
+		return
+	end
+	if classId() == "Gunner" and not Window.AnyOpen() then
+		chargeStart = os.clock()
+		chargeRay = ray
+		abilityRemote:FireServer("Charge")
+		return
+	end
+	click(ray)
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.KeyCode == CB.Block.Key and classId() == "Blade" then
+		abilityRemote:FireServer("Block", false)
+		return
+	end
+	if chargeStart and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+		local held = os.clock() - chargeStart
+		chargeStart = nil
+		local camera = Workspace.CurrentCamera
+		local ray = chargeRay
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			local mouse = UserInputService:GetMouseLocation()
+			ray = camera:ViewportPointToRay(mouse.X, mouse.Y)
+		end
+		lastSent = 0 -- the press itself was not sent
+		click(ray, held >= CB.Gunner.ChargeSeconds)
 	end
 end)
 

@@ -193,7 +193,84 @@ DataService.Migrations = {
 		data.OwnedPets = nil
 		data.EquippedPet = nil
 	end,
+	-- 4 -> 5: gear stronger than the player's progress is replaced by the
+	-- best gear of the biome the player can reach (Config.ItemMigration).
+	[4] = function(data)
+		DataService.FitGearToProgress(data)
+	end,
 }
+
+-- Replaces gear above the player's progress (schema 5 migration; the DEV
+-- panel can call it too). Returns the credits given.
+function DataService.FitGearToProgress(data): number
+	local m = Config.ItemMigration
+	local room = if type(data.RoomReached) == "number" then data.RoomReached else 0
+	local biome = math.clamp(room // m.RoomsPerBiome + 1, 1, 4)
+	-- the strongest normal weapon of the allowed biomes (per class + overall)
+	local cap, bestByClass, best = 1, {}, nil
+	for _, w in ipairs(Config.Weapons) do
+		if not w.Robux and not w.Legacy and (w.Biome or 0) <= biome then
+			cap = math.max(cap, w.Damage)
+			if not best or w.Damage > best.Damage then
+				best = w
+			end
+			if not bestByClass[w.Class] or w.Damage > bestByClass[w.Class].Damage then
+				bestByClass[w.Class] = w
+			end
+		end
+	end
+	local credits = 0
+	data.OwnedWeapons = if type(data.OwnedWeapons) == "table" then data.OwnedWeapons else {}
+	for id in pairs(table.clone(data.OwnedWeapons)) do
+		local w = Config.ItemById.Weapon[id]
+		if w and not w.Robux and w.Damage > cap then
+			local replacement = bestByClass[w.Class] or best
+			data.OwnedWeapons[id] = nil
+			credits += m.ByRarity[w.Rarity] or 0
+			if replacement then
+				data.OwnedWeapons[replacement.Id] = true
+				if data.EquippedWeapon == id then
+					data.EquippedWeapon = replacement.Id
+				end
+			end
+		end
+	end
+	if not data.OwnedWeapons[data.EquippedWeapon or ""] then
+		data.OwnedWeapons.Stick = true
+		data.EquippedWeapon = if best and data.OwnedWeapons[best.Id] then best.Id else "Stick"
+	end
+	local setOfBiome = nil
+	for _, setId in ipairs(Config.ArmorSetOrder) do
+		local set = Config.ArmorSets[setId]
+		if not set.Robux and set.Biome and set.Biome <= biome then
+			setOfBiome = setId
+		end
+	end
+	data.OwnedArmor = if type(data.OwnedArmor) == "table" then data.OwnedArmor else {}
+	data.EquippedArmor = if type(data.EquippedArmor) == "table" then data.EquippedArmor else {}
+	for id in pairs(table.clone(data.OwnedArmor)) do
+		local piece = Config.ItemById.Armor[id]
+		local set = piece and Config.ArmorSets[piece.Set]
+		if piece and set and not set.Robux and (set.Biome or 0) > biome then
+			data.OwnedArmor[id] = nil
+			credits += m.ByRarity[piece.Rarity] or 0
+			local replacement = setOfBiome and (setOfBiome .. piece.Slot)
+			if replacement and Config.ItemById.Armor[replacement] then
+				data.OwnedArmor[replacement] = true
+			end
+			if data.EquippedArmor[piece.Slot] == id then
+				data.EquippedArmor[piece.Slot] = replacement or ""
+			end
+		end
+	end
+	credits = math.floor(math.min(m.Max, credits))
+	if credits > 0 then
+		data.Credits = (if type(data.Credits) == "number" then data.Credits else 0) + credits
+		local notice = m.Notice:format(tostring(credits))
+		data.Notice = if type(data.Notice) == "string" and data.Notice ~= "" then data.Notice .. "\n" .. notice else notice
+	end
+	return credits
+end
 
 function DataService.Migrate(data, fromVersion: number, player)
 	local version = fromVersion

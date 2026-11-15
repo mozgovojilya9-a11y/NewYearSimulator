@@ -57,8 +57,8 @@ local function plate(anchor: BasePart, material, rarity)
 	frame.BackgroundColor3 = Style.Colors.PanelDark
 	frame.BorderSizePixel = 0
 	frame.Parent = gui
-	Style.Corner(frame, UDim.new(0, 8))
-	Style.Stroke(frame, 2, rarity.Color)
+	Style.Corner(frame, UDim.new(0, 3))
+	Style.Stroke(frame, 1.5, rarity.Color)
 	local nameLabel = Style.Label(frame, material.Name, 15, rarity.Color, { Size = UDim2.fromScale(1, 1), TextScaled = true })
 	local padding = Instance.new("UIPadding")
 	padding.PaddingLeft = UDim.new(0, 6)
@@ -192,9 +192,52 @@ end
 -- Float + spin (+ rainbow for Secret drops).
 local player = Players.LocalPlayer
 
+-- Plates never overlap: nearest first, each one that would cover an
+-- already placed plate on screen is lifted by whole plate heights
+-- (BillboardGui.SizeOffset), so a pile of drops reads as a neat stack.
+local function declutter(root)
+	local camera = Workspace.CurrentCamera
+	if not camera then
+		return
+	end
+	local list = {}
+	for _, drop in pairs(drops) do
+		local gui = drop.plate.gui
+		local point, onScreen = camera:WorldToViewportPoint(drop.base + Vector3.new(0, 2.2, 0))
+		if onScreen then
+			local distance = if root then (root.Position - drop.base).Magnitude else point.Z
+			table.insert(list, { gui = gui, x = point.X, y = point.Y, w = gui.Size.X.Offset, h = gui.Size.Y.Offset, d = distance })
+		else
+			gui.SizeOffset = Vector2.zero
+		end
+	end
+	table.sort(list, function(a, b)
+		return a.d < b.d
+	end)
+	local placed = {}
+	for _, p in ipairs(list) do
+		local lift = 0
+		local moved = true
+		while moved and lift < 8 do
+			moved = false
+			local y = p.y - lift * (p.h + 4)
+			for _, q in ipairs(placed) do
+				if math.abs(p.x - q.x) < (p.w + q.w) / 2 and math.abs(y - q.y) < (p.h + q.h) / 2 + 2 then
+					lift += 1
+					moved = true
+					break
+				end
+			end
+		end
+		p.gui.SizeOffset = Vector2.new(0, lift * (p.h + 4) / math.max(1, p.h))
+		table.insert(placed, { x = p.x, y = p.y - lift * (p.h + 4), w = p.w, h = p.h })
+	end
+end
+
 RunService.RenderStepped:Connect(function()
 	local t = os.clock()
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	declutter(root)
 	for _, drop in pairs(drops) do
 		if root then
 			setDetailed(drop.plate, (root.Position - drop.base).Magnitude <= LOOT.DetailDistance)

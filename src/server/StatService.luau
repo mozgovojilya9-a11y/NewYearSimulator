@@ -1,8 +1,8 @@
 --[[
 	StatService.luau
 	The ONE place that turns everything a player has into final numbers.
-	Sources: level, weapon, armor pieces, armor set bonus, game passes,
-	boosts (class and skills will plug in here later).
+	Sources: level, weapon, armor pieces, armor set bonus, skill tree
+	passives of the current class, game passes, boosts.
 
 	Stats (all final, ready to use):
 	  Damage       one hit before crit
@@ -40,6 +40,9 @@ local PlayerState = require(script.Parent.PlayerState)
 local StatService = {}
 
 local cache = {} -- [player] = stats table
+
+-- Combat stats that only skills give (used by AbilityService / MobAI).
+StatService.CombatStats = { "Lifesteal", "Thorns", "ComboBonus", "BlockBonus", "SlowOnHit", "StunOnHit", "ControlPct", "AbilityPct", "CooldownPct", "LowHpDamage", "CheatDeath", "DashPower", "ChargeBonus", "VolleyBonus" }
 local published = {} -- [player] = { [attribute] = value }
 
 -- Pure computation from the save data.
@@ -60,6 +63,10 @@ local function compute(player)
 		XpMult = 1,
 		CreditsMult = 1,
 	}
+	-- combat stats of skill passives (0 = none)
+	for _, name in ipairs(StatService.CombatStats) do
+		stats[name] = 0
+	end
 	if not data then
 		return stats
 	end
@@ -88,6 +95,29 @@ local function compute(player)
 	local damageMult = 1
 	if set then
 		damageMult *= 1 + set.Bonus
+	end
+
+	-- Skill tree passives of the current class
+	local skill = {}
+	for nodeId, rank in pairs(PlayerState.SkillRanks(player)) do
+		local node = Config.SkillById[nodeId]
+		if node and node.Stats and type(rank) == "number" and rank > 0 then
+			for stat, list in pairs(node.Stats) do
+				skill[stat] = (skill[stat] or 0) + Config.RankValue(list, rank)
+			end
+		end
+	end
+	damageMult *= 1 + (skill.DamagePct or 0)
+	stats.MaxHealth = math.floor(stats.MaxHealth * (1 + (skill.HealthPct or 0)))
+	stats.Defense = math.min(0.8, stats.Defense + (skill.Defense or 0))
+	stats.CritChance += skill.CritChance or 0
+	stats.CritDamage += skill.CritDamage or 0
+	stats.AttackSpeed += skill.AttackSpeed or 0
+	stats.Regen += skill.Regen or 0
+	stats.Dash += skill.Dash or 0
+	stats.Luck += skill.Luck or 0
+	for _, name in ipairs(StatService.CombatStats) do
+		stats[name] = skill[name] or 0
 	end
 
 	-- Passes and boosts

@@ -16,6 +16,7 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local AbilityService = require(script.Parent.AbilityService)
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local StatService = require(script.Parent.StatService)
 local WorldKit = require(script.Parent.WorldKit)
@@ -29,12 +30,24 @@ local TICK = 0.3
 local mobs = {} -- [model] = { run, humanoid, root, lastAttack, busy, lastSlam }
 local lastDamaged = {} -- [player] = os.clock() of the last hit taken
 
-local function damagePlayer(player, amount: number)
+local function damagePlayer(player, amount: number, attacker: Model?)
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid and humanoid.Health > 0 then
-		humanoid:TakeDamage(math.max(1, amount * (1 - StatService.Get(player).Defense))) -- armor
+		local taken = amount * (1 - StatService.Get(player).Defense) -- armor
+		taken = AbilityService.Incoming(player, taken, attacker) -- shield, block, thorns, cheat death
+		if taken > 0 then
+			humanoid:TakeDamage(math.max(1, taken))
+		end
 		lastDamaged[player] = os.clock()
 	end
+end
+
+-- Control effects of the skills (attributes = server time they end).
+local function statusOf(model): (boolean, number)
+	local t = Workspace:GetServerTimeNow()
+	local stunned = (model:GetAttribute("StunUntil") or 0) > t
+	local slow = if (model:GetAttribute("SlowUntil") or 0) > t then Config.Combat.SlowFactor else 1
+	return stunned, slow
 end
 
 local function playerRoot(run)
@@ -50,7 +63,7 @@ local function attack(state, model, root)
 	if mobs[model] and model.Parent then
 		local target = playerRoot(state.run)
 		if target and (target.Position - state.root.Position).Magnitude - state.reach <= M.AttackRange + 2 then
-			damagePlayer(state.run.player, model:GetAttribute("Damage") or 1)
+			damagePlayer(state.run.player, model:GetAttribute("Damage") or 1, model)
 		end
 	end
 	state.lastAttack = os.clock()
@@ -117,6 +130,11 @@ local function tick()
 		if not target then
 			continue
 		end
+		local stunned, slow = statusOf(model)
+		if stunned then
+			state.humanoid:MoveTo(state.root.Position)
+			continue
+		end
 		-- measured from the mob's surface, so big bosses reach as far as small mobs
 		local distance = (target.Position - state.root.Position).Magnitude - state.reach
 		local isBoss = model:GetAttribute("Boss") == true
@@ -130,7 +148,7 @@ local function tick()
 				task.spawn(attack, state, model, state.root)
 			end
 		elseif distance <= M.AggroRange then
-			state.humanoid.WalkSpeed = if isBoss then M.BossWalkSpeed else M.WalkSpeed
+			state.humanoid.WalkSpeed = (if isBoss then M.BossWalkSpeed else M.WalkSpeed) * slow
 			state.humanoid:MoveTo(target.Position)
 		else
 			state.humanoid:MoveTo(state.root.Position)

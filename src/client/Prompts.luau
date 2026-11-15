@@ -15,6 +15,7 @@ local Style = require(script.Parent.ui.Style)
 local Forge = require(script.Parent.ui.Windows.Forge)
 local Store = require(script.Parent.ui.Windows.Store)
 local Reward = require(script.Parent.ui.Windows.Reward)
+local ClassSelect = require(script.Parent.ui.ClassSelect)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -27,6 +28,9 @@ local ACTIONS = {
 		Store.Open()
 	end,
 	Wheel = Reward.OpenWheel,
+	OpenClasses = function()
+		ClassSelect.Open(true)
+	end,
 }
 
 

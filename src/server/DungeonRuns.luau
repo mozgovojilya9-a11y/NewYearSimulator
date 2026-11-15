@@ -398,24 +398,58 @@ function DungeonRuns.NearestMob(player, position: Vector3, range: number)
 	return best
 end
 
+-- Every living mob of the player's run within `range` of `position`
+-- (measured from the mob's surface), nearest first.
+function DungeonRuns.MobsNear(player, position: Vector3, range: number)
+	local run = runs[player]
+	local list = {}
+	if not run then
+		return list
+	end
+	for _, room in pairs(run.rooms) do
+		for model in pairs(room.Mobs) do
+			local root = model.PrimaryPart
+			local humanoid = model:FindFirstChildOfClass("Humanoid")
+			if root and humanoid and humanoid.Health > 0 and not model:GetAttribute("Dying") then
+				local distance = (root.Position - position).Magnitude - math.max(root.Size.X, root.Size.Z) / 2
+				if distance <= range then
+					table.insert(list, { model = model, distance = distance })
+				end
+			end
+		end
+	end
+	table.sort(list, function(a, b)
+		return a.distance < b.distance
+	end)
+	return list
+end
+
 -- Called by ClickService after cooldown and range checks.
 function DungeonRuns.Hit(player, model)
+	local damage, isCrit = StatService.RollHit(player)
+	return DungeonRuns.Damage(player, model, damage, isCrit)
+end
+
+-- Deals a ready-made amount of damage to a mob of the player's run
+-- (abilities, basic attacks). Returns the damage dealt (0 if none).
+function DungeonRuns.Damage(player, model, damage: number, isCrit: boolean?)
 	local info = mobInfo[model]
 	if not info or info.run.player ~= player then
-		return
+		return 0
 	end
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then
-		return
+		return 0
 	end
-	local damage, isCrit = StatService.RollHit(player)
+	damage = math.max(1, math.floor(damage))
 	humanoid.Health = math.max(0, humanoid.Health - damage)
 	model:SetAttribute("Hits", (model:GetAttribute("Hits") or 0) + 1)
 	WorldKit.UpdateHealth(model.PrimaryPart, humanoid.Health, humanoid.MaxHealth)
-	Remotes.Get("ClickHit"):FireClient(player, "Hit", model, damage, isCrit)
+	Remotes.Get("ClickHit"):FireClient(player, "Hit", model, damage, isCrit == true)
 	if humanoid.Health <= 0 then
 		kill(model)
 	end
+	return damage
 end
 
 -- Weapon changed mid-run: recolor the hint on the rooms that exist.

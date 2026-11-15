@@ -10,6 +10,9 @@
 ]]
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local PlayerState = require(script.Parent.PlayerState)
@@ -41,6 +44,10 @@ function TravelService.EnterDungeon(player)
 	local character = player.Character
 	if not character or not character:FindFirstChild("HumanoidRootPart") then
 		return false, "Персонаж ещё не появился"
+	end
+	if (player:GetAttribute("Class") or "") == "" then
+		Remotes.Notify(player, Config.Combat.Texts.NeedClass, "bad")
+		return false, Config.Combat.Texts.NeedClass
 	end
 	local entry, message = DungeonRuns.StartRun(player)
 	if not entry then

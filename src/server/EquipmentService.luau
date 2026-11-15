@@ -21,6 +21,7 @@ local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
 local EquipmentService = {}
 
 local E = Config.Equipment
+local refreshShield
 
 local function isR15(character): boolean
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -35,6 +36,49 @@ local function weld(part0: BasePart, part1: BasePart, offset: CFrame)
 	w.Parent = part1
 end
 
+-- Клинок carries an energy shield on the left arm.
+refreshShield = function(player, character)
+	local old = character:FindFirstChild("EnergyShield")
+	if old then
+		old:Destroy()
+	end
+	if player:GetAttribute("Class") ~= "Blade" then
+		return
+	end
+	local arm = character:FindFirstChild(if isR15(character) then "LeftLowerArm" else "Left Arm")
+	if not arm then
+		return
+	end
+	local S = E.Shield
+	local model = Instance.new("Model")
+	model.Name = "EnergyShield"
+	local plate = Instance.new("Part")
+	plate.Name = "Plate"
+	plate.Shape = Enum.PartType.Cylinder
+	plate.Size = Vector3.new(0.12, S.Size, S.Size)
+	plate.Color = S.Color
+	plate.Material = Enum.Material.ForceField
+	plate.Transparency = 0.15
+	plate.CanCollide = false
+	plate.CanQuery = false
+	plate.Massless = true
+	plate.Parent = model
+	local rim = Instance.new("Part")
+	rim.Name = "Rim"
+	rim.Shape = Enum.PartType.Cylinder
+	rim.Size = Vector3.new(0.2, 0.9, 0.9)
+	rim.Color = Color3.fromRGB(70, 74, 84)
+	rim.Material = Enum.Material.Metal
+	rim.CanCollide = false
+	rim.CanQuery = false
+	rim.Massless = true
+	rim.Parent = model
+	model.PrimaryPart = rim
+	model.Parent = character
+	weld(arm, rim, S.Offset)
+	weld(rim, plate, CFrame.new(-0.08, 0, 0))
+end
+
 local function refreshWeapon(player, character)
 	local old = character:FindFirstChild("EquippedWeapon")
 	if old then
@@ -45,11 +89,19 @@ local function refreshWeapon(player, character)
 	if not weapon or not hand then
 		return
 	end
-	local model = WeaponBuilder.Build(weapon)
+	-- the look follows the player's class (sword / spear / blaster)
+	local classId = player:GetAttribute("Class") or ""
+	local look = weapon
+	if Config.ClassById[classId] and weapon.Class ~= classId then
+		look = table.clone(weapon)
+		look.Class = classId
+	end
+	local model = WeaponBuilder.Build(look)
 	model.Name = "EquippedWeapon"
 	model:SetAttribute("WeaponId", weapon.Id)
 	model.Parent = character
 	weld(hand, model.PrimaryPart, if isR15(character) then E.GripR15 else E.GripR6)
+	refreshShield(player, character)
 end
 
 local function refreshArmor(player, character)
@@ -110,6 +162,12 @@ function EquipmentService.Init()
 			end
 			return nil
 		end
+		player:GetAttributeChangedSignal("Class"):Connect(function()
+			local character = onCharacter()
+			if character then
+				refreshWeapon(player, character)
+			end
+		end)
 		player:GetAttributeChangedSignal("EquippedWeapon"):Connect(function()
 			local character = onCharacter()
 			if character then
