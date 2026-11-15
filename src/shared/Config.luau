@@ -931,12 +931,14 @@ Config.Lighting = {
 	BloomThreshold = 1.4, -- only the very brightest pixels may glow
 	ShadowSoftness = 0.3,
 	Clouds = { Cover = 0.45, Density = 0.55, Color = Color3.fromRGB(245, 248, 255) },
+	-- Hub = the Atrium interior: the sun only through the skylight, warm
+	-- lamps do the rest; ambient a little warm, almost no haze indoors.
 	Hub = {
-		ClockTime = 14.5, Brightness = 3, ExposureCompensation = 0,
-		Ambient = Color3.fromRGB(70, 72, 82), OutdoorAmbient = Color3.fromRGB(128, 132, 142),
-		EnvironmentDiffuseScale = 1, EnvironmentSpecularScale = 1,
-		Saturation = 0.05, Contrast = 0.05, Tint = Color3.fromRGB(255, 251, 244), Bloom = 0.04,
-		Atmosphere = { Density = 0.3, Offset = 0.15, Color = Color3.fromRGB(199, 210, 226), Decay = Color3.fromRGB(106, 122, 145), Glare = 0.15, Haze = 1.2 },
+		ClockTime = 13.5, Brightness = 2.6, ExposureCompensation = 0.1,
+		Ambient = Color3.fromRGB(104, 96, 88), OutdoorAmbient = Color3.fromRGB(118, 110, 102),
+		EnvironmentDiffuseScale = 0.35, EnvironmentSpecularScale = 0.8,
+		Saturation = 0.04, Contrast = 0.06, Tint = Color3.fromRGB(255, 246, 234), Bloom = 0.04,
+		Atmosphere = { Density = 0.12, Offset = 0, Color = Color3.fromRGB(214, 204, 190), Decay = Color3.fromRGB(120, 110, 100), Glare = 0, Haze = 0.6 },
 	},
 	Dungeon = {
 		ClockTime = 14.5, Brightness = 1.4, ExposureCompensation = 0.25,
@@ -951,96 +953,111 @@ Config.Lighting = {
 -- VISUAL: hub layout
 ---------------------------------------------------------------------
 
--- Hub "Нано-Цитадель": a square plaza of the floating technopolis.
--- Offsets are from the SpawnLocation (ground level); north is -Z, west
--- is -X. Top view:
+-- Hub "Атриум Нано-Цитадели": a closed hall (walls, ceiling, a glass
+-- skylight on steel trusses), arches into the side rooms, the Gates at
+-- the far end. Offsets are from the SpawnLocation (ground level); north
+-- is -Z (spawn -> gates), east is +X. Top view:
 --
---                  [ ВРАТА ]              (gates to the modes)
---     ПОЛИГОН        |  bridge  |       ФАБРИКАТОР
---     (dummies)      |          |       (forge hall)
---     ИНКУБАТОР   [ HOLO TOWER ]        Store kiosk
---     Wheel          |
---     Leaderboards [ SPAWN ]
+--              [========= ВРАТА =========]          north wall
+--   Полигон ⌂ |                            | ⌂ Фабрикатор
+--   (wheel)    |        (free center)       |  (rack)
+--   Магазин ⌂ |                            | ⌂ Инкубатор
+--   (board)    |                            |  (board)
+--              [====== вход · SPAWN ======]          south wall
+--
+-- The side rooms behind the arches are temporary compact rooms that keep
+-- the stations working (their full halls come later).
 Config.HubLayout = {
 	Name = "Нано-Цитадель",
-	Size = 176, -- plaza side (square)
-	Center = Vector3.new(0, 0, -60), -- plaza center: the spawn sits near the south wall
-	TileSize = 16,
-	WallHeight = 16,
-	WallThickness = 3,
-	TowerSize = 8, -- corner pylons
-	TowerHeight = 30,
+	Hall = {
+		Width = 60, -- X, inner
+		Length = 80, -- Z, inner (south wall -> north wall)
+		Height = 32, -- floor -> ceiling
+		SouthZ = 8, -- inner face of the south wall (spawn is at 0)
+		WallThickness = 2,
+		Bay = 12, -- pilaster spacing on the side walls
+		FloorTile = 8,
+		Skylight = { HalfWidth = 18, FromZ = -4, ToZ = -64, Mullion = 4, Purlin = 6 },
+		TrussDepth = 3,
+		PendantX = { -12, 12 }, -- pendant lamps on every truss
+	},
+	-- Hall colors (materials: Concrete / Metal / DiamondPlate / Glass).
+	Colors = {
+		Floor = Color3.fromRGB(86, 84, 82),
+		Runner = Color3.fromRGB(62, 61, 62),
+		Paint = Color3.fromRGB(176, 140, 62), -- floor markings (painted, not glowing)
+		WallSlab = Color3.fromRGB(104, 100, 96),
+		WallPanel = Color3.fromRGB(152, 144, 134),
+		Dado = Color3.fromRGB(54, 52, 52),
+		Steel = Color3.fromRGB(92, 92, 96),
+		Beam = Color3.fromRGB(60, 60, 64),
+		Ceiling = Color3.fromRGB(48, 46, 46),
+		Glass = Color3.fromRGB(190, 212, 226),
+		Tunnel = Color3.fromRGB(10, 12, 18),
+		Screen = Color3.fromRGB(16, 22, 30),
+	},
+	Lamp = { Range = 26, Brightness = 1.8, Angle = 120 }, -- pilaster lamps (warm)
+	Pendant = { Range = 32, Brightness = 1.2, Drop = 4 },
+	Arch = { Width = 10, Height = 12 },
+	Entrance = { Width = 10, Height = 12 },
+	Portal = { Width = 14, Height = 18, FrameWidth = 5.5, FrameDepth = 5, Curtains = 5, CurtainTransparency = 0.88, SignHeight = 5.4 },
+	Room = { Width = 22, Depth = 22, Height = 16 }, -- temporary side rooms
+	-- Side wall bays (Side: -1 west, 1 east; Z = bay center). Kind:
+	--   Arch = door into a side room (Room: Forge / Egg / Polygon / Store)
+	--   Board = leaderboard, Wheel = wheel of fortune,
+	--   Bench / Console / Cargo / Pipes / Rack = decor sets.
+	Bays = {
+		{ Side = -1, Z = 2, Kind = "Bench" },
+		{ Side = 1, Z = 2, Kind = "Bench" },
+		{ Side = -1, Z = -10, Kind = "Board", Board = "Level" },
+		{ Side = 1, Z = -10, Kind = "Board", Board = "Room" },
+		{ Side = -1, Z = -22, Kind = "Arch", Room = "Store" },
+		{ Side = 1, Z = -22, Kind = "Arch", Room = "Egg" },
+		{ Side = -1, Z = -34, Kind = "Wheel" },
+		{ Side = 1, Z = -34, Kind = "Rack" },
+		{ Side = -1, Z = -46, Kind = "Arch", Room = "Polygon" },
+		{ Side = 1, Z = -46, Kind = "Arch", Room = "Forge" },
+		{ Side = -1, Z = -58, Kind = "Console" },
+		{ Side = 1, Z = -58, Kind = "Console" },
+		{ Side = -1, Z = -68, Kind = "Cargo" },
+		{ Side = 1, Z = -68, Kind = "Pipes" },
+	},
+	-- End wall bays (X = bay center).
+	NorthBays = { { X = -21, Kind = "Pipes" }, { X = 21, Kind = "Cargo" } },
+	SouthBays = { { X = -12, Kind = "Bench" }, { X = 12, Kind = "Bench" }, { X = -24, Kind = "Rack" }, { X = 24, Kind = "Console" } },
+	SouthPilasters = { -18, 18 },
+	-- Decor scale: everything next to the player is human-sized.
+	CrateSize = 3,
+	BarrelHeight = 3.2,
+	CanisterHeight = 2.6,
+	PipesHeight = 8,
 
-	AvenueWidth = 16, -- main avenue spawn -> gates
-	SidePathWidth = 7,
-	LampSpacing = 22,
-
-	Portal = { Offset = Vector3.new(0, 0, -138), Width = 18, Height = 20 }, -- the gates
-	Plaza = { Offset = Vector3.new(0, 0, -52), Radius = 17 }, -- holo tower in the middle
-	Forge = { Offset = Vector3.new(54, 0, -108), Size = Vector2.new(30, 26), Height = 14 }, -- fabricator hall
-	Store = { Offset = Vector3.new(38, 0, -52) },
-	Egg = { Offset = Vector3.new(-46, 0, -30), Radius = 11 }, -- incubator
-	Wheel = { Offset = Vector3.new(-46, 0, -56) },
-	-- Polygon: arena with test dummies (PolygonService places them).
+	-- Polygon room: dummies (PolygonService). Offsets from the room center,
+	-- they face the entrance (+X).
 	Polygon = {
-		Offset = Vector3.new(-49, 0, -110), Size = Vector3.new(40, 0, 56),
-		Dummies = { -- offsets from the polygon center; Kind = asset (falls back to procedural)
-			{ Offset = Vector3.new(-8, 0, -18), Kind = "Trainer_Dummy" },
-			{ Offset = Vector3.new(8, 0, -18), Kind = "Trainer_Dummy" },
-			{ Offset = Vector3.new(-8, 0, 0), Kind = "Trainer_Bag" },
-			{ Offset = Vector3.new(8, 0, 0), Kind = "Trainer_Bag" },
-			{ Offset = Vector3.new(0, 0, 16), Kind = "Trainer_Dummy", Big = true },
+		Dummies = {
+			{ Offset = Vector3.new(-6, 0, -7), Kind = "Trainer_Dummy" },
+			{ Offset = Vector3.new(-6, 0, 7), Kind = "Trainer_Dummy" },
+			{ Offset = Vector3.new(1, 0, -5), Kind = "Trainer_Bag" },
+			{ Offset = Vector3.new(1, 0, 5), Kind = "Trainer_Bag" },
+			{ Offset = Vector3.new(-7, 0, 0), Kind = "Trainer_Dummy", Big = true },
 		},
 	},
-	Leaderboards = { -- free-standing boards west of the spawn, facing it
-		{ Offset = Vector3.new(-44, 0, -4), Kind = "Level", Title = "Топ уровней" },
-		{ Offset = Vector3.new(-44, 0, 15), Kind = "Room", Title = "Глубже всех в данже" },
+	Leaderboards = {
+		Level = "Топ уровней",
+		Room = "Глубже всех в данже",
 	},
-	Bridge = { From = Vector3.new(-34, 0, -92), To = Vector3.new(34, 0, -92), Height = 15, Width = 6 },
-
-	-- Decor
-	PlantCapsules = { Vector3.new(-12, 0, -38), Vector3.new(12, 0, -38), Vector3.new(-12, 0, -66), Vector3.new(12, 0, -66), Vector3.new(-20, 0, 6), Vector3.new(20, 0, 6), Vector3.new(24, 0, -120), Vector3.new(-24, 0, -124) },
-	Benches = { -- offset + facing direction
-		{ Offset = Vector3.new(-14, 0, -52), Facing = Vector3.new(1, 0, 0) },
-		{ Offset = Vector3.new(14, 0, -52), Facing = Vector3.new(-1, 0, 0) },
-		{ Offset = Vector3.new(-16, 0, -10), Facing = Vector3.new(1, 0, 0) },
-		{ Offset = Vector3.new(16, 0, -10), Facing = Vector3.new(-1, 0, 0) },
-	},
-	Cargo = { Vector3.new(72, 0, -130), Vector3.new(30, 0, -136), Vector3.new(-30, 0, -138), Vector3.new(74, 0, -20), Vector3.new(-74, 0, -76) },
-	Vents = { -- on the inner side of the walls: offset + facing
-		{ Offset = Vector3.new(-86, 0, -20), Facing = Vector3.new(1, 0, 0) },
-		{ Offset = Vector3.new(-86, 0, -140), Facing = Vector3.new(1, 0, 0) },
-		{ Offset = Vector3.new(86, 0, -40), Facing = Vector3.new(-1, 0, 0) },
-		{ Offset = Vector3.new(86, 0, -80), Facing = Vector3.new(-1, 0, 0) },
-	},
-	-- Slots for owner props whose purpose is unknown (Prop_Misc_*, Pipes,
-	-- Trainer_Machine / Refiner / Weights): each takes a model whose
-	-- height fits Size ("Small" < 4, "Medium" 4..10, "Large" > 10 studs).
-	PropSlots = {
-		{ Offset = Vector3.new(80, 0, -60), Facing = Vector3.new(-1, 0, 0), Size = "Large" },
-		{ Offset = Vector3.new(-80, 0, -6), Facing = Vector3.new(1, 0, 0), Size = "Large" },
-		{ Offset = Vector3.new(60, 0, -140), Facing = Vector3.new(0, 0, 1), Size = "Large" },
-		{ Offset = Vector3.new(24, 0, -14), Facing = Vector3.new(-1, 0, 0), Size = "Medium" },
-		{ Offset = Vector3.new(-24, 0, -80), Facing = Vector3.new(1, 0, 0), Size = "Medium" },
-		{ Offset = Vector3.new(30, 0, -80), Facing = Vector3.new(-1, 0, 0), Size = "Medium" },
-		{ Offset = Vector3.new(-8, 0, -24), Facing = Vector3.new(1, 0, 0), Size = "Small" },
-		{ Offset = Vector3.new(8, 0, -80), Facing = Vector3.new(-1, 0, 0), Size = "Small" },
-	},
-	DroneRoutes = {
-		{ Vector3.new(-30, 18, -20), Vector3.new(30, 18, -20), Vector3.new(30, 20, -100), Vector3.new(-30, 20, -100) },
-		{ Vector3.new(0, 24, -10), Vector3.new(60, 22, -60), Vector3.new(0, 24, -130), Vector3.new(-60, 22, -60) },
-		{ Vector3.new(40, 16, -120), Vector3.new(70, 18, -90), Vector3.new(40, 16, -70) },
-		{ Vector3.new(-40, 15, -20), Vector3.new(-70, 17, -40), Vector3.new(-60, 15, -120), Vector3.new(-30, 17, -100) },
-	},
-	FloatingPlatforms = { -- center (y = height) + size
-		{ Offset = Vector3.new(-70, 26, -150), Size = Vector3.new(14, 1.2, 10) },
-		{ Offset = Vector3.new(70, 30, 10), Size = Vector3.new(12, 1.2, 12) },
-		{ Offset = Vector3.new(100, 22, -110), Size = Vector3.new(10, 1.2, 16) },
-		{ Offset = Vector3.new(-100, 28, -40), Size = Vector3.new(12, 1.2, 10) },
+	-- Wall screens of the decor sets (one line each, cycled).
+	Screens = {
+		{ Title = "ЦИТАДЕЛЬ · СТАТУС", Line = "Энергосеть: норма" },
+		{ Title = "НАНО-ФАБРИКА", Line = "Активность роботов растёт" },
+		{ Title = "ВРАТА", Line = "Канал в подземелье открыт" },
+		{ Title = "ФАБРИКАТОР", Line = "Материалы → снаряжение" },
 	},
 
 	Texts = {
 		Title = "НАНО-ЦИТАДЕЛЬ",
+		TitleSub = "Атриум",
 		Portal = "ВРАТА",
 		PortalSub = "Подземелье · Нано-фабрика",
 		Polygon = "ПОЛИГОН",
@@ -1048,11 +1065,12 @@ Config.HubLayout = {
 		Forge = "ФАБРИКАТОР",
 		ForgeSub = "Крафт оружия и брони",
 		Store = "МАГАЗИН",
+		StoreSub = "Robux",
 		Pets = "ИНКУБАТОР",
 		PetsSub = "Яйца питомцев",
 		Wheel = "КОЛЕСО УДАЧИ",
 		WheelFree = "Бесплатное вращение!",
-		Guide = "Врата — прямо ↑",
+		Console = "СИСТЕМЫ В НОРМЕ",
 	},
 	Prompts = {
 		Forge = "Фабрикатор",

@@ -172,21 +172,33 @@ function WorldKit.SurfaceText(part: BasePart, face: Enum.NormalId, lines: { { Te
 		total += line.Size * 1.3 + gap
 	end
 	local scale = math.min(1.6, (canvasH - 28) / math.max(1, total))
+	-- Roblox draws text at most 100 px high: big signs are built smaller
+	-- and enlarged with a UIScale, so their letters still fill the plate.
+	local biggest = 0
+	for _, line in ipairs(lines) do
+		biggest = math.max(biggest, line.Size * 1.3 * scale)
+	end
+	local k = math.max(1, biggest / 95)
 
 	local plate = Instance.new("Frame")
 	plate.Name = "Plate"
 	plate.AnchorPoint = Vector2.new(0.5, 0.5)
 	plate.Position = UDim2.fromScale(0.5, 0.5)
-	plate.Size = UDim2.fromOffset(canvasW - 8, math.min(canvasH - 8, total * scale + 20))
+	plate.Size = UDim2.fromOffset((canvasW - 8) / k, math.min(canvasH - 8, total * scale + 20) / k)
 	plate.BackgroundColor3 = Theme.PanelDark
 	plate.BackgroundTransparency = 0
 	plate.BorderSizePixel = 0
 	plate.Parent = gui
+	if k > 1 then
+		local uiScale = Instance.new("UIScale")
+		uiScale.Scale = k
+		uiScale.Parent = plate
+	end
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 14)
+	corner.CornerRadius = UDim.new(0, 14 / k)
 	corner.Parent = plate
 	local border = Instance.new("UIStroke")
-	border.Thickness = 3
+	border.Thickness = 3 / k
 	border.Color = Theme.Outline
 	border.Parent = plate
 
@@ -194,7 +206,7 @@ function WorldKit.SurfaceText(part: BasePart, face: Enum.NormalId, lines: { { Te
 	layout.FillDirection = Enum.FillDirection.Vertical
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.Padding = UDim.new(0, gap * scale)
+	layout.Padding = UDim.new(0, gap * scale / k)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = plate
 
@@ -203,16 +215,25 @@ function WorldKit.SurfaceText(part: BasePart, face: Enum.NormalId, lines: { { Te
 		local label = Instance.new("TextLabel")
 		label.Name = line.Name or ("Line" .. i)
 		label.LayoutOrder = i
-		label.Size = UDim2.new(1, -20, 0, line.Size * 1.3 * scale)
+		label.Size = UDim2.new(1, -20 / k, 0, line.Size * 1.3 * scale / k)
 		label.BackgroundTransparency = 1
 		label.Font = Theme.Font
 		label.TextScaled = true
 		label.TextWrapped = true
 		label.TextColor3 = line.Color or Theme.Text
 		label.Text = line.Text
+		if k > 1 then
+			-- TextScaled stops at 100 px even under a UIScale: a fixed size
+			-- (fitted to the width) is enlarged by the UIScale instead.
+			local h = line.Size * 1.3 * scale / k
+			local width = (canvasW - 28) / k
+			local chars = utf8.len(line.Text) or #line.Text
+			label.TextScaled = false
+			label.TextSize = math.floor(math.min(100, h * 0.8, width / math.max(1, chars * 0.58)))
+		end
 		label.Parent = plate
 		local stroke = Instance.new("UIStroke")
-		stroke.Thickness = 2.5
+		stroke.Thickness = 2.5 / k
 		stroke.Color = Color3.new(0, 0, 0)
 		stroke.Parent = label
 		labels[i] = label
