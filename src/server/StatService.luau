@@ -1,8 +1,8 @@
 --[[
 	StatService.luau
 	The ONE place that turns everything a player has into final numbers.
-	Sources: level, weapon, armor pieces, armor set bonus, pets, game
-	passes, boosts (class and skills will plug in here later).
+	Sources: level, weapon, armor pieces, armor set bonus, game passes,
+	boosts (class and skills will plug in here later).
 
 	Stats (all final, ready to use):
 	  Damage       one hit before crit
@@ -19,11 +19,11 @@
 	  CreditsMult  x Нано-кредиты earned (passes, VIP, boosts)
 
 	Damage = BaseDamage x weapon Damage x LevelMult(level) x set bonus
-	         x pets x passes x boosts (x skills / class later).
+	         x passes x boosts (x skills / class later).
 
 	Every system reads stats ONLY through StatService.Get(player).
 	Stats are recomputed on every change (PlayerState.Sync: gear, level,
-	pets, pass bought, boost started / ended) and pushed to the client as
+	pass bought, boost started / ended) and pushed to the client as
 	attributes: the old names (ClickPower, MaxHealth, Defense) plus
 	"Stat_<Name>" for every stat and a JSON "Stats".
 ]]
@@ -89,11 +89,6 @@ local function compute(player)
 	if set then
 		damageMult *= 1 + set.Bonus
 	end
-
-	-- Pets
-	local petDamage, petHealth = PlayerState.PetBonus(player)
-	damageMult *= 1 + petDamage
-	stats.MaxHealth = math.floor(stats.MaxHealth * (1 + petHealth))
 
 	-- Passes and boosts
 	if Passes.Owns(player, "Damage2x") then
@@ -181,7 +176,7 @@ function StatService.ClickCooldown(player): number
 end
 
 function StatService.Init()
-	-- Every Sync (gear, pets, level, boosts) refreshes stats.
+	-- Every Sync (gear, level, boosts) refreshes stats.
 	PlayerState.OnSynced = StatService.Refresh
 	Players.PlayerRemoving:Connect(function(player)
 		cache[player] = nil

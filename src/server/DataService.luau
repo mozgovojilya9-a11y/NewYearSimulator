@@ -103,21 +103,11 @@ function DataService.Load(player)
 	data.BoostUntil = nil
 	data.OwnedBackpacks = nil
 	data.EquippedBackpack = nil
-	-- Old pets (one of each, one equipped) -> pet stacks.
-	if type(data.OwnedPets) == "table" then
-		for petId in pairs(data.OwnedPets) do
-			if Config.PetById[petId] then
-				data.Pets[petId] = data.Pets[petId] or { ["1"] = 0 }
-				data.Pets[petId]["1"] = (data.Pets[petId]["1"] or 0) + 1
-				data.PetIndex[petId] = true
-			end
-		end
-		if type(data.EquippedPet) == "string" and data.Pets[data.EquippedPet] then
-			table.insert(data.EquippedPets, data.EquippedPet .. ":1")
-		end
-	end
-	data.OwnedPets = nil
+	data.OwnedPets = nil -- pets (removed in schema 4, compensated there)
 	data.EquippedPet = nil
+	data.Pets = nil
+	data.EquippedPets = nil
+	data.PetIndex = nil
 
 	if player.Parent == nil then
 		noSave[player.UserId] = nil
@@ -164,6 +154,44 @@ DataService.Migrations = {
 		data.Rebirths = nil
 		data.TrainersUnlocked = nil
 		data.BoostUntil = nil
+	end,
+	-- 3 -> 4: pets are gone. Every pet (stacks by tier, plus the very old
+	-- one-of-each OwnedPets) becomes Нано-кредиты once (Config.PetMigration),
+	-- with a message on the next join.
+	[3] = function(data)
+		local m = Config.PetMigration
+		local total = 0
+		local function add(petId, tier, count)
+			local rarity = m.PetRarity[petId]
+			if rarity and type(count) == "number" and count > 0 then
+				total += (m.ByRarity[rarity] or 0) * (m.TierMult[tostring(tier)] or 1) * math.floor(count)
+			end
+		end
+		if type(data.Pets) == "table" then
+			for petId, tiers in pairs(data.Pets) do
+				if type(tiers) == "table" then
+					for tier, count in pairs(tiers) do
+						add(petId, tier, count)
+					end
+				end
+			end
+		end
+		if type(data.OwnedPets) == "table" then
+			for petId in pairs(data.OwnedPets) do
+				add(petId, "1", 1)
+			end
+		end
+		local credits = math.floor(math.min(m.Max, total))
+		if credits > 0 then
+			data.Credits = (if type(data.Credits) == "number" then data.Credits else 0) + credits
+			local notice = m.Notice:format(tostring(credits))
+			data.Notice = if type(data.Notice) == "string" and data.Notice ~= "" then data.Notice .. "\n" .. notice else notice
+		end
+		data.Pets = nil
+		data.EquippedPets = nil
+		data.PetIndex = nil
+		data.OwnedPets = nil
+		data.EquippedPet = nil
 	end,
 }
 

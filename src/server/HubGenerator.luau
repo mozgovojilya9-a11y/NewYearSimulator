@@ -13,7 +13,7 @@
 	            a big sign above (touching the field starts a run).
 	  Arches    doors in the side walls with a hanging sign on cables;
 	            behind each a compact room that keeps a station working
-	            (Forge, Egg, Polygon, Store; their full halls come later).
+	            (Forge, Academy, Polygon, Store; their full halls come later).
 	  Bays      the other wall bays: leaderboards, the wheel and decor
 	            sets (benches, consoles, racks, cargo, pipes) - dense along
 	            the walls, the center of the hall stays free.
@@ -753,38 +753,31 @@ local function buildForgeRoom(cf: CFrame)
 	return prompt, m
 end
 
-local function egg(parent, cf: CFrame, scale: number, color: Color3)
-	local shell = Panel(parent, "EggShell", Vector3.new(2.6, 3.4, 2.6) * scale, cf, Color3.fromRGB(240, 238, 248), M.Smooth, { Shape = Enum.PartType.Ball, CanCollide = false })
-	for i = 1, 4 do
-		local angle = i * math.pi / 2
-		Panel(parent, "EggLine", Vector3.new(0.1, 2.6, 0.1) * scale, cf * CFrame.new(math.cos(angle) * 1.3 * scale, 0, math.sin(angle) * 1.3 * scale), color, M.Smooth, { CanCollide = false })
+-- Academy of classes: one pedestal per class with a hologram plate.
+-- (The class mannequins and the "change class" prompt: ClassService.)
+local function buildAcademyRoom(cf: CFrame)
+	local m = roomShell("Academy", cf)
+	local d = L.Room.Depth
+	local pedestals = {}
+	for i = -1, 1 do
+		local pcf = cf * CFrame.new(i * 6.5, 0, -d + 6) * CFrame.Angles(0, math.rad(180), 0)
+		NanoKit.Cylinder(m, "PedestalBase", 0.6, 4.6, pcf * CFrame.new(0, 0.3, 0) * CFrame.Angles(0, 0, math.rad(90)), C.Beam, M.Metal)
+		local top = NanoKit.Cylinder(m, "Pedestal", 0.4, 3.8, pcf * CFrame.new(0, 0.8, 0) * CFrame.Angles(0, 0, math.rad(90)), C.Steel, M.Plate)
+		NanoKit.Cylinder(m, "PedestalRing", 0.08, 4, pcf * CFrame.new(0, 1.02, 0) * CFrame.Angles(0, 0, math.rad(90)), C.Paint, M.Smooth).CanCollide = false
+		local spot = Panel(m, "Spot", Vector3.new(1.4, 0.4, 0.8), cf * CFrame.new(i * 6.5, L.Room.Height - 1, -d + 9) * CFrame.Angles(math.rad(-55), 0, 0), C.Steel, M.Metal)
+		local light = Instance.new("SpotLight")
+		light.Face = Enum.NormalId.Front
+		light.Color = N.WarmLight
+		light.Range = 18
+		light.Brightness = 1.6
+		light.Angle = 45
+		light.Parent = spot
+		pedestals[i + 2] = top
 	end
-	return shell
-end
-
-local function buildEggRoom(cf: CFrame)
-	local m = roomShell("Egg", cf)
-	local center = cf * CFrame.new(0, 0, -L.Room.Depth / 2 - 1)
-	local pos = center.Position
-	NanoKit.Cylinder(m, "Platform", 0.8, 10, CFrame.new(pos + Vector3.new(0, 0.4, 0)) * CFrame.Angles(0, 0, math.rad(90)), C.Beam, M.Metal)
-	NanoKit.Cylinder(m, "PlatformTop", 0.1, 9.2, CFrame.new(pos + Vector3.new(0, 0.82, 0)) * CFrame.Angles(0, 0, math.rad(90)), C.Steel, M.Plate).CanCollide = false
-	local pedestal = Panel(m, "Pedestal", Vector3.new(3.6, 2, 3.6), CFrame.new(pos + Vector3.new(0, 1.8, 0)), C.Steel, M.Plate)
-	NanoKit.Column(m, "Capsule", 5, 4.4, pos + Vector3.new(0, 2.8, 0), C.Glass, M.Glass).Transparency = 0.75
-	NanoKit.Column(m, "CapsuleLid", 0.6, 4.8, pos + Vector3.new(0, 7.8, 0), C.Steel, M.Metal)
-	local big = egg(m, CFrame.new(pos + Vector3.new(0, 4.6, 0)), 0.9, N.Magenta)
-	NanoKit.Tag(big, "Bob", { Amplitude = 0.3, Period = 2.6 })
-	WorldKit.Light(big, N.Magenta, 14, 0.8)
-	-- incubation pods along the side walls
-	for i, z in ipairs({ -6, -16 }) do
-		for _, sx in ipairs({ -1, 1 }) do
-			local p = (cf * CFrame.new(sx * (L.Room.Width / 2 - 2.2), 0, z)).Position
-			NanoKit.Column(m, "PodBase", 0.8, 2.6, p, C.Beam, M.Metal)
-			NanoKit.Column(m, "Pod", 3, 2.2, p + Vector3.new(0, 0.8, 0), C.Glass, M.Glass).Transparency = 0.6
-			egg(m, CFrame.new(p + Vector3.new(0, 2.2, 0)), 0.45, if (i + sx) % 2 == 0 then N.Cyan else N.Gold)
-			NanoKit.Column(m, "PodLid", 0.3, 2.4, p + Vector3.new(0, 3.8, 0), C.Steel, M.Metal)
-		end
-	end
-	return WorldKit.Prompt(pedestal, L.Prompts.Egg, "", { Action = "OpenPets" }, 12)
+	-- terminal by the door (the prompt is added by ClassService)
+	local terminal = console(m, cf * CFrame.new(-6, 0, -4) * CFrame.Angles(0, math.rad(-90), 0))
+	terminal.Name = "Terminal"
+	return m, pedestals, terminal
 end
 
 local function buildStoreRoom(cf: CFrame)
@@ -887,7 +880,7 @@ function HubGenerator.Build()
 
 	-- side wall bays
 	local boards = {}
-	local forgePrompt, forge, eggPrompt, storePrompt, wheelPrompt, polygon, polygonCenter
+	local forgePrompt, forge, storePrompt, wheelPrompt, polygon, polygonCenter, academy
 	for _, bay in ipairs(L.Bays) do
 		local cf = sideFrame(bay.Side, bay.Z)
 		if bay.Kind == "Arch" then
@@ -896,9 +889,10 @@ function HubGenerator.Build()
 			if bay.Room == "Forge" then
 				forgePrompt, forge = buildForgeRoom(rcf)
 				hangingSign(root, cf, Texts.Forge, Texts.ForgeSub, N.Cyan)
-			elseif bay.Room == "Egg" then
-				eggPrompt = buildEggRoom(rcf)
-				hangingSign(root, cf, Texts.Pets, Texts.PetsSub, N.Magenta)
+			elseif bay.Room == "Academy" then
+				local room, pedestals, terminal = buildAcademyRoom(rcf)
+				academy = { Model = room, Pedestals = pedestals, Terminal = terminal }
+				hangingSign(root, cf, Texts.Academy, Texts.AcademySub, N.Gold)
 			elseif bay.Room == "Store" then
 				storePrompt = buildStoreRoom(rcf)
 				hangingSign(root, cf, Texts.Store, Texts.StoreSub, T.Green)
@@ -932,7 +926,7 @@ function HubGenerator.Build()
 		ForgePrompt = forgePrompt,
 		StorePrompt = storePrompt,
 		WheelPrompt = wheelPrompt,
-		EggPrompt = eggPrompt,
+		Academy = academy,
 		Leaderboards = boards,
 		SpawnCFrame = CFrame.lookAt(at(0, 4, 0), at(0, 4, -10)),
 		GroundY = base.Y,

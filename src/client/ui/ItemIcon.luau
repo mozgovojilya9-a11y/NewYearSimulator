@@ -8,7 +8,7 @@
 	color of the item's rarity (dark at the bottom, rarity glow on top).
 
 		ItemIcon.Create(parent, category, item, size, position) -> Frame
-	category: "Weapon" | "Armor" | "Material" | "Pet" (item = { Pet, Tier })
+	category: "Weapon" | "Armor" | "Material"
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,14 +20,11 @@ local Style = require(script.Parent.Style)
 local ItemIcon = {}
 
 local function rarityOf(category: string, item)
-	local id = if category == "Pet" then item.Pet and item.Pet.Rarity else item.Rarity
+	local id = item.Rarity
 	return Config.Rarity[id or "Common"] or Config.Rarity.Common
 end
 
 local function idOf(category: string, item): string?
-	if category == "Pet" then
-		return item.Pet and item.Pet.Id
-	end
 	return item.Id
 end
 
@@ -36,7 +33,6 @@ local VIEW = {
 	Weapon = CFrame.Angles(0, math.rad(20), 0) * CFrame.Angles(math.rad(-12), 0, 0),
 	Armor = CFrame.Angles(0, math.rad(-28), 0) * CFrame.Angles(math.rad(-14), 0, 0),
 	Material = CFrame.Angles(0, math.rad(-35), 0) * CFrame.Angles(math.rad(-25), 0, 0),
-	Pet = CFrame.Angles(0, math.rad(-25), 0) * CFrame.Angles(math.rad(-10), 0, 0),
 }
 
 function ItemIcon.Create(parent: GuiObject, category: string, item, size: UDim2, position: UDim2): Frame

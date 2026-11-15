@@ -7,7 +7,7 @@
 	  bosses, runs),
 	- player level from XP (every 5 levels a credits reward),
 	- Нано-кредиты for every kill (Config.KillCredits).
-	Rewards are credits / XP / boosts / pets.
+	Rewards are credits / XP / boosts.
 	- temporary x2 XP boosts (Boosts.Xp).
 
 	Client: Progression:InvokeServer("Status") -> table;
@@ -22,7 +22,6 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local DataService = require(script.Parent.DataService)
 local DungeonRuns = require(script.Parent.DungeonRuns)
-local PetService = require(script.Parent.PetService)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
 local StatService = require(script.Parent.StatService)
@@ -290,24 +289,9 @@ local function spin(player)
 	if prize.Kind == "Credits" then
 		local amount = earnCredits(player, prize.Amount * creditScale(data))
 		message = "+" .. Format.Number(amount) .. " нано-кредитов"
-	elseif prize.Kind == "Boost" then
+	else -- Boost
 		giveBoost(player, data, prize.Minutes)
 		message = ("x2 Опыт на %d мин"):format(prize.Minutes)
-	else -- Egg: a free hatch of the best egg the player can afford, at least the first one
-		local egg = Config.Eggs[1]
-		for _, candidate in ipairs(Config.Eggs) do
-			if PlayerState.GetCredits(player) >= candidate.Cost then
-				egg = candidate
-			end
-		end
-		local petId = PetService.Roll(player, egg)
-		if PlayerState.GrantPet(player, petId) then
-			PlayerState.Sync(player)
-			message = "Питомец: " .. Config.PetById[petId].Name .. "!"
-		else
-			local amount = PlayerState.AddCredits(player, egg.Cost)
-			message = "Хранилище питомцев полно: +" .. Format.Number(amount) .. " нано-кредитов"
-		end
 	end
 	ProgressionService.RefreshReady(player)
 	return true, message, index

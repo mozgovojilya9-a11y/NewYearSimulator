@@ -82,11 +82,6 @@ toggle(4, "✨ Эффекты", function()
 end, function(on)
 	Style.HideEffects = not on
 end)
-toggle(5, "🐾 Чужие питомцы", function()
-	return not Style.HideOtherPets
-end, function(on)
-	Style.HideOtherPets = not on
-end)
 
 refreshMusic()
 

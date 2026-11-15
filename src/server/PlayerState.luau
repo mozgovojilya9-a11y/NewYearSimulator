@@ -1,6 +1,6 @@
 --[[
 	PlayerState.luau
-	Access to the player's state: credits, level, materials, armor, pets,
+	Access to the player's state: credits, level, materials, armor,
 	boosts. Every service goes through here instead of poking the data
 	table directly. Final numbers (damage, HP, ...) are computed by
 	StatService, never here.
@@ -15,7 +15,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local DataService = require(script.Parent.DataService)
-local Passes = require(script.Parent.Passes)
 
 local PlayerState = {}
 
@@ -155,70 +154,6 @@ function PlayerState.HasMaterials(player, cost: { [string]: number }): boolean
 	return true
 end
 
----------------------------------------------------------------------
--- Pets
----------------------------------------------------------------------
-
--- "Spark:2" -> pet def, tier (or nil).
-function PlayerState.ParsePetKey(key: string)
-	if type(key) ~= "string" then
-		return nil, nil
-	end
-	local petId, tierText = string.match(key, "^(%w+):(%d)$")
-	local pet = petId and Config.PetById[petId]
-	local tier = tonumber(tierText)
-	if not pet or not tier or not Config.PetTiers[tier] then
-		return nil, nil
-	end
-	return pet, tier
-end
-
-function PlayerState.PetSlots(player): number
-	return Config.PetSlots + (if Passes.Owns(player, "PetSlots") then Config.PetSlotsPass else 0)
-end
-
--- Sum of the equipped pets' bonuses (shares): damage, max HP.
-function PlayerState.PetBonus(player): (number, number)
-	local data = DataService.Get(player)
-	if not data then
-		return 0, 0
-	end
-	local damage, health = 0, 0
-	for _, key in ipairs(data.EquippedPets) do
-		local pet, tier = PlayerState.ParsePetKey(key)
-		if pet then
-			local multiplier = Config.PetTiers[tier].Multiplier
-			damage += (pet.Damage or 0) * multiplier
-			health += (pet.Health or 0) * multiplier
-		end
-	end
-	return damage, health
-end
-
--- Adds one pet (tier 1). Returns false when the storage is full.
-function PlayerState.GrantPet(player, petId: string): boolean
-	local data = DataService.Get(player)
-	if not data or not Config.PetById[petId] then
-		return false
-	end
-	local total = 0
-	for _, tiers in pairs(data.Pets) do
-		for _, count in pairs(tiers) do
-			total += count
-		end
-	end
-	if total >= Config.PetStorage then
-		return false
-	end
-	data.Pets[petId] = data.Pets[petId] or {}
-	data.Pets[petId]["1"] = (data.Pets[petId]["1"] or 0) + 1
-	data.PetIndex[petId] = true
-	if #data.EquippedPets < PlayerState.PetSlots(player) then
-		table.insert(data.EquippedPets, petId .. ":1")
-	end
-	return true
-end
-
 -- Pushes everything the client UI needs into Player attributes.
 -- Call after any change to the data table.
 function PlayerState.Sync(player)
@@ -269,15 +204,6 @@ function PlayerState.Sync(player)
 	end
 	local set = PlayerState.ActiveSet(player)
 	player:SetAttribute("ArmorSet", if set then set.Id else "")
-	-- Pets
-	player:SetAttribute("Pets", HttpService:JSONEncode(data.Pets))
-	player:SetAttribute("EquippedPets", table.concat(data.EquippedPets, ","))
-	local index = {}
-	for petId in pairs(data.PetIndex) do
-		table.insert(index, petId)
-	end
-	player:SetAttribute("PetIndex", table.concat(index, ","))
-	player:SetAttribute("PetSlots", PlayerState.PetSlots(player))
 	if PlayerState.OnSynced then
 		PlayerState.OnSynced(player) -- StatService recomputes every stat
 	end

@@ -22,9 +22,6 @@ Config.StartingData = {
 	OwnedArmor = {}, -- [armorId] = true
 	EquippedArmor = { Helmet = "", Chest = "", Legs = "" },
 	Materials = {}, -- [materialId] = count
-	Pets = {}, -- [petId] = { ["1"] = count, ["2"] = count, ["3"] = count } (tiers)
-	EquippedPets = {}, -- { "petId:tier", ... }
-	PetIndex = {}, -- [petId] = true once hatched
 	RoomReached = 0, -- highest dungeon room cleared (0 = none, 20 = all)
 	-- Engagement systems (ProgressionService)
 	Daily = { LastClaim = 0, Streak = 0 },
@@ -37,7 +34,8 @@ Config.StartingData = {
 	LastSeen = 0, -- os.time() of the last save
 }
 -- Fields from older versions that are migrated / dropped on load
--- (DataService): OwnedBackpacks, EquippedBackpack, OwnedPets, EquippedPet.
+-- (DataService): OwnedBackpacks, EquippedBackpack, OwnedPets, EquippedPet,
+-- Pets, EquippedPets, PetIndex (pets were removed in schema 4).
 
 -- Version of the save format. Bump it when the format changes and add
 -- a step to DataService.Migrations; old saves are upgraded step by step
@@ -46,7 +44,8 @@ Config.StartingData = {
 --   2 = Aura is power (never spent), Нано-кредиты, skill points
 --   3 = action-RPG: Aura, rebirths and trainers removed (credits as
 --       compensation, Config.Migration), x2 boosts in Boosts
-Config.SchemaVersion = 3
+--   4 = pets removed (credits as compensation, Config.PetMigration)
+Config.SchemaVersion = 4
 
 -- One-time compensation (schema 2 -> 3) for the removed clicker: Aura and
 -- rebirths turn into Нано-кредиты. Moderate on purpose.
@@ -56,6 +55,21 @@ Config.Migration = {
 	PerRebirth = 120, -- 8 rebirths -> 960
 	Max = 3000,
 	Notice = "Игра обновилась: Аура и перерождения убраны. Компенсация: +%s нано-кредитов!",
+}
+
+-- One-time compensation (schema 3 -> 4) for the removed pets: every pet
+-- the player had (stacks by tier) turns into Нано-кредиты.
+--   credits = sum of ByRarity[rarity] x TierMult[tier] per pet, capped
+-- (old pet ids -> rarity are listed here: Config.Pets no longer exists)
+Config.PetMigration = {
+	PetRarity = {
+		Blob = "Common", Bunny = "Common", Bat = "Uncommon", Spark = "Rare", IceFox = "Rare",
+		Imp = "Epic", Golem = "Epic", Dragon = "Legendary", Phoenix = "Legendary", AbyssEye = "Mythic",
+	},
+	ByRarity = { Common = 15, Uncommon = 30, Rare = 60, Epic = 150, Legendary = 400, Mythic = 1000 },
+	TierMult = { ["1"] = 1, ["2"] = 3, ["3"] = 9 }, -- 3 equal pets merged into one of the next tier
+	Max = 6000,
+	Notice = "Игра обновилась: питомцы убраны. Компенсация: +%s нано-кредитов!",
 }
 
 Config.AutosaveInterval = 120
@@ -156,11 +170,7 @@ Config.GamePasses = {
 	Damage2x = { Id = 0, Order = 2, Icon = "⚔", Name = "x2 Урон", Price = 149, Text = "Навсегда удваивает урон" },
 	Xp2x = { Id = 0, Order = 3, Icon = "⭐", Name = "x2 Опыт", Price = 149, Text = "Навсегда удваивает опыт" },
 	Credits2x = { Id = 0, Order = 4, Icon = "💠", Name = "x2 Кредиты", Price = 149, Text = "Навсегда удваивает нано-кредиты" },
-	TripleEgg = { Id = 0, Order = 5, Icon = "🥚", Name = "Открытие 3 яиц", Price = 249, Text = "Открывай по 3 яйца сразу" },
-	FastEgg = { Id = 0, Order = 6, Icon = "💨", Name = "Быстрые яйца", Price = 79, Text = "Вылупление в 3 раза быстрее" },
-	Luck = { Id = 0, Order = 7, Icon = "🍀", Name = "Удача x2", Price = 199, Text = "x2 шанс эпических и лучше питомцев" },
 	LootLuck = { Id = 0, Order = 8, Icon = "💎", Name = "Удача добычи x2", Price = 199, Text = "x2 шанс редких материалов с мобов" },
-	PetSlots = { Id = 0, Order = 9, Icon = "🐾", Name = "+3 слота питомцев", Price = 99, Text = "Носи на 3 питомца больше" },
 }
 
 -- Developer Products (bought again and again). Id = 0 -> "Скоро".
@@ -572,60 +582,6 @@ Config.Forge = {
 	},
 }
 
--- Pets hatch from eggs (Нано-кредиты) and follow the player. Every
--- equipped pet adds small stat bonuses x its tier multiplier: Damage and
--- Health are shares (0.02 = +2% damage). Three equal pets of one tier merge into one of the
--- next tier. Shape = look built by Shared.PetBuilder. Ids are stored in
--- saves: never rename.
-Config.Pets = {
-	{ Id = "Blob", Name = "Слизнячок", Rarity = "Common", Damage = 0.02, Health = 0.03, Shape = "Blob", Color = Color3.fromRGB(110, 235, 120), Size = 1.3 },
-	{ Id = "Bunny", Name = "Ушастик", Rarity = "Common", Damage = 0.02, Health = 0.04, Shape = "Ears", Color = Color3.fromRGB(245, 235, 240), Size = 1.3 },
-	{ Id = "Bat", Name = "Летучая мышка", Rarity = "Uncommon", Damage = 0.03, Health = 0.05, Shape = "Wings", Color = Color3.fromRGB(120, 90, 170), Size = 1.3 },
-	{ Id = "Spark", Name = "Искорка", Rarity = "Rare", Damage = 0.05, Health = 0.06, Shape = "Star", Color = Color3.fromRGB(255, 220, 90), Size = 1.4 },
-	{ Id = "IceFox", Name = "Ледяной лис", Rarity = "Rare", Damage = 0.05, Health = 0.08, Shape = "Ears", Color = Color3.fromRGB(170, 225, 255), Size = 1.5 },
-	{ Id = "Imp", Name = "Бесёнок", Rarity = "Epic", Damage = 0.08, Health = 0.08, Shape = "Horns", Color = Color3.fromRGB(240, 90, 60), Size = 1.5 },
-	{ Id = "Golem", Name = "Мини-голем", Rarity = "Epic", Damage = 0.07, Health = 0.12, Shape = "Crystal", Color = Color3.fromRGB(150, 80, 255), Size = 1.6 },
-	{ Id = "Dragon", Name = "Дракончик Ауры", Rarity = "Legendary", Damage = 0.12, Health = 0.12, Shape = "Wings", Color = Color3.fromRGB(170, 90, 255), Size = 2 },
-	{ Id = "Phoenix", Name = "Феникс", Rarity = "Legendary", Damage = 0.14, Health = 0.14, Shape = "Wings", Color = Color3.fromRGB(255, 150, 40), Size = 2 },
-	{ Id = "AbyssEye", Name = "Око бездны", Rarity = "Mythic", Damage = 0.2, Health = 0.2, Shape = "Eye", Color = Color3.fromRGB(255, 61, 184), Size = 2 },
-}
-Config.PetById = {}
-for order, pet in ipairs(Config.Pets) do
-	pet.Order = order
-	Config.PetById[pet.Id] = pet
-end
-
-Config.PetTiers = {
-	{ Name = "", Multiplier = 1 },
-	{ Name = "Золотой", Multiplier = 1.6, Color = Color3.fromRGB(255, 201, 60) },
-	{ Name = "Радужный", Multiplier = 2.5, Color = Color3.fromRGB(255, 120, 220), Rainbow = true },
-}
-Config.PetMerge = 3 -- equal pets merged into one of the next tier
-Config.PetSlots = 3 -- equipped at once (+ PetSlotsPass with the pass)
-Config.PetSlotsPass = 3
-Config.PetStorage = 100 -- max pets kept
-
--- Eggs: price in Нано-кредиты (Cost) and the weight of each pet. Luck (pass / boost)
--- multiplies the weight of Epic and better pets.
-Config.Eggs = {
-	{ Id = "Basic", Name = "Обычное яйцо", Cost = 150, Color = Color3.fromRGB(240, 235, 225),
-		Pets = { { Id = "Blob", Weight = 45 }, { Id = "Bunny", Weight = 35 }, { Id = "Bat", Weight = 15 }, { Id = "Spark", Weight = 5 } } },
-	{ Id = "Crystal", Name = "Кристальное яйцо", Cost = 2000, Color = Color3.fromRGB(150, 220, 255),
-		Pets = { { Id = "Bat", Weight = 40 }, { Id = "Spark", Weight = 28 }, { Id = "IceFox", Weight = 22 }, { Id = "Imp", Weight = 8 }, { Id = "Dragon", Weight = 2 } } },
-	{ Id = "Abyss", Name = "Яйцо бездны", Cost = 25000, Color = Color3.fromRGB(170, 80, 255),
-		Pets = { { Id = "IceFox", Weight = 35 }, { Id = "Imp", Weight = 28 }, { Id = "Golem", Weight = 22 }, { Id = "Dragon", Weight = 9 }, { Id = "Phoenix", Weight = 5 }, { Id = "AbyssEye", Weight = 1 } } },
-}
-Config.EggById = {}
-for _, egg in ipairs(Config.Eggs) do
-	Config.EggById[egg.Id] = egg
-end
-Config.Hatch = {
-	Seconds = 2.2, -- hatch animation
-	FastSeconds = 0.8, -- with the "Быстрые яйца" pass
-	TripleCount = 3, -- eggs per hatch with the "Открытие 3 яиц" pass
-	LuckFrom = "Epic",
-}
-
 -- Pacing model for tools/pacing.py (not used by the game itself): how a
 -- typical active player plays, and the owner's time targets. The tool
 -- simulates dungeon runs (kills -> XP, credits, materials), crafting and
@@ -663,7 +619,7 @@ Config.Progression = {
 			{ Kind = "Credits", Amount = 250, Weight = 10, Label = "Много кредитов" },
 			{ Kind = "Boost", Minutes = 15, Weight = 16, Label = "x2 Опыт 15 мин" },
 			{ Kind = "Credits", Amount = 50, Weight = 12, Label = "Кредиты" },
-			{ Kind = "Egg", Weight = 6, Label = "Яйцо питомца" },
+			{ Kind = "Credits", Amount = 160, Weight = 6, Label = "Кредиты+++" },
 			{ Kind = "Credits", Amount = 120, Weight = 10, Label = "Кредиты++" },
 			{ Kind = "Boost", Minutes = 30, Weight = 4, Label = "x2 Опыт 30 мин" },
 		},
@@ -830,9 +786,8 @@ Config.Dev = {
 -- All remotes live directly in ReplicatedStorage, created by the server.
 Config.Remotes = {
 	ClickHit = "RemoteEvent", -- C->S (mob or nil) on every attack click; S->C ("Hit"|"Kill"|"Credits", ...)
-	ShopRequest = "RemoteFunction", -- ("Equip", "Weapon"|"Armor", id) | ("Unequip", "Armor", slot) | pets -> ok, message
+	ShopRequest = "RemoteFunction", -- ("Equip", "Weapon"|"Armor", id) | ("Unequip", "Armor", slot) -> ok, message
 	Craft = "RemoteFunction", -- (recipeId) -> ok, message
-	Pets = "RemoteFunction", -- ("Hatch", eggId, triple) | ("Equip"|"Unequip"|"Merge", key) | ("EquipBest") -> ok, message, results
 	Travel = "RemoteFunction", -- ("Hub") | ("Room", n) -> ok, message
 	Notify = "RemoteEvent", -- S->C (text, kind) toast
 	RoomState = "RemoteEvent", -- S->C (room, alive, total) for the player's own run
@@ -1003,7 +958,7 @@ Config.HubLayout = {
 	Portal = { Width = 14, Height = 18, FrameWidth = 5.5, FrameDepth = 5, Curtains = 5, CurtainTransparency = 0.88, SignHeight = 5.4 },
 	Room = { Width = 22, Depth = 22, Height = 16 }, -- temporary side rooms
 	-- Side wall bays (Side: -1 west, 1 east; Z = bay center). Kind:
-	--   Arch = door into a side room (Room: Forge / Egg / Polygon / Store)
+	--   Arch = door into a side room (Room: Forge / Academy / Polygon / Store)
 	--   Board = leaderboard, Wheel = wheel of fortune,
 	--   Bench / Console / Cargo / Pipes / Rack = decor sets.
 	Bays = {
@@ -1012,7 +967,7 @@ Config.HubLayout = {
 		{ Side = -1, Z = -10, Kind = "Board", Board = "Level" },
 		{ Side = 1, Z = -10, Kind = "Board", Board = "Room" },
 		{ Side = -1, Z = -22, Kind = "Arch", Room = "Store" },
-		{ Side = 1, Z = -22, Kind = "Arch", Room = "Egg" },
+		{ Side = 1, Z = -22, Kind = "Arch", Room = "Academy" },
 		{ Side = -1, Z = -34, Kind = "Wheel" },
 		{ Side = 1, Z = -34, Kind = "Rack" },
 		{ Side = -1, Z = -46, Kind = "Arch", Room = "Polygon" },
@@ -1066,8 +1021,8 @@ Config.HubLayout = {
 		ForgeSub = "Крафт оружия и брони",
 		Store = "МАГАЗИН",
 		StoreSub = "Robux",
-		Pets = "ИНКУБАТОР",
-		PetsSub = "Яйца питомцев",
+		Academy = "АКАДЕМИЯ",
+		AcademySub = "Классы: смена и обучение",
 		Wheel = "КОЛЕСО УДАЧИ",
 		WheelFree = "Бесплатное вращение!",
 		Console = "СИСТЕМЫ В НОРМЕ",
@@ -1075,7 +1030,7 @@ Config.HubLayout = {
 	Prompts = {
 		Forge = "Фабрикатор",
 		Store = "Магазин",
-		Egg = "Инкубатор",
+		Academy = "Сменить класс",
 		Wheel = "Крутить",
 	},
 }
@@ -1171,7 +1126,6 @@ Config.Hud = {
 		{ Id = "Forge", Icon = "⚒", Label = "Кузница", Color = Color3.fromRGB(255, 120, 40) },
 		{ Id = "Inventory", Icon = "🎒", Label = "Инвентарь", Color = Color3.fromRGB(70, 140, 255) },
 		{ Id = "Equipment", Icon = "⚔", Label = "Снаряжение", Color = Color3.fromRGB(90, 230, 110) },
-		{ Id = "Pets", Icon = "🐾", Label = "Питомцы", Color = Color3.fromRGB(255, 61, 184) },
 		{ Id = "Reward", Icon = "🎁", Label = "Награда", Color = Color3.fromRGB(255, 201, 60) },
 		{ Id = "Store", Icon = "💎", Label = "Магазин", Color = Color3.fromRGB(46, 200, 255) },
 		{ Id = "Travel", Icon = "🚪", Label = "Телепорт", Color = Color3.fromRGB(70, 60, 190) },

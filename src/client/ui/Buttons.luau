@@ -18,7 +18,6 @@ local Forge = require(script.Parent.Windows.Forge)
 local Inventory = require(script.Parent.Windows.Inventory)
 local Reward = require(script.Parent.Windows.Reward)
 local Settings = require(script.Parent.Windows.Settings)
-local Pets = require(script.Parent.Windows.Pets)
 local Store = require(script.Parent.Windows.Store)
 
 local player = Players.LocalPlayer
@@ -72,7 +71,6 @@ local actions = {
 	Forge = Forge.Open,
 	Inventory = Inventory.Open,
 	Equipment = Equipment.Open,
-	Pets = Pets.Open,
 	Store = function()
 		Store.Open()
 	end,
@@ -119,10 +117,9 @@ local function setBadge(id, visible)
 	end
 end
 local function refreshBadges()
-	setBadge("Pets", Pets.CanHatch() and (player:GetAttribute("EquippedPets") or "") == "")
 	setBadge("Reward", player:GetAttribute("RewardReady") == true)
 end
-for _, attribute in ipairs({ "EquippedPets", "RoomReached", "RewardReady", "Credits" }) do
+for _, attribute in ipairs({ "RoomReached", "RewardReady", "Credits" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshBadges)
 end
 refreshBadges()

@@ -1,7 +1,7 @@
 --[[
 	PlayerData.luau
 	Read-only view of what the server publishes about the local player
-	as attributes (PlayerState.Sync): JSON tables (Materials, Pets) and
+	as attributes (PlayerState.Sync): JSON tables (Materials) and
 	comma lists (owned items, passes). Decoded lazily and cached until
 	the attribute changes.
 ]]

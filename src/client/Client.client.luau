@@ -38,7 +38,6 @@ end
 load(ui, "Style")
 load(ui, "Popups")
 load(windows, "Window")
-load(windows, "Pets") -- waits for leaderstats
 load(windows, "Inventory")
 load(windows, "Forge")
 load(windows, "Equipment")
@@ -55,7 +54,6 @@ load(modules, "PolygonHud")
 load(modules, "LootFx")
 load(modules, "Zone")
 load(modules, "Prompts")
-load(modules, "Cosmetics")
 load(modules, "HubLife")
 load(modules, "ItemFx")
 load(ui, "DevPanel") -- Studio only
