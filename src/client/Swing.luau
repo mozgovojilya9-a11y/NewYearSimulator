@@ -232,13 +232,61 @@ local function watch(character)
 	character.Destroying:Connect(function()
 		swinging[character] = nil
 		variantOf[character] = nil
+		for _, track in pairs(tracks[character] or {}) do
+			track:Stop(0)
+			track:Destroy()
+		end
 		tracks[character] = nil
 		lastSeen[character] = nil
 		active[character] = nil
 	end)
 end
 
+-- Guard against "AnimationTrack limit of 64 tracks exceeded": whatever
+-- plays animations on a rig (default Animate, emotes, owner models), an
+-- Animator never keeps more than MaxTracks playing; the oldest one-shot
+-- tracks are stopped and destroyed first (looped idle/walk survive).
+local MAX_TRACKS = Config.Animations.MaxTracks or 24
+local function guardAnimator(animator: Animator)
+	local order = {} -- tracks in the order they started
+	animator.AnimationPlayed:Connect(function(track)
+		table.insert(order, track)
+		local playing = animator:GetPlayingAnimationTracks()
+		if #playing <= MAX_TRACKS then
+			if #order > MAX_TRACKS * 2 then
+				order = playing -- drop finished ones from the list
+			end
+			return
+		end
+		local excess = #playing - MAX_TRACKS
+		local kept = {}
+		for _, old in ipairs(order) do
+			if excess > 0 and old ~= track and not old.Looped and old.IsPlaying then
+				old:Stop(0)
+				old:Destroy()
+				excess -= 1
+			elseif old.IsPlaying then
+				table.insert(kept, old)
+			end
+		end
+		order = kept
+	end)
+end
+local function guardCharacter(character)
+	local humanoid = character:WaitForChild("Humanoid", 10)
+	local animator = humanoid and humanoid:WaitForChild("Animator", 10)
+	if animator then
+		guardAnimator(animator)
+	end
+end
+
 local function watchPlayer(other)
+	if other.Character then
+		task.spawn(guardCharacter, other.Character)
+	end
+	other.CharacterAdded:Connect(function(character)
+		task.spawn(guardCharacter, character)
+	end)
 	if other.Character then
 		watch(other.Character)
 	end

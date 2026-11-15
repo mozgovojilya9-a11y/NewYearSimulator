@@ -703,6 +703,12 @@ Config.Progression = {
 	},
 }
 
+-- XP needed for the next level at `level` (formula above).
+function Config.XpToNext(level: number): number
+	local l = Config.Progression.Level
+	return math.floor(l.XpBase * math.max(1, level) ^ l.XpExponent)
+end
+
 -- Equipment on the character (visual only). Grip = offset of the weapon
 -- Handle from the hand part.
 Config.Equipment = {
@@ -718,6 +724,7 @@ Config.Equipment = {
 -- and they are played instead, in turn. Never guess ids.
 Config.Animations = {
 	SwingIds = {},
+	MaxTracks = 24, -- an Animator never plays more (Roblox errors at 64)
 	Swing = {
 		WindSeconds = 0.07,
 		StrikeSeconds = 0.08,
@@ -779,15 +786,19 @@ Config.Assets = {
 	},
 	-- How a weapon model is held: Length in studs; GripAt = where the hand
 	-- is, 0 = rear end .. 1 = tip (default: the Tool's Handle, else 0.12);
-	-- Flip = true when the tip and the grip end come out swapped.
+	-- Flip = true when the tip and the grip end come out swapped (checked
+	-- in Studio: swords and spears are fine as they are).
 	WeaponFit = {
 		Weapon_Sword_1 = { Length = 4.6 },
 		Weapon_Sword_2 = { Length = 5 },
 		Weapon_Spear_1 = { Length = 7 },
 		Weapon_Spear_2 = { Length = 7.5 },
-		Weapon_Blaster_1 = { Length = 2.6, GripAt = 0.3 },
-		Weapon_Blaster_2 = { Length = 3, GripAt = 0.3 },
-		Weapon_Blaster_3 = { Length = 3.6, GripAt = 0.3 },
+		-- Gun = held like a pistol: barrel = the Handle's (or longest
+		-- part's) front, top = its top; GripDown = share of the height
+		-- below the center where the hand is.
+		Weapon_Blaster_1 = { Gun = true, Length = 2.6, GripAt = 0.3 },
+		Weapon_Blaster_2 = { Gun = true, Length = 3, GripAt = 0.3 },
+		Weapon_Blaster_3 = { Gun = true, Flip = true, Length = 3.6, GripAt = 0.3 }, -- rifle: muzzle is on its back side
 	},
 	-- Item icons: [item id] = "rbxassetid://..." uploaded by the owner.
 	-- Empty = the icon is rendered from the 3D model (Shared ItemIcon).

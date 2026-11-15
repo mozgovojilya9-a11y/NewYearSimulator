@@ -101,6 +101,46 @@ local function parts(model: Instance): { BasePart }
 end
 Assets.Parts = parts
 
+-- Bounding box in the axes of the model's longest part. Weapons are
+-- often built tilted (a spear lying diagonally); a world-axis box would
+-- then take the box diagonal for the length and hold it crooked.
+local function longestPart(list: { BasePart }): BasePart?
+	local longest, best = nil, 0
+	for _, p in ipairs(list) do
+		local s = p.Size
+		local m = math.max(s.X, s.Y, s.Z)
+		if m > best then
+			longest, best = p, m
+		end
+	end
+	return longest
+end
+
+local function alignedBox(model: Model, reference: BasePart?): (CFrame, Vector3)
+	local list = parts(model)
+	local longest = reference or longestPart(list)
+	if not longest then
+		return model:GetBoundingBox()
+	end
+	local rot = longest.CFrame.Rotation
+	local lo = Vector3.new(math.huge, math.huge, math.huge)
+	local hi = -lo
+	for _, p in ipairs(list) do
+		local half = p.Size / 2
+		for _, sx in ipairs({ -1, 1 }) do
+			for _, sy in ipairs({ -1, 1 }) do
+				for _, sz in ipairs({ -1, 1 }) do
+					local corner = p.CFrame * Vector3.new(half.X * sx, half.Y * sy, half.Z * sz)
+					local v = rot:PointToObjectSpace(corner)
+					lo = lo:Min(v)
+					hi = hi:Max(v)
+				end
+			end
+		end
+	end
+	return rot + rot:PointToWorldSpace((lo + hi) / 2), hi - lo
+end
+
 -- A clean Model clone of GameAssets/<category>/<name>, or nil.
 function Assets.Get(category: string, name: string?): Model?
 	local src = name and source(category, name)
@@ -186,6 +226,47 @@ end
 -- Weapons
 ---------------------------------------------------------------------
 
+-- Guns (fit.Gun): held like a pistol, barrel forward, top up. The axes
+-- come from the authored Handle (Tools) or the longest part: barrel =
+-- its LookVector (muzzle side; fit.Flip swaps), top = its UpVector.
+-- Owner meshes are built this way, a box can't tell top from bottom.
+local function gunHold(model: Model, fit): Model?
+	local ref = model:FindFirstChild("Handle", true)
+	if not (ref and ref:IsA("BasePart")) then
+		ref = longestPart(parts(model))
+	end
+	if not ref then
+		model:Destroy()
+		return nil
+	end
+	local box, size = alignedBox(model, ref)
+	local tipDir = if fit.Flip then -ref.CFrame.LookVector else ref.CFrame.LookVector
+	local up = ref.CFrame.UpVector
+	local length = size.Z
+	if length < 0.1 then
+		model:Destroy()
+		return nil
+	end
+	if ref.Name == "Handle" then
+		ref.Name = "Grip"
+	end
+	local rear = box.Position - tipDir * length / 2
+	local gripPoint = rear + tipDir * ((fit.GripAt or 0.3) * length) - up * (size.Y * (fit.GripDown or 0.2))
+	local handle = Instance.new("Part")
+	handle.Name = "Handle"
+	handle.Size = Vector3.new(0.3, 0.8, 0.3)
+	handle.Transparency = 1
+	handle.CFrame = CFrame.fromMatrix(gripPoint, tipDir:Cross(up).Unit, tipDir)
+	handle.Parent = model
+	model.PrimaryPart = handle
+	setAll(model, { Anchored = false, CanCollide = false, CanQuery = false, CanTouch = false, Massless = true })
+	if fit.Length and fit.Length > 0 then
+		model:ScaleTo(model:GetScale() * fit.Length / length)
+	end
+	weldTo(model, handle)
+	return model
+end
+
 -- fit: { Length = studs, GripAt = 0..1 from the rear end (optional),
 --        Flip = true to swap the tip and the grip end }
 -- Returns a Model whose PrimaryPart is a new invisible "Handle" at the grip,
@@ -196,7 +277,10 @@ function Assets.Weapon(name: string, fit): Model?
 		return nil
 	end
 	fit = fit or {}
-	local box, size = model:GetBoundingBox()
+	if fit.Gun then
+		return gunHold(model, fit)
+	end
+	local box, size = alignedBox(model)
 	-- longest axis of the box = the weapon's length
 	local axes = { { box.RightVector, size.X }, { box.UpVector, size.Y }, { box.LookVector, size.Z } }
 	table.sort(axes, function(a, b)
