@@ -57,7 +57,7 @@ end
 
 local function place(parent, def, center: Vector3)
 	local pos = center + def.Offset + Vector3.new(0, 0.4, 0)
-	local cf = CFrame.lookAt(pos, pos + Vector3.new(1, 0, 0)) -- faces the avenue (+X)
+	local cf = CFrame.lookAt(pos, pos + (Config.HubLayout.Polygon.Facing or Vector3.new(0, 0, 1))) -- faces into the hall
 	local height = P.DummyHeight * (if def.Big then P.BigScale else 1)
 	local model = Assets.Prop(def.Kind, height)
 	if model then

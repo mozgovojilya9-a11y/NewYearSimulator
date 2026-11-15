@@ -19,6 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local DataService = require(script.Parent.DataService)
+local GameEvents = require(script.Parent.GameEvents)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
 local Remotes = require(script.Parent.Remotes)
@@ -78,6 +79,7 @@ local function choose(player, data, classId)
 	data.Class = classId
 	PlayerState.ClassRecord(data, classId)
 	PlayerState.Sync(player)
+	GameEvents.Fire(player, "Class", 1)
 	if ClassService.OnChosen then
 		ClassService.OnChosen(player, classId, first)
 	end
@@ -105,6 +107,7 @@ local function learn(player, data, nodeId)
 		end
 	end
 	PlayerState.Sync(player)
+	GameEvents.Fire(player, "Learn", 1)
 	if ClassService.OnLearned then
 		ClassService.OnLearned(player, node)
 	end

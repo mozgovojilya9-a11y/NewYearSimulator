@@ -16,6 +16,7 @@ local Forge = require(script.Parent.ui.Windows.Forge)
 local Store = require(script.Parent.ui.Windows.Store)
 local Reward = require(script.Parent.ui.Windows.Reward)
 local ClassSelect = require(script.Parent.ui.ClassSelect)
+local Dialog = require(script.Parent.ui.Windows.Dialog)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -23,13 +24,34 @@ local playerGui = player:WaitForChild("PlayerGui")
 local Prompts = {}
 
 local ACTIONS = {
-	OpenForge = Forge.Open,
+	OpenForge = function()
+		Forge.Open()
+	end,
 	OpenStore = function()
 		Store.Open()
 	end,
-	Wheel = Reward.OpenWheel,
+	Wheel = function()
+		Reward.OpenWheel()
+	end,
 	OpenClasses = function()
 		ClassSelect.Open(true)
+	end,
+	-- NPC: the mentor opens the story dialog, the gate keeper the daily quests
+	Talk = function(prompt)
+		local npc = prompt:GetAttribute("Npc")
+		if npc == "GateKeeper" then
+			Reward.OpenQuests()
+			return
+		end
+		local ok, payload = pcall(function()
+			return ReplicatedStorage:WaitForChild("Quest"):InvokeServer("Talk", npc)
+		end)
+		if ok and type(payload) == "table" then
+			Dialog.Open(payload)
+		end
+	end,
+	Train = function(prompt)
+		ReplicatedStorage:WaitForChild("Training"):FireServer("Start", prompt:GetAttribute("Index"))
 	end,
 }
 
@@ -158,7 +180,7 @@ end)
 ProximityPromptService.PromptTriggered:Connect(function(prompt)
 	local action = ACTIONS[prompt:GetAttribute("Action")]
 	if action then
-		action()
+		action(prompt)
 	end
 end)
 

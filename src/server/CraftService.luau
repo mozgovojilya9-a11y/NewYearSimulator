@@ -15,6 +15,7 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local DataService = require(script.Parent.DataService)
+local GameEvents = require(script.Parent.GameEvents)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
 local Remotes = require(script.Parent.Remotes)
@@ -93,6 +94,7 @@ local function craft(player, recipeId)
 	PlayerState.Sync(player)
 	task.spawn(DataService.Save, player) -- crafted gear is precious: save right away
 	flare()
+	GameEvents.Fire(player, "Craft", 1)
 	return true, Texts.Done:format(item.Name)
 end
 

@@ -31,6 +31,7 @@ Config.StartingData = {
 	Xp = 0,
 	SkillPoints = 0, -- old field (points are now Config.Skills.PointsAtLevel per class)
 	Class = "", -- "" until the player picks one (class selection screen)
+	Story = { Step = 1, Count = 0, Seen = 0 }, -- mentor chain: current step, progress counter, step already heard
 	Classes = {}, -- [classId] = { Skills = { [nodeId] = rank }, Loadout = { Q = nodeId, ... }, Resets = n }
 	Boosts = { Xp = 0, Damage = 0, Loot = 0, Credits = 0 }, -- timed x2 boosts: os.time() they end
 	LastSeen = 0, -- os.time() of the last save
@@ -1117,6 +1118,8 @@ Config.Remotes = {
 	LevelUp = "RemoteEvent", -- S->C (level, skillPoints gained) big "Новый уровень!" banner
 	Class = "RemoteFunction", -- ("Choose", classId) | ("Learn", nodeId) | ("Reset") | ("Equip", slot, nodeId|nil) -> ok, message
 	Ability = "RemoteEvent", -- C->S ("Use", slot, aim) | ("Dash", direction) | ("Block", on) | ("Charge"); S->C ("Dash", direction, distance, seconds); S->all ("Fx", kind, ...)
+	Quest = "RemoteFunction", -- ("Talk", npcId) -> dialog payload | ("Claim") -> ok, message
+	Training = "RemoteEvent", -- C->S ("Start", stationIndex) | ("Stop"); S->C ("Gain", xp)
 }
 
 ---------------------------------------------------------------------
@@ -1233,41 +1236,60 @@ Config.Lighting = {
 -- VISUAL: hub layout
 ---------------------------------------------------------------------
 
--- Hub "Атриум Нано-Цитадели": a closed hall (walls, ceiling, a glass
--- skylight on steel trusses), arches into the side rooms, the Gates at
--- the far end. Offsets are from the SpawnLocation (ground level); north
--- is -Z (spawn -> gates), east is +X. Top view:
+-- Hub "Нано-Цитадель" after the owner's plan docs/design/hub_plan.png.
+-- Offsets from the SpawnLocation (ground level); north is -Z, east +X.
+-- Rects are { X0, X1, Z0, Z1 } (X0 < X1, Z0 > Z1: south edge first).
 --
---              [========= ВРАТА =========]          north wall
---   Полигон  [ |                            | ]  Фабрикатор
---   (wheel)    |        (free center)       |  (rack)
---   Магазин  [ |                            | ]  Академия
---   (board)    |                            |  (board)
---              [====== вход · SPAWN ======]          south wall
+--                [ 7 ЗАЛ ВРАТ ]                     north
+--   [ 5 ]  8 ┌──────────────────────┐ 9   [ 6 ФАБРИКАТОР ]
+--   ТРЕНИ-   │   2 АТРИУМ, 2 яруса,  │
+--   РОВОЧ-   │   мост, лестницы      │      [ 4 АКАДЕМИЯ ]
+--   НЫЙ      └──────────┬───────────┘
+--                  [ 1 СПАВН ] 3 Наставник           south
 --
--- The side rooms behind the arches are temporary compact rooms that keep
--- the stations working (their full halls come later).
+-- Every hall has its own colors (Theme), central object and decor groups
+-- along the walls and in the corners; the middle and the paths stay free.
 Config.HubLayout = {
 	Name = "Нано-Цитадель",
-	Hall = {
-		Width = 60, -- X, inner
-		Length = 80, -- Z, inner (south wall -> north wall)
-		Height = 32, -- floor -> ceiling
-		SouthZ = 8, -- inner face of the south wall (spawn is at 0)
-		WallThickness = 2,
-		Bay = 12, -- pilaster spacing on the side walls
-		FloorTile = 8,
-		Skylight = { HalfWidth = 18, FromZ = -4, ToZ = -64, Mullion = 4, Purlin = 6 },
-		TrussDepth = 3,
-		PendantX = { -12, 12 }, -- pendant lamps on every truss
+	WallThickness = 2,
+	Pilaster = 12, -- pilasters on the walls every N studs
+	Halls = {
+		Spawn = { Rect = { -20, 20, 15, -15 }, Height = 20, Theme = "Spawn", Name = "СПАВН" },
+		Atrium = { Rect = { -100, 100, -15, -165 }, Height = 34, Theme = "Atrium", Name = "АТРИУМ" },
+		Gates = { Rect = { -60, 60, -165, -220 }, Height = 42, Theme = "Gates", Name = "ЗАЛ ВРАТ" },
+		Training = { Rect = { -180, -100, -30, -150 }, Height = 22, Theme = "Training", Name = "ТРЕНИРОВОЧНЫЙ ЗАЛ" },
+		Forge = { Rect = { 100, 162, -100, -165 }, Height = 24, Theme = "Forge", Name = "ФАБРИКАТОР" },
+		Academy = { Rect = { 100, 162, -15, -76 }, Height = 22, Theme = "Academy", Name = "АКАДЕМИЯ КЛАССОВ" },
 	},
-	-- Hall colors (materials: Concrete / Metal / DiamondPlate / Glass).
+	-- Wide arches between halls (on the atrium walls): side + center.
+	Doors = {
+		{ Side = "S", At = 0, Width = 20, Height = 14, To = "Spawn" },
+		{ Side = "N", At = 0, Width = 24, Height = 18, To = "Gates" },
+		{ Side = "W", At = -45, Width = 18, Height = 14, To = "Training" },
+		{ Side = "E", At = -43, Width = 18, Height = 14, To = "Academy" },
+		{ Side = "E", At = -135, Width = 18, Height = 14, To = "Forge" },
+	},
+	-- Atrium: balcony (2nd level) along the walls, a bridge across, stairs.
+	Balcony = { Height = 22, Depth = 22, Column = 12 },
+	Bridge = { Z = -90, Width = 12 },
+	Stairs = { { X = -42, Z0 = -46 }, { X = 42, Z0 = -46 }, { X = -42, Z0 = -134 }, { X = 42, Z0 = -134 } }, -- foot of each stair -> the bridge (2 from the south, 2 from the north)
+	StairWidth = 8,
+	Skylight = { Rect = { -60, 60, -40, -140 }, Mullion = 5, Truss = 12 },
+	-- Hall colors. Accent = thin light strips and signs, Light = lamps.
+	Themes = {
+		Spawn = { Floor = Color3.fromRGB(70, 68, 84), Wall = Color3.fromRGB(122, 116, 140), Accent = Color3.fromRGB(170, 150, 255), Light = Color3.fromRGB(235, 228, 255) },
+		Atrium = { Floor = Color3.fromRGB(84, 82, 82), Wall = Color3.fromRGB(150, 143, 134), Accent = Color3.fromRGB(46, 230, 255), Light = Color3.fromRGB(255, 226, 190) },
+		Gates = { Floor = Color3.fromRGB(46, 70, 72), Wall = Color3.fromRGB(80, 118, 120), Accent = Color3.fromRGB(40, 230, 200), Light = Color3.fromRGB(200, 255, 245) },
+		Training = { Floor = Color3.fromRGB(88, 62, 46), Wall = Color3.fromRGB(150, 108, 76), Accent = Color3.fromRGB(255, 140, 50), Light = Color3.fromRGB(255, 210, 160) },
+		Forge = { Floor = Color3.fromRGB(64, 40, 40), Wall = Color3.fromRGB(112, 66, 62), Accent = Color3.fromRGB(255, 80, 60), Light = Color3.fromRGB(255, 180, 130) },
+		Academy = { Floor = Color3.fromRGB(86, 74, 42), Wall = Color3.fromRGB(160, 136, 84), Accent = Color3.fromRGB(255, 201, 60), Light = Color3.fromRGB(255, 232, 180) },
+	},
+	-- AI-generated MaterialVariants (MaterialService, made in Studio);
+	-- missing names simply fall back to the base material.
+	Materials = { Floor = "NanoFloor", Wall = "NanoWall", ForgeFloor = "NanoFloor" }, -- the AI "ForgeFloor" looked like lava camo: off
+	-- Shared colors of the structure.
 	Colors = {
-		Floor = Color3.fromRGB(86, 84, 82),
-		Runner = Color3.fromRGB(62, 61, 62),
-		Paint = Color3.fromRGB(176, 140, 62), -- floor markings (painted, not glowing)
-		WallSlab = Color3.fromRGB(104, 100, 96),
-		WallPanel = Color3.fromRGB(152, 144, 134),
+		Paint = Color3.fromRGB(176, 140, 62),
 		Dado = Color3.fromRGB(54, 52, 52),
 		Steel = Color3.fromRGB(92, 92, 96),
 		Beam = Color3.fromRGB(60, 60, 64),
@@ -1275,90 +1297,214 @@ Config.HubLayout = {
 		Glass = Color3.fromRGB(190, 212, 226),
 		Tunnel = Color3.fromRGB(10, 12, 18),
 		Screen = Color3.fromRGB(16, 22, 30),
+		Runner = Color3.fromRGB(62, 61, 62),
 	},
-	Lamp = { Range = 26, Brightness = 1.8, Angle = 120 }, -- pilaster lamps (warm)
-	Pendant = { Range = 32, Brightness = 1.2, Drop = 4 },
-	Arch = { Width = 10, Height = 12 },
-	Entrance = { Width = 10, Height = 12 },
-	Portal = { Width = 14, Height = 18, FrameWidth = 5.5, FrameDepth = 5, Curtains = 5, CurtainTransparency = 0.88, SignHeight = 5.4 },
-	Room = { Width = 22, Depth = 22, Height = 16 }, -- temporary side rooms
-	-- Side wall bays (Side: -1 west, 1 east; Z = bay center). Kind:
-	--   Arch = door into a side room (Room: Forge / Academy / Polygon / Store)
-	--   Board = leaderboard, Wheel = wheel of fortune,
-	--   Bench / Console / Cargo / Pipes / Rack = decor sets.
-	Bays = {
-		{ Side = -1, Z = 2, Kind = "Bench" },
-		{ Side = 1, Z = 2, Kind = "Bench" },
-		{ Side = -1, Z = -10, Kind = "Board", Board = "Level" },
-		{ Side = 1, Z = -10, Kind = "Board", Board = "Room" },
-		{ Side = -1, Z = -22, Kind = "Arch", Room = "Store" },
-		{ Side = 1, Z = -22, Kind = "Arch", Room = "Academy" },
-		{ Side = -1, Z = -34, Kind = "Wheel" },
-		{ Side = 1, Z = -34, Kind = "Rack" },
-		{ Side = -1, Z = -46, Kind = "Arch", Room = "Polygon" },
-		{ Side = 1, Z = -46, Kind = "Arch", Room = "Forge" },
-		{ Side = -1, Z = -58, Kind = "Console" },
-		{ Side = 1, Z = -58, Kind = "Console" },
-		{ Side = -1, Z = -68, Kind = "Cargo" },
-		{ Side = 1, Z = -68, Kind = "Pipes" },
+	Lamp = { Range = 26, Brightness = 1.8, Angle = 120 },
+	Pendant = { Range = 34, Brightness = 1.2, Drop = 4 },
+	Portal = { Width = 20, Height = 26, FrameWidth = 7, FrameDepth = 6, Curtains = 5, CurtainTransparency = 0.86, SignHeight = 6 },
+	-- Decor groups (plan squares): hall, Kind, offset from the hall's
+	-- corner ("SW", "NE", ...) or a wall point { Side, At }.
+	Decor = {
+		{ Hall = "Spawn", Wall = "W", At = 0, Kind = "Bench" },
+		{ Hall = "Spawn", Corner = "SW", Kind = "Plant" },
+		{ Hall = "Spawn", Corner = "SE", Kind = "Plant" },
+		{ Hall = "Atrium", Corner = "SW", Kind = "Cargo" },
+		{ Hall = "Atrium", Corner = "SE", Kind = "Cargo" },
+		{ Hall = "Atrium", Corner = "NW", Kind = "Pipes" },
+		{ Hall = "Atrium", Corner = "NE", Kind = "Pipes" },
+		{ Hall = "Atrium", Wall = "S", At = -40, Kind = "Bench" },
+		{ Hall = "Atrium", Wall = "S", At = 40, Kind = "Bench" },
+		{ Hall = "Atrium", Wall = "S", At = -70, Kind = "Console" },
+		{ Hall = "Atrium", Wall = "S", At = 70, Kind = "Console" },
+		{ Hall = "Atrium", Wall = "W", At = -80, Kind = "Rack" },
+		{ Hall = "Atrium", Wall = "W", At = -105, Kind = "Bench" },
+		{ Hall = "Atrium", Wall = "W", At = -130, Kind = "Console" },
+		{ Hall = "Atrium", Wall = "E", At = -80, Kind = "Bench" },
+		{ Hall = "Atrium", Wall = "E", At = -100, Kind = "Rack" },
+		{ Hall = "Gates", Corner = "NW", Kind = "Plant" },
+		{ Hall = "Gates", Corner = "NE", Kind = "Plant" },
+		{ Hall = "Gates", Corner = "SW", Kind = "Console" },
+		{ Hall = "Gates", Corner = "SE", Kind = "Console" },
+		{ Hall = "Training", Corner = "NW", Kind = "Plant" },
+		{ Hall = "Training", Corner = "SW", Kind = "Plant" },
+		{ Hall = "Training", Wall = "W", At = -90, Kind = "Rack" },
+		{ Hall = "Forge", Corner = "SW", Kind = "Cargo" },
+		{ Hall = "Forge", Corner = "NW", Kind = "Rack" },
+		{ Hall = "Forge", Corner = "SE", Kind = "Pipes" },
+		{ Hall = "Academy", Corner = "SW", Kind = "Plant" },
+		{ Hall = "Academy", Corner = "SE", Kind = "Plant" },
+		{ Hall = "Academy", Corner = "NE", Kind = "Plant" },
+		{ Hall = "Academy", Wall = "S", At = 131, Kind = "Bench" },
 	},
-	-- End wall bays (X = bay center).
-	NorthBays = { { X = -21, Kind = "Pipes" }, { X = 21, Kind = "Cargo" } },
-	SouthBays = { { X = -12, Kind = "Bench" }, { X = 12, Kind = "Bench" }, { X = -24, Kind = "Rack" }, { X = 24, Kind = "Console" } },
-	SouthPilasters = { -18, 18 },
-	-- Decor scale: everything next to the player is human-sized.
-	CrateSize = 3,
-	BarrelHeight = 3.2,
-	CanisterHeight = 2.6,
-	PipesHeight = 8,
-
-	-- Polygon room: dummies (PolygonService). Offsets from the room center,
-	-- they face the entrance (+X).
+	Leaderboards = { -- on the atrium north wall, either side of the Gate hall arch
+		{ Kind = "Level", Title = "Топ уровней", At = -42 },
+		{ Kind = "Room", Title = "Глубже всех в данже", At = -66 },
+	},
+	QuestBoard = { At = 42 }, -- 9: board + the Смотритель Врат NPC
+	Mentor = { Offset = Vector3.new(13, 0, -8), Face = Vector3.new(0, 0, 4) }, -- 3: next to the spawn, facing it
+	GateKeeper = { Offset = Vector3.new(54, 0, -150) },
+	-- Training hall stations (2 rows along the long walls) and the dummies.
+	TrainingRows = { X = { -168, -112 }, Z0 = -64, Step = 17 },
 	Polygon = {
+		Center = Vector3.new(-140, 0, -135),
 		Dummies = {
-			{ Offset = Vector3.new(-6, 0, -7), Kind = "Trainer_Dummy" },
-			{ Offset = Vector3.new(-6, 0, 7), Kind = "Trainer_Dummy" },
-			{ Offset = Vector3.new(1, 0, -5), Kind = "Trainer_Bag" },
-			{ Offset = Vector3.new(1, 0, 5), Kind = "Trainer_Bag" },
-			{ Offset = Vector3.new(-7, 0, 0), Kind = "Trainer_Dummy", Big = true },
+			{ Offset = Vector3.new(-8, 0, 0), Kind = "Trainer_Dummy" },
+			{ Offset = Vector3.new(0, 0, 0), Kind = "Trainer_Dummy", Big = true },
+			{ Offset = Vector3.new(8, 0, 0), Kind = "Trainer_Bag" },
+		},
+		Facing = Vector3.new(0, 0, 1), -- dummies face south (into the hall)
+	},
+	-- First path of a new player (plan's yellow dashes): waypoints the floor
+	-- guide follows from the spawn into each hall (client QuestGuide).
+	Waypoints = {
+		Spawn = Vector3.new(0, 0, 0),
+		AtriumSouth = Vector3.new(0, 0, -30),
+		AtriumCenter = Vector3.new(0, 0, -90),
+		AtriumNorth = Vector3.new(0, 0, -150),
+		TrainingDoor = Vector3.new(-104, 0, -45),
+		AcademyDoor = Vector3.new(104, 0, -43),
+		ForgeDoor = Vector3.new(104, 0, -135),
+		GatesDoor = Vector3.new(0, 0, -168),
+	},
+	-- Floor guide (plan's yellow dashes): gold chevrons on the floor from
+	-- the player along the route to the story quest's place (client
+	-- QuestGuide). Points are offsets from the spawn, walked in order.
+	Guide = {
+		Step = 4, -- studs between chevrons
+		Max = 36, -- chevrons drawn at most
+		Speed = 3, -- studs per second they crawl forward
+		Color = Color3.fromRGB(255, 201, 60),
+		Routes = {
+			Mentor = { Vector3.new(0, 0, 0), Vector3.new(10, 0, -5) },
+			Academy = { Vector3.new(0, 0, 0), Vector3.new(0, 0, -30), Vector3.new(0, 0, -44), Vector3.new(104, 0, -44), Vector3.new(118, 0, -44) },
+			Training = { Vector3.new(0, 0, 0), Vector3.new(0, 0, -30), Vector3.new(0, 0, -44), Vector3.new(-104, 0, -44), Vector3.new(-120, 0, -44) },
+			Forge = { Vector3.new(0, 0, 0), Vector3.new(0, 0, -30), Vector3.new(0, 0, -44), Vector3.new(88, 0, -44), Vector3.new(88, 0, -135), Vector3.new(104, 0, -135), Vector3.new(116, 0, -135) },
+			Gates = { Vector3.new(0, 0, 0), Vector3.new(0, 0, -30), Vector3.new(0, 0, -150), Vector3.new(0, 0, -168), Vector3.new(0, 0, -200) },
 		},
 	},
-	Leaderboards = {
-		Level = "Топ уровней",
-		Room = "Глубже всех в данже",
-	},
-	-- Wall screens of the decor sets (one line each, cycled).
 	Screens = {
 		{ Title = "ЦИТАДЕЛЬ · СТАТУС", Line = "Энергосеть: норма" },
 		{ Title = "НАНО-ФАБРИКА", Line = "Активность роботов растёт" },
 		{ Title = "ВРАТА", Line = "Канал в подземелье открыт" },
 		{ Title = "ФАБРИКАТОР", Line = "Материалы в снаряжение" },
 	},
-
+	CrateSize = 3,
+	BarrelHeight = 3.2,
+	CanisterHeight = 2.6,
+	PipesHeight = 8,
+	-- Owner / AI-generated models (GameAssets/Props); procedural if missing.
+	Models = {
+		Mentor = "NPC_Mentor",
+		GateKeeper = "NPC_GateKeeper",
+		ForgeCore = "Prop_ForgeCore",
+		Stations = { Power = "Station_Power", Dummy = "Station_Dummy", Gravity = "Station_Gravity", Laser = "Station_Laser" },
+	},
 	Texts = {
 		Title = "НАНО-ЦИТАДЕЛЬ",
-		TitleSub = "Атриум",
+		TitleSub = "Добро пожаловать",
 		Portal = "ВРАТА",
 		PortalSub = "Подземелье · Нано-фабрика",
-		Polygon = "ПОЛИГОН",
+		Polygon = "МАНЕКЕНЫ",
 		PolygonSub = "Проверь урон и комбо",
 		Forge = "ФАБРИКАТОР",
 		ForgeSub = "Крафт оружия и брони",
-		Store = "МАГАЗИН",
-		StoreSub = "Robux",
+		Training = "ТРЕНИРОВОЧНЫЙ ЗАЛ",
+		TrainingSub = "Станции: опыт за тренировку",
 		Academy = "АКАДЕМИЯ",
 		AcademySub = "Классы: смена и обучение",
+		Gates = "ЗАЛ ВРАТ",
+		GatesSub = "Режимы и подземелье",
+		QuestBoard = "ЗАДАНИЯ",
+		QuestBoardSub = "Ежедневные · у Смотрителя",
+		Console = "СИСТЕМЫ В НОРМЕ",
 		Wheel = "КОЛЕСО УДАЧИ",
 		WheelFree = "Бесплатное вращение!",
-		Console = "СИСТЕМЫ В НОРМЕ",
 	},
 	Prompts = {
 		Forge = "Фабрикатор",
-		Store = "Магазин",
 		Academy = "Сменить класс",
-		Wheel = "Крутить",
+		Talk = "Поговорить",
+		Board = "Задания",
+		Train = "Тренироваться",
 	},
 }
+
+-- Training hall stations: E to start, a panel with "Выйти", the station
+-- animation; a little XP every Tick seconds (Xp x player level), stronger
+-- stations open by level. XP from training is smaller than from fights.
+Config.Training = {
+	Tick = 3,
+	MaxDistance = 8, -- moving away ends the session
+	Stations = {
+		{ Id = "Power", Name = "Силовой стенд", Icon = "chevron", Level = 1, Xp = 2, Count = 2 },
+		{ Id = "Dummy", Name = "Робот-манекен", Icon = "sword", Level = 5, Xp = 3, Count = 2 },
+		{ Id = "Gravity", Name = "Гравиплатформа", Icon = "vortex", Level = 12, Xp = 4, Count = 2 },
+		{ Id = "Laser", Name = "Лазерный тир", Icon = "target", Level = 20, Xp = 5, Count = 2 },
+	},
+	Texts = {
+		Locked = "Откроется на %d уровне",
+		Panel = "Тренировка: %s",
+		Exit = "Выйти",
+		Gain = "+%d XP за тренировку",
+		Busy = "Станция занята",
+		Hint = "Опыт каждые %d с",
+	},
+}
+
+-- NPCs (name plate + "Поговорить"). The mentor runs the story chain
+-- (Config.Quests.Story), the gate keeper the daily quests.
+Config.Npcs = {
+	Mentor = { Name = "Наставник Арк", Title = "Наставник", Color = Color3.fromRGB(46, 230, 255) },
+	GateKeeper = { Name = "Смотритель Врат", Title = "Ежедневные задания", Color = Color3.fromRGB(40, 230, 200) },
+}
+
+-- The mentor's story chain: leads a new player through every system
+-- (plan's first path: spawn -> mentor -> academy -> training -> forge ->
+-- gates). Kind: Class (pick a class), Train (training sessions), Kill,
+-- Learn (skill ranks), Loot (materials picked up), Craft, Boss, Room
+-- (record room), Level. Target = waypoint / place the floor guide leads to.
+-- Rewards: XP x player level and credits, on talking to the mentor.
+Config.Quests = {
+	Story = {
+		{ Id = "class", Title = "Выбери свой путь", Text = "Выбери класс в Академии классов.", Kind = "Class", Target = 1, Place = "Academy", Xp = 30, Credits = 40,
+			Talk = "Добро пожаловать в Нано-Цитадель! Первым делом выбери свой путь: Клинок, Импульс или Стрелок. Академия — на востоке атриума." },
+		{ Id = "train", Title = "Разминка", Text = "Потренируйся на станции в Тренировочном зале.", Kind = "Train", Target = 1, Place = "Training", Xp = 30, Credits = 40,
+			Talk = "Отлично! Теперь разомнись: в Тренировочном зале на западе станции дают опыт." },
+		{ Id = "kill", Title = "Первый бой", Text = "Победи 5 роботов в подземелье.", Kind = "Kill", Target = 5, Place = "Gates", Xp = 40, Credits = 60,
+			Talk = "Пора в бой. Врата на севере ведут в Нано-фабрику. Победи пятерых роботов." },
+		{ Id = "learn", Title = "Первое очко навыка", Text = "Изучи навык в дереве навыков [K].", Kind = "Learn", Target = 1, Xp = 40, Credits = 60,
+			Talk = "За уровни ты получаешь очки навыков. Открой дерево навыков [K] и изучи первый приём." },
+		{ Id = "loot", Title = "Добыча", Text = "Подбери 8 материалов с роботов (удерживай E).", Kind = "Loot", Target = 8, Place = "Gates", Xp = 50, Credits = 80,
+			Talk = "Роботы роняют материалы. Подходи и удерживай E, чтобы подобрать." },
+		{ Id = "craft", Title = "Первый крафт", Text = "Создай предмет в Фабрикаторе.", Kind = "Craft", Target = 1, Place = "Forge", Xp = 60, Credits = 100,
+			Talk = "Из материалов делают снаряжение. Фабрикатор — на северо-востоке." },
+		{ Id = "boss", Title = "Первый босс", Text = "Победи босса на 5-м этапе.", Kind = "Boss", Target = 1, Place = "Gates", Xp = 80, Credits = 150,
+			Talk = "Каждый 5-й этап — босс. Покажи ему, на что способен твой класс." },
+		{ Id = "room7", Title = "Глубже", Text = "Дойди до 7-го этапа.", Kind = "Room", Target = 7, Place = "Gates", Xp = 90, Credits = 180,
+			Talk = "Дальше — Криолаборатория. Дойди до 7-го этапа." },
+		{ Id = "skills5", Title = "Сборка", Text = "Вложи 5 очков в дерево навыков.", Kind = "Learn", Target = 5, Xp = 90, Credits = 180,
+			Talk = "Собери свою сборку: вложи пять очков в навыки." },
+		{ Id = "level10", Title = "Оператор", Text = "Достигни 10-го уровня.", Kind = "Level", Target = 10, Xp = 100, Credits = 220,
+			Talk = "Звание Оператора — на 10-м уровне. Продолжай!" },
+		{ Id = "room10", Title = "Второй босс", Text = "Дойди до 10-го этапа.", Kind = "Room", Target = 10, Place = "Gates", Xp = 120, Credits = 300,
+			Talk = "На 10-м этапе ждёт следующий босс." },
+		{ Id = "craft3", Title = "Арсенал", Text = "Создай 3 предмета в Фабрикаторе.", Kind = "Craft", Target = 3, Place = "Forge", Xp = 120, Credits = 300,
+			Talk = "Сильное снаряжение — главный источник силы. Создай ещё три предмета." },
+		{ Id = "room15", Title = "Сердце реактора", Text = "Дойди до 15-го этапа.", Kind = "Room", Target = 15, Place = "Gates", Xp = 160, Credits = 500,
+			Talk = "Плавильный реактор горяч. Дойди до 15-го этапа." },
+		{ Id = "level30", Title = "Страж", Text = "Достигни 30-го уровня.", Kind = "Level", Target = 30, Xp = 200, Credits = 800,
+			Talk = "Страж Цитадели — 30-й уровень. Ты почти легенда." },
+	},
+	Done = "Все задания Наставника выполнены. Ежедневные задания — у Смотрителя Врат.",
+	Ready = "Задание выполнено! Вернись к Наставнику.",
+	ReadyTalk = "Отлично, задание выполнено! Держи награду — и сразу дам следующее.",
+	Texts = { Accept = "Принять", Claim = "Получить награду", Later = "Позже", Close = "Закрыть", Reward = "Награда: %s XP, %s кр." },
+}
+Config.QuestById = {}
+for index, q in ipairs(Config.Quests.Story) do
+	q.Index = index
+	Config.QuestById[q.Id] = q
+end
 
 ---------------------------------------------------------------------
 -- VISUAL: dungeon look

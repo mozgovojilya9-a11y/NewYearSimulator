@@ -28,6 +28,8 @@ local MobAI = require(script.Parent.MobAI)
 local Passes = require(script.Parent.Passes)
 local PlayerState = require(script.Parent.PlayerState)
 local PolygonService = require(script.Parent.PolygonService)
+local QuestService = require(script.Parent.QuestService)
+local TrainingService = require(script.Parent.TrainingService)
 local ProgressionService = require(script.Parent.ProgressionService)
 local Remotes = require(script.Parent.Remotes)
 local ShopService = require(script.Parent.ShopService)
@@ -85,6 +87,8 @@ start("TravelService", TravelService.Init, hub)
 start("EquipmentService", EquipmentService.Init)
 start("ProgressionService", ProgressionService.Init)
 start("LootService", LootService.Init) -- after ProgressionService: both listen to kills
+start("QuestService", QuestService.Init) -- mentor story chain (listens to GameEvents)
+start("TrainingService", TrainingService.Init, hub)
 start("DevService", DevService.Init) -- Studio only
 
 local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)

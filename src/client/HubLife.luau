@@ -74,7 +74,7 @@ local function add(kind: string, instance: Instance)
 	entries[instance] = entry
 end
 
-for _, kind in ipairs({ "Spin", "Bob", "Flicker", "Pulse", "Drone" }) do
+for _, kind in ipairs({ "Spin", "Bob", "Flicker", "Pulse", "Drone", "Conveyor" }) do
 	for _, instance in ipairs(CollectionService:GetTagged(kind)) do
 		add(kind, instance)
 	end
@@ -129,6 +129,12 @@ RunService.RenderStepped:Connect(function()
 			else
 				setPivot(instance, CFrame.new(base.Position) * axis(angle) * base.Rotation)
 			end
+		elseif kind == "Conveyor" then
+			-- slides along its own -Z (look) and wraps after Length studs
+			local length = instance:GetAttribute("Length") or 20
+			local speed = instance:GetAttribute("Speed") or 3
+			local d = ((t * speed) + (instance:GetAttribute("Start") or 0)) % length
+			setPivot(instance, e.base * CFrame.new(0, 0, -d))
 		elseif kind == "Bob" then
 			local amp = instance:GetAttribute("Amplitude") or 0.5
 			local period = instance:GetAttribute("Period") or 3

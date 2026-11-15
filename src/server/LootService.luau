@@ -21,6 +21,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local DungeonGenerator = require(script.Parent.DungeonGenerator)
 local DungeonRuns = require(script.Parent.DungeonRuns)
+local GameEvents = require(script.Parent.GameEvents)
 local PlayerState = require(script.Parent.PlayerState)
 local StatService = require(script.Parent.StatService)
 local RateLimit = require(script.Parent.RateLimit)
@@ -155,6 +156,7 @@ local function pickUp(player, id)
 		run.loot[drop.material] = (run.loot[drop.material] or 0) + 1
 	end
 	Remotes.Get("Loot"):FireClient(player, "Picked", id, drop.material, total)
+	GameEvents.Fire(player, "Loot", 1)
 end
 
 -- Removes every drop of a player (run ended / left the game).

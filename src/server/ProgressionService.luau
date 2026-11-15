@@ -21,6 +21,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local DataService = require(script.Parent.DataService)
+local GameEvents = require(script.Parent.GameEvents)
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
@@ -145,6 +146,7 @@ local function addXp(player, data, amount: number, raw: boolean?)
 			end)
 		end
 		Remotes.Get("LevelUp"):FireClient(player, data.Level, gained * P.Level.SkillPointsPerLevel)
+		GameEvents.Fire(player, "Level", data.Level)
 	else
 		player:SetAttribute("Xp", data.Xp)
 	end
@@ -336,14 +338,17 @@ function ProgressionService.OnKill(player, room: number, isBoss: boolean, positi
 		Remotes.Get("ClickHit"):FireClient(player, "Credits", credits, position)
 	end
 	questProgress(player, "Kill", 1)
+	GameEvents.Fire(player, "Kill", 1)
 	if isBoss then
 		questProgress(player, "Boss", 1)
+		GameEvents.Fire(player, "Boss", 1)
 	end
 	addXp(player, data, (if isBoss then P.Level.XpPerBoss else P.Level.XpPerKill) * room)
 end
 
 function ProgressionService.OnRoomCleared(player, room: number)
 	questProgress(player, "Room", room, true)
+	GameEvents.Fire(player, "Room", room)
 end
 
 function ProgressionService.OnRunStarted(player)
