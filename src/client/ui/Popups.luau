@@ -76,7 +76,7 @@ end
 local toastHolder = Instance.new("Frame")
 toastHolder.Name = "Toasts"
 toastHolder.AnchorPoint = Vector2.new(1, 0)
-toastHolder.Position = UDim2.new(1, -16, 0, 70)
+toastHolder.Position = UDim2.new(1, -16, 0, 64)
 toastHolder.Size = UDim2.fromOffset(340, 400)
 toastHolder.BackgroundTransparency = 1
 toastHolder.ZIndex = 40 -- above open windows
@@ -94,58 +94,56 @@ local KIND_COLORS = {
 }
 
 function Popups.Toast(text: string, kind: string?)
-	local color = KIND_COLORS[kind] or Style.Colors.Text
-	local plate = Instance.new("TextLabel")
-	plate.AutomaticSize = Enum.AutomaticSize.XY
-	plate.Size = UDim2.fromOffset(0, 40)
-	plate.BackgroundColor3 = Style.Colors.PanelDark
-	plate.BackgroundTransparency = 0
-	plate.Font = Style.Font
-	plate.TextSize = 22
-	plate.TextColor3 = Style.Colors.Text
-	plate.TextWrapped = true
-	plate.Text = text
-	plate.ZIndex = 41
+	local color = KIND_COLORS[kind] or Style.Colors.GoldDim
+	local width = 320
+	local plate = Style.Panel(toastHolder, {
+		Name = "Toast",
+		Size = UDim2.fromOffset(width, 40),
+		ZIndex = 41,
+		Fill = Style.Colors.PanelDark,
+		Transparency = 0.08,
+		Border = Style.Colors.Line,
+		Cut = 6,
+	})
 	plate.LayoutOrder = math.floor(os.clock() * 1000)
-	plate.Parent = toastHolder
-	Style.Corner(plate)
-	local ts = Instance.new("UIStroke")
-	ts.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
-	ts.Thickness = 2
-	ts.Color = Color3.new(0, 0, 0)
-	ts.Parent = plate
-	-- Kind color: a bar on the left edge (the text itself stays white).
+	-- kind color: a thin bar on the left edge (the text itself stays light)
 	local bar = Instance.new("Frame")
-	bar.AnchorPoint = Vector2.new(0, 0.5)
-	bar.Position = UDim2.new(0, -8, 0.5, 0)
-	bar.Size = UDim2.new(0, 5, 1, 4)
+	bar.Position = UDim2.fromOffset(6, 8)
+	bar.Size = UDim2.new(0, 3, 1, -16)
 	bar.BackgroundColor3 = color
 	bar.BorderSizePixel = 0
 	bar.ZIndex = 42
 	bar.Parent = plate
-	Style.Corner(bar, UDim.new(0.5, 0))
-	local padding = Instance.new("UIPadding")
-	padding.PaddingLeft = UDim.new(0, 14)
-	padding.PaddingRight = UDim.new(0, 14)
-	padding.PaddingTop = UDim.new(0, 8)
-	padding.PaddingBottom = UDim.new(0, 8)
-	padding.Parent = plate
-	local sizeConstraint = Instance.new("UISizeConstraint")
-	sizeConstraint.MaxSize = Vector2.new(340, 200)
-	sizeConstraint.Parent = plate
+	local label = Style.Label(plate, text, 15, Style.Colors.Text, {
+		Position = UDim2.fromOffset(16, 0),
+		Size = UDim2.new(1, -26, 1, 0),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextWrapped = true,
+		ZIndex = 42,
+	})
+	-- grow for long texts (two or three lines)
+	local bounds = game:GetService("TextService"):GetTextSize(text, 15, Style.Font, Vector2.new(width - 26, 200))
+	plate.Size = UDim2.fromOffset(width, math.max(40, bounds.Y + 18))
 
 	local pop = Instance.new("UIScale")
-	pop.Scale = 0.7
+	pop.Scale = 0.9
 	pop.Parent = plate
-	Style.Tween(pop, 0.2, { Scale = 1 }, Enum.EasingStyle.Back)
+	Style.Tween(pop, 0.15, { Scale = 1 })
 
 	task.delay(Config.Hud.ToastSeconds, function()
-		Style.Tween(plate, 0.3, { TextTransparency = 1, BackgroundTransparency = 1 })
-		Style.Tween(bar, 0.3, { BackgroundTransparency = 1 })
-		Style.Tween(ts, 0.3, { Transparency = 1 })
+		for _, d in ipairs(plate:GetDescendants()) do
+			if d:IsA("Frame") then
+				Style.Tween(d, 0.3, { BackgroundTransparency = 1 })
+			elseif d:IsA("TextLabel") then
+				Style.Tween(d, 0.3, { TextTransparency = 1 })
+			elseif d:IsA("UIStroke") then
+				Style.Tween(d, 0.3, { Transparency = 1 })
+			end
+		end
 		task.wait(0.3)
 		plate:Destroy()
 	end)
+	local _ = label
 end
 
 -- Server -> client toasts.
@@ -211,24 +209,24 @@ function Popups.Banner(title: string, big: string, lines: { string }?, color: Co
 	if old then
 		old:Destroy()
 	end
-	local plate = Instance.new("Frame")
-	plate.Name = "Banner"
-	plate.AnchorPoint = Vector2.new(0.5, 0.5)
-	plate.Position = UDim2.fromScale(0.5, 0.36)
-	plate.Size = UDim2.fromOffset(440, 190)
-	plate.BackgroundColor3 = Style.Colors.PanelDark
-	plate.ZIndex = 80
-	plate.Parent = Style.Gui
-	Style.Corner(plate, UDim.new(0, 18))
-	Style.Stroke(plate, 4, color)
-	local glow = Instance.new("UIGradient")
-	glow.Rotation = 90
-	glow.Color = ColorSequence.new(Style.Lighter(Style.Colors.PanelDark, 0.12), Style.Colors.PanelDark)
-	glow.Parent = plate
-	Style.Label(plate, title, 30, color, { Position = UDim2.fromOffset(0, 12), Size = UDim2.new(1, 0, 0, 36), ZIndex = 81 })
-	Style.Label(plate, big, 64, Style.Colors.Text, { Position = UDim2.fromOffset(0, 50), Size = UDim2.new(1, 0, 0, 70), ZIndex = 81 })
+	local count = #(lines or {})
+	local plate = Style.Panel(Style.Gui, {
+		Name = "Banner",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.34),
+		Size = UDim2.fromOffset(460, 150 + count * 24),
+		ZIndex = 80,
+		Fill = Style.Colors.PanelDark,
+		Transparency = 0.06,
+		Border = color,
+		Cut = 16,
+		Thickness = 2,
+	})
+	Style.Label(plate, Style.Upper(title), 18, color, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 16), Size = UDim2.new(1, 0, 0, 22), ZIndex = 81 })
+	Style.Rule(plate, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 44), Size = UDim2.new(0.7, 0, 0, 1), Color = color, ZIndex = 81 })
+	Style.Label(plate, big, 54, Style.Colors.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 50), Size = UDim2.new(1, 0, 0, 64), ZIndex = 81 })
 	for i, line in ipairs(lines or {}) do
-		Style.Label(plate, line, 18, if i == 1 then Style.Colors.Cyan else Style.Colors.Muted, { Position = UDim2.fromOffset(0, 120 + (i - 1) * 26), Size = UDim2.new(1, 0, 0, 24), ZIndex = 81 })
+		Style.Label(plate, line, 16, if i == 1 then Style.Colors.Gold else Style.Colors.Muted, { Position = UDim2.fromOffset(0, 118 + (i - 1) * 24), Size = UDim2.new(1, 0, 0, 22), ZIndex = 81 })
 	end
 	local scale = Instance.new("UIScale")
 	scale.Scale = 0.3
@@ -246,7 +244,11 @@ function Popups.Banner(title: string, big: string, lines: { string }?, color: Co
 				Style.Tween(d, 0.25, { Transparency = 1 })
 			end
 		end
-		Style.Tween(plate, 0.25, { BackgroundTransparency = 1 })
+		for _, d in ipairs(plate:GetDescendants()) do
+			if d:IsA("Frame") then
+				Style.Tween(d, 0.25, { BackgroundTransparency = 1 })
+			end
+		end
 		task.wait(0.3)
 		plate:Destroy()
 	end)

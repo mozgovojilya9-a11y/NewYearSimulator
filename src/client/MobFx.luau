@@ -265,7 +265,7 @@ task.spawn(function()
 		local humanoid = boss and boss:FindFirstChildOfClass("Humanoid")
 		bar.Visible = humanoid ~= nil
 		if humanoid then
-			bossName.Text = "👑 " .. (boss:GetAttribute("MobName") or boss.Name)
+			bossName.Text = Style.Upper(boss:GetAttribute("MobName") or boss.Name)
 			local ratio = math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1)
 			Style.Tween(fill, 0.1, { Size = UDim2.fromScale(ratio, 1) })
 			hpText.Text = Format.Number(humanoid.Health) .. " / " .. Format.Number(humanoid.MaxHealth)

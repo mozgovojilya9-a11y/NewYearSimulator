@@ -94,7 +94,7 @@ left.Size = UDim2.new(0, LEFT, 1, 0)
 left.BackgroundTransparency = 1
 left.ZIndex = 32
 left.Parent = content
-local tabs, selectTab = Window.Tabs(left, { { Id = "Weapon", Text = "⚔ Оружие" }, { Id = "Armor", Text = "🛡 Броня" } }, Style.Colors.Orange, 153)
+local tabs, selectTab = Window.Tabs(left, { { Id = "Weapon", Text = "Оружие" }, { Id = "Armor", Text = "Броня" } }, Style.Colors.Orange, 153)
 
 local listHolder = Instance.new("Frame")
 listHolder.Position = UDim2.fromOffset(0, 48)
@@ -128,7 +128,9 @@ for _, recipe in ipairs(Config.Recipes) do
 		Style.Rainbow(name)
 	end
 	local status = Style.Label(row, "", 15, Style.Colors.Muted, { Position = UDim2.fromOffset(66, 34), Size = UDim2.new(1, -104, 0, 22), TextXAlignment = Enum.TextXAlignment.Left, TextScaled = true, ZIndex = 35 })
-	local lock = Style.Label(row, "🔒", 22, Style.Colors.Text, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -6, 0.5, 0), Size = UDim2.fromOffset(30, 30), ZIndex = 35 })
+	local lock = Style.Icons.Make(row, "lock", 22, Style.Colors.Muted, 35)
+	lock.AnchorPoint = Vector2.new(1, 0.5)
+	lock.Position = UDim2.new(1, -10, 0.5, 0)
 	rows[recipe.Id] = { button = row, stroke = stroke, status = status, lock = lock, recipe = recipe }
 	row.Activated:Connect(function()
 		showDetails(recipe)
@@ -144,7 +146,7 @@ local function refreshRows()
 		row.stroke.Thickness = if selected == recipe then 4.5 else 2.5
 		row.button.BackgroundColor3 = if selected == recipe then Style.Lighter(Style.Colors.Card, 0.12) else Style.Colors.Card
 		if state == "owned" then
-			row.status.Text = "Выковано ✓"
+			row.status.Text = "Выковано"
 			row.status.TextColor3 = Style.Colors.Muted
 		elseif state == "ok" then
 			row.status.Text = "Можно ковать!"
@@ -226,17 +228,17 @@ local function refreshDetails()
 	if recipe.Kind == "Weapon" then
 		local current = Config.ItemById.Weapon[player:GetAttribute("EquippedWeapon") or ""]
 		local currentDamage = if current then current.Damage else 1
-		statLabels[1].Text = ("⚔ Урон оружия: %s%s"):format(Format.Number(item.Damage), delta(item.Damage - currentDamage))
+		statLabels[1].Text = ("Урон оружия: %s%s"):format(Format.Number(item.Damage), delta(item.Damage - currentDamage))
 		statLabels[2].Text = ("Сейчас: %s (%s)"):format(Format.Number(currentDamage), if current then current.Name else "—")
 		local mine = player:GetAttribute("ClickPower") or 1
 		statLabels[3].Text = ("Твой удар станет около %s"):format(Format.Number(mine / math.max(1, currentDamage) * item.Damage))
-		statLabels[4].Text = ("🔷 Уровень предмета: %d%s"):format(Config.ItemLevelOf(item), delta(Config.ItemLevelOf(item) - Config.ItemLevelOf(current)))
+		statLabels[4].Text = ("Уровень предмета: %d%s"):format(Config.ItemLevelOf(item), delta(Config.ItemLevelOf(item) - Config.ItemLevelOf(current)))
 	else
 		local current = Config.ItemById.Armor[player:GetAttribute("Equipped" .. item.Slot) or ""]
 		local set = Config.ArmorSets[item.Set]
-		statLabels[1].Text = ("❤ Здоровье: +%d%s"):format(item.Health, delta(item.Health - (if current then current.Health else 0)))
-		statLabels[2].Text = ("🛡 Защита: +%d%%%s"):format(math.floor(item.Defense * 100 + 0.5), delta((item.Defense - (if current then current.Defense else 0)) * 100, "%"))
-		statLabels[3].Text = ("🔷 Ур. предмета %d  •  %s: %s"):format(Config.ItemLevelOf(item), Config.ArmorSlotNames[item.Slot], if current then "сейчас " .. current.Name else "слот пуст")
+		statLabels[1].Text = ("Здоровье: +%d%s"):format(item.Health, delta(item.Health - (if current then current.Health else 0)))
+		statLabels[2].Text = ("Защита: +%d%%%s"):format(math.floor(item.Defense * 100 + 0.5), delta((item.Defense - (if current then current.Defense else 0)) * 100, "%"))
+		statLabels[3].Text = ("Ур. предмета %d  •  %s: %s"):format(Config.ItemLevelOf(item), Config.ArmorSlotNames[item.Slot], if current then "сейчас " .. current.Name else "слот пуст")
 		statLabels[4].Text = ('<font color="%s">%s (3 части): +%d%% урона</font>'):format(hex(Style.Colors.Gold), set.Name, math.floor(set.Bonus * 100 + 0.5))
 	end
 
@@ -258,7 +260,7 @@ local function refreshDetails()
 		craftButton.Text = Texts.Owned
 		setCraftColor(Color3.fromRGB(110, 110, 130))
 	elseif state == "ok" then
-		craftButton.Text = "⚒ " .. Texts.Craft
+		craftButton.Text = Texts.Craft
 		setCraftColor(GREEN)
 	else
 		craftButton.Text = Texts.Missing
@@ -585,7 +587,7 @@ craftButton.Activated:Connect(function()
 		busy = false
 		if ok then
 			playCraft(recipe)
-			Popups.Toast("⚒ " .. (message or ""), "gold")
+			Popups.Toast(message or "", "gold")
 		else
 			Popups.Toast(message or "", "bad")
 		end

@@ -80,7 +80,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	key.Font = Style.Font
 	key.TextSize = 22
 	key.TextColor3 = Style.Colors.Outline
-	key.Text = if inputType == Enum.ProximityPromptInputType.Touch then "👆" else keyText(prompt)
+	key.Text = if inputType == Enum.ProximityPromptInputType.Touch then "•" else keyText(prompt)
 	key.LayoutOrder = 1
 	key.Parent = plate
 	Style.Corner(key, UDim.new(0.5, 0))

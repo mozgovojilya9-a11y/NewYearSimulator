@@ -182,7 +182,7 @@ local function vipTag(player, character)
 	label.Font = Config.Theme.Font
 	label.TextScaled = true
 	label.TextColor3 = Config.Theme.Gold
-	label.Text = "👑 VIP"
+	label.Text = "VIP"
 	label.Parent = gui
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 8)

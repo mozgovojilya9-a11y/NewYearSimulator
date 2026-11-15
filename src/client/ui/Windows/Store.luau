@@ -39,7 +39,7 @@ local cards = {} -- { card, tab, refresh }
 
 local function describe(product): string
 	if product.Kind == "Credits" then
-		return ("+%s %s для яиц и косметики"):format(Format.Number(product.Amount), Config.Credits.Icon)
+		return ("+%s кредитов: сброс навыков, косметика"):format(Format.Number(product.Amount))
 	elseif product.Kind == "Boost" then
 		return ("На %d минут, время складывается"):format(product.Minutes)
 	elseif product.Kind == "Chest" then
@@ -59,7 +59,9 @@ end
 local function card(tab: string, order: number, icon: string, name: string, text: string, price: number, id: number, onBuy, isOwned)
 	local c = Style.Card(grid, Style.Colors.Cyan)
 	c.LayoutOrder = order
-	Style.Label(c, icon, 34, Style.Colors.Text, { Position = UDim2.fromOffset(0, 6), Size = UDim2.new(1, 0, 0, 40), ZIndex = 35 })
+	local glyph = Style.Icons.Make(c, icon, 34, Style.Colors.Gold, 35)
+	glyph.AnchorPoint = Vector2.new(0.5, 0)
+	glyph.Position = UDim2.new(0.5, 0, 0, 10)
 	Style.Label(c, name, 18, Style.Colors.Gold, { Position = UDim2.fromOffset(6, 48), Size = UDim2.new(1, -12, 0, 22), TextScaled = true, ZIndex = 35 })
 	Style.Label(c, text, 14, Style.Colors.Text, { Position = UDim2.fromOffset(8, 72), Size = UDim2.new(1, -16, 0, 50), TextWrapped = true, ZIndex = 35 })
 	local button, setColor = Style.Button(c, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -8), Size = UDim2.new(1, -20, 0, 40), Color = Style.Colors.Green, Text = "", TextSize = 18, ZIndex = 36, Shadow = false })
@@ -69,7 +71,7 @@ local function card(tab: string, order: number, icon: string, name: string, text
 			button.Text = "Скоро"
 			setColor(GREY)
 		elseif isOwned and isOwned() then
-			button.Text = "Куплено ✓"
+			button.Text = "Куплено"
 			setColor(GREY)
 		else
 			button.Text = "R$ " .. price
@@ -98,7 +100,7 @@ table.sort(passKeys, function(a, b)
 end)
 for _, key in ipairs(passKeys) do
 	local pass = Config.GamePasses[key]
-	card("Passes", pass.Order or 99, pass.Icon or "⭐", pass.Name, pass.Text, pass.Price, pass.Id, function()
+	card("Passes", pass.Order or 99, pass.Icon or "star", pass.Name, pass.Text, pass.Price, pass.Id, function()
 		MarketplaceService:PromptGamePassPurchase(player, pass.Id)
 	end, function()
 		return PlayerData.HasPass(key)
@@ -106,7 +108,7 @@ for _, key in ipairs(passKeys) do
 end
 -- Products
 for order, product in ipairs(Config.Products) do
-	card(product.Tab, order, product.Icon or "🎁", product.Name, describe(product), product.Price, product.Id, function()
+	card(product.Tab, order, product.Icon or "gem", product.Name, describe(product), product.Price, product.Id, function()
 		MarketplaceService:PromptProductPurchase(player, product.Id)
 	end, nil)
 end
@@ -126,13 +128,13 @@ end)
 window.OnOpen = refresh
 
 ReplicatedStorage:WaitForChild("StoreNotify").OnClientEvent:Connect(function(text)
-	Popups.Toast("💎 " .. tostring(text), "gold")
+	Popups.Toast(tostring(text), "gold")
 	Popups.Flash(Style.Colors.Cyan)
 	Style.PlaySound(Config.Sounds.Forged, 1.2, 0.6)
 end)
 MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(who, _, purchased)
 	if who == player and purchased then
-		Popups.Toast("💎 Пасс куплен! Спасибо!", "gold")
+		Popups.Toast("Пасс куплен! Спасибо!", "gold")
 	end
 end)
 

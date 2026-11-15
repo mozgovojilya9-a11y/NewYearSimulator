@@ -239,7 +239,7 @@ local function hex(color: Color3): string
 end
 announceRemote.OnClientEvent:Connect(function(text, color)
 	text = tostring(text)
-	Popups.Toast("🌟 " .. text, "gold")
+	Popups.Toast(text, "gold")
 	task.spawn(function()
 		local channels = TextChatService:FindFirstChild("TextChannels")
 		local general = channels and channels:FindFirstChild("RBXGeneral")

@@ -178,14 +178,14 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 		local amount, position = ...
 		local at = if typeof(position) == "Vector3" then position + Vector3.new(0, 3, 0) else headPosition()
 		if at then
-			Popups.World(at, "+" .. Format.Number(amount) .. " " .. Config.Credits.Icon, Style.Colors.Cyan, 30, false)
+			Popups.World(at, "+" .. Format.Number(amount) .. " кр.", Style.Colors.Gold, 26, false)
 		end
 	elseif kind == "Kill" then
 		local position, isBoss = ...
 		hitParticles(position, if isBoss then Style.Colors.Gold else Style.Colors.Magenta, if isBoss then 60 else 20)
 		if isBoss then
 			Popups.Shake(Config.Hud.ShakeBoss.Amplitude, Config.Hud.ShakeBoss.Seconds)
-			Popups.Toast("👑 Босс побеждён!", "gold")
+			Popups.Toast("Босс побеждён!", "gold")
 			Style.PlaySound(Config.Sounds.BossDeath, 1, 0.8)
 		end
 	end

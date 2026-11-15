@@ -196,7 +196,7 @@ function refresh()
 			entry.card.Visible = true
 			entry.card.LayoutOrder = -math.floor(if slot.Category == "Weapon" then item.Damage else item.Health)
 			if item.Id == equippedId then
-				entry.button.Text = "Надето ✓"
+				entry.button.Text = "Надето"
 				entry.setColor(Color3.fromRGB(110, 110, 130))
 			else
 				entry.button.Text = "Надеть"
@@ -209,7 +209,7 @@ function refresh()
 
 	-- Totals
 	local defense = math.floor((player:GetAttribute("Defense") or 0) * 100 + 0.5)
-	statsLine.Text = ("⚔ Урон за удар: %s     ❤ Здоровье: %s     🛡 Защита: %d%%"):format(Format.Number(player:GetAttribute("ClickPower") or 1), Format.Number(player:GetAttribute("MaxHealth") or Config.Player.Health), defense)
+	statsLine.Text = ("Урон за удар: %s     Здоровье: %s     Защита: %d%%"):format(Format.Number(player:GetAttribute("ClickPower") or 1), Format.Number(player:GetAttribute("MaxHealth") or Config.Player.Health), defense)
 	local activeSet = Config.ArmorSets[player:GetAttribute("ArmorSet") or ""]
 	if activeSet then
 		setLine.Text = ("Бонус сета «%s» (3/3): +%d%% урона"):format(activeSet.Name, math.floor(activeSet.Bonus * 100 + 0.5))

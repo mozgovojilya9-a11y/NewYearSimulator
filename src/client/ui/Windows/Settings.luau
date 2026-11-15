@@ -1,7 +1,7 @@
 --[[
 	Settings.luau
 	Settings window: sound, music, camera shake, hide effects, hide other
-	players' pets. Choices live in Style flags for this session.
+	Choices live in Style flags for this session.
 	Music plays Config.Sounds.Music in a loop when an id is set there.
 ]]
 
@@ -62,22 +62,22 @@ local function toggle(order, label, get, set)
 	table.insert(toggles, refresh)
 end
 
-toggle(1, "🔊 Звук", function()
+toggle(1, "Звук", function()
 	return not Style.Muted
 end, function(on)
 	Style.Muted = not on
 end)
-toggle(2, "🎵 Музыка", function()
+toggle(2, "Музыка", function()
 	return Style.MusicOn
 end, function(on)
 	Style.MusicOn = on
 end)
-toggle(3, "📳 Тряска камеры", function()
+toggle(3, "Тряска камеры", function()
 	return Style.Shake
 end, function(on)
 	Style.Shake = on
 end)
-toggle(4, "✨ Эффекты", function()
+toggle(4, "Эффекты", function()
 	return not Style.HideEffects
 end, function(on)
 	Style.HideEffects = not on

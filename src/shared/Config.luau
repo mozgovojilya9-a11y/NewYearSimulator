@@ -143,7 +143,7 @@ end
 -- quests, the wheel and level rewards. Spent on eggs (and cosmetics).
 Config.Credits = {
 	Name = "Нано-кредиты",
-	Icon = "💠",
+	Icon = "credits",
 	PerKill = 2, -- room 1 mob
 	Growth = 1.2, -- x per room: room 10 ~ 10, room 20 ~ 64
 	BossMultiplier = 8,
@@ -164,13 +164,13 @@ end
 -- Dashboard here (see README).
 Config.VipBonus = 0.2 -- VIP: +20% XP and credits (passes Xp2x / Credits2x: x2)
 
--- Order = position in the store. Icon = emoji on the card.
+-- Order = position in the store. Icon = line icon on the card (ui/Icons).
 Config.GamePasses = {
-	VIP = { Id = 0, Order = 1, Icon = "👑", Name = "VIP", Price = 199, Text = "+20% опыта и кредитов, VIP-тег" },
-	Damage2x = { Id = 0, Order = 2, Icon = "⚔", Name = "x2 Урон", Price = 149, Text = "Навсегда удваивает урон" },
-	Xp2x = { Id = 0, Order = 3, Icon = "⭐", Name = "x2 Опыт", Price = 149, Text = "Навсегда удваивает опыт" },
-	Credits2x = { Id = 0, Order = 4, Icon = "💠", Name = "x2 Кредиты", Price = 149, Text = "Навсегда удваивает нано-кредиты" },
-	LootLuck = { Id = 0, Order = 8, Icon = "💎", Name = "Удача добычи x2", Price = 199, Text = "x2 шанс редких материалов с мобов" },
+	VIP = { Id = 0, Order = 1, Icon = "crown", Name = "VIP", Price = 199, Text = "+20% опыта и кредитов, VIP-тег" },
+	Damage2x = { Id = 0, Order = 2, Icon = "sword", Name = "x2 Урон", Price = 149, Text = "Навсегда удваивает урон" },
+	Xp2x = { Id = 0, Order = 3, Icon = "star", Name = "x2 Опыт", Price = 149, Text = "Навсегда удваивает опыт" },
+	Credits2x = { Id = 0, Order = 4, Icon = "credits", Name = "x2 Кредиты", Price = 149, Text = "Навсегда удваивает нано-кредиты" },
+	LootLuck = { Id = 0, Order = 8, Icon = "gem", Name = "Удача добычи x2", Price = 199, Text = "x2 шанс редких материалов с мобов" },
 }
 
 -- Developer Products (bought again and again). Id = 0 -> "Скоро".
@@ -178,27 +178,27 @@ Config.GamePasses = {
 -- Chest (Biome, Rolls: random materials of that biome, loot luck x Luck),
 -- Weapon / ArmorSet (exclusive gear, granted once), WheelSkip.
 Config.Products = {
-	{ Key = "CreditsSmall", Id = 0, Tab = "Packs", Icon = "💠", Name = "Горсть кредитов", Price = 25, Kind = "Credits", Amount = 400 },
-	{ Key = "CreditsMedium", Id = 0, Tab = "Packs", Icon = "💠", Name = "Пачка кредитов", Price = 79, Kind = "Credits", Amount = 1500 },
-	{ Key = "CreditsLarge", Id = 0, Tab = "Packs", Icon = "💠", Name = "Сейф кредитов", Price = 199, Kind = "Credits", Amount = 5000 },
-	{ Key = "WheelSkip", Id = 0, Tab = "Packs", Icon = "🎡", Name = "Крутить колесо сейчас", Price = 25, Kind = "WheelSkip" },
+	{ Key = "CreditsSmall", Id = 0, Tab = "Packs", Icon = "credits", Name = "Горсть кредитов", Price = 25, Kind = "Credits", Amount = 400 },
+	{ Key = "CreditsMedium", Id = 0, Tab = "Packs", Icon = "credits", Name = "Пачка кредитов", Price = 79, Kind = "Credits", Amount = 1500 },
+	{ Key = "CreditsLarge", Id = 0, Tab = "Packs", Icon = "credits", Name = "Сейф кредитов", Price = 199, Kind = "Credits", Amount = 5000 },
+	{ Key = "WheelSkip", Id = 0, Tab = "Packs", Icon = "wheel", Name = "Крутить колесо сейчас", Price = 25, Kind = "WheelSkip" },
 
-	{ Key = "BoostXp15", Id = 0, Tab = "Boosts", Icon = "⭐", Name = "x2 Опыт · 15 мин", Price = 25, Kind = "Boost", Boost = "Xp", Minutes = 15 },
-	{ Key = "BoostXp60", Id = 0, Tab = "Boosts", Icon = "⭐", Name = "x2 Опыт · 60 мин", Price = 69, Kind = "Boost", Boost = "Xp", Minutes = 60 },
-	{ Key = "BoostDamage15", Id = 0, Tab = "Boosts", Icon = "⚔", Name = "x2 Урон · 15 мин", Price = 29, Kind = "Boost", Boost = "Damage", Minutes = 15 },
-	{ Key = "BoostDamage60", Id = 0, Tab = "Boosts", Icon = "⚔", Name = "x2 Урон · 60 мин", Price = 79, Kind = "Boost", Boost = "Damage", Minutes = 60 },
-	{ Key = "BoostLoot15", Id = 0, Tab = "Boosts", Icon = "💎", Name = "x2 Удача добычи · 15 мин", Price = 29, Kind = "Boost", Boost = "Loot", Minutes = 15 },
-	{ Key = "BoostLoot60", Id = 0, Tab = "Boosts", Icon = "💎", Name = "x2 Удача добычи · 60 мин", Price = 79, Kind = "Boost", Boost = "Loot", Minutes = 60 },
+	{ Key = "BoostXp15", Id = 0, Tab = "Boosts", Icon = "star", Name = "x2 Опыт · 15 мин", Price = 25, Kind = "Boost", Boost = "Xp", Minutes = 15 },
+	{ Key = "BoostXp60", Id = 0, Tab = "Boosts", Icon = "star", Name = "x2 Опыт · 60 мин", Price = 69, Kind = "Boost", Boost = "Xp", Minutes = 60 },
+	{ Key = "BoostDamage15", Id = 0, Tab = "Boosts", Icon = "sword", Name = "x2 Урон · 15 мин", Price = 29, Kind = "Boost", Boost = "Damage", Minutes = 15 },
+	{ Key = "BoostDamage60", Id = 0, Tab = "Boosts", Icon = "sword", Name = "x2 Урон · 60 мин", Price = 79, Kind = "Boost", Boost = "Damage", Minutes = 60 },
+	{ Key = "BoostLoot15", Id = 0, Tab = "Boosts", Icon = "gem", Name = "x2 Удача добычи · 15 мин", Price = 29, Kind = "Boost", Boost = "Loot", Minutes = 15 },
+	{ Key = "BoostLoot60", Id = 0, Tab = "Boosts", Icon = "gem", Name = "x2 Удача добычи · 60 мин", Price = 79, Kind = "Boost", Boost = "Loot", Minutes = 60 },
 
-	{ Key = "ChestCatacombs", Id = 0, Tab = "Chests", Icon = "💀", Name = "Контейнер цеха", Price = 49, Kind = "Chest", Biome = 1, Rolls = 30, Luck = 2 },
-	{ Key = "ChestIce", Id = 0, Tab = "Chests", Icon = "❄", Name = "Контейнер криолаборатории", Price = 99, Kind = "Chest", Biome = 2, Rolls = 30, Luck = 2 },
-	{ Key = "ChestLava", Id = 0, Tab = "Chests", Icon = "🔥", Name = "Контейнер реактора", Price = 149, Kind = "Chest", Biome = 3, Rolls = 30, Luck = 2 },
-	{ Key = "ChestAbyss", Id = 0, Tab = "Chests", Icon = "🌀", Name = "Контейнер Нексуса", Price = 199, Kind = "Chest", Biome = 4, Rolls = 30, Luck = 2 },
+	{ Key = "ChestCatacombs", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер цеха", Price = 49, Kind = "Chest", Biome = 1, Rolls = 30, Luck = 2 },
+	{ Key = "ChestIce", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер криолаборатории", Price = 99, Kind = "Chest", Biome = 2, Rolls = 30, Luck = 2 },
+	{ Key = "ChestLava", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер реактора", Price = 149, Kind = "Chest", Biome = 3, Rolls = 30, Luck = 2 },
+	{ Key = "ChestAbyss", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер Нексуса", Price = 199, Kind = "Chest", Biome = 4, Rolls = 30, Luck = 2 },
 
-	{ Key = "WeaponPatron", Id = 0, Tab = "Exclusive", Icon = "🗡", Name = "Клинок Покровителя", Price = 149, Kind = "Weapon", Item = "PatronBlade" },
-	{ Key = "WeaponComet", Id = 0, Tab = "Exclusive", Icon = "☄", Name = "Кометное копьё", Price = 249, Kind = "Weapon", Item = "CometSword" },
-	{ Key = "WeaponCrown", Id = 0, Tab = "Exclusive", Icon = "👑", Name = "Коронный излучатель", Price = 399, Kind = "Weapon", Item = "CrownBlade" },
-	{ Key = "ArmorRoyal", Id = 0, Tab = "Exclusive", Icon = "🛡", Name = "Королевский сет", Price = 299, Kind = "ArmorSet", Item = "Royal" },
+	{ Key = "WeaponPatron", Id = 0, Tab = "Exclusive", Icon = "sword", Name = "Клинок Покровителя", Price = 149, Kind = "Weapon", Item = "PatronBlade" },
+	{ Key = "WeaponComet", Id = 0, Tab = "Exclusive", Icon = "spear", Name = "Кометное копьё", Price = 249, Kind = "Weapon", Item = "CometSword" },
+	{ Key = "WeaponCrown", Id = 0, Tab = "Exclusive", Icon = "crown", Name = "Коронный излучатель", Price = 399, Kind = "Weapon", Item = "CrownBlade" },
+	{ Key = "ArmorRoyal", Id = 0, Tab = "Exclusive", Icon = "shield", Name = "Королевский сет", Price = 299, Kind = "ArmorSet", Item = "Royal" },
 }
 Config.ProductById = {} -- [product id] = product (only real ids)
 Config.ProductByKey = {}
@@ -575,7 +575,7 @@ Config.Forge = {
 	Strikes = 3,
 	Texts = {
 		Craft = "Выковать",
-		Owned = "Уже выковано ✓",
+		Owned = "Уже выковано",
 		Missing = "Не хватает материалов",
 		Skip = "Пропустить",
 		Done = "Выковано: %s!",
@@ -759,6 +759,12 @@ Config.Assets = {
 	-- Item icons: [item id] = "rbxassetid://..." uploaded by the owner.
 	-- Empty = the icon is rendered from the 3D model (Shared ItemIcon).
 	Icons = {},
+	-- Interface icons: [icon name] = "rbxassetid://..." replaces the line
+	-- icon drawn by ui/Icons (names: see Icons.Names). A Decal / ImageLabel
+	-- / Texture named like the icon in ServerStorage/GameAssets/Icons does
+	-- the same without editing Config. Sounds: a Sound named like a
+	-- Config.Sounds key in ServerStorage/GameAssets/Audio replaces it.
+	UiIcons = {},
 }
 
 -- Polygon in the hub: test dummies (no rewards). Damage per hit, DPS and
@@ -824,7 +830,8 @@ Config.Nano = {
 -- "Цитадель Ауры": bright cartoon brick world. Light lilac stone base,
 -- three loud accents. Neon is used only on trims, portals and runes.
 Config.Theme = {
-	Font = Enum.Font.FredokaOne,
+	Font = Enum.Font.GothamBold, -- dense bold font with Cyrillic (FredokaOne has none)
+	FontTitle = Enum.Font.GothamBlack,
 	Magenta = Color3.fromRGB(255, 61, 184), -- #FF3DB8
 	Cyan = Color3.fromRGB(46, 230, 255), -- #2EE6FF
 	Gold = Color3.fromRGB(255, 201, 60), -- #FFC93C
@@ -833,13 +840,17 @@ Config.Theme = {
 	Red = Color3.fromRGB(240, 70, 80),
 	Orange = Color3.fromRGB(255, 150, 50),
 	Blue = Color3.fromRGB(70, 140, 255),
-	Text = Color3.fromRGB(255, 255, 255),
-	Muted = Color3.fromRGB(220, 215, 235),
-	Outline = Color3.fromRGB(20, 10, 35),
-	Panel = Color3.fromRGB(30, 27, 46), -- window body (#1E1B2E, opaque)
-	PanelDark = Color3.fromRGB(30, 27, 46), -- HUD plates and every text plate (#1E1B2E)
-	Card = Color3.fromRGB(48, 43, 72), -- cards inside windows
-	CardDark = Color3.fromRGB(22, 20, 34), -- slots, viewport backgrounds
+	Text = Color3.fromRGB(236, 232, 222),
+	Muted = Color3.fromRGB(158, 152, 140),
+	Outline = Color3.fromRGB(6, 6, 8),
+	Panel = Color3.fromRGB(17, 18, 22), -- window body (dark graphite, reference UI)
+	PanelDark = Color3.fromRGB(12, 13, 16), -- HUD plates and every text plate
+	Card = Color3.fromRGB(30, 31, 37), -- cards / buttons inside windows
+	CardDark = Color3.fromRGB(14, 15, 18), -- slots, viewport backgrounds
+	GoldDim = Color3.fromRGB(176, 140, 62), -- thin borders, inactive gold
+	Line = Color3.fromRGB(74, 66, 48), -- quiet borders and separators
+	Health = Color3.fromRGB(196, 54, 54),
+	Xp = Color3.fromRGB(255, 201, 60),
 	-- Stone: two close tints alternate in 4x4 / 8x8 blocks for a tile look.
 	StoneA = Color3.fromRGB(140, 123, 214), -- #8C7BD6 walls
 	StoneB = Color3.fromRGB(110, 95, 192), -- #6E5FC0 walls (alternate)
@@ -914,9 +925,9 @@ Config.Lighting = {
 -- is -Z (spawn -> gates), east is +X. Top view:
 --
 --              [========= ВРАТА =========]          north wall
---   Полигон ⌂ |                            | ⌂ Фабрикатор
+--   Полигон  [ |                            | ]  Фабрикатор
 --   (wheel)    |        (free center)       |  (rack)
---   Магазин ⌂ |                            | ⌂ Инкубатор
+--   Магазин  [ |                            | ]  Академия
 --   (board)    |                            |  (board)
 --              [====== вход · SPAWN ======]          south wall
 --
@@ -1007,7 +1018,7 @@ Config.HubLayout = {
 		{ Title = "ЦИТАДЕЛЬ · СТАТУС", Line = "Энергосеть: норма" },
 		{ Title = "НАНО-ФАБРИКА", Line = "Активность роботов растёт" },
 		{ Title = "ВРАТА", Line = "Канал в подземелье открыт" },
-		{ Title = "ФАБРИКАТОР", Line = "Материалы → снаряжение" },
+		{ Title = "ФАБРИКАТОР", Line = "Материалы в снаряжение" },
 	},
 
 	Texts = {
@@ -1122,22 +1133,81 @@ Config.Hud = {
 		Cleared = "Иди дальше!",
 		Done = "Данж пройден! Улучшай снаряжение",
 	},
-	MenuButtons = { -- grid on the left, 2 columns
-		{ Id = "Forge", Icon = "⚒", Label = "Кузница", Color = Color3.fromRGB(255, 120, 40) },
-		{ Id = "Inventory", Icon = "🎒", Label = "Инвентарь", Color = Color3.fromRGB(70, 140, 255) },
-		{ Id = "Equipment", Icon = "⚔", Label = "Снаряжение", Color = Color3.fromRGB(90, 230, 110) },
-		{ Id = "Reward", Icon = "🎁", Label = "Награда", Color = Color3.fromRGB(255, 201, 60) },
-		{ Id = "Store", Icon = "💎", Label = "Магазин", Color = Color3.fromRGB(46, 200, 255) },
-		{ Id = "Travel", Icon = "🚪", Label = "Телепорт", Color = Color3.fromRGB(70, 60, 190) },
-	},
 	ToastSeconds = 4,
 	ShakeCrit = { Amplitude = 0.25, Seconds = 0.15 },
 	ShakeBoss = { Amplitude = 0.8, Seconds = 0.5 },
-	DamageHint = "⚔ Твой урон %s  •  нужно %s", -- HUD plate in the dungeon (not the barrier wording)
+	DamageHint = "Твой урон %s  •  нужно %s", -- HUD plate in the dungeon (not the barrier wording)
 	BackKey = Enum.KeyCode.B,
-	BackButton = { Icon = "←", Label = "Назад [B]", Color = Color3.fromRGB(240, 70, 80) }, -- the Travel cell in the dungeon
 	MobileScaleWidth = 1100, -- UIScale = min(1, viewportWidth / this)
 }
+
+-- Interface in the reference style: dark graphite panels with cut corners,
+-- thin gold lines, monochrome line icons (ui/Icons), dense bold font.
+-- No bright tiles, no emoji. Sizes are for a 1280x720 screen; the HUD is
+-- scaled down on small screens (Hud.MobileScaleWidth).
+Config.Ui = {
+	Cut = 10, -- corner cut of panels (px)
+	CutSmall = 6,
+	Border = 1.5, -- thin gold line
+	PanelTransparency = 0.12, -- HUD panels are slightly see-through
+	WindowTransparency = 0.04,
+	-- Top-left: profile under the Roblox buttons, the icon bar under it.
+	Profile = { Width = 300, Height = 86, Avatar = 66 },
+	-- Icon bar: Id = window, Key = hotkey (shown on the button; hidden on touch).
+	Bar = {
+		{ Id = "Inventory", Icon = "bag", Label = "Инвентарь", Key = Enum.KeyCode.G },
+		{ Id = "Skills", Icon = "skills", Label = "Навыки", Key = Enum.KeyCode.K },
+		{ Id = "Quests", Icon = "quest", Label = "Задания", Key = Enum.KeyCode.J },
+		{ Id = "Shop", Icon = "gem", Label = "Магазин" },
+	},
+	BarButton = 50,
+	-- Bottom center: HP and the ability slots (Q / E / R / dash).
+	AbilitySlots = {
+		{ Slot = "Q", Key = Enum.KeyCode.Q },
+		{ Slot = "E", Key = Enum.KeyCode.E },
+		{ Slot = "R", Key = Enum.KeyCode.R },
+		{ Slot = "Dash", Key = Enum.KeyCode.LeftShift, Label = "Shift", Icon = "dash" },
+	},
+	AbilitySize = 62,
+	HealthWidth = 420,
+	-- Bottom right: the big gold button. In the hub it opens the Gates
+	-- window (modes), in the dungeon it brings you back to the hub.
+	Play = { Text = "ИГРАТЬ", Back = "В ХАБ", BackKey = Enum.KeyCode.B },
+	Modes = {
+		{ Id = "Dungeon", Name = "Нано-фабрика", Text = "Подземелье: 20 этапов, босс каждые 5", Icon = "gate" },
+		{ Id = "Bosses", Name = "Испытание боссов", Text = "Скоро", Icon = "skull", Locked = true },
+		{ Id = "Raid", Name = "Рейд Нексуса", Text = "Скоро · группы до 4 игроков", Icon = "crown", Locked = true },
+	},
+	Texts = {
+		NoClass = "Без класса",
+		Quest = "ЗАДАНИЕ",
+		NoQuest = "Поговори с Наставником в атриуме",
+		Gates = "ВРАТА",
+		GatesSub = "Выбери режим",
+		Enter = "Войти",
+		Locked = "Закрыто",
+		CreditsName = "кредитов",
+	},
+}
+
+-- Ranks by level (shown under the name in the profile).
+Config.Ranks = {
+	{ Level = 1, Name = "Новобранец" },
+	{ Level = 10, Name = "Оператор" },
+	{ Level = 20, Name = "Страж" },
+	{ Level = 35, Name = "Командор" },
+	{ Level = 50, Name = "Легенда Нексуса" },
+}
+
+function Config.RankFor(level: number)
+	local rank = Config.Ranks[1]
+	for _, r in ipairs(Config.Ranks) do
+		if level >= r.Level then
+			rank = r
+		end
+	end
+	return rank
+end
 
 -- Sounds. Only built-in rbxasset:// files that ship with the Roblox
 -- client are used (the classic sword / victory / ping sounds, pitched); empty slots are TODO: put your own rbxassetid://

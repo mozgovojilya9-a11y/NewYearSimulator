@@ -98,7 +98,7 @@ local function questProgress(player, kind: string, amount: number, absolute: boo
 			if quest.Progress ~= before then
 				changed = true
 				if quest.Progress >= def.Target then
-					Remotes.Notify(player, "✅ Задание выполнено: " .. def.Text, "gold")
+					Remotes.Notify(player, "Задание выполнено: " .. def.Text, "gold")
 				end
 			end
 		end
@@ -133,7 +133,7 @@ local function addXp(player, data, amount: number, raw: boolean?)
 		data.SkillPoints = (data.SkillPoints or 0) + P.Level.SkillPointsPerLevel
 		if data.Level % P.Level.RewardEvery == 0 then
 			local reward = earnCredits(player, P.Level.RewardCredits * data.Level)
-			Remotes.Notify(player, ("🎉 Награда за уровень %d: +%s нано-кредитов"):format(data.Level, Format.Number(reward)), "gold")
+			Remotes.Notify(player, ("Награда за уровень %d: +%s нано-кредитов"):format(data.Level, Format.Number(reward)), "gold")
 		end
 	end
 	if gained > 0 then

@@ -30,12 +30,14 @@ local title = Style.Label(content, "", 30, Style.Colors.Red, { LayoutOrder = 1, 
 local function stat(order, icon)
 	local plate = Style.Plate(content, { Size = UDim2.new(1, -20, 0, 48), Transparency = 0.1, ZIndex = 33 })
 	plate.LayoutOrder = order
-	Style.Label(plate, icon, 26, Style.Colors.Text, { Position = UDim2.fromOffset(10, 0), Size = UDim2.fromOffset(40, 48), ZIndex = 34 })
+	local glyph = Style.Icons.Make(plate, icon, 26, Style.Colors.Gold, 34)
+	glyph.AnchorPoint = Vector2.new(0, 0.5)
+	glyph.Position = UDim2.new(0, 16, 0.5, 0)
 	return Style.Label(plate, "", 22, Style.Colors.Text, { Position = UDim2.fromOffset(56, 0), Size = UDim2.new(1, -64, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
 end
-local roomLabel = stat(2, "🏰")
-local lootLabel = stat(3, "🎒")
-local recordLabel = stat(4, "🏆")
+local roomLabel = stat(2, "gate")
+local lootLabel = stat(3, "bag")
+local recordLabel = stat(4, "trophy")
 
 local again = Style.Button(content, { Size = UDim2.fromOffset(260, 54), Color = Style.Colors.Green, Text = "В подземелье!", TextSize = 22, ZIndex = 34, LayoutOrder = 5, Shadow = false })
 local travel = ReplicatedStorage:WaitForChild("Travel")
