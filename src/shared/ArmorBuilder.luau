@@ -150,8 +150,30 @@ end
 -- also emit particles. Secret gets the "ItemFx" tag (rainbow, client).
 local function rarityFx(model: Model, piece)
 	local set = Config.ArmorSets[piece.Set]
-	local rarity = Config.Rarity[set.Rarity]
+	-- an item instance carries its own rarity; a bare base uses the set's
+	local rarity = Config.Rarity[piece.Rarity or set.Rarity] or Config.Rarity[set.Rarity]
 	local glowPart = model:FindFirstChild("Reactor") or model:FindFirstChild("Visor") or model:FindFirstChild("Sole") or model:FindFirstChild("PackCore")
+	if glowPart and piece.Glow then
+		-- enhance +10 and above
+		local glow = Instance.new("PointLight")
+		glow.Name = "EnhanceGlow"
+		glow.Color = Color3.fromRGB(190, 245, 255)
+		glow.Range = 8
+		glow.Brightness = 1.2
+		glow.Shadows = false
+		glow.Parent = glowPart
+		local sparks = Instance.new("ParticleEmitter")
+		sparks.Name = "EnhanceSparks"
+		sparks.Color = ColorSequence.new(Color3.fromRGB(190, 245, 255), Color3.new(1, 1, 1))
+		sparks.LightEmission = 0.9
+		sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.14), NumberSequenceKeypoint.new(1, 0) })
+		sparks.Transparency = NumberSequence.new(0.1, 1)
+		sparks.Lifetime = NumberRange.new(0.5, 0.9)
+		sparks.Speed = NumberRange.new(0.4, 1.2)
+		sparks.SpreadAngle = Vector2.new(180, 180)
+		sparks.Rate = 5
+		sparks.Parent = glowPart
+	end
 	if not glowPart or rarity.Index < Config.Rarity.Epic.Index then
 		return
 	end
@@ -173,7 +195,7 @@ local function rarityFx(model: Model, piece)
 		emitter.Rate = 6
 		emitter.Parent = glowPart
 	end
-	model:SetAttribute("Rarity", set.Rarity)
+	model:SetAttribute("Rarity", rarity.Id)
 end
 
 local function makePart(spec)

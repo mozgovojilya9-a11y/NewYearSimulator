@@ -33,7 +33,6 @@ local Icons = require(script.Parent.Icons)
 local Popups = require(script.Parent.Popups)
 local Style = require(script.Parent.Style)
 local Window = require(script.Parent.Windows.Window)
-local Equipment = require(script.Parent.Windows.Equipment)
 local Gates = require(script.Parent.Windows.Gates)
 local Inventory = require(script.Parent.Windows.Inventory)
 local Reward = require(script.Parent.Windows.Reward)
@@ -55,7 +54,6 @@ local Hud = {}
 Hud.OnAbility = nil -- (slot) set by the combat module: a tap on an ability slot
 
 -- Inventory [G] shows two tabs: gear and materials.
-Window.Group({ { Window = Equipment.Window, Text = "Снаряжение" }, { Window = Inventory.Window, Text = "Материалы" } })
 
 local function decode(attribute: string)
 	local raw = player:GetAttribute(attribute)
@@ -193,7 +191,7 @@ barLayout.SortOrder = Enum.SortOrder.LayoutOrder
 barLayout.Parent = bar
 
 local actions = {
-	Inventory = { Open = Equipment.Open, Windows = { Equipment.Window, Inventory.Window } },
+	Inventory = { Open = Inventory.Open, Windows = { Inventory.Window } },
 	Skills = { Open = Skills.Open, Windows = { Skills.Window } },
 	Quests = { Open = Reward.OpenQuests, Windows = { Reward.Window } },
 	Shop = { Open = function()

@@ -2,8 +2,9 @@
 	QuestService.luau
 	The mentor's story chain (Config.Quests.Story): one step at a time,
 	it leads a new player through every system. Progress comes from
-	GameEvents (Kill, Boss, Loot, Craft, Train) or is read from the save
-	(Class, Learn = skill points spent, Level, Room = record room).
+	GameEvents (Kill, Boss, Loot, Enhance, Train) or is read from the save
+	(Class, Learn = skill points spent, Stat = stat points spent, Level,
+	Room = record room).
 
 	Save: data.Story = { Step, Count, Seen } (Seen = the step the player
 	already heard about; a new / finished step shows "!" over the mentor).
@@ -34,7 +35,7 @@ local Remotes = require(script.Parent.Remotes)
 
 local Q = Config.Quests
 local STORY = Q.Story
-local COUNTED = { Kill = true, Boss = true, Loot = true, Craft = true, Train = true }
+local COUNTED = { Kill = true, Boss = true, Loot = true, Enhance = true, Train = true }
 
 local QuestService = {}
 
@@ -58,6 +59,12 @@ local function progressOf(data, def): number
 			return 0
 		end
 		return PlayerState.SpentPoints(PlayerState.ClassRecord(data, data.Class))
+	elseif def.Kind == "Stat" then
+		local spent = 0
+		for _, value in pairs(data.Attributes or {}) do
+			spent += value
+		end
+		return spent
 	elseif def.Kind == "Level" then
 		return data.Level or 1
 	elseif def.Kind == "Room" then

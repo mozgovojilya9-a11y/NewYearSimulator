@@ -1,8 +1,9 @@
 --[[
 	StatService.luau
 	The ONE place that turns everything a player has into final numbers.
-	Sources: level, weapon, armor pieces, armor set bonus, skill tree
-	passives of the current class, game passes, boosts.
+	Sources: level, weapon and armor (item instances with enhance and
+	bonus props), armor set bonus, skill tree passives of the current
+	class, artifacts, stat points ("Статус"), game passes, boosts.
 
 	Stats (all final, ready to use):
 	  Damage       one hit before crit
@@ -14,7 +15,8 @@
 	  Luck         x chances of Rare+ drops
 	  Regen        HP per second out of combat
 	  Dash         dash distance (studs)
-	  GearScore    sum of item levels: weapon + 3 armor slots
+	  GearScore    sum of item scores: weapon + 3 armor slots
+	  DropChance   + chance that a mob drops an item (Восприятие)
 	  XpMult       x XP earned (passes, VIP, boosts)
 	  CreditsMult  x Нано-кредиты earned (passes, VIP, boosts)
 
@@ -45,6 +47,12 @@ local cache = {} -- [player] = stats table
 StatService.CombatStats = { "Lifesteal", "Thorns", "ComboBonus", "BlockBonus", "SlowOnHit", "StunOnHit", "ControlPct", "AbilityPct", "CooldownPct", "LowHpDamage", "CheatDeath", "DashPower", "ChargeBonus", "VolleyBonus" }
 local published = {} -- [player] = { [attribute] = value }
 
+-- Extra stat sources: function(player, data) -> { [stat] = value } (same
+-- names as skill passives: DamagePct, HealthPct, Health, Defense,
+-- CritChance, CritDamage, AttackSpeed, Regen, Luck, DropChance + combat
+-- stats). ArtifactService and StatusService register here.
+StatService.Sources = {}
+
 -- Pure computation from the save data.
 local function compute(player)
 	local data = DataService.Get(player)
@@ -60,6 +68,7 @@ local function compute(player)
 		Regen = base.Regen,
 		Dash = base.Dash,
 		GearScore = 0,
+		DropChance = 0,
 		XpMult = 1,
 		CreditsMult = 1,
 	}
@@ -76,21 +85,27 @@ local function compute(player)
 	stats.MaxHealth += (level - 1) * base.HealthPerLevel
 	stats.Defense += (level - 1) * base.DefensePerLevel
 
-	-- Weapon
-	local weapon = Config.ItemById.Weapon[data.EquippedWeapon]
+	-- Gear: weapon + armor pieces (item instances), their bonus props, set bonus
+	local gear = {} -- sums of bonus props
+	local weapon = PlayerState.Weapon(player)
 	local weaponDamage = if weapon then weapon.Damage else 1
-	stats.GearScore += Config.ItemLevelOf(weapon)
-
-	-- Armor pieces + set bonus
+	local function wear(view)
+		stats.GearScore += view.Score
+		for _, prop in ipairs(view.Props) do
+			gear[prop.S] = (gear[prop.S] or 0) + prop.V
+		end
+	end
+	if weapon then
+		wear(weapon)
+	end
 	for _, slot in ipairs(Config.ArmorSlots) do
 		local piece = PlayerState.ArmorIn(player, slot)
 		if piece then
 			stats.MaxHealth += piece.Health
 			stats.Defense += piece.Defense
-			stats.GearScore += Config.ItemLevelOf(piece)
+			wear(piece)
 		end
 	end
-	stats.Defense = math.min(0.8, stats.Defense)
 	local set = PlayerState.ActiveSet(player)
 	local damageMult = 1
 	if set then
@@ -107,17 +122,30 @@ local function compute(player)
 			end
 		end
 	end
-	damageMult *= 1 + (skill.DamagePct or 0)
-	stats.MaxHealth = math.floor(stats.MaxHealth * (1 + (skill.HealthPct or 0)))
-	stats.Defense = math.min(0.8, stats.Defense + (skill.Defense or 0))
-	stats.CritChance += skill.CritChance or 0
-	stats.CritDamage += skill.CritDamage or 0
-	stats.AttackSpeed += skill.AttackSpeed or 0
-	stats.Regen += skill.Regen or 0
-	stats.Dash += skill.Dash or 0
-	stats.Luck += skill.Luck or 0
+	-- every extra source (gear props, artifacts, stat points) adds into `bonus`
+	local bonus = {}
+	local function add(source)
+		for stat, value in pairs(source) do
+			bonus[stat] = (bonus[stat] or 0) + value
+		end
+	end
+	add(skill)
+	add(gear)
+	for _, source in ipairs(StatService.Sources) do
+		add(source(player, data) or {})
+	end
+	damageMult *= 1 + (bonus.DamagePct or 0)
+	stats.MaxHealth = math.floor((stats.MaxHealth + (bonus.Health or 0)) * (1 + (bonus.HealthPct or 0)))
+	stats.Defense = math.min(0.8, stats.Defense + (bonus.Defense or 0))
+	stats.CritChance = math.min(0.75, stats.CritChance + (bonus.CritChance or 0))
+	stats.CritDamage += bonus.CritDamage or 0
+	stats.AttackSpeed += bonus.AttackSpeed or 0
+	stats.Regen += bonus.Regen or 0
+	stats.Dash += bonus.Dash or 0
+	stats.Luck += bonus.Luck or 0
+	stats.DropChance = bonus.DropChance or 0
 	for _, name in ipairs(StatService.CombatStats) do
-		stats[name] = skill[name] or 0
+		stats[name] = bonus[name] or 0
 	end
 
 	-- Passes and boosts

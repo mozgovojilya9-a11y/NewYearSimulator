@@ -1,13 +1,16 @@
 --[[
 	PlayerData.luau
 	Read-only view of what the server publishes about the local player
-	as attributes (PlayerState.Sync): JSON tables (Materials) and
+	as attributes (PlayerState.Sync): JSON tables (Items, Equipped) and
 	comma lists (owned items, passes). Decoded lazily and cached until
 	the attribute changes.
 ]]
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Items = require(ReplicatedStorage.Shared.Items)
 
 local player = Players.LocalPlayer
 
@@ -55,12 +58,39 @@ function PlayerData.Set(attribute: string)
 	return value
 end
 
-function PlayerData.Materials()
-	return PlayerData.Table("Materials")
+-- Gear: every owned item as an Items view (final numbers), by uid.
+local itemViews = nil
+function PlayerData.Items()
+	watch("Items")
+	if not itemViews or cache.Items == nil then
+		itemViews = {}
+		for _, instance in ipairs(PlayerData.Table("Items")) do
+			local view = Items.Resolve(instance)
+			if view then
+				itemViews[view.Uid] = view
+			end
+		end
+	end
+	return itemViews
 end
 
-function PlayerData.MaterialCount(materialId: string): number
-	return PlayerData.Materials()[materialId] or 0
+-- { Weapon = uid, Helmet = uid, Chest = uid, Legs = uid }
+function PlayerData.Equipped()
+	return PlayerData.Table("Equipped")
+end
+
+-- The view worn in a slot (or nil).
+function PlayerData.Worn(slot: string)
+	return PlayerData.Items()[PlayerData.Equipped()[slot] or ""]
+end
+
+function PlayerData.IsWorn(uid: string): boolean
+	for _, worn in pairs(PlayerData.Equipped()) do
+		if worn == uid then
+			return true
+		end
+	end
+	return false
 end
 
 function PlayerData.HasPass(key: string): boolean

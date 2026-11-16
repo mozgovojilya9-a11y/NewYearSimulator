@@ -16,12 +16,17 @@ Config.DataStoreName = "AuraClicker_v1"
 -- fields missing from an older save. IDs stored in saves (weapons,
 -- pets) must never be renamed without a migration.
 Config.StartingData = {
-	Credits = 0, -- "Нано-кредиты": eggs, cosmetics
-	EquippedWeapon = "Stick",
-	OwnedWeapons = { Stick = true }, -- crafted (or legacy bought) weapons
-	OwnedArmor = {}, -- [armorId] = true
-	EquippedArmor = { Helmet = "", Chest = "", Legs = "" },
-	Materials = {}, -- [materialId] = count
+	Credits = 0, -- "Нано-кредиты" (монеты): forge, resets, cosmetics
+	Cores = 0, -- "Нано-ядра": from salvaged items, spent in the forge
+	-- Gear: item instances (Shared.Items). [uid] = { U, B = base id, K = "W" | "A",
+	-- R = rarity, L = item level, Q = stat roll, E = enhance, P = bonus props,
+	-- Lk = locked, F = failed enhances in a row, C = "Any" (class-free), St = starter }
+	Items = {},
+	NextItem = 1, -- counter for item uids
+	Equipped = { Weapon = "", Helmet = "", Chest = "", Legs = "" }, -- slot -> uid
+	Artifacts = {}, -- [artifactId] = { Level = 1.., Copies = spare duplicates }
+	ArtifactSlots = { "", "", "" }, -- equipped artifact ids
+	Attributes = { Str = 0, Agi = 0, Vit = 0, Per = 0 }, -- spent stat points ("Статус")
 	RoomReached = 0, -- highest dungeon room cleared (0 = none, 20 = all)
 	-- Engagement systems (ProgressionService)
 	Daily = { LastClaim = 0, Streak = 0 },
@@ -49,7 +54,27 @@ Config.StartingData = {
 --       compensation, Config.Migration), x2 boosts in Boosts
 --   4 = pets removed (credits as compensation, Config.PetMigration)
 --   5 = gear above the player's progress replaced (Config.ItemMigration)
-Config.SchemaVersion = 5
+--   6 = crafting and materials removed: owned catalog gear becomes item
+--       instances (kept as it was), materials become credits + Нано-ядра
+--       (Config.CraftMigration)
+Config.SchemaVersion = 6
+
+-- Schema 5 -> 6: every material the player had turns into credits and
+-- Нано-ядра by its old rarity (old material id -> rarity is listed here:
+-- Config.Materials no longer exists).
+Config.CraftMigration = {
+	MaterialRarity = {
+		Bone = "Common", Slime = "Uncommon", RustyIron = "Rare", CursedSkull = "Epic", CatacombHeart = "Secret",
+		Ice = "Common", YetiFur = "Uncommon", FrostCrystal = "Rare", EternalIce = "Legendary",
+		Obsidian = "Common", Ember = "Uncommon", MagmaCore = "Rare", FirePlume = "Epic", VolcanoHeart = "Mythic",
+		DarkShard = "Common", ShadowDust = "Uncommon", AuraEssence = "Rare", AbyssEye = "Legendary",
+	},
+	Credits = { Common = 2, Uncommon = 5, Rare = 15, Epic = 50, Legendary = 150, Mythic = 400, Secret = 800 },
+	Cores = { Common = 0.1, Uncommon = 0.25, Rare = 0.8, Epic = 2.5, Legendary = 8, Mythic = 20, Secret = 40 },
+	MaxCredits = 20000,
+	MaxCores = 600,
+	Notice = "Крафт заменён добычей и Кузницей. За материалы: +%s нано-кредитов и +%s нано-ядер. Твоё снаряжение осталось!",
+}
 
 -- One-time compensation (schema 2 -> 3) for the removed clicker: Aura and
 -- rebirths turn into Нано-кредиты. Moderate on purpose.
@@ -137,27 +162,63 @@ function Config.LevelMult(level: number): number
 	return 1 + (math.max(1, level) - 1) * Config.Stats.DamagePerLevel
 end
 
--- Item level ("уровень предмета") of gear. Weapons: from their damage
--- (Stick 1, biome 1 ~10-29, biome 2 ~35-52, biome 3 ~58-76, biome 4
--- ~81-99); armor: the ItemLevel of its set. Gear Score = the sum over the
--- weapon and the three armor slots (empty slot = 0).
-Config.ItemLevel = {
-	WeaponK = 31, -- weapon item level = 1 + WeaponK x log10(Damage)
+-- GEAR. Items are instances (Shared.Items) of a base from Config.Weapons /
+-- Config.Armor (the base gives the name, look, class / slot / set); the
+-- numbers come from the item level, rarity, stat roll and enhance level:
+--   weapon Damage = Weapon.Base x Weapon.Growth^L x RarityMult x Q x enhance
+--   armor  Health = (Armor.HealthBase + Armor.HealthPerLevel x L) x RarityMult x Q x enhance
+--          (chest x ChestMult), Defense = (DefenseBase + DefensePerLevel x L) x enhance
+--   enhance = 1 + Forge.PerLevel x E
+-- Epic+ items carry bonus props (BonusCount by rarity) rolled from Bonuses:
+-- value = Min..Max x BonusScale[rarity]. Gear Score = sum of Score(item)
+-- over the 4 slots: L x ScoreRarity + ScorePerEnhance x E.
+Config.Items = {
+	MaxInventory = 80,
+	LevelPerRoom = 5, -- item level of a drop = room x this -+ LevelSpread
+	LevelSpread = 2,
+	MaxLevel = 100,
+	Weapon = { Base = 2, Growth = 1.068 }, -- L 25 -> 10, 50 -> 54, 75 -> 278, 100 -> 1436 (Uncommon)
+	Armor = { HealthBase = 6, HealthPerLevel = 1.5, ChestMult = 1.5, DefenseBase = 0.015, DefensePerLevel = 0.0006 },
+	RarityMult = { Common = 0.85, Uncommon = 1, Rare = 1.15, Epic = 1.32, Legendary = 1.52, Mythic = 1.76, Secret = 2.05 },
+	Roll = { 0.92, 1.08 }, -- Q: the random part of an item's main stat
+	WeaponShare = 0.4, -- a drop is a weapon with this chance, else armor
+	OwnClassChance = 0.7, -- a weapon drop is of the player's class this often
+	BonusCount = { Epic = { 1, 1 }, Legendary = { 1, 2 }, Mythic = { 2, 3 }, Secret = { 3, 3 } },
+	BonusScale = { Epic = 1, Legendary = 1.3, Mythic = 1.65, Secret = 2 },
+	Bonuses = {
+		{ Id = "DamagePct", Name = "Урон", Min = 0.03, Max = 0.06, Pct = true },
+		{ Id = "HealthPct", Name = "Макс. HP", Min = 0.03, Max = 0.06, Pct = true },
+		{ Id = "CritChance", Name = "Шанс крита", Min = 0.015, Max = 0.03, Pct = true },
+		{ Id = "CritDamage", Name = "Крит. урон", Min = 0.08, Max = 0.16, Pct = true },
+		{ Id = "AttackSpeed", Name = "Скорость атаки", Min = 0.03, Max = 0.06, Pct = true },
+		{ Id = "Defense", Name = "Защита", Min = 0.01, Max = 0.02, Pct = true },
+		{ Id = "Luck", Name = "Удача", Min = 0.04, Max = 0.08, Pct = true },
+		{ Id = "Regen", Name = "Регенерация", Min = 1, Max = 2.5 },
+		{ Id = "Lifesteal", Name = "Вампиризм", Min = 0.01, Max = 0.02, Pct = true },
+	},
+	ScoreRarity = { Common = 0.8, Uncommon = 1, Rare = 1.2, Epic = 1.45, Legendary = 1.75, Mythic = 2.1, Secret = 2.5 },
+	ScorePerEnhance = 2,
+	Starter = "Stick", -- every player always has it (class-free, can't be salvaged)
+	Texts = {
+		Full = "Инвентарь полон (%d). Разбери лишнее в Кузнице или в инвентаре.",
+		WrongClass = "Это оружие другого класса",
+		Equipped = "Надето: %s",
+		Unequipped = "Снято: %s",
+		Locked = "Предмет под замком",
+		Level = "Ур. предмета %d",
+		Salvaged = "Разобрано предметов: %d  •  +%s нано-ядер",
+		NothingToSalvage = "Нечего разбирать",
+		KeepWeapon = "Нужно оставить хотя бы одно оружие",
+	},
 }
-
-function Config.ItemLevelOf(item): number
-	if not item then
-		return 0
-	end
-	if item.ItemLevel then
-		return item.ItemLevel
-	end
-	return math.floor(1 + Config.ItemLevel.WeaponK * math.log10(math.max(1, item.Damage or 1)))
+Config.BonusById = {}
+for _, bonus in ipairs(Config.Items.Bonuses) do
+	Config.BonusById[bonus.Id] = bonus
 end
 
 -- "Нано-кредиты": the spendable currency. Earned from
 -- mobs (more in deeper rooms, bosses x BossMultiplier), daily reward,
--- quests, the wheel and level rewards. Spent on eggs (and cosmetics).
+-- quests, the wheel and level rewards. Spent in the forge, on resets and cosmetics.
 Config.Credits = {
 	Name = "Нано-кредиты",
 	Icon = "credits",
@@ -187,12 +248,12 @@ Config.GamePasses = {
 	Damage2x = { Id = 0, Order = 2, Icon = "sword", Name = "x2 Урон", Price = 149, Text = "Навсегда удваивает урон" },
 	Xp2x = { Id = 0, Order = 3, Icon = "star", Name = "x2 Опыт", Price = 149, Text = "Навсегда удваивает опыт" },
 	Credits2x = { Id = 0, Order = 4, Icon = "credits", Name = "x2 Кредиты", Price = 149, Text = "Навсегда удваивает нано-кредиты" },
-	LootLuck = { Id = 0, Order = 8, Icon = "gem", Name = "Удача добычи x2", Price = 199, Text = "x2 шанс редких материалов с мобов" },
+	LootLuck = { Id = 0, Order = 8, Icon = "gem", Name = "Удача добычи x2", Price = 199, Text = "x2 шанс редких предметов (в пределах ранга Врат)" },
 }
 
 -- Developer Products (bought again and again). Id = 0 -> "Скоро".
 -- Kind: Credits (Amount of Нано-кредиты), Boost (Boost + Minutes),
--- Chest (Biome, Rolls: random materials of that biome, loot luck x Luck),
+-- Chest (Rank, Rolls: gear rolled from the Boss table of that gate rank),
 -- Weapon / ArmorSet (exclusive gear, granted once), WheelSkip.
 Config.Products = {
 	{ Key = "CreditsSmall", Id = 0, Tab = "Packs", Icon = "credits", Name = "Горсть кредитов", Price = 25, Kind = "Credits", Amount = 400 },
@@ -207,10 +268,10 @@ Config.Products = {
 	{ Key = "BoostLoot15", Id = 0, Tab = "Boosts", Icon = "gem", Name = "x2 Удача добычи · 15 мин", Price = 29, Kind = "Boost", Boost = "Loot", Minutes = 15 },
 	{ Key = "BoostLoot60", Id = 0, Tab = "Boosts", Icon = "gem", Name = "x2 Удача добычи · 60 мин", Price = 79, Kind = "Boost", Boost = "Loot", Minutes = 60 },
 
-	{ Key = "ChestCatacombs", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер цеха", Price = 49, Kind = "Chest", Biome = 1, Rolls = 30, Luck = 2 },
-	{ Key = "ChestIce", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер криолаборатории", Price = 99, Kind = "Chest", Biome = 2, Rolls = 30, Luck = 2 },
-	{ Key = "ChestLava", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер реактора", Price = 149, Kind = "Chest", Biome = 3, Rolls = 30, Luck = 2 },
-	{ Key = "ChestAbyss", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер Нексуса", Price = 199, Kind = "Chest", Biome = 4, Rolls = 30, Luck = 2 },
+	{ Key = "ChestCatacombs", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер цеха", Price = 49, Kind = "Chest", Rank = "E", Rolls = 3 },
+	{ Key = "ChestIce", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер криолаборатории", Price = 99, Kind = "Chest", Rank = "D", Rolls = 3 },
+	{ Key = "ChestLava", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер реактора", Price = 149, Kind = "Chest", Rank = "C", Rolls = 3 },
+	{ Key = "ChestAbyss", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер Нексуса", Price = 199, Kind = "Chest", Rank = "B", Rolls = 3 },
 
 	{ Key = "WeaponPatron", Id = 0, Tab = "Exclusive", Icon = "sword", Name = "Клинок Покровителя", Price = 149, Kind = "Weapon", Item = "PatronBlade" },
 	{ Key = "WeaponComet", Id = 0, Tab = "Exclusive", Icon = "spear", Name = "Кометное копьё", Price = 249, Kind = "Weapon", Item = "CometSword" },
@@ -282,63 +343,92 @@ Config.Dungeon = {
 	},
 }
 
--- Materials: what mobs drop and what the forge consumes. Biome = index
--- into Config.DungeonLayout.Biomes. Shape = mini-model built from Parts
--- by Shared.MaterialBuilder. Ids are stored in saves: never rename.
-Config.Materials = {
-	-- 1. Сборочный цех
-	{ Id = "Bone", Name = "Болт", Biome = 1, Rarity = "Common", Shape = "Bone", Color = Color3.fromRGB(235, 230, 215) },
-	{ Id = "Slime", Name = "Смазка", Biome = 1, Rarity = "Uncommon", Shape = "Blob", Color = Color3.fromRGB(110, 235, 120) },
-	{ Id = "RustyIron", Name = "Ржавая пластина", Biome = 1, Rarity = "Rare", Shape = "Ingot", Color = Color3.fromRGB(165, 95, 60) },
-	{ Id = "CursedSkull", Name = "Чип управления", Biome = 1, Rarity = "Epic", Shape = "Skull", Color = Color3.fromRGB(190, 120, 255) },
-	{ Id = "CatacombHeart", Name = "Сердце фабрики", Biome = 1, Rarity = "Secret", Shape = "Heart", Color = Color3.fromRGB(255, 90, 160) },
-	-- 2. Криолаборатория
-	{ Id = "Ice", Name = "Криогель", Biome = 2, Rarity = "Common", Shape = "Cube", Color = Color3.fromRGB(170, 225, 255) },
-	{ Id = "YetiFur", Name = "Термоизоляция", Biome = 2, Rarity = "Uncommon", Shape = "Fur", Color = Color3.fromRGB(240, 245, 250) },
-	{ Id = "FrostCrystal", Name = "Крио-кристалл", Biome = 2, Rarity = "Rare", Shape = "Crystal", Color = Color3.fromRGB(90, 190, 255) },
-	{ Id = "EternalIce", Name = "Вечный хладагент", Biome = 2, Rarity = "Legendary", Shape = "Star", Color = Color3.fromRGB(140, 240, 255) },
-	-- 3. Плавильный реактор
-	{ Id = "Obsidian", Name = "Шлак", Biome = 3, Rarity = "Common", Shape = "Shards", Color = Color3.fromRGB(45, 35, 60) },
-	{ Id = "Ember", Name = "Раскалённая окалина", Biome = 3, Rarity = "Uncommon", Shape = "Coal", Color = Color3.fromRGB(255, 130, 40) },
-	{ Id = "MagmaCore", Name = "Плазменное ядро", Biome = 3, Rarity = "Rare", Shape = "Core", Color = Color3.fromRGB(255, 110, 30) },
-	{ Id = "FirePlume", Name = "Огненный конденсатор", Biome = 3, Rarity = "Epic", Shape = "Feather", Color = Color3.fromRGB(255, 170, 50) },
-	{ Id = "VolcanoHeart", Name = "Сердце реактора", Biome = 3, Rarity = "Mythic", Shape = "Heart", Color = Color3.fromRGB(255, 80, 40) },
-	-- 4. Ядро Нексуса
-	{ Id = "DarkShard", Name = "Осколок данных", Biome = 4, Rarity = "Common", Shape = "Shards", Color = Color3.fromRGB(70, 40, 120) },
-	{ Id = "ShadowDust", Name = "Квантовая пыль", Biome = 4, Rarity = "Uncommon", Shape = "Dust", Color = Color3.fromRGB(120, 90, 170) },
-	{ Id = "AuraEssence", Name = "Эссенция Нексуса", Biome = 4, Rarity = "Rare", Shape = "Vial", Color = Color3.fromRGB(255, 61, 184) },
-	{ Id = "AbyssEye", Name = "Око Нексуса", Biome = 4, Rarity = "Legendary", Shape = "Eye", Color = Color3.fromRGB(170, 80, 255) },
+-- Gate ranks (E -> S). Until the rank Gates replace the 20-room dungeon
+-- (next update) a room maps to a rank here: loot tables and the item
+-- level of drops read the rank / room from this table.
+Config.Gates = {
+	Ranks = { "E", "D", "C", "B", "A", "S" },
+	RankByRoom = { "E", "E", "E", "E", "D", "D", "D", "D", "C", "C", "C", "C", "B", "B", "B", "B", "A", "A", "A", "S" },
+	Colors = {
+		E = Color3.fromRGB(150, 160, 175), D = Color3.fromRGB(90, 230, 110), C = Color3.fromRGB(70, 140, 255),
+		B = Color3.fromRGB(170, 90, 255), A = Color3.fromRGB(255, 201, 60), S = Color3.fromRGB(255, 70, 70),
+	},
 }
-Config.MaterialById = {}
-for order, material in ipairs(Config.Materials) do
-	material.Order = order
-	Config.MaterialById[material.Id] = material
+function Config.RankForRoom(room: number): string
+	local list = Config.Gates.RankByRoom
+	return list[math.clamp(room, 1, #list)]
 end
 
--- Loot. A drop is personal: only the player whose run killed the mob
--- sees it and can pick it up, and only by HOLDING E (ProximityPrompt).
+-- Loot: ready gear (weapons, armor) and rarely artifacts. A drop is
+-- personal: only the player whose run killed the mob sees it and can pick
+-- it up, and only by HOLDING E. Bosses leave a chest that opens.
+-- Tables[rank][enemy] = weights of rarities (missing = 0%: impossible at
+-- that rank). Enemy: Normal / Elite / Boss / Red (Красные Врата).
+-- Luck (Восприятие, passes, boosts) multiplies the weights of the two
+-- highest rarities the table allows: it never opens a rarity early.
 Config.Loot = {
 	HoldSeconds = 0.5,
-	Lifetime = 60, -- seconds a drop stays on the ground
+	Lifetime = 90, -- seconds a drop stays on the ground
 	PickupRange = 16, -- server-side distance check
 	PromptDistance = 10,
-	ExtraDropChance = 0.3, -- normal mobs: 1 drop + this chance of a second one
-	BossDrops = 4,
-	BossGuaranteed = "Rare", -- the first boss drop is at least this rarity
-	BossLuck = 4, -- boss drops: chances of Rare+ multiplied by this
-	LuckFrom = "Rare", -- luck multiplies this rarity and everything above
+	DropChance = { Normal = 0.22, Elite = 0.6, Boss = 1, Red = 0.35 }, -- an item drops at all
+	BossItems = 3, -- items inside a boss chest
+	BossMinRarity = { E = "Uncommon", D = "Rare", C = "Rare", B = "Epic", A = "Epic", S = "Legendary" }, -- first chest item is at least this
+	ArtifactChance = { Normal = 0, Elite = 0.02, Boss = 0.25, Red = 0.4 }, -- an artifact on top of the gear
+	LuckTop = 2, -- luck multiplies this many highest rarities of the table
+	LuckCap = 4,
+	Tables = {
+		E = {
+			Normal = { Common = 78, Uncommon = 20, Rare = 2 },
+			Elite = { Common = 55, Uncommon = 37, Rare = 8 },
+			Boss = { Common = 20, Uncommon = 55, Rare = 25 },
+			Red = { Uncommon = 60, Rare = 40 },
+		},
+		D = {
+			Normal = { Common = 62, Uncommon = 30, Rare = 7.5, Epic = 0.5 },
+			Elite = { Common = 40, Uncommon = 42, Rare = 16, Epic = 2 },
+			Boss = { Uncommon = 50, Rare = 42, Epic = 8 },
+			Red = { Uncommon = 35, Rare = 50, Epic = 15 },
+		},
+		C = {
+			Normal = { Common = 50, Uncommon = 35, Rare = 13, Epic = 2 },
+			Elite = { Common = 28, Uncommon = 42, Rare = 24, Epic = 6 },
+			Boss = { Uncommon = 30, Rare = 50, Epic = 19, Legendary = 1 },
+			Red = { Rare = 60, Epic = 36, Legendary = 4 },
+		},
+		B = {
+			Normal = { Common = 38, Uncommon = 38, Rare = 19, Epic = 4.7, Legendary = 0.3 },
+			Elite = { Common = 18, Uncommon = 40, Rare = 30, Epic = 11, Legendary = 1 },
+			Boss = { Rare = 55, Epic = 38, Legendary = 7 },
+			Red = { Rare = 35, Epic = 50, Legendary = 14, Mythic = 1 },
+		},
+		A = {
+			Normal = { Common = 28, Uncommon = 38, Rare = 25, Epic = 8, Legendary = 0.95, Mythic = 0.05 },
+			Elite = { Uncommon = 40, Rare = 38, Epic = 18, Legendary = 3.7, Mythic = 0.3 },
+			Boss = { Rare = 35, Epic = 48, Legendary = 15, Mythic = 2 },
+			Red = { Epic = 62, Legendary = 30, Mythic = 7.5, Secret = 0.5 },
+		},
+		S = {
+			Normal = { Common = 18, Uncommon = 36, Rare = 30, Epic = 13, Legendary = 2.8, Mythic = 0.19, Secret = 0.01 },
+			Elite = { Uncommon = 28, Rare = 40, Epic = 24, Legendary = 7, Mythic = 0.9, Secret = 0.1 },
+			Boss = { Epic = 55, Legendary = 34, Mythic = 10, Secret = 1 },
+			Red = { Epic = 35, Legendary = 45, Mythic = 17, Secret = 3 },
+		},
+	},
+	EnemyNames = { Normal = "Обычный", Elite = "Элита", Boss = "Босс", Red = "Красные Врата" },
+	FlashFrom = "Legendary", -- this rarity and above: screen flash + chat line
 	FloatHeight = 2.4,
-	SpreadRadius = 4.5, -- several drops lie on a circle of this radius around the kill
-	BossSpreadRadius = 7,
-	DetailDistance = 14, -- closer than this the plate shows name + rarity; farther only a small name tag
-	PlateSmall = Vector2.new(120, 26),
-	PlateFull = Vector2.new(160, 46),
-	SpinSeconds = 4,
-	BeamHeight = 14,
+	SpreadRadius = 4.5,
+	BeamHeight = 16,
+	Chest = { OpenSeconds = 1.2, Scale = 1 },
+	Feed = { Max = 5, Seconds = 6 }, -- loot feed on the right side of the screen
 	Texts = {
 		Pickup = "Подобрать",
+		OpenChest = "Открыть сундук",
+		ChestName = "Сундук босса",
 		Announce = "%s выбил %s предмет: %s!",
-		Picked = "+%d %s",
+		Better = "Лучше надетого",
+		Artifact = "Артефакт",
 	},
 }
 
@@ -347,9 +437,7 @@ Config.Loot = {
 -- Height in studs (bosses x Config.MobLooks.BossScale), Tint = color the
 -- parts lean to (TintAmount 0..1), Glow = color of neon parts, Turn =
 -- degrees to turn the model if it faces backwards. No model -> the
--- procedural mob Builder. Drops = materials this mob can drop; the rarity
--- is rolled first (Config.Rarities), then a material of that rarity is
--- picked from this list (nearest lower rarity, else the nearest higher).
+-- procedural mob Builder. What a mob drops: Config.Loot.
 Config.Mobs = {
 	Biomes = {
 		{ Kinds = { "SpiderBot", "Assembler", "Loader" }, Boss = "ForemanMech" },
@@ -359,25 +447,25 @@ Config.Mobs = {
 	},
 	Defs = {
 		-- 1. Сборочный цех
-		SpiderBot = { Name = "Паукобот", Asset = "Mob_SpiderBot", Height = 3.6, Builder = "IceSpider", Drops = { "Bone", "Slime", "RustyIron", "CatacombHeart" } },
-		Assembler = { Name = "Робот-сборщик", Asset = "Mob_Robot", Height = 5.5, Builder = "ZombieMiner", Drops = { "Bone", "RustyIron", "CursedSkull", "CatacombHeart" } },
-		Loader = { Name = "Бот-погрузчик", Asset = "Mob_Bot2", Height = 5, Builder = "SkeletonArcher", Drops = { "Slime", "Bone", "CursedSkull", "CatacombHeart" } },
-		ForemanMech = { Name = "Мех-бригадир", Boss = true, Asset = "Boss_Foreman", Turn = 90, AltAsset = "Mob_Mech", Height = 6, Tint = Color3.fromRGB(255, 170, 60), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "SlimeKing", Drops = { "Bone", "Slime", "RustyIron", "CursedSkull", "CatacombHeart" } },
+		SpiderBot = { Name = "Паукобот", Asset = "Mob_SpiderBot", Height = 3.6, Builder = "IceSpider" },
+		Assembler = { Name = "Робот-сборщик", Asset = "Mob_Robot", Height = 5.5, Builder = "ZombieMiner" },
+		Loader = { Name = "Бот-погрузчик", Asset = "Mob_Bot2", Height = 5, Builder = "SkeletonArcher" },
+		ForemanMech = { Name = "Мех-бригадир", Boss = true, Asset = "Boss_Foreman", Turn = 90, AltAsset = "Mob_Mech", Height = 6, Tint = Color3.fromRGB(255, 170, 60), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "SlimeKing" },
 		-- 2. Криолаборатория
-		CryoBot = { Name = "Крио-бот", Asset = "Mob_BlueBot", Height = 5, Glow = Color3.fromRGB(120, 230, 255), Builder = "SnowGolem", Drops = { "Ice", "FrostCrystal", "EternalIce" } },
-		CryoAndroid = { Name = "Крио-андроид", Asset = "Mob_Android", Height = 6, Tint = Color3.fromRGB(170, 220, 255), TintAmount = 0.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "Yeti", Drops = { "YetiFur", "FrostCrystal", "EternalIce" } },
-		FrostSpider = { Name = "Ледяной паукобот", Asset = "Mob_SpiderBot", Height = 4.2, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider", Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" } },
-		CryoOverseer = { Name = "Крио-надзиратель", Boss = true, Asset = "Boss_Cryo", AltAsset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(150, 210, 255), TintAmount = 0.45, Glow = Color3.fromRGB(46, 230, 255), Builder = "IceBoneLord", Drops = { "Ice", "YetiFur", "FrostCrystal", "EternalIce" } },
+		CryoBot = { Name = "Крио-бот", Asset = "Mob_BlueBot", Height = 5, Glow = Color3.fromRGB(120, 230, 255), Builder = "SnowGolem" },
+		CryoAndroid = { Name = "Крио-андроид", Asset = "Mob_Android", Height = 6, Tint = Color3.fromRGB(170, 220, 255), TintAmount = 0.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "Yeti" },
+		FrostSpider = { Name = "Ледяной паукобот", Asset = "Mob_SpiderBot", Height = 4.2, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider" },
+		CryoOverseer = { Name = "Крио-надзиратель", Boss = true, Asset = "Boss_Cryo", AltAsset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(150, 210, 255), TintAmount = 0.45, Glow = Color3.fromRGB(46, 230, 255), Builder = "IceBoneLord" },
 		-- 3. Плавильный реактор
-		Smelter = { Name = "Андроид-плавильщик", Asset = "Mob_RedAndroid", Height = 6, Glow = Color3.fromRGB(255, 140, 40), Builder = "FireImp", Drops = { "Ember", "Obsidian", "FirePlume", "VolcanoHeart" } },
-		HeavyMech = { Name = "Тяжёлый мех", Asset = "Mob_Mech", Height = 6.5, Tint = Color3.fromRGB(90, 70, 60), TintAmount = 0.4, Glow = Color3.fromRGB(255, 120, 30), Builder = "MagmaGolem", Drops = { "Obsidian", "MagmaCore", "FirePlume", "VolcanoHeart" } },
-		SlagBot = { Name = "Шлакобот", Asset = "Mob_Bot2", Height = 5, Tint = Color3.fromRGB(255, 130, 40), TintAmount = 0.4, Glow = Color3.fromRGB(255, 160, 60), Builder = "GoblinSmith", Drops = { "Obsidian", "Ember", "MagmaCore", "VolcanoHeart" } },
-		MoltenColossus = { Name = "Плавильный колосс", Boss = true, Asset = "Boss_Molten", AltAsset = "Mob_Android", Height = 6.2, Tint = Color3.fromRGB(255, 110, 30), TintAmount = 0.45, Glow = Color3.fromRGB(255, 150, 40), Builder = "FireChief", Drops = { "Obsidian", "Ember", "MagmaCore", "FirePlume", "VolcanoHeart" } },
+		Smelter = { Name = "Андроид-плавильщик", Asset = "Mob_RedAndroid", Height = 6, Glow = Color3.fromRGB(255, 140, 40), Builder = "FireImp" },
+		HeavyMech = { Name = "Тяжёлый мех", Asset = "Mob_Mech", Height = 6.5, Tint = Color3.fromRGB(90, 70, 60), TintAmount = 0.4, Glow = Color3.fromRGB(255, 120, 30), Builder = "MagmaGolem" },
+		SlagBot = { Name = "Шлакобот", Asset = "Mob_Bot2", Height = 5, Tint = Color3.fromRGB(255, 130, 40), TintAmount = 0.4, Glow = Color3.fromRGB(255, 160, 60), Builder = "GoblinSmith" },
+		MoltenColossus = { Name = "Плавильный колосс", Boss = true, Asset = "Boss_Molten", AltAsset = "Mob_Android", Height = 6.2, Tint = Color3.fromRGB(255, 110, 30), TintAmount = 0.45, Glow = Color3.fromRGB(255, 150, 40), Builder = "FireChief" },
 		-- 4. Ядро Нексуса
-		NexusSentinel = { Name = "Страж Нексуса", Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(120, 60, 200), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight", Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" } },
-		NexusDrone = { Name = "Дрон Нексуса", Asset = "Mob_Robot", Height = 5.5, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.45, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye", Drops = { "DarkShard", "AuraEssence", "AbyssEye" } },
-		PhaseAndroid = { Name = "Фазовый андроид", Asset = "Mob_RedAndroid", Height = 6, Tint = Color3.fromRGB(170, 80, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost", Drops = { "ShadowDust", "AuraEssence", "AbyssEye" } },
-		Juggernaut = { Name = "Джаггернаут", Boss = true, Asset = "Boss_Juggernaut", Height = 6.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord", Drops = { "DarkShard", "ShadowDust", "AuraEssence", "AbyssEye" } },
+		NexusSentinel = { Name = "Страж Нексуса", Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(120, 60, 200), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
+		NexusDrone = { Name = "Дрон Нексуса", Asset = "Mob_Robot", Height = 5.5, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.45, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye" },
+		PhaseAndroid = { Name = "Фазовый андроид", Asset = "Mob_RedAndroid", Height = 6, Tint = Color3.fromRGB(170, 80, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost" },
+		Juggernaut = { Name = "Джаггернаут", Boss = true, Asset = "Boss_Juggernaut", Height = 6.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord" },
 	},
 }
 for id, def in pairs(Config.Mobs.Defs) do
@@ -747,14 +835,14 @@ function Config.MobDamage(room: number, isBoss: boolean): number
 	return math.floor(damage)
 end
 
--- Weapons: Damage is the weapon base (see Config.Damage for the full
--- formula). One weapon is active. Weapons are CRAFTED at the forge from
--- materials (Config.Recipes): 4 per biome, each stronger than the last.
--- Class = Blade (Клинок: swords) / Pulse (Импульс: spears) / Gunner
--- (Стрелок: blasters): picks the owner model (Config.Assets.WeaponModels).
--- Shape = procedural fallback model (Shared.WeaponBuilder). Legacy = bought in an
--- older version of the game: still owned and usable, not craftable.
--- Ids are stored in saves: never rename.
+-- Weapon BASES: the name, look and class of weapon items (Shared.Items
+-- makes instances of them; a drop picks a base of its class and biome).
+-- Damage here is only the old catalog value, used to convert gear from
+-- saves before schema 6. Class = Blade (Клинок: swords) / Pulse (Импульс:
+-- spears) / Gunner (Стрелок: blasters): picks the owner model
+-- (Config.Assets.WeaponModels). Shape = procedural fallback model
+-- (Shared.WeaponBuilder). Robux = store exclusive, Legacy = from an old
+-- version (both never drop). Ids are stored in saves: never rename.
 Config.Weapons = {
 	{ Id = "Stick", Name = "Обрезок трубы", Rarity = "Common", Damage = 1, Class = "Blade", Shape = "Stick", Color = Color3.fromRGB(150, 110, 70) },
 	-- 1. Катакомбы
@@ -841,61 +929,66 @@ do
 	end
 end
 
--- Forge recipes: materials -> the item (Id = weapon or
--- armor id). Shown in this order inside each tab.
-Config.Recipes = {
-	-- Weapons
-	{ Id = "BoneSword", Kind = "Weapon", Materials = { Bone = 8 } },
-	{ Id = "SlimeDagger", Kind = "Weapon", Materials = { Bone = 12, Slime = 6 } },
-	{ Id = "RustCleaver", Kind = "Weapon", Materials = { Bone = 20, RustyIron = 4 } },
-	{ Id = "SkullMace", Kind = "Weapon", Materials = { Bone = 30, Slime = 12, RustyIron = 6, CursedSkull = 1 } },
-	{ Id = "IceBlade", Kind = "Weapon", Materials = { Ice = 15, RustyIron = 3 } },
-	{ Id = "YetiClub", Kind = "Weapon", Materials = { Ice = 25, YetiFur = 10 } },
-	{ Id = "FrostSpear", Kind = "Weapon", Materials = { Ice = 40, YetiFur = 15, FrostCrystal = 6 } },
-	{ Id = "EternalBlade", Kind = "Weapon", Materials = { Ice = 60, FrostCrystal = 10, EternalIce = 1 } },
-	{ Id = "ObsidianAxe", Kind = "Weapon", Materials = { Obsidian = 30, Ember = 10 } },
-	{ Id = "EmberSword", Kind = "Weapon", Materials = { Obsidian = 45, Ember = 20, MagmaCore = 5 } },
-	{ Id = "MagmaHammer", Kind = "Weapon", Materials = { Obsidian = 70, MagmaCore = 8, FirePlume = 2 } },
-	{ Id = "PhoenixBlade", Kind = "Weapon", Materials = { Obsidian = 100, MagmaCore = 14, FirePlume = 5 } },
-	{ Id = "ShadowKatana", Kind = "Weapon", Materials = { DarkShard = 40, ShadowDust = 15 } },
-	{ Id = "DuskScythe", Kind = "Weapon", Materials = { DarkShard = 60, ShadowDust = 25, AuraEssence = 8 } },
-	{ Id = "AbyssBlade", Kind = "Weapon", Materials = { DarkShard = 90, AuraEssence = 12, AbyssEye = 1 } },
-	{ Id = "AuraReaver", Kind = "Weapon", Materials = { DarkShard = 140, AuraEssence = 20, AbyssEye = 3, EternalIce = 2 } },
-	-- Armor
-	{ Id = "BoneHelmet", Kind = "Armor", Materials = { Bone = 10, Slime = 3 } },
-	{ Id = "BoneChest", Kind = "Armor", Materials = { Bone = 18, Slime = 6, RustyIron = 2 } },
-	{ Id = "BoneLegs", Kind = "Armor", Materials = { Bone = 14, Slime = 4 } },
-	{ Id = "IceHelmet", Kind = "Armor", Materials = { Ice = 20, YetiFur = 8 } },
-	{ Id = "IceChest", Kind = "Armor", Materials = { Ice = 35, YetiFur = 14, FrostCrystal = 4 } },
-	{ Id = "IceLegs", Kind = "Armor", Materials = { Ice = 28, YetiFur = 10, FrostCrystal = 2 } },
-	{ Id = "LavaHelmet", Kind = "Armor", Materials = { Obsidian = 35, Ember = 12, MagmaCore = 3 } },
-	{ Id = "LavaChest", Kind = "Armor", Materials = { Obsidian = 60, Ember = 20, MagmaCore = 6, FirePlume = 1 } },
-	{ Id = "LavaLegs", Kind = "Armor", Materials = { Obsidian = 45, Ember = 15, MagmaCore = 4 } },
-	{ Id = "AbyssHelmet", Kind = "Armor", Materials = { DarkShard = 50, ShadowDust = 20, AuraEssence = 5 } },
-	{ Id = "AbyssChest", Kind = "Armor", Materials = { DarkShard = 80, ShadowDust = 30, AuraEssence = 10, AbyssEye = 1 } },
-	{ Id = "AbyssLegs", Kind = "Armor", Materials = { DarkShard = 60, ShadowDust = 24, AuraEssence = 6 } },
-}
-Config.RecipeById = {}
-for order, recipe in ipairs(Config.Recipes) do
-	recipe.Order = order
-	Config.RecipeById[recipe.Id] = recipe
-end
-
+-- Кузница (Фабрикатор). Everything is paid with монеты (credits) and
+-- Нано-ядра (cores, from salvaged items).
+--   Enhance +1..+Max: each level adds PerLevel to the item's main stats.
+--     credits = Enhance.Credits x (1 + L / 10) x Enhance.Growth^(target - 1)
+--     cores   = ceil(target x Enhance.CoresPerLevel x rarity index / 2)
+--     From +10 the attempt can fail (Chance[target]); the item never
+--     breaks or loses levels, and every failure adds Pity to the next
+--     attempt on that item ("защита от невезения").
+--   Ascend: rarity one step up for credits + cores + one more item of the
+--     same base (it is consumed). Missing bonus props are rolled.
+--   Salvage: item -> cores (Salvage.Cores by rarity x (1 + L / 50)) plus
+--     Salvage.EnhanceRefund of the cores spent on its enhance levels.
+--   Reforge: reroll ONE bonus prop for credits.
 Config.Forge = {
-	AnimationSeconds = 2.5,
+	AnimationSeconds = 1.6,
 	Strikes = 3,
+	MaxEnhance = 15,
+	PerLevel = 0.06,
+	GlowFrom = 10, -- +10 and above: the item glows
+	Enhance = { Credits = 12, Growth = 1.32, CoresPerLevel = 1 },
+	Chance = { [10] = 0.8, [11] = 0.7, [12] = 0.6, [13] = 0.5, [14] = 0.4, [15] = 0.3 },
+	Pity = 0.1,
+	Ascend = {
+		Credits = { Uncommon = 150, Rare = 500, Epic = 1800, Legendary = 6000, Mythic = 20000, Secret = 60000 }, -- by the NEW rarity
+		Cores = { Uncommon = 5, Rare = 12, Epic = 30, Legendary = 70, Mythic = 160, Secret = 350 },
+	},
+	Salvage = {
+		Cores = { Common = 1, Uncommon = 2, Rare = 4, Epic = 9, Legendary = 20, Mythic = 45, Secret = 100 },
+		EnhanceRefund = 0.5,
+	},
+	Reforge = { Credits = 60 }, -- x rarity index x (1 + L / 20)
 	Texts = {
-		Craft = "Выковать",
-		Owned = "Уже выковано",
-		Missing = "Не хватает материалов",
-		Skip = "Пропустить",
-		Done = "Выковано: %s!",
+		Title = "КУЗНИЦА",
+		Tabs = { Enhance = "Заточка", Ascend = "Возвышение", Reforge = "Перековка", Salvage = "Разбор" },
+		Pick = "Выбери предмет слева",
+		Enhance = "Заточить",
+		Ascend = "Возвысить",
+		Reforge = "Перековать",
+		Salvage = "Разобрать",
+		Max = "Максимальная заточка",
+		MaxRarity = "Выше редкости нет",
+		NoCredits = "Не хватает нано-кредитов",
+		NoCores = "Не хватает нано-ядер",
+		NoTwin = "Нужен ещё один такой же предмет (%s)",
+		NoProps = "У предмета нет бонусных свойств (они есть у Эпических и выше)",
+		Success = "Заточка удалась: %s",
+		Fail = "Неудача. Предмет цел, шанс следующей попытки выше.",
+		Ascended = "Возвышение: %s теперь %s!",
+		Reforged = "Новое свойство: %s",
+		Chance = "Шанс успеха %d%%",
+		PityNote = "защита от невезения +%d%%",
+		Cost = "%s кр.  •  %s ядер",
+		Twin = "Расходуется: %s",
+		Gain = "Получишь: %s нано-ядер",
 	},
 }
 
 -- Pacing model for tools/pacing.py (not used by the game itself): how a
 -- typical active player plays, and the owner's time targets. The tool
--- simulates dungeon runs (kills -> XP, credits, materials), crafting and
+-- simulates dungeon runs (kills -> XP, credits, gear drops), the forge and
 -- levels with the formulas above; `--tune` suggests XpBase and the room
 -- curve (RecommendedRoom1 / Base / Growth) so that the recommended damage
 -- of a room = the real damage of a player who gets there on time;
@@ -1016,17 +1109,9 @@ Config.Leaderboards = {
 }
 
 -- Shop categories (what is owned / equipped and how to describe it).
-Config.Shop = {
-	Weapon = { Title = "Оружие", Items = Config.Weapons, OwnedKey = "OwnedWeapons", EquippedKey = "EquippedWeapon", Purchasable = false,
-		Describe = function(item) return "Урон " .. item.Damage end },
-}
-
-Config.ItemById = {} -- [category][id] = item
-for category, shop in pairs(Config.Shop) do
-	Config.ItemById[category] = {}
-	for _, item in ipairs(shop.Items) do
-		Config.ItemById[category][item.Id] = item
-	end
+Config.ItemById = { Weapon = {} } -- [category][id] = base item
+for _, item in ipairs(Config.Weapons) do
+	Config.ItemById.Weapon[item.Id] = item
 end
 
 Config.ItemById.Armor = {}
@@ -1098,21 +1183,21 @@ Config.Polygon = {
 
 -- DEV panel (only in Studio, never in a published game).
 Config.Dev = {
-	Credits = 100,
-	Materials = 10, -- of every material
+	Credits = 1000,
+	Cores = 50,
 }
 
 -- All remotes live directly in ReplicatedStorage, created by the server.
 Config.Remotes = {
 	ClickHit = "RemoteEvent", -- C->S (mob or nil) on every attack click; S->C ("Hit"|"Kill"|"Credits", ...)
-	ShopRequest = "RemoteFunction", -- ("Equip", "Weapon"|"Armor", id) | ("Unequip", "Armor", slot) -> ok, message
-	Craft = "RemoteFunction", -- (recipeId) -> ok, message
+	Items = "RemoteFunction", -- ("Equip", uid) | ("Unequip", slot) | ("Lock", uid) | ("Salvage", { uid, ... }) | ("SalvageRarity", rarityId) -> ok, message
+	Forge = "RemoteFunction", -- ("Enhance", uid) | ("Ascend", uid) | ("Reforge", uid, propIndex) -> ok, message, extra
 	Travel = "RemoteFunction", -- ("Hub") | ("Room", n) -> ok, message
 	Notify = "RemoteEvent", -- S->C (text, kind) toast
 	RoomState = "RemoteEvent", -- S->C (room, alive, total) for the player's own run
 	RunEnded = "RemoteEvent", -- S->C (reason, room, auraEarned, record, isNewRecord)
 	Progression = "RemoteFunction", -- ("Status") | ("ClaimDaily") | ("Spin") | ("ClaimQuest", index) -> ok, payload
-	Loot = "RemoteEvent", -- S->C ("Spawn", id, materialId, position, lifetime) | ("Picked", id, materialId, total) | ("Remove", id) | ("Clear"); C->S (id) pick up
+	Loot = "RemoteEvent", -- S->C ("Spawn", id, kind, payload, position, lifetime) kind = "Item" | "Chest" | "Artifact" | ("Picked", id, kind, payload) | ("Remove", id) | ("Clear"); C->S (id) pick up / open
 	Announce = "RemoteEvent", -- S->all (text, color) system chat line + toast
 	StoreNotify = "RemoteEvent", -- S->C (text) after a Robux purchase was granted
 	LevelUp = "RemoteEvent", -- S->C (level, skillPoints gained) big "Новый уровень!" banner
@@ -1386,7 +1471,7 @@ Config.HubLayout = {
 		{ Title = "ЦИТАДЕЛЬ · СТАТУС", Line = "Энергосеть: норма" },
 		{ Title = "НАНО-ФАБРИКА", Line = "Активность роботов растёт" },
 		{ Title = "ВРАТА", Line = "Канал в подземелье открыт" },
-		{ Title = "ФАБРИКАТОР", Line = "Материалы в снаряжение" },
+		{ Title = "КУЗНИЦА", Line = "Заточка до +15" },
 	},
 	CrateSize = 3,
 	BarrelHeight = 3.2,
@@ -1461,8 +1546,8 @@ Config.Npcs = {
 -- The mentor's story chain: leads a new player through every system
 -- (plan's first path: spawn -> mentor -> academy -> training -> forge ->
 -- gates). Kind: Class (pick a class), Train (training sessions), Kill,
--- Learn (skill ranks), Loot (materials picked up), Craft, Boss, Room
--- (record room), Level. Target = waypoint / place the floor guide leads to.
+-- Learn (skill ranks), Stat (stat points spent), Loot (items picked up),
+-- Enhance (successful enhances in the forge), Boss, Room (record room), Level. Target = waypoint / place the floor guide leads to.
 -- Rewards: XP x player level and credits, on talking to the mentor.
 Config.Quests = {
 	Story = {
@@ -1474,10 +1559,12 @@ Config.Quests = {
 			Talk = "Пора в бой. Врата на севере ведут в Нано-фабрику. Победи пятерых роботов." },
 		{ Id = "learn", Title = "Первое очко навыка", Text = "Изучи навык в дереве навыков [K].", Kind = "Learn", Target = 1, Xp = 40, Credits = 60,
 			Talk = "За уровни ты получаешь очки навыков. Открой дерево навыков [K] и изучи первый приём." },
-		{ Id = "loot", Title = "Добыча", Text = "Подбери 8 материалов с роботов (удерживай E).", Kind = "Loot", Target = 8, Place = "Gates", Xp = 50, Credits = 80,
-			Talk = "Роботы роняют материалы. Подходи и удерживай E, чтобы подобрать." },
-		{ Id = "craft", Title = "Первый крафт", Text = "Создай предмет в Фабрикаторе.", Kind = "Craft", Target = 1, Place = "Forge", Xp = 60, Credits = 100,
-			Talk = "Из материалов делают снаряжение. Фабрикатор — на северо-востоке." },
+		{ Id = "stat", Title = "Статус", Text = "Распредели 3 очка характеристик в окне Статус [C].", Kind = "Stat", Target = 3, Xp = 40, Credits = 60,
+			Talk = "Каждый уровень даёт 3 очка характеристик. Открой Статус [C] и вложи их: Сила, Ловкость, Живучесть или Восприятие." },
+		{ Id = "loot", Title = "Добыча", Text = "Подбери 3 предмета с роботов (удерживай E).", Kind = "Loot", Target = 3, Place = "Gates", Xp = 50, Credits = 80,
+			Talk = "Роботы роняют оружие и броню. Луч над предметом показывает редкость. Подходи и удерживай E." },
+		{ Id = "craft", Title = "Первая заточка", Text = "Заточи предмет в Кузнице (Фабрикатор).", Kind = "Enhance", Target = 1, Place = "Forge", Xp = 60, Credits = 150,
+			Talk = "Ненужные предметы разбирай на нано-ядра, а лучшие — затачивай. Кузница — в Фабрикаторе на северо-востоке." },
 		{ Id = "boss", Title = "Первый босс", Text = "Победи босса на 5-м этапе.", Kind = "Boss", Target = 1, Place = "Gates", Xp = 80, Credits = 150,
 			Talk = "Каждый 5-й этап — босс. Покажи ему, на что способен твой класс." },
 		{ Id = "room7", Title = "Глубже", Text = "Дойди до 7-го этапа.", Kind = "Room", Target = 7, Place = "Gates", Xp = 90, Credits = 180,
@@ -1488,8 +1575,8 @@ Config.Quests = {
 			Talk = "Звание Оператора — на 10-м уровне. Продолжай!" },
 		{ Id = "room10", Title = "Второй босс", Text = "Дойди до 10-го этапа.", Kind = "Room", Target = 10, Place = "Gates", Xp = 120, Credits = 300,
 			Talk = "На 10-м этапе ждёт следующий босс." },
-		{ Id = "craft3", Title = "Арсенал", Text = "Создай 3 предмета в Фабрикаторе.", Kind = "Craft", Target = 3, Place = "Forge", Xp = 120, Credits = 300,
-			Talk = "Сильное снаряжение — главный источник силы. Создай ещё три предмета." },
+		{ Id = "craft3", Title = "Арсенал", Text = "Сделай 5 успешных заточек в Кузнице.", Kind = "Enhance", Target = 5, Place = "Forge", Xp = 120, Credits = 300,
+			Talk = "Сильное снаряжение — главный источник силы. Заточи своё оружие и броню ещё пять раз." },
 		{ Id = "room15", Title = "Сердце реактора", Text = "Дойди до 15-го этапа.", Kind = "Room", Target = 15, Place = "Gates", Xp = 160, Credits = 500,
 			Talk = "Плавильный реактор горяч. Дойди до 15-го этапа." },
 		{ Id = "level30", Title = "Страж", Text = "Достигни 30-го уровня.", Kind = "Level", Target = 30, Xp = 200, Credits = 800,

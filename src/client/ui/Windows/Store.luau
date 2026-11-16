@@ -43,7 +43,7 @@ local function describe(product): string
 	elseif product.Kind == "Boost" then
 		return ("На %d минут, время складывается"):format(product.Minutes)
 	elseif product.Kind == "Chest" then
-		return ("%d материалов биома, x%d удача редких"):format(product.Rolls, product.Luck)
+		return ("%d предмета ранга %s, первый не ниже «%s»"):format(product.Rolls, product.Rank, Config.Rarity[Config.Loot.BossMinRarity[product.Rank]].Name)
 	elseif product.Kind == "Weapon" then
 		local weapon = Config.ItemById.Weapon[product.Item]
 		return weapon and ("Оружие: урон %s"):format(Format.Number(weapon.Damage)) or ""

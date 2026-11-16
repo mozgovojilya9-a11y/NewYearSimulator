@@ -20,6 +20,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local DataService = require(script.Parent.DataService)
 local GameEvents = require(script.Parent.GameEvents)
+local ItemService = require(script.Parent.ItemService)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
 local Remotes = require(script.Parent.Remotes)
@@ -79,6 +80,7 @@ local function choose(player, data, classId)
 	data.Class = classId
 	PlayerState.ClassRecord(data, classId)
 	PlayerState.Sync(player)
+	ItemService.FitWeapon(player) -- a weapon of another class leaves the hand
 	GameEvents.Fire(player, "Class", 1)
 	if ClassService.OnChosen then
 		ClassService.OnChosen(player, classId, first)

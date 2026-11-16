@@ -12,7 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Style = require(script.Parent.ui.Style)
-local Forge = require(script.Parent.ui.Windows.Forge)
+local Inventory = require(script.Parent.ui.Windows.Inventory)
 local Store = require(script.Parent.ui.Windows.Store)
 local Reward = require(script.Parent.ui.Windows.Reward)
 local ClassSelect = require(script.Parent.ui.ClassSelect)
@@ -25,7 +25,7 @@ local Prompts = {}
 
 local ACTIONS = {
 	OpenForge = function()
-		Forge.Open()
+		Inventory.Open()
 	end,
 	OpenStore = function()
 		Store.Open()

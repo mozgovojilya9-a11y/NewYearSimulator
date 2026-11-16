@@ -14,6 +14,7 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Items = require(ReplicatedStorage.Shared.Items)
 local DataService = require(script.Parent.DataService)
 
 local PlayerState = {}
@@ -28,11 +29,21 @@ end
 -- Armor
 ---------------------------------------------------------------------
 
+-- The equipped item of a slot ("Weapon" / "Helmet" / "Chest" / "Legs")
+-- as an Items view with final numbers (or nil).
+function PlayerState.EquippedIn(player, slot: string)
+	local data = DataService.Get(player)
+	local item = data and data.Items[data.Equipped[slot] or ""]
+	return if item then Items.Resolve(item) else nil
+end
+
+function PlayerState.Weapon(player)
+	return PlayerState.EquippedIn(player, "Weapon")
+end
+
 -- The equipped armor piece in a slot (or nil).
 function PlayerState.ArmorIn(player, slot: string)
-	local data = DataService.Get(player)
-	local id = data and data.EquippedArmor[slot]
-	return if id and id ~= "" and data.OwnedArmor[id] then Config.ItemById.Armor[id] else nil
+	return PlayerState.EquippedIn(player, slot)
 end
 
 -- The armor set whose 3 pieces are all equipped (or nil).
@@ -97,7 +108,7 @@ function PlayerState.ReachRoom(player, room: number): boolean
 end
 
 ---------------------------------------------------------------------
--- Materials (inventory)
+-- Boosts
 ---------------------------------------------------------------------
 
 -- Timed boosts: "Xp", "Damage", "Loot", "Credits" (os.time() they end).
@@ -119,39 +130,66 @@ function PlayerState.AddBoost(player, kind: string, minutes: number)
 	PlayerState.Sync(player)
 end
 
-local function publishMaterials(player, data)
-	player:SetAttribute("Materials", HttpService:JSONEncode(data.Materials))
+---------------------------------------------------------------------
+-- Нано-ядра (from salvaged items, spent in the forge)
+---------------------------------------------------------------------
+
+function PlayerState.GetCores(player): number
+	local data = DataService.Get(player)
+	return if data then data.Cores or 0 else 0
 end
 
-function PlayerState.MaterialCount(player, materialId: string): number
+function PlayerState.AddCores(player, amount: number): number
 	local data = DataService.Get(player)
-	return if data then data.Materials[materialId] or 0 else 0
-end
-
--- Adds (or removes, with a negative amount) a material. Returns the new count.
-function PlayerState.AddMaterial(player, materialId: string, amount: number): number
-	local data = DataService.Get(player)
-	if not data or not Config.MaterialById[materialId] then
+	amount = math.floor(amount)
+	if not data or amount <= 0 then
 		return 0
 	end
-	local count = math.max(0, (data.Materials[materialId] or 0) + amount)
-	data.Materials[materialId] = if count > 0 then count else nil
-	publishMaterials(player, data)
-	return count
+	data.Cores = (data.Cores or 0) + amount
+	player:SetAttribute("Cores", data.Cores)
+	return amount
 end
 
--- True when the player owns every { materialId = count } of `cost`.
-function PlayerState.HasMaterials(player, cost: { [string]: number }): boolean
+function PlayerState.SpendCores(player, cost: number): boolean
 	local data = DataService.Get(player)
-	if not data then
+	if not data or (data.Cores or 0) < cost then
 		return false
 	end
-	for materialId, count in pairs(cost) do
-		if (data.Materials[materialId] or 0) < count then
-			return false
+	data.Cores -= cost
+	player:SetAttribute("Cores", data.Cores)
+	return true
+end
+
+---------------------------------------------------------------------
+-- Items (gear instances: Shared.Items)
+---------------------------------------------------------------------
+
+function PlayerState.ItemCount(player): number
+	local data = DataService.Get(player)
+	local n = 0
+	if data then
+		for _ in pairs(data.Items) do
+			n += 1
 		end
 	end
-	return true
+	return n
+end
+
+-- "Items" = JSON array of instances, "Equipped" = JSON { slot = uid }; the
+-- look attributes (base id, rarity, enhance per slot) drive the character.
+local function publishItems(player, data)
+	local list = {}
+	for _, item in pairs(data.Items) do
+		table.insert(list, item)
+	end
+	player:SetAttribute("Items", HttpService:JSONEncode(list))
+	player:SetAttribute("Equipped", HttpService:JSONEncode(data.Equipped))
+	player:SetAttribute("Cores", data.Cores or 0)
+	for _, slot in ipairs({ "Weapon", "Helmet", "Chest", "Legs" }) do
+		local item = data.Items[data.Equipped[slot] or ""]
+		player:SetAttribute("Equipped" .. slot, if item then item.B else "")
+		player:SetAttribute("Look" .. slot, if item then ("%s|%d|%s"):format(item.R, item.E or 0, item.C or "") else "")
+	end
 end
 
 ---------------------------------------------------------------------
@@ -246,7 +284,7 @@ function PlayerState.Sync(player)
 	for _, kind in ipairs(Config.BoostKinds) do
 		player:SetAttribute("Boost" .. kind, data.Boosts[kind] or 0)
 	end
-	publishMaterials(player, data)
+	publishItems(player, data)
 
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then
@@ -254,30 +292,6 @@ function PlayerState.Sync(player)
 		leaderstats.Room.Value = data.RoomReached
 	end
 
-	-- Shop state per category: "EquippedWeapon" = "IronSword",
-	-- "OwnedWeapon" = "Stick,WoodSword,IronSword".
-	for category, shop in pairs(Config.Shop) do
-		local owned = {}
-		for _, item in ipairs(shop.Items) do
-			if data[shop.OwnedKey][item.Id] then
-				table.insert(owned, item.Id)
-			end
-		end
-		player:SetAttribute("Owned" .. category, table.concat(owned, ","))
-		player:SetAttribute("Equipped" .. category, data[shop.EquippedKey] or "")
-	end
-	-- Armor: owned list, one attribute per slot, derived stats.
-	local ownedArmor = {}
-	for _, piece in ipairs(Config.Armor) do
-		if data.OwnedArmor[piece.Id] then
-			table.insert(ownedArmor, piece.Id)
-		end
-	end
-	player:SetAttribute("OwnedArmor", table.concat(ownedArmor, ","))
-	for _, slot in ipairs(Config.ArmorSlots) do
-		local piece = PlayerState.ArmorIn(player, slot)
-		player:SetAttribute("Equipped" .. slot, if piece then piece.Id else "")
-	end
 	local set = PlayerState.ActiveSet(player)
 	player:SetAttribute("ArmorSet", if set then set.Id else "")
 	if PlayerState.OnSynced then

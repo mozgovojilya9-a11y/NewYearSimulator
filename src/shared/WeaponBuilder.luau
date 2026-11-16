@@ -701,6 +701,28 @@ function WeaponBuilder.Build(weapon): Model
 	trail.Parent = handle
 
 	WeaponBuilder.ApplyRarity(model, weapon, handle, glowPart, trail, top)
+	if weapon.Glow then
+		-- enhance +10 and above: a white-cyan glow with rising sparks
+		local light = Instance.new("PointLight")
+		light.Name = "EnhanceGlow"
+		light.Color = Color3.fromRGB(190, 245, 255)
+		light.Range = 9
+		light.Brightness = 1.4
+		light.Shadows = false
+		light.Parent = handle
+		local sparks = Instance.new("ParticleEmitter")
+		sparks.Name = "EnhanceSparks"
+		sparks.Color = ColorSequence.new(Color3.fromRGB(190, 245, 255), WHITE)
+		sparks.LightEmission = 0.9
+		sparks.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.16), NumberSequenceKeypoint.new(1, 0) })
+		sparks.Transparency = NumberSequence.new(0.1, 1)
+		sparks.Lifetime = NumberRange.new(0.5, 0.9)
+		sparks.Speed = NumberRange.new(0.6, 1.6)
+		sparks.SpreadAngle = Vector2.new(180, 180)
+		sparks.Rate = 10
+		sparks.Parent = a1
+		model:SetAttribute("EnhanceGlow", true)
+	end
 	if not isAsset then
 		weldAll(model, handle)
 	end

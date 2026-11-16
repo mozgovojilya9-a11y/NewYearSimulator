@@ -15,8 +15,10 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Items = require(ReplicatedStorage.Shared.Items)
 local ArmorBuilder = require(ReplicatedStorage.Shared.ArmorBuilder)
 local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
+local PlayerState = require(script.Parent.PlayerState)
 
 local EquipmentService = {}
 
@@ -84,18 +86,13 @@ local function refreshWeapon(player, character)
 	if old then
 		old:Destroy()
 	end
-	local weapon = Config.ItemById.Weapon[player:GetAttribute("EquippedWeapon") or ""]
+	local weapon = PlayerState.Weapon(player)
 	local hand = character:FindFirstChild(if isR15(character) then "RightHand" else "Right Arm")
 	if not weapon or not hand then
 		return
 	end
-	-- the look follows the player's class (sword / spear / blaster)
-	local classId = player:GetAttribute("Class") or ""
-	local look = weapon
-	if Config.ClassById[classId] and weapon.Class ~= classId then
-		look = table.clone(weapon)
-		look.Class = classId
-	end
+	-- a class-free weapon (starter, old saves) looks like the class weapon
+	local look = Items.LookFor(weapon, player:GetAttribute("Class"))
 	local model = WeaponBuilder.Build(look)
 	model.Name = "EquippedWeapon"
 	model:SetAttribute("WeaponId", weapon.Id)
@@ -106,16 +103,19 @@ end
 
 local function refreshArmor(player, character)
 	for _, slot in ipairs(Config.ArmorSlots) do
-		local id = player:GetAttribute("Equipped" .. slot) or ""
+		local piece = PlayerState.ArmorIn(player, slot)
+		local key = if piece then piece.Id .. "|" .. (player:GetAttribute("Look" .. slot) or "") else ""
 		local name = "Armor_" .. slot
 		local old = character:FindFirstChild(name)
-		if not old or old:GetAttribute("ArmorId") ~= id then
+		if not old or old:GetAttribute("LookKey") ~= key then
 			if old then
 				old:Destroy()
 			end
-			local piece = Config.ItemById.Armor[id]
 			if piece then
-				ArmorBuilder.Attach(character, piece)
+				local model = ArmorBuilder.Attach(character, piece)
+				if model then
+					model:SetAttribute("LookKey", key)
+				end
 			end
 		end
 	end
@@ -168,19 +168,23 @@ function EquipmentService.Init()
 				refreshWeapon(player, character)
 			end
 		end)
-		player:GetAttributeChangedSignal("EquippedWeapon"):Connect(function()
-			local character = onCharacter()
-			if character then
-				refreshWeapon(player, character)
-			end
-		end)
-		for _, slot in ipairs(Config.ArmorSlots) do
-			player:GetAttributeChangedSignal("Equipped" .. slot):Connect(function()
+		for _, attribute in ipairs({ "EquippedWeapon", "LookWeapon" }) do
+			player:GetAttributeChangedSignal(attribute):Connect(function()
 				local character = onCharacter()
 				if character then
-					refreshArmor(player, character)
+					refreshWeapon(player, character)
 				end
 			end)
+		end
+		for _, slot in ipairs(Config.ArmorSlots) do
+			for _, attribute in ipairs({ "Equipped" .. slot, "Look" .. slot }) do
+				player:GetAttributeChangedSignal(attribute):Connect(function()
+					local character = onCharacter()
+					if character then
+						refreshArmor(player, character)
+					end
+				end)
+			end
 		end
 		player:GetAttributeChangedSignal("MaxHealth"):Connect(function()
 			local character = onCharacter()

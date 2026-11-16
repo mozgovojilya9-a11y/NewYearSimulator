@@ -19,6 +19,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Items = require(ReplicatedStorage.Shared.Items)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 
 local DataService = {}
@@ -108,6 +109,11 @@ function DataService.Load(player)
 	data.Pets = nil
 	data.EquippedPets = nil
 	data.PetIndex = nil
+	data.Materials = nil -- crafting (removed in schema 6, compensated there)
+	data.OwnedWeapons = nil
+	data.OwnedArmor = nil
+	data.EquippedWeapon = nil
+	data.EquippedArmor = nil
 
 	if player.Parent == nil then
 		noSave[player.UserId] = nil
@@ -198,7 +204,85 @@ DataService.Migrations = {
 	[4] = function(data)
 		DataService.FitGearToProgress(data)
 	end,
+	-- 5 -> 6: crafting is gone. Owned catalog gear becomes item instances
+	-- with the same numbers (usable by any class), what was equipped stays
+	-- equipped; materials turn into credits + Нано-ядра once.
+	[5] = function(data)
+		DataService.GearToItems(data)
+		local m = Config.CraftMigration
+		local credits, cores = 0, 0
+		if type(data.Materials) == "table" then
+			for materialId, count in pairs(data.Materials) do
+				local rarity = m.MaterialRarity[materialId]
+				if rarity and type(count) == "number" and count > 0 then
+					credits += (m.Credits[rarity] or 0) * count
+					cores += (m.Cores[rarity] or 0) * count
+				end
+			end
+		end
+		credits = math.floor(math.min(m.MaxCredits, credits))
+		cores = math.floor(math.min(m.MaxCores, cores) + 0.5)
+		if credits > 0 or cores > 0 then
+			data.Credits = (if type(data.Credits) == "number" then data.Credits else 0) + credits
+			data.Cores = (if type(data.Cores) == "number" then data.Cores else 0) + cores
+			local notice = m.Notice:format(tostring(credits), tostring(cores))
+			data.Notice = if type(data.Notice) == "string" and data.Notice ~= "" then data.Notice .. "\n" .. notice else notice
+		end
+		data.Materials = nil
+	end,
 }
+
+-- Adds an instance to data.Items with a fresh uid. Returns the uid.
+function DataService.AddItem(data, instance): string
+	data.Items = if type(data.Items) == "table" then data.Items else {}
+	data.NextItem = if type(data.NextItem) == "number" then data.NextItem else 1
+	local uid = "i" .. data.NextItem
+	while data.Items[uid] do
+		data.NextItem += 1
+		uid = "i" .. data.NextItem
+	end
+	data.NextItem += 1
+	instance.U = uid
+	data.Items[uid] = instance
+	return uid
+end
+
+-- Schema 6: OwnedWeapons / OwnedArmor / EquippedWeapon / EquippedArmor
+-- (catalog ids) -> item instances.
+function DataService.GearToItems(data)
+	data.Items = if type(data.Items) == "table" then data.Items else {}
+	data.Equipped = if type(data.Equipped) == "table" then data.Equipped else { Weapon = "", Helmet = "", Chest = "", Legs = "" }
+	if type(data.OwnedWeapons) == "table" then
+		for id in pairs(data.OwnedWeapons) do
+			local base = Config.ItemById.Weapon[id]
+			if base then
+				local instance = Items.FromCatalog("W", base)
+				if id == Config.Items.Starter then
+					instance.St = true
+				end
+				local uid = DataService.AddItem(data, instance)
+				if data.EquippedWeapon == id then
+					data.Equipped.Weapon = uid
+				end
+			end
+		end
+	end
+	if type(data.OwnedArmor) == "table" then
+		for id in pairs(data.OwnedArmor) do
+			local base = Config.ItemById.Armor[id]
+			if base then
+				local uid = DataService.AddItem(data, Items.FromCatalog("A", base))
+				if type(data.EquippedArmor) == "table" and data.EquippedArmor[base.Slot] == id then
+					data.Equipped[base.Slot] = uid
+				end
+			end
+		end
+	end
+	data.OwnedWeapons = nil
+	data.OwnedArmor = nil
+	data.EquippedWeapon = nil
+	data.EquippedArmor = nil
+end
 
 -- Replaces gear above the player's progress (schema 5 migration; the DEV
 -- panel can call it too). Returns the credits given.
@@ -307,18 +391,62 @@ function DataService.Sanitize(data)
 			data[field] = deepCopy(default)
 		end
 	end
-	if not Config.ItemById.Weapon[data.EquippedWeapon] or not data.OwnedWeapons[data.EquippedWeapon] then
-		data.OwnedWeapons.Stick = true
-		data.EquippedWeapon = "Stick"
+	number("Cores", 0)
+	data.Cores = math.max(0, math.floor(data.Cores))
+	number("NextItem", 1)
+	-- items: drop broken ones, keep every field in range
+	local starter = nil
+	for uid, item in pairs(data.Items) do
+		local base = type(item) == "table" and Items.Base(item)
+		if not base or not Config.Rarity[item.R] then
+			data.Items[uid] = nil
+		else
+			item.U = uid
+			item.L = math.clamp(math.floor(tonumber(item.L) or 1), 1, Config.Items.MaxLevel)
+			item.E = math.clamp(math.floor(tonumber(item.E) or 0), 0, Config.Forge.MaxEnhance)
+			item.Q = math.clamp(tonumber(item.Q) or 1, 0.2, 3)
+			if type(item.P) ~= "table" then
+				item.P = nil
+			end
+			if item.K == "W" and item.St then
+				starter = uid
+			end
+		end
+	end
+	-- the starter weapon always exists (class-free, can't be salvaged)
+	if not starter then
+		local instance = Items.FromCatalog("W", Config.ItemById.Weapon[Config.Items.Starter])
+		instance.St = true
+		starter = DataService.AddItem(data, instance)
+	end
+	for _, slot in ipairs({ "Weapon", "Helmet", "Chest", "Legs" }) do
+		local item = data.Items[data.Equipped[slot] or ""]
+		local base = item and Items.Base(item)
+		local fits = base and (if slot == "Weapon" then item.K == "W" else item.K == "A" and base.Slot == slot)
+		if not fits then
+			data.Equipped[slot] = if slot == "Weapon" then starter else ""
+		end
+	end
+	for id, record in pairs(data.Artifacts) do
+		if not Config.ArtifactById or not Config.ArtifactById[id] or type(record) ~= "table" then
+			data.Artifacts[id] = nil
+		else
+			record.Level = math.clamp(math.floor(tonumber(record.Level) or 1), 1, Config.Artifacts.MaxLevel)
+			record.Copies = math.max(0, math.floor(tonumber(record.Copies) or 0))
+		end
+	end
+	for i = 1, 3 do
+		local id = data.ArtifactSlots[i]
+		if type(id) ~= "string" or (id ~= "" and not data.Artifacts[id]) then
+			data.ArtifactSlots[i] = ""
+		end
+	end
+	for _, key in ipairs({ "Str", "Agi", "Vit", "Per" }) do
+		data.Attributes[key] = math.max(0, math.floor(tonumber(data.Attributes[key]) or 0))
 	end
 	for _, kind in ipairs(Config.BoostKinds) do
 		if type(data.Boosts[kind]) ~= "number" then
 			data.Boosts[kind] = 0
-		end
-	end
-	for materialId, count in pairs(data.Materials) do
-		if type(count) ~= "number" or count <= 0 then
-			data.Materials[materialId] = nil
 		end
 	end
 end
@@ -328,6 +456,7 @@ function DataService.Reset(player)
 	if cache[player.UserId] then
 		local data = deepCopy(Config.StartingData)
 		data.SchemaVersion = Config.SchemaVersion
+		DataService.Sanitize(data)
 		cache[player.UserId] = data
 		return data
 	end

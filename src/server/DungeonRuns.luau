@@ -224,7 +224,7 @@ function DungeonRuns.StartRun(player)
 		rooms = {},
 		current = 1,
 		best = 0,
-		loot = {}, -- [materialId] = count picked up this run (LootService fills it)
+		loot = {}, -- items picked up this run: { B, K, R, L } (LootService fills it)
 		newRecord = false,
 	}
 	runs[player] = run

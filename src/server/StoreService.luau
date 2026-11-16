@@ -20,7 +20,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local Items = require(ReplicatedStorage.Shared.Items)
 local DataService = require(script.Parent.DataService)
+local ItemService = require(script.Parent.ItemService)
+local LootService = require(script.Parent.LootService)
 local PlayerState = require(script.Parent.PlayerState)
 local StatService = require(script.Parent.StatService)
 local Remotes = require(script.Parent.Remotes)
@@ -28,40 +31,6 @@ local Remotes = require(script.Parent.Remotes)
 local StoreService = {}
 
 local purchases = DataStoreService:GetDataStore(Config.Store.PurchaseStore)
-
--- Random materials of a biome; loot luck applies to Rare+.
-local function chestRewards(biome: number, rolls: number, luck: number)
-	local byRarity = {}
-	for _, material in ipairs(Config.Materials) do
-		if material.Biome == biome then
-			local index = Config.Rarity[material.Rarity].Index
-			byRarity[index] = byRarity[index] or {}
-			table.insert(byRarity[index], material.Id)
-		end
-	end
-	local luckFrom = Config.Rarity[Config.Loot.LuckFrom].Index
-	local result = {}
-	for _ = 1, rolls do
-		local total = 0
-		local weights = {}
-		for index, rarity in ipairs(Config.Rarities) do
-			local weight = if byRarity[index] then rarity.Chance * (if index >= luckFrom then luck else 1) else 0
-			weights[index] = weight
-			total += weight
-		end
-		local roll = math.random() * total
-		for index, weight in ipairs(weights) do
-			roll -= weight
-			if roll <= 0 and weight > 0 then
-				local list = byRarity[index]
-				local id = list[math.random(#list)]
-				result[id] = (result[id] or 0) + 1
-				break
-			end
-		end
-	end
-	return result
-end
 
 -- Gives a product to a loaded player. Returns a message or nil on failure.
 local function grant(player, product): string?
@@ -80,36 +49,47 @@ local function grant(player, product): string?
 		player:SetAttribute("RewardReady", true)
 		return "Колесо удачи можно крутить!"
 	elseif product.Kind == "Chest" then
-		local rewards = chestRewards(product.Biome, product.Rolls, product.Luck * StatService.Get(player).Luck)
-		local parts = {}
-		for materialId, count in pairs(rewards) do
-			PlayerState.AddMaterial(player, materialId, count)
-			table.insert(parts, ("%s x%d"):format(Config.MaterialById[materialId].Name, count))
+		-- gear container: Rolls items from the Boss table of the gate rank
+		local names = {}
+		local level = 5
+		for room, rank in ipairs(Config.Gates.RankByRoom) do
+			if rank == product.Rank then
+				level = room * Config.Items.LevelPerRoom
+			end
 		end
-		return product.Name .. ": " .. table.concat(parts, ", ")
+		for i = 1, product.Rolls do
+			local rarityId = LootService.RollRarity(player, product.Rank, "Boss", if i == 1 then Config.Loot.BossMinRarity[product.Rank] else nil)
+			local view = ItemService.Give(player, ItemService.Generate(player, level, rarityId), { Force = true, NoSync = true })
+			if view then
+				table.insert(names, ("%s (%s)"):format(view.Name, Config.Rarity[view.Rarity].Name))
+			end
+		end
+		PlayerState.Sync(player)
+		return product.Name .. ": " .. table.concat(names, ", ")
 	elseif product.Kind == "Weapon" then
 		local weapon = Config.ItemById.Weapon[product.Item]
 		if not weapon then
 			return nil
 		end
-		if data.OwnedWeapons[weapon.Id] then
-			-- already owned: give credits instead so the purchase is never wasted
-			local amount = PlayerState.AddCredits(player, Config.Store.DuplicateCreditsPerRobux * product.Price)
-			return ("%s уже есть: +%s нано-кредитов"):format(weapon.Name, Format.Number(amount))
+		for _, item in pairs(data.Items) do
+			if item.B == weapon.Id then
+				-- already owned: give credits instead so the purchase is never wasted
+				local amount = PlayerState.AddCredits(player, Config.Store.DuplicateCreditsPerRobux * product.Price)
+				return ("%s уже есть: +%s нано-кредитов"):format(weapon.Name, Format.Number(amount))
+			end
 		end
-		data.OwnedWeapons[weapon.Id] = true
-		data.EquippedWeapon = weapon.Id
-		PlayerState.Sync(player)
+		ItemService.Give(player, Items.FromCatalog("W", weapon), { Force = true, Equip = true })
 		return "Получено: " .. weapon.Name .. "!"
 	elseif product.Kind == "ArmorSet" then
+		local owned = {}
+		for _, item in pairs(data.Items) do
+			owned[item.B] = true
+		end
 		local got = false
 		for _, piece in ipairs(Config.Armor) do
-			if piece.Set == product.Item then
-				if not data.OwnedArmor[piece.Id] then
-					got = true
-				end
-				data.OwnedArmor[piece.Id] = true
-				data.EquippedArmor[piece.Slot] = piece.Id
+			if piece.Set == product.Item and not owned[piece.Id] then
+				got = true
+				ItemService.Give(player, Items.FromCatalog("A", piece), { Force = true, Equip = true, NoSync = true })
 			end
 		end
 		PlayerState.Sync(player)

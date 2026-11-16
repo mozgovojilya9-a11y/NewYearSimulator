@@ -8,8 +8,9 @@
 	  "Reset"      fresh progress (everything back to the start)
 	  "Level", n   +n levels (1 or 5)
 	  "Credits"    +Config.Dev.Credits Нано-кредиты
-	  "Materials"  +Config.Dev.Materials of every material (all rarities)
+	  "Cores"      +Config.Dev.Cores Нано-ядра
 	  "Item", rarityId   a random weapon or armor piece of that rarity
+	  "Drop", "Item" | "Chest"   a drop / boss chest on the ground
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,28 +19,12 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local DataService = require(script.Parent.DataService)
 local DungeonRuns = require(script.Parent.DungeonRuns)
+local ItemService = require(script.Parent.ItemService)
+local LootService = require(script.Parent.LootService)
 local PlayerState = require(script.Parent.PlayerState)
 local ProgressionService = require(script.Parent.ProgressionService)
 
 local DevService = {}
-
-local function randomItem(rarityId: string)
-	local pool = {}
-	for _, weapon in ipairs(Config.Weapons) do
-		if weapon.Rarity == rarityId and not weapon.Legacy then
-			table.insert(pool, { kind = "Weapon", item = weapon })
-		end
-	end
-	for _, piece in ipairs(Config.Armor) do
-		if piece.Rarity == rarityId then
-			table.insert(pool, { kind = "Armor", item = piece })
-		end
-	end
-	if #pool == 0 then
-		return nil
-	end
-	return pool[math.random(#pool)]
-end
 
 local actions = {}
 
@@ -64,33 +49,38 @@ function actions.Credits(player)
 	return true, ("+%d кредитов"):format(Config.Dev.Credits)
 end
 
-function actions.Materials(player)
-	for _, material in ipairs(Config.Materials) do
-		PlayerState.AddMaterial(player, material.Id, Config.Dev.Materials)
-	end
-	return true, ("+%d каждого материала"):format(Config.Dev.Materials)
+function actions.Cores(player)
+	PlayerState.AddCores(player, Config.Dev.Cores)
+	return true, ("+%d нано-ядер"):format(Config.Dev.Cores)
 end
 
+-- A random weapon or armor piece of that rarity at the player's progress.
 function actions.Item(player, rarityId)
 	local rarity = type(rarityId) == "string" and Config.Rarity[rarityId]
 	if not rarity then
 		return false, "Нет такой редкости"
 	end
-	local pick = randomItem(rarityId)
-	if not pick then
-		return false, ("Нет предметов редкости «%s»"):format(rarity.Name)
+	local data = DataService.Get(player)
+	local level = math.max(1, data.RoomReached) * Config.Items.LevelPerRoom
+	local view = ItemService.Give(player, ItemService.Generate(player, level, rarityId), { Force = true })
+	return true, ("Получено: %s"):format(view.Name)
+end
+
+-- Drops on the ground next to the player: "Item" / "Chest".
+function actions.Drop(player, what)
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return false, "Нет персонажа"
 	end
 	local data = DataService.Get(player)
-	local item = pick.item
-	if pick.kind == "Weapon" then
-		data.OwnedWeapons[item.Id] = true
-		data.EquippedWeapon = item.Id
-	else
-		data.OwnedArmor[item.Id] = true
-		data.EquippedArmor[item.Slot] = item.Id
+	local room = math.max(1, data.RoomReached)
+	local position = root.Position + root.CFrame.LookVector * 8 - Vector3.new(0, 3, 0)
+	if what == "Chest" then
+		LootService.DropChest(player, room, position)
+		return true, "Сундук босса"
 	end
-	PlayerState.Sync(player)
-	return true, ("Получено и надето: %s"):format(item.Name)
+	LootService.DropItem(player, room, "Boss", position)
+	return true, "Предмет на земле"
 end
 
 function DevService.Init()
