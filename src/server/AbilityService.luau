@@ -592,6 +592,7 @@ function AbilityService.Dash(player, direction)
 	local stats = StatService.Get(player)
 	local distance = CB.Dash.Distance + (stats.Dash or 0)
 	setCooldown(player, "Dash", CB.Dash.Cooldown)
+	state(player).iframeUntil = os.clock() + CB.Dash.IFrames -- dodge: no damage for a moment
 	Remotes.Get("Ability"):FireClient(player, "Dash", flat, distance, CB.Dash.Seconds)
 	fx("Dash", player.Character, CB.Dash.Seconds)
 	if classId == "Pulse" then
@@ -629,6 +630,10 @@ end
 function AbilityService.Incoming(player, amount: number, attacker: Model?): number
 	local s = state(player)
 	local stats = StatService.Get(player)
+	if (s.iframeUntil or 0) > os.clock() then
+		Remotes.Get("ClickHit"):FireClient(player, "Dodge")
+		return 0
+	end
 	local shield = buff(player, "Shield")
 	if shield > 0 then
 		amount *= 1 - math.min(1, shield)

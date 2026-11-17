@@ -17,6 +17,8 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local Popups = require(script.Parent.ui.Popups)
 local Style = require(script.Parent.ui.Style)
 local Swing = require(script.Parent.Swing)
+local GateHud = require(script.Parent.GateHud)
+local MobFx = require(script.Parent.MobFx)
 local Window = require(script.Parent.ui.Windows.Window)
 
 local player = Players.LocalPlayer
@@ -279,6 +281,56 @@ local function hitParticles(position: Vector3, color: Color3, count: number)
 end
 Combat.Particles = hitParticles
 
+-- Thin hot sparks flying from the hit point (stretched along their speed).
+local function sparks(position: Vector3, color: Color3, count: number)
+	if Style.HideEffects then
+		return
+	end
+	local attachment = Instance.new("Attachment")
+	attachment.WorldPosition = position
+	attachment.Parent = Workspace.Terrain
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
+	emitter.LightEmission = 1
+	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.18), NumberSequenceKeypoint.new(1, 0) })
+	emitter.Squash = NumberSequence.new(-1.6)
+	emitter.Orientation = Enum.ParticleOrientation.VelocityParallel
+	emitter.Lifetime = NumberRange.new(0.15, 0.35)
+	emitter.Speed = NumberRange.new(26, 44)
+	emitter.SpreadAngle = Vector2.new(180, 180)
+	emitter.Drag = 4
+	emitter.Acceleration = Vector3.new(0, -60, 0)
+	emitter.Rate = 0
+	emitter.Parent = attachment
+	emitter:Emit(count)
+	task.delay(0.6, function()
+		attachment:Destroy()
+	end)
+end
+
+-- Hitstop: our own animations and the mob freeze for a few frames.
+local function hitStop(model, seconds: number)
+	local character = player.Character
+	local animator = character and character:FindFirstChildWhichIsA("Animator", true)
+	if animator then
+		local tracks = animator:GetPlayingAnimationTracks()
+		local speeds = {}
+		for i, track in ipairs(tracks) do
+			speeds[i] = track.Speed
+			track:AdjustSpeed(0)
+		end
+		task.delay(seconds, function()
+			for i, track in ipairs(tracks) do
+				if track.IsPlaying then
+					track:AdjustSpeed(speeds[i] or 1)
+				end
+			end
+		end)
+	end
+	MobFx.Freeze(model, seconds)
+	Swing.Freeze(seconds)
+end
+
 local function topOf(model)
 	return model:GetPivot().Position + Vector3.new(0, model:GetExtentsSize().Y / 2, 0)
 end
@@ -290,17 +342,35 @@ end
 
 clickHit.OnClientEvent:Connect(function(kind, ...)
 	if kind == "Hit" then
-		local model, damage, isCrit = ...
+		local model, damage, isCrit, isBlocked = ...
 		if not model or not model.Parent then
 			return
 		end
-		Popups.World(topOf(model), (if isCrit then "КРИТ! " else "") .. Format.Number(damage), if isCrit then Style.Colors.Gold else Style.Colors.Text, if isCrit then 44 else 30, isCrit)
+		Popups.World(topOf(model), (if isCrit then "КРИТ! " else "") .. Format.Number(damage), if isBlocked then Style.Colors.Muted elseif isCrit then Style.Colors.Gold else Style.Colors.Text, if isCrit then 44 else 30, isCrit)
 		flash(model, isCrit)
-		hitParticles(model:GetPivot().Position, if isCrit then Style.Colors.Gold else Style.Colors.Orange, if isCrit then 16 else 7)
+		local at = model:GetPivot().Position
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if root then
+			-- sparks on the side of the mob that faces us
+			local toUs = root.Position - at
+			toUs = Vector3.new(toUs.X, 0, toUs.Z)
+			if toUs.Magnitude > 0.1 then
+				at += toUs.Unit * 1.5 + Vector3.new(0, 1, 0)
+			end
+		end
+		hitParticles(at, if isCrit then Style.Colors.Gold else Style.Colors.Orange, if isCrit then 16 else 7)
+		sparks(at, if isBlocked then Style.Colors.Cyan elseif isCrit then Style.Colors.Gold else Style.Colors.Orange, if isCrit then 22 else 10)
+		hitStop(model, if isCrit then CB.HitStop.Crit else CB.HitStop.Normal)
+		GateHud.Hit(isCrit)
+		if isBlocked then
+			GateHud.Blocked(model)
+		end
 		Style.PlaySound(Config.Sounds.Hit, if isCrit then 0.8 else 1 + (math.random() - 0.5) * 0.2, 0.4)
 		if isCrit then
 			Popups.Shake(Config.Hud.ShakeCrit.Amplitude, Config.Hud.ShakeCrit.Seconds)
 		end
+	elseif kind == "Dodge" then
+		GateHud.Dodge()
 	elseif kind == "Dummy" then
 		local model, damage, isCrit = ...
 		if model and model.Parent then

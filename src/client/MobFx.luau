@@ -17,6 +17,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Format = require(game:GetService("ReplicatedStorage").Shared.Format)
+local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 local Style = require(script.Parent.ui.Style)
 
 local player = Players.LocalPlayer
@@ -25,6 +26,14 @@ local lanes = Workspace:WaitForChild("Dungeon"):WaitForChild("Lanes")
 local MobFx = {}
 
 local mobs = {} -- [model] = state
+
+-- Hitstop: the mob keeps its pose for a moment.
+function MobFx.Freeze(model, seconds: number)
+	local s = mobs[model]
+	if s then
+		s.frozenUntil = os.clock() + seconds
+	end
+end
 
 local function joints(model)
 	local list = {}
@@ -170,6 +179,9 @@ RunService.Stepped:Connect(function(_, dt)
 			mobs[model] = nil
 			continue
 		end
+		if s.frozenUntil and t < s.frozenUntil then
+			continue
+		end
 		local velocity = s.root.AssemblyLinearVelocity
 		local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 		s.walk += (math.clamp(speed / 8, 0, 1) - s.walk) * math.min(1, dt * 8)
@@ -218,13 +230,75 @@ RunService.Stepped:Connect(function(_, dt)
 end)
 
 ---------------------------------------------------------------------
+-- Health bars never pile up: every few frames the bars on screen are
+-- sorted nearest first, and a bar that would cover one already placed is
+-- lifted above it (the lift is in studs, so it follows the camera).
+---------------------------------------------------------------------
+
+local camera = Workspace.CurrentCamera
+local placedBars = {}
+task.spawn(function()
+	while true do
+		task.wait(0.12)
+		camera = Workspace.CurrentCamera
+		local list = {}
+		for model in pairs(mobs) do
+			local root = model.PrimaryPart
+			local gui = root and root:FindFirstChild("HealthGui")
+			if gui and gui.Enabled and not model:GetAttribute("Boss") then
+				local base = gui:GetAttribute("BaseOffset")
+				if not base then
+					base = gui.StudsOffsetWorldSpace
+					gui:SetAttribute("BaseOffset", base)
+				end
+				local world = root.Position + base
+				local screen, onScreen = camera:WorldToViewportPoint(world)
+				if onScreen then
+					table.insert(list, { gui = gui, base = base, root = root, screen = screen })
+				else
+					gui.StudsOffsetWorldSpace = base
+				end
+			end
+		end
+		table.sort(list, function(a, b)
+			return a.screen.Z < b.screen.Z
+		end)
+		table.clear(placedBars)
+		for _, entry in ipairs(list) do
+			-- pixels per stud at this depth: project a point 1 stud higher
+			local up = camera:WorldToViewportPoint(entry.root.Position + entry.base + Vector3.new(0, 1, 0))
+			local pxPerStud = math.max(1, math.abs(entry.screen.Y - up.Y))
+			local size = entry.gui.AbsoluteSize
+			local w, h = math.max(30, size.X), math.max(6, size.Y + 4)
+			local lift = 0
+			local y = entry.screen.Y
+			for _ = 1, 6 do
+				local hit = false
+				for _, other in ipairs(placedBars) do
+					if math.abs(entry.screen.X - other.x) < (w + other.w) / 2 and math.abs(y - other.y) < (h + other.h) / 2 then
+						hit = true
+						y = other.y - (h + other.h) / 2 - 1
+					end
+				end
+				if not hit then
+					break
+				end
+			end
+			lift = (entry.screen.Y - y) / pxPerStud
+			entry.gui.StudsOffsetWorldSpace = entry.base + Vector3.new(0, lift, 0)
+			table.insert(placedBars, { x = entry.screen.X, y = y, w = w, h = h })
+		end
+	end
+end)
+
+---------------------------------------------------------------------
 -- Boss health bar (top of the screen)
 ---------------------------------------------------------------------
 
 local bar = Style.Plate(Style.Gui, {
 	Name = "BossBar",
 	AnchorPoint = Vector2.new(0.5, 0),
-	Position = UDim2.new(0.5, 0, 0, 140), -- under the objective + hint lines
+	Position = UDim2.new(0.5, 0, 0, 150), -- under the wave panel
 	Size = UDim2.fromOffset(520, 64),
 	ZIndex = 6,
 })
@@ -265,7 +339,8 @@ task.spawn(function()
 		local humanoid = boss and boss:FindFirstChildOfClass("Humanoid")
 		bar.Visible = humanoid ~= nil
 		if humanoid then
-			bossName.Text = Style.Upper(boss:GetAttribute("MobName") or boss.Name)
+			local phase = boss:GetAttribute("Phase") or 1
+			bossName.Text = Style.Upper(boss:GetAttribute("MobName") or boss.Name) .. "   " .. string.rep("◆", phase) .. string.rep("◇", #Config.Enemies.Boss.Phases + 1 - phase)
 			local ratio = math.clamp(humanoid.Health / math.max(1, humanoid.MaxHealth), 0, 1)
 			Style.Tween(fill, 0.1, { Size = UDim2.fromScale(ratio, 1) })
 			hpText.Text = Format.Number(humanoid.Health) .. " / " .. Format.Number(humanoid.MaxHealth)

@@ -298,6 +298,13 @@ end
 Players.PlayerAdded:Connect(watchPlayer)
 
 -- Instant local swing on our own click.
+-- Hitstop: every running swing holds its pose for `seconds`.
+function Swing.Freeze(seconds: number)
+	for _, swing in pairs(active) do
+		swing.started += seconds
+	end
+end
+
 function Swing.Local()
 	lastLocal = os.clock()
 	if player.Character then
