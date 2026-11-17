@@ -17,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local ArtifactService = require(script.Parent.ArtifactService)
 local DataService = require(script.Parent.DataService)
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local ItemService = require(script.Parent.ItemService)
@@ -81,6 +82,13 @@ function actions.Drop(player, what)
 	end
 	LootService.DropItem(player, room, "Boss", position)
 	return true, "Предмет на земле"
+end
+
+-- A random artifact (or the next copy of one).
+function actions.Artifact(player)
+	local id = ArtifactService.Roll(player, "S")
+	ArtifactService.Give(player, id)
+	return true, "Артефакт: " .. Config.ArtifactById[id].Name
 end
 
 function DevService.Init()

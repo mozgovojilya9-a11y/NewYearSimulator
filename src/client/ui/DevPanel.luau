@@ -114,6 +114,9 @@ end)
 button("Сундук босса на землю", Style.Colors.Card, function()
 	call("Drop", "Chest")
 end)
+button("Случайный артефакт", Style.Colors.Card, function()
+	call("Artifact")
+end)
 
 order += 1
 Style.Label(panel, "Случайный предмет:", 15, Style.Colors.Gold, { Size = UDim2.fromOffset(226, 20), LayoutOrder = order, ZIndex = 21 })

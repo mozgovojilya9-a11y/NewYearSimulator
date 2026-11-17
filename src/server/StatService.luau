@@ -44,7 +44,7 @@ local StatService = {}
 local cache = {} -- [player] = stats table
 
 -- Combat stats that only skills give (used by AbilityService / MobAI).
-StatService.CombatStats = { "Lifesteal", "Thorns", "ComboBonus", "BlockBonus", "SlowOnHit", "StunOnHit", "ControlPct", "AbilityPct", "CooldownPct", "LowHpDamage", "CheatDeath", "DashPower", "ChargeBonus", "VolleyBonus" }
+StatService.CombatStats = { "Lifesteal", "Thorns", "ComboBonus", "BlockBonus", "SlowOnHit", "StunOnHit", "ControlPct", "AbilityPct", "CooldownPct", "LowHpDamage", "CheatDeath", "DashPower", "ChargeBonus", "VolleyBonus", "CheatDeathHaste" }
 local published = {} -- [player] = { [attribute] = value }
 
 -- Extra stat sources: function(player, data) -> { [stat] = value } (same

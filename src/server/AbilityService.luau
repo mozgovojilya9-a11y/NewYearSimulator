@@ -66,6 +66,13 @@ end
 local function fx(kind: string, ...)
 	Remotes.Get("Ability"):FireAllClients("Fx", kind, ...)
 end
+AbilityService.Fx = fx
+
+-- Hooks of other systems (artifacts):
+--   OnHit[i](player, model, dealt, isCrit)  after a hit landed on a mob
+--   OnIncoming[i](player, amount) -> amount  damage the player is about to take
+AbilityService.OnHit = {}
+AbilityService.OnIncoming = {}
 
 ---------------------------------------------------------------------
 -- Buffs
@@ -183,6 +190,9 @@ local function hit(player, model: Model, damage: number, isCrit: boolean?)
 				if humanoid and humanoid.Health > 0 then
 					humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + dealt * stats.Lifesteal)
 				end
+			end
+			for _, hook in ipairs(AbilityService.OnHit) do
+				hook(player, model, dealt, isCrit == true)
 			end
 			if model.Parent and not model:GetAttribute("Dying") then
 				if (stats.SlowOnHit or 0) > 0 and math.random() < stats.SlowOnHit then
@@ -626,11 +636,14 @@ function AbilityService.Incoming(player, amount: number, attacker: Model?): numb
 	if s.blocking then
 		amount *= 1 - math.min(0.95, CB.Block.Reduction + (stats.BlockBonus or 0))
 	end
+	for _, hook in ipairs(AbilityService.OnIncoming) do
+		amount = hook(player, amount)
+	end
 	if attacker and (stats.Thorns or 0) > 0 and DungeonRuns.IsMob(attacker) then
 		DungeonRuns.Damage(player, attacker, amount * stats.Thorns * 3, false)
 	end
 	local humanoid = humanoidOf(player)
-	if humanoid and (stats.CheatDeath or 0) > 0 and humanoid.Health - amount <= 0 and os.clock() - s.cheatAt >= SK.CheatDeathCooldown then
+	if humanoid and (stats.CheatDeath or 0) > 0 and humanoid.Health - amount <= 0 and os.clock() - s.cheatAt >= SK.CheatDeathCooldown - (stats.CheatDeathHaste or 0) then
 		s.cheatAt = os.clock()
 		humanoid.Health = humanoid.MaxHealth * 0.5
 		fx("Heal", player.Character)
