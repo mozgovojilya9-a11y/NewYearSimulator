@@ -289,7 +289,7 @@ end
 
 function Items.EnhanceChance(instance): (number, number)
 	local target = (instance.E or 0) + 1
-	local base = F.Chance[target] or 1
+	local base = F.Chance[target - F.ChanceFrom + 1] or 1
 	local pity = if base < 1 then (instance.F or 0) * F.Pity else 0
 	return math.min(1, base + pity), pity
 end

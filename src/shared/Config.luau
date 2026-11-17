@@ -177,7 +177,7 @@ Config.Items = {
 	LevelPerRoom = 5, -- item level of a drop = room x this -+ LevelSpread
 	LevelSpread = 2,
 	MaxLevel = 100,
-	Weapon = { Base = 2, Growth = 1.068 }, -- L 25 -> 10, 50 -> 54, 75 -> 278, 100 -> 1436 (Uncommon)
+	Weapon = { Base = 3, Growth = 1.046 }, -- L 25 -> 9, 50 -> 28, 75 -> 87, 100 -> 270 (Uncommon); slower than the room curve: levels, rarity and the forge close the gap
 	Armor = { HealthBase = 6, HealthPerLevel = 1.5, ChestMult = 1.5, DefenseBase = 0.015, DefensePerLevel = 0.0006 },
 	RarityMult = { Common = 0.85, Uncommon = 1, Rare = 1.15, Epic = 1.32, Legendary = 1.52, Mythic = 1.76, Secret = 2.05 },
 	Roll = { 0.92, 1.08 }, -- Q: the random part of an item's main stat
@@ -313,9 +313,9 @@ Config.Dungeon = {
 	RecommendedRoom1 = 1, -- room 1: a Stick is enough
 	RampTo = 5, -- rooms 1..RampTo-1 ramp up to the curve below
 	RecommendedBase = 2.85,
-	RecommendedGrowth = 1.348,
+	RecommendedGrowth = 1.397,
 	LateFrom = 15, -- after this room the curve gets steeper
-	LateGrowth = 1.947,
+	LateGrowth = 1.6,
 	ClicksToKill = 8,
 	BossClicksToKill = 50,
 
@@ -934,7 +934,7 @@ end
 --   Enhance +1..+Max: each level adds PerLevel to the item's main stats.
 --     credits = Enhance.Credits x (1 + L / 10) x Enhance.Growth^(target - 1)
 --     cores   = ceil(target x Enhance.CoresPerLevel x rarity index / 2)
---     From +10 the attempt can fail (Chance[target]); the item never
+--     From +ChanceFrom the attempt can fail (Chance list); the item never
 --     breaks or loses levels, and every failure adds Pity to the next
 --     attempt on that item ("защита от невезения").
 --   Ascend: rarity one step up for credits + cores + one more item of the
@@ -949,7 +949,8 @@ Config.Forge = {
 	PerLevel = 0.06,
 	GlowFrom = 10, -- +10 and above: the item glows
 	Enhance = { Credits = 12, Growth = 1.32, CoresPerLevel = 1 },
-	Chance = { [10] = 0.8, [11] = 0.7, [12] = 0.6, [13] = 0.5, [14] = 0.4, [15] = 0.3 },
+	ChanceFrom = 10, -- attempts to +10 and above can fail:
+	Chance = { 0.8, 0.7, 0.6, 0.5, 0.4, 0.3 }, -- +10, +11, ... +15
 	Pity = 0.1,
 	Ascend = {
 		Credits = { Uncommon = 150, Rare = 500, Epic = 1800, Legendary = 6000, Mythic = 20000, Secret = 60000 }, -- by the NEW rarity
@@ -986,6 +987,138 @@ Config.Forge = {
 	},
 }
 
+-- ARTIFACTS: 3 slots, passive bonuses and special effects. They drop
+-- from boss chests (Config.Loot.ArtifactChance) and come from rewards;
+-- a duplicate becomes a spare copy, copies upgrade the artifact
+-- (level N -> N + 1 costs N copies), at MaxLevel a duplicate turns into
+-- DuplicateCores Нано-ядра. Value at a level = Min .. Max (linear).
+-- Stats = passive bonuses (same names as StatService bonuses);
+-- Effect = special behaviour (ArtifactService):
+--   Lightning  every Every-th hit: a bolt for Value x the hit to the
+--              target and Targets enemies near it
+--   Chain      a crit jumps to Targets enemies nearby for Value x the hit
+--   Explode    a kill explodes: Value x damage in Radius
+--   Shield     HP below Below: damage taken x (1 - Value) for Seconds,
+--              once per Cooldown
+--   KillHeal   a kill heals Value x max HP
+-- MaxRank: the best artifact rarity a gate rank can drop.
+Config.Artifacts = {
+	Slots = 3,
+	MaxLevel = 5,
+	DuplicateCores = { Uncommon = 5, Rare = 12, Epic = 30, Legendary = 80 },
+	Weights = { Uncommon = 50, Rare = 30, Epic = 15, Legendary = 5 },
+	MaxRank = { E = "Rare", D = "Rare", C = "Epic", B = "Epic", A = "Legendary", S = "Legendary" },
+	List = {
+		{ Id = "Reactor", Name = "Малый реактор", Rarity = "Uncommon", Icon = "burst", Text = "+%s%% урона", Stats = { DamagePct = { 0.04, 0.12 } } },
+		{ Id = "Overclock", Name = "Модуль разгона", Rarity = "Uncommon", Icon = "dash", Text = "+%s%% скорости атаки", Stats = { AttackSpeed = { 0.05, 0.15 } } },
+		{ Id = "Plating", Name = "Нано-броня", Rarity = "Uncommon", Icon = "shield", Text = "+%s%% макс. HP", Stats = { HealthPct = { 0.06, 0.18 } } },
+		{ Id = "RepairSwarm", Name = "Ремонтный рой", Rarity = "Uncommon", Icon = "regen", Text = "Убийство лечит %s%% макс. HP", Effect = "KillHeal", Value = { 0.02, 0.06 } },
+		{ Id = "Vampire", Name = "Нано-вампир", Rarity = "Rare", Icon = "heart", Text = "Вампиризм: %s%% урона в HP", Stats = { Lifesteal = { 0.02, 0.06 } } },
+		{ Id = "Scanner", Name = "Сканер добычи", Rarity = "Rare", Icon = "eye", Text = "+%s%% удачи и шанса добычи", Stats = { Luck = { 0.1, 0.3 }, DropChance = { 0.02, 0.06 } }, Show = "Luck" },
+		{ Id = "Targeting", Name = "Прицельный модуль", Rarity = "Rare", Icon = "target", Text = "+%s%% шанса крита", Stats = { CritChance = { 0.03, 0.09 }, CritDamage = { 0.1, 0.3 } }, Show = "CritChance" },
+		{ Id = "Cryo", Name = "Крио-модуль", Rarity = "Rare", Icon = "vortex", Text = "%s%% шанс замедлить врага ударом", Stats = { SlowOnHit = { 0.1, 0.3 } } },
+		{ Id = "Spikes", Name = "Шипастое поле", Rarity = "Rare", Icon = "trap", Text = "Отражает %s%% полученного урона (x3)", Stats = { Thorns = { 0.1, 0.3 } } },
+		{ Id = "Aegis", Name = "Аварийный щит", Rarity = "Epic", Icon = "shield", Text = "При HP ниже 30%%: −%s%% урона на 5 с", Effect = "Shield", Value = { 0.4, 0.8 }, Below = 0.3, Seconds = 5, Cooldown = 30 },
+		{ Id = "Storm", Name = "Грозовой контур", Rarity = "Epic", Icon = "bolt", Text = "Каждый 5-й удар — молния на %s%% урона", Effect = "Lightning", Value = { 0.6, 1.6 }, Every = 5, Targets = 2, Radius = 14 },
+		{ Id = "Detonator", Name = "Детонатор", Rarity = "Epic", Icon = "flame", Text = "Убийство взрывается на %s%% урона", Effect = "Explode", Value = { 0.5, 1.3 }, Radius = 12 },
+		{ Id = "Fury", Name = "Ядро ярости", Rarity = "Epic", Icon = "combo", Text = "+%s%% урона при HP ниже 35%%", Stats = { LowHpDamage = { 0.15, 0.45 } } },
+		{ Id = "ChainCoil", Name = "Цепная катушка", Rarity = "Legendary", Icon = "wave", Text = "Крит бьёт ещё 2 врагов на %s%% урона", Effect = "Chain", Value = { 0.3, 0.7 }, Targets = 2, Radius = 14 },
+		{ Id = "Backup", Name = "Резервное ядро", Rarity = "Legendary", Icon = "reset", Text = "Спасает от смерти раз в %s с", Stats = { CheatDeath = { 1, 1 }, CheatDeathHaste = { 0, 60 } }, Cooldown = { 120, 60 } },
+	},
+	Texts = {
+		Title = "АРТЕФАКТЫ",
+		Slot = "Слот %d",
+		Empty = "Пусто",
+		Equip = "Вставить",
+		Unequip = "Снять",
+		Upgrade = "Улучшить (%d/%d)",
+		Max = "Макс. уровень",
+		Level = "Ур. %d / %d",
+		None = "Артефакты падают из сундуков боссов и приходят в наградах.",
+		Got = "Получен артефакт: %s!",
+		Duplicate = "Дубликат: %s (копий: %d)",
+		ToCores = "%s уже максимального уровня: +%d нано-ядер",
+		NoSlot = "Все 3 слота заняты: сними один артефакт",
+		Upgraded = "%s улучшен до уровня %d",
+	},
+}
+Config.ArtifactById = {}
+for order, artifact in ipairs(Config.Artifacts.List) do
+	artifact.Order = order
+	Config.ArtifactById[artifact.Id] = artifact
+end
+
+-- Value of an artifact range { min, max } at a level.
+function Config.ArtifactValue(range, level: number): number
+	local a = (math.clamp(level, 1, Config.Artifacts.MaxLevel) - 1) / (Config.Artifacts.MaxLevel - 1)
+	return range[1] + (range[2] - range[1]) * a
+end
+
+-- The number shown in an artifact's text at a level.
+function Config.ArtifactText(artifact, level: number): string
+	local range = artifact.Value or (artifact.Cooldown and type(artifact.Cooldown) == "table" and artifact.Cooldown) or (artifact.Stats and artifact.Stats[artifact.Show or next(artifact.Stats)])
+	local value = Config.ArtifactValue(range, level)
+	local shown = if artifact.Cooldown and type(artifact.Cooldown) == "table" then math.floor(value + 0.5) else math.floor(value * 100 + 0.5)
+	return artifact.Text:format(tostring(shown))
+end
+
+-- "System" notifications (client ui/SystemNotice): translucent cyan
+-- windows at the top of the screen.
+Config.System = {
+	Tag = "[ СИСТЕМА ]",
+	Width = 440,
+	Top = 96, -- px from the top (under the objective line)
+	Seconds = 4,
+	Max = 3,
+	Fill = Color3.fromRGB(8, 26, 38),
+	Transparency = 0.22,
+	ItemFrom = "Epic", -- picked items of this rarity and above get a notice
+	Texts = {
+		LevelUp = "Уровень повышен!",
+		Level = "Уровень %d",
+		SkillPoints = "+%d очко навыка",
+		StatPoints = "+%d очка характеристик",
+		Rank = "Новое звание: %s",
+		Got = "Получено: %s",
+		Artifact = "Получен артефакт: %s",
+		NewQuest = "Новое задание",
+		QuestDone = "Задание выполнено",
+		QuestBack = "Вернись к Наставнику за наградой",
+	},
+}
+
+-- STATUS ("Статус", like Solo Leveling): PointsPerLevel stat points per
+-- level above 1, the player puts them into four attributes. Each point
+-- gives PerPoint (same names as StatService bonuses). Reset: all points
+-- back for ResetCost + ResetPerLevel x level credits.
+Config.Attributes = {
+	PointsPerLevel = 3,
+	ResetCost = 50,
+	ResetPerLevel = 10,
+	List = {
+		{ Id = "Str", Name = "Сила", Icon = "sword", Text = "Урон", PerPoint = { DamagePct = 0.01 }, Lines = { "+1% урона" } },
+		{ Id = "Agi", Name = "Ловкость", Icon = "dash", Text = "Скорость атаки и крит", PerPoint = { AttackSpeed = 0.004, CritChance = 0.002 }, Lines = { "+0.4% скорости атаки", "+0.2% шанса крита" } },
+		{ Id = "Vit", Name = "Живучесть", Icon = "heart", Text = "HP и защита", PerPoint = { Health = 8, Defense = 0.001 }, Lines = { "+8 макс. HP", "+0.1% защиты" } },
+		{ Id = "Per", Name = "Восприятие", Icon = "eye", Text = "Удача и шанс добычи", PerPoint = { Luck = 0.01, DropChance = 0.002 }, Lines = { "+1% удачи (редкость в пределах ранга)", "+0.2% шанса добычи" } },
+	},
+	Texts = {
+		Title = "СТАТУС",
+		Points = "Свободных очков: %d",
+		Reset = "Сбросить  •  %s кр.",
+		ResetDone = "Очки характеристик возвращены",
+		NoPoints = "Нет свободных очков",
+		NoCredits = "Не хватает нано-кредитов",
+		Nothing = "Очки ещё не вложены",
+	},
+}
+Config.AttributeById = {}
+for _, attribute in ipairs(Config.Attributes.List) do
+	Config.AttributeById[attribute.Id] = attribute
+end
+function Config.StatPointsAtLevel(level: number): number
+	return math.max(0, level - 1) * Config.Attributes.PointsPerLevel
+end
+
 -- Pacing model for tools/pacing.py (not used by the game itself): how a
 -- typical active player plays, and the owner's time targets. The tool
 -- simulates dungeon runs (kills -> XP, credits, gear drops), the forge and
@@ -998,6 +1131,7 @@ Config.Pacing = {
 	MoveSeconds = 2.5, -- walking to the next mob
 	RoomSeconds = 5, -- walking through a doorway / corridor
 	RunOverhead = 30, -- back to the hub, forge, portal between runs
+	StrShare = 0.6, -- share of the stat points a typical player puts into Сила
 	Targets = {
 		Stages = { ["1"] = 1, ["5"] = 15, ["10"] = 60, ["15"] = 120, ["20"] = 420 },
 		Level = 30,
@@ -1044,10 +1178,10 @@ Config.Progression = {
 	-- Every level: +SkillPointsPerLevel skill point, damage and max HP grow
 	-- (Config.Stats), full heal.
 	--   XP to the next level = XpBase x level^XpExponent:
-	--   lvl 1 -> 49, 10 -> 1.55K, 30 -> 8K, 50 -> 17K
+	--   lvl 1 -> 54, 10 -> 1.7K, 30 -> 8.9K, 50 -> 19K
 	--   (tuned with tools/pacing.py: level ~30 after 2 hours)
 	Level = {
-		XpBase = 49,
+		XpBase = 54,
 		XpExponent = 1.5,
 		XpPerKill = 10, -- x room index
 		XpPerBoss = 80, -- x room index
@@ -1192,6 +1326,9 @@ Config.Remotes = {
 	ClickHit = "RemoteEvent", -- C->S (mob or nil) on every attack click; S->C ("Hit"|"Kill"|"Credits", ...)
 	Items = "RemoteFunction", -- ("Equip", uid) | ("Unequip", slot) | ("Lock", uid) | ("Salvage", { uid, ... }) | ("SalvageRarity", rarityId) -> ok, message
 	Forge = "RemoteFunction", -- ("Enhance", uid) | ("Ascend", uid) | ("Reforge", uid, propIndex) -> ok, message, extra
+	Artifacts = "RemoteFunction", -- ("Equip", id) | ("Unequip", id) | ("Upgrade", id) -> ok, message
+	Status = "RemoteFunction", -- ("Add", attributeId, count) | ("Reset") -> ok, message
+	System = "RemoteEvent", -- S->C (title, { lines }, kind) "[СИСТЕМА]" notification window
 	Travel = "RemoteFunction", -- ("Hub") | ("Room", n) -> ok, message
 	Notify = "RemoteEvent", -- S->C (text, kind) toast
 	RoomState = "RemoteEvent", -- S->C (room, alive, total) for the player's own run
@@ -1565,7 +1702,7 @@ Config.Quests = {
 			Talk = "Роботы роняют оружие и броню. Луч над предметом показывает редкость. Подходи и удерживай E." },
 		{ Id = "craft", Title = "Первая заточка", Text = "Заточи предмет в Кузнице (Фабрикатор).", Kind = "Enhance", Target = 1, Place = "Forge", Xp = 60, Credits = 150,
 			Talk = "Ненужные предметы разбирай на нано-ядра, а лучшие — затачивай. Кузница — в Фабрикаторе на северо-востоке." },
-		{ Id = "boss", Title = "Первый босс", Text = "Победи босса на 5-м этапе.", Kind = "Boss", Target = 1, Place = "Gates", Xp = 80, Credits = 150,
+		{ Id = "boss", Title = "Первый босс", Text = "Победи босса на 5-м этапе.", Kind = "Boss", Target = 1, Place = "Gates", Xp = 80, Credits = 150, Artifact = "Reactor",
 			Talk = "Каждый 5-й этап — босс. Покажи ему, на что способен твой класс." },
 		{ Id = "room7", Title = "Глубже", Text = "Дойди до 7-го этапа.", Kind = "Room", Target = 7, Place = "Gates", Xp = 90, Credits = 180,
 			Talk = "Дальше — Криолаборатория. Дойди до 7-го этапа." },
@@ -1707,6 +1844,7 @@ Config.Ui = {
 	-- Icon bar: Id = window, Key = hotkey (shown on the button; hidden on touch).
 	Bar = {
 		{ Id = "Inventory", Icon = "bag", Label = "Инвентарь", Key = Enum.KeyCode.G },
+		{ Id = "Status", Icon = "user", Label = "Статус", Key = Enum.KeyCode.C },
 		{ Id = "Skills", Icon = "skills", Label = "Навыки", Key = Enum.KeyCode.K },
 		{ Id = "Quests", Icon = "quest", Label = "Задания", Key = Enum.KeyCode.J },
 		{ Id = "Shop", Icon = "gem", Label = "Магазин" },
