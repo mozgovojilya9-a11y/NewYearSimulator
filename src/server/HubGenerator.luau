@@ -907,6 +907,39 @@ local function buildSpawn()
 end
 
 -- Gate hall: giant gates on the spawn axis, set into the north wall.
+-- Red Gates (event, GateService): a smaller gate on the west wall of the
+-- Gate hall. Its field, curtains and light are hidden until the event.
+local function buildRedGate()
+	local R = Config.RedGate
+	local m = NanoKit.Model(root, "RedGate")
+	local cf = wallFrame("W", "Gates", -194)
+	local w, h = 12, 16
+	for _, side in ipairs({ -1, 1 }) do
+		Panel(m, "Pylon", Vector3.new(3, h + 3, 4), cf * CFrame.new(side * (w / 2 + 1.5), (h + 3) / 2, -2), C.Beam, M.Metal)
+		Panel(m, "PylonFace", Vector3.new(1.6, h - 2, 0.3), cf * CFrame.new(side * (w / 2 + 1.5), h / 2, -4.1), C.Steel, M.Plate)
+	end
+	Panel(m, "Lintel", Vector3.new(w + 6, 3, 4), cf * CFrame.new(0, h + 1.5, -2), C.Beam, M.Metal)
+	Panel(m, "Back", Vector3.new(w, h, 0.6), cf * CFrame.new(0, h / 2, -0.4), C.Tunnel, M.Smooth)
+	local plate = Panel(m, "Sign", Vector3.new(w + 4, 2.4, 0.3), cf * CFrame.new(0, h + 4.4, -2.4), T.PanelDark, M.Smooth, { CanCollide = false })
+	text(plate, Enum.NormalId.Front, { { Text = R.Texts.Name, Size = 56, Color = R.Color } })
+	local parts = {}
+	local field = Panel(m, "RedField", Vector3.new(w, h, 0.6), cf * CFrame.new(0, h / 2, -2.6), R.Color, Enum.Material.ForceField, { CanCollide = false, Transparency = 1, CastShadow = false })
+	field:SetAttribute("OnTransparency", 0.2)
+	table.insert(parts, field)
+	for i = 1, 3 do
+		local curtain = Panel(m, "RedCurtain", Vector3.new(w / 3 + 0.4, h - 0.4, 0.1), cf * CFrame.new(-w / 2 + w * (i - 0.5) / 3, h / 2, -2.9 - (i % 2) * 0.2), R.Color, M.Neon, { CanCollide = false, CanQuery = false, Transparency = 1, CastShadow = false })
+		curtain:SetAttribute("OnTransparency", 0.82)
+		NanoKit.Tag(curtain, "Pulse", { Period = 1.4 + i * 0.3 })
+		table.insert(parts, curtain)
+	end
+	local light = WorldKit.Light(field, R.Color, 26, 1.6)
+	light.Enabled = false
+	local prompt = WorldKit.Prompt(field, R.Texts.Enter, R.Texts.Name, { Action = "RedGate" }, 12)
+	prompt.RequiresLineOfSight = false
+	prompt.Enabled = false
+	return { Model = m, Parts = parts, Prompt = prompt, Light = light }
+end
+
 local function buildGates()
 	local P = L.Portal
 	sideHall("Gates", "S", { { Side = "N", At = 0, Width = P.Width, Height = P.Height } })
@@ -1240,6 +1273,7 @@ function HubGenerator.Build()
 	buildAtrium()
 	buildSpawn()
 	local portal = buildGates()
+	local redGate = buildRedGate()
 	local polygon, polygonCenter = buildTraining()
 	local forgePrompt, forge = buildForge()
 	local academy = buildAcademy()
@@ -1281,6 +1315,7 @@ function HubGenerator.Build()
 		Polygon = polygon,
 		PolygonCenter = polygonCenter,
 		Portal = portal,
+		RedGate = redGate,
 		Forge = forge,
 		ForgePrompt = forgePrompt,
 		Academy = academy,
