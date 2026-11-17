@@ -26,6 +26,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local ArtifactService = require(script.Parent.ArtifactService)
 local DataService = require(script.Parent.DataService)
 local GameEvents = require(script.Parent.GameEvents)
 local PlayerState = require(script.Parent.PlayerState)
@@ -158,6 +159,9 @@ local function claim(player)
 	local xp = def.Xp * math.max(1, data.Level or 1)
 	PlayerState.AddCredits(player, def.Credits)
 	ProgressionService.AddXp(player, xp)
+	if def.Artifact then
+		ArtifactService.Give(player, def.Artifact) -- story reward
+	end
 	s.Step += 1
 	s.Count = 0
 	publish(player)

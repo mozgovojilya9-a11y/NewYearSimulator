@@ -285,6 +285,13 @@ function PlayerState.Sync(player)
 		player:SetAttribute("Boost" .. kind, data.Boosts[kind] or 0)
 	end
 	publishItems(player, data)
+	player:SetAttribute("Artifacts", HttpService:JSONEncode({ Owned = data.Artifacts, Slots = data.ArtifactSlots }))
+	player:SetAttribute("Attributes", HttpService:JSONEncode(data.Attributes))
+	local spentStats = 0
+	for _, value in pairs(data.Attributes) do
+		spentStats += value
+	end
+	player:SetAttribute("StatPoints", math.max(0, Config.StatPointsAtLevel(data.Level) - spentStats))
 
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then
