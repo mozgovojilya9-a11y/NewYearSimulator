@@ -328,12 +328,15 @@ end
 -- Hooks from gameplay
 ---------------------------------------------------------------------
 
-function ProgressionService.OnKill(player, room: number, isBoss: boolean, position: Vector3?)
+-- info (gate runs): Weight = share of a kill's reward (waves have many
+-- enemies: swarm counts less, elites more).
+function ProgressionService.OnKill(player, room: number, isBoss: boolean, position: Vector3?, _kind, info)
 	local data = DataService.Get(player)
 	if not data then
 		return
 	end
-	local credits = earnCredits(player, Config.KillCredits(room, isBoss))
+	local weight = if isBoss then 1 else (info and info.Weight or 1)
+	local credits = earnCredits(player, Config.KillCredits(room, isBoss) * weight)
 	if credits > 0 then
 		Remotes.Get("ClickHit"):FireClient(player, "Credits", credits, position)
 	end
@@ -343,7 +346,7 @@ function ProgressionService.OnKill(player, room: number, isBoss: boolean, positi
 		questProgress(player, "Boss", 1)
 		GameEvents.Fire(player, "Boss", 1)
 	end
-	addXp(player, data, (if isBoss then P.Level.XpPerBoss else P.Level.XpPerKill) * room)
+	addXp(player, data, (if isBoss then P.Level.XpPerBoss else P.Level.XpPerKill) * room * weight)
 end
 
 function ProgressionService.OnRoomCleared(player, room: number)

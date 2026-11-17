@@ -36,6 +36,7 @@ Config.StartingData = {
 	Xp = 0,
 	SkillPoints = 0, -- old field (points are now Config.Skills.PointsAtLevel per class)
 	Class = "", -- "" until the player picks one (class selection screen)
+	Gates = { Cleared = {} }, -- [locationId] = best grade ("S".."C")
 	Story = { Step = 1, Count = 0, Seen = 0 }, -- mentor chain: current step, progress counter, step already heard
 	Classes = {}, -- [classId] = { Skills = { [nodeId] = rank }, Loadout = { Q = nodeId, ... }, Resets = n }
 	Boosts = { Xp = 0, Damage = 0, Loot = 0, Credits = 0 }, -- timed x2 boosts: os.time() they end
@@ -348,12 +349,135 @@ Config.Dungeon = {
 -- level of drops read the rank / room from this table.
 Config.Gates = {
 	Ranks = { "E", "D", "C", "B", "A", "S" },
+	-- Tier = difficulty in the units of the old 20-room curve
+	-- (Config.RecommendedDamage / MobHealth / loot item level). Still used
+	-- by the rank of a tier (loot outside a gate run, store chests).
 	RankByRoom = { "E", "E", "E", "E", "D", "D", "D", "D", "C", "C", "C", "C", "B", "B", "B", "B", "A", "A", "A", "S" },
 	Colors = {
 		E = Color3.fromRGB(150, 160, 175), D = Color3.fromRGB(90, 230, 110), C = Color3.fromRGB(70, 140, 255),
 		B = Color3.fromRGB(170, 90, 255), A = Color3.fromRGB(255, 201, 60), S = Color3.fromRGB(255, 70, 70),
 	},
+	-- A rank opens at Level once a location of Requires was cleared.
+	RankInfo = {
+		E = { Name = "Ранг E", Level = 1, Text = "Первые разломы: роботы цеха и лаборатории" },
+		D = { Name = "Ранг D", Level = 8, Requires = "E", Text = "Опасные сектора: плавильня, заражение, Нексус" },
+		C = { Name = "Ранг C", Level = 18, Requires = "D", Text = "Скоро" },
+		B = { Name = "Ранг B", Level = 26, Requires = "C", Text = "Скоро" },
+		A = { Name = "Ранг A", Level = 34, Requires = "B", Text = "Скоро" },
+		S = { Name = "Ранг S", Level = 42, Requires = "A", Text = "Скоро" },
+	},
+	-- Locations: a big map of Zones (each: Waves count) + a boss arena.
+	-- Biome = look (Config.DungeonLayout.Biomes[*].Theme); Mobs = enemy
+	-- kinds of the waves (Config.Mobs.Defs), Boss = the arena boss.
+	-- Tier = difficulty of zone 1 (+TierStep per zone, the boss = last + 1).
+	-- Level / GearScore = what is recommended. ParSeconds = time of an S.
+	-- Ready = false: a placeholder (shown as "Скоро"), add data to open it.
+	Locations = {
+		{ Id = "E_Assembly", Rank = "E", Biome = "Assembly", Name = "Сборочный цех", Text = "Конвейеры встали, роботы-сборщики вышли из-под контроля.",
+			Tier = 1, TierStep = 1, Zones = { 3, 3, 4 }, Level = 1, GearScore = 10, ParSeconds = 300, Seed = 11,
+			Mobs = { "SpiderBot", "Assembler", "AsmGunner", "AsmShield" }, Boss = "ForemanMech", Icon = "gear" },
+		{ Id = "E_Cryo", Rank = "E", Biome = "Cryo", Name = "Криолаборатория", Text = "Ледяные камеры треснули. Внутри — то, что держали в холоде.",
+			Tier = 4, TierStep = 1, Zones = { 3, 4, 4 }, Level = 5, GearScore = 60, ParSeconds = 330, Seed = 23,
+			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic" }, Boss = "CryoOverseer", Icon = "vortex" },
+		{ Id = "D_Smelter", Rank = "D", Biome = "Smelter", Name = "Плавильный реактор", Text = "Каналы расплава, жар и тяжёлые мехи плавильни.",
+			Tier = 7, TierStep = 1, Zones = { 3, 4, 4 }, Level = 9, GearScore = 140, ParSeconds = 360, Seed = 37,
+			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic" }, Boss = "MoltenColossus", Icon = "flame" },
+		{ Id = "D_Infected", Rank = "D", Biome = "Infected", Name = "Заражённый сектор", Text = "Нано-биомасса пожирает металл. Роботы стали её носителями.",
+			Tier = 9, TierStep = 1, Zones = { 4, 4, 4, 5 }, Level = 12, GearScore = 190, ParSeconds = 420, Seed = 41,
+			Mobs = { "InfectedCrawler", "InfectedBrute", "InfectedSpitter", "InfectedMedic" }, Boss = "HiveMother", Icon = "skull" },
+		{ Id = "D_Nexus", Rank = "D", Biome = "Nexus", Name = "Ядро Нексуса", Text = "Сердце ИИ. Его стражи не знают пощады.",
+			Tier = 11, TierStep = 1, Zones = { 4, 4, 5, 5 }, Level = 15, GearScore = 250, ParSeconds = 450, Seed = 53,
+			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
+		-- placeholders: data is enough to open them later
+		{ Id = "C_Foundry", Rank = "C", Biome = "Smelter", Name = "Глубинная литейная", Ready = false, Tier = 14, TierStep = 1, Zones = { 4, 4, 5, 5 }, Level = 18, GearScore = 330, ParSeconds = 480, Seed = 61,
+			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic" }, Boss = "MoltenColossus", Icon = "flame" },
+		{ Id = "C_Hive", Rank = "C", Biome = "Infected", Name = "Улей биомассы", Ready = false, Tier = 15, TierStep = 1, Zones = { 4, 5, 5, 5 }, Level = 20, GearScore = 360, ParSeconds = 480, Seed = 67,
+			Mobs = { "InfectedCrawler", "InfectedBrute", "InfectedSpitter", "InfectedMedic" }, Boss = "HiveMother", Icon = "skull" },
+		{ Id = "B_Core", Rank = "B", Biome = "Nexus", Name = "Ядро-2", Ready = false, Tier = 17, TierStep = 1, Zones = { 5, 5, 5, 5 }, Level = 26, GearScore = 440, ParSeconds = 510, Seed = 71,
+			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
+		{ Id = "A_Citadel", Rank = "A", Biome = "Cryo", Name = "Ледяная цитадель", Ready = false, Tier = 19, TierStep = 1, Zones = { 5, 5, 5, 5 }, Level = 34, GearScore = 520, ParSeconds = 540, Seed = 79,
+			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic" }, Boss = "CryoOverseer", Icon = "vortex" },
+		{ Id = "S_Throne", Rank = "S", Biome = "Nexus", Name = "Трон Нексуса", Ready = false, Tier = 21, TierStep = 1, Zones = { 5, 5, 5, 5 }, Level = 42, GearScore = 600, ParSeconds = 600, Seed = 83,
+			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
+	},
+	Texts = {
+		Title = "ВРАТА",
+		Locked = "Закрыто",
+		NeedLevel = "Нужен %d уровень",
+		NeedRank = "Пройди любые Врата ранга %s",
+		Soon = "Скоро",
+		Recommended = "Рекомендуется: ур. %d  •  Gear Score %d",
+		Zones = "Зон: %d  •  Волн: %d  •  Босс: %s",
+		Solo = "Соло",
+		Party = "Группой",
+		Best = "Лучшая оценка: %s",
+		NotLeader = "Начинает лидер группы",
+		Busy = "Сейчас нельзя",
+	},
 }
+Config.GateRankIndex = {}
+for index, rank in ipairs(Config.Gates.Ranks) do
+	Config.GateRankIndex[rank] = index
+end
+Config.LocationById = {}
+for order, location in ipairs(Config.Gates.Locations) do
+	location.Order = order
+	location.Ready = location.Ready ~= false
+	location.Waves = 0
+	for _, waves in ipairs(location.Zones) do
+		location.Waves += waves
+	end
+	location.BossTier = location.Tier + #location.Zones * location.TierStep
+	Config.LocationById[location.Id] = location
+end
+
+-- A location map (server LocationGenerator). Sizes in studs.
+Config.GateMap = {
+	Origin = Vector3.new(0, 0, -4000), -- far from the hub: never visible
+	SlotSpacing = 1600, -- runs sit side by side along X
+	MaxRuns = 24,
+	ZoneSize = 84, -- square zones
+	BossSize = 112, -- the boss arena
+	WallHeight = 26,
+	Corridor = { Length = 28, Width = 18, Height = 16 },
+	Covers = 7, -- cover blocks per zone
+	Portals = 4, -- spawn portals per zone (on the walls)
+	Pylons = 4, -- lamp pylons per zone
+	Ceiling = true, -- closed halls: a roof with girders and light slits
+	FloorTile = 18, -- studs per tile of the AI floor material
+	Texts = { Zone = "ЗОНА %d", Boss = "АРЕНА" },
+}
+
+-- Waves in every zone. Count of a wave = Base + PerWave x (wave - 1)
+-- (+ GroupCount per extra player); the last wave of a zone adds Elites
+-- elite enemies. Health x (1 + GroupHealth per extra player).
+Config.Waves = {
+	Base = 3,
+	PerWave = 1,
+	Elites = 1,
+	EliteFromZone = 1, -- the last wave of every zone has elites
+	RestSeconds = 4,
+	PortalSeconds = 1.1, -- the portal opens this long before the enemy steps out
+	StartDelay = 1.5, -- after entering a zone
+	GroupCount = 0.35,
+	GroupHealth = 0.6,
+	-- XP / credits of a kill x Reward (a wave run has many more enemies
+	-- than the old rooms), elites x EliteReward, swarm x SwarmReward
+	Reward = 0.45,
+	EliteReward = 4,
+	SwarmReward = 0.4,
+	Texts = {
+		Wave = "ВОЛНА %d/%d",
+		Zone = "Зона %d/%d",
+		Enemies = "Врагов: %d",
+		Rest = "Следующая волна через %d",
+		Elite = "ЭЛИТНАЯ ВОЛНА",
+		Cleared = "Зона зачищена — проход открыт",
+		Boss = "АРЕНА БОССА",
+		Enter = "Войди в зону",
+	},
+}
+
 function Config.RankForRoom(room: number): string
 	local list = Config.Gates.RankByRoom
 	return list[math.clamp(room, 1, #list)]
@@ -439,47 +563,166 @@ Config.Loot = {
 -- degrees to turn the model if it faces backwards. No model -> the
 -- procedural mob Builder. What a mob drops: Config.Loot.
 Config.Mobs = {
+	-- Biome list (old dungeon order); gate locations name their own
+	-- Mobs / Boss (Config.Gates.Locations).
 	Biomes = {
-		{ Kinds = { "SpiderBot", "Assembler", "Loader" }, Boss = "ForemanMech" },
-		{ Kinds = { "CryoBot", "CryoAndroid", "FrostSpider" }, Boss = "CryoOverseer" },
-		{ Kinds = { "Smelter", "HeavyMech", "SlagBot" }, Boss = "MoltenColossus" },
-		{ Kinds = { "NexusSentinel", "NexusDrone", "PhaseAndroid" }, Boss = "Juggernaut" },
+		{ Kinds = { "SpiderBot", "Assembler", "AsmGunner" }, Boss = "ForemanMech" },
+		{ Kinds = { "FrostSpider", "CryoAndroid", "CryoBot" }, Boss = "CryoOverseer" },
+		{ Kinds = { "SlagBot", "Smelter", "SmeltGunner" }, Boss = "MoltenColossus" },
+		{ Kinds = { "PhaseAndroid", "NexusSentinel", "NexusDrone" }, Boss = "Juggernaut" },
 	},
+	-- Role = behaviour (Config.Enemies.Roles). Asset = model in
+	-- GameAssets/Mobs (procedural Builder if missing), Height in studs.
 	Defs = {
 		-- 1. Сборочный цех
-		SpiderBot = { Name = "Паукобот", Asset = "Mob_SpiderBot", Height = 3.6, Builder = "IceSpider" },
-		Assembler = { Name = "Робот-сборщик", Asset = "Mob_Robot", Height = 5.5, Builder = "ZombieMiner" },
-		Loader = { Name = "Бот-погрузчик", Asset = "Mob_Bot2", Height = 5, Builder = "SkeletonArcher" },
-		ForemanMech = { Name = "Мех-бригадир", Boss = true, Asset = "Boss_Foreman", Turn = 90, AltAsset = "Mob_Mech", Height = 6, Tint = Color3.fromRGB(255, 170, 60), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "SlimeKing" },
+		SpiderBot = { Name = "Паукобот", Role = "Swarm", Asset = "Mob_SpiderBot", Height = 2.8, Builder = "IceSpider" },
+		Assembler = { Name = "Робот-сборщик", Role = "Melee", Asset = "Mob_Android", Height = 5.6, Tint = Color3.fromRGB(255, 190, 70), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "ZombieMiner" },
+		AsmGunner = { Name = "Монтажник-стрелок", Role = "Ranged", Asset = "Mob_Sniper", Height = 5.6, Glow = Color3.fromRGB(255, 190, 70), Builder = "SkeletonArcher" },
+		AsmShield = { Name = "Щитовой погрузчик", Role = "Shield", Asset = "Mob_ShieldBearer", Height = 6, Glow = Color3.fromRGB(255, 190, 70), Builder = "ZombieMiner" },
+		ForemanMech = { Name = "Мех-бригадир", Boss = true, Asset = "Boss_Foreman", Turn = 90, AltAsset = "Mob_Mech", Height = 6, Tint = Color3.fromRGB(255, 170, 60), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "SlimeKing", Title = "Хозяин конвейера" },
 		-- 2. Криолаборатория
-		CryoBot = { Name = "Крио-бот", Asset = "Mob_BlueBot", Height = 5, Glow = Color3.fromRGB(120, 230, 255), Builder = "SnowGolem" },
-		CryoAndroid = { Name = "Крио-андроид", Asset = "Mob_Android", Height = 6, Tint = Color3.fromRGB(170, 220, 255), TintAmount = 0.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "Yeti" },
-		FrostSpider = { Name = "Ледяной паукобот", Asset = "Mob_SpiderBot", Height = 4.2, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider" },
-		CryoOverseer = { Name = "Крио-надзиратель", Boss = true, Asset = "Boss_Cryo", AltAsset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(150, 210, 255), TintAmount = 0.45, Glow = Color3.fromRGB(46, 230, 255), Builder = "IceBoneLord" },
+		FrostSpider = { Name = "Ледяной паукобот", Role = "Swarm", Asset = "Mob_SpiderBot", Height = 3, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider" },
+		CryoAndroid = { Name = "Крио-андроид", Role = "Melee", Asset = "Mob_Android", Height = 6, Tint = Color3.fromRGB(170, 220, 255), TintAmount = 0.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "Yeti" },
+		CryoBot = { Name = "Крио-турель", Role = "Ranged", Asset = "Mob_BlueBot", Height = 4.6, Glow = Color3.fromRGB(120, 230, 255), Builder = "SnowGolem" },
+		CryoMedic = { Name = "Крио-медик", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(200, 235, 255), TintAmount = 0.3, Glow = Color3.fromRGB(120, 230, 255), Builder = "FlyingEye", Float = true },
+		CryoOverseer = { Name = "Крио-надзиратель", Boss = true, Asset = "Boss_Cryo", AltAsset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(150, 210, 255), TintAmount = 0.45, Glow = Color3.fromRGB(46, 230, 255), Builder = "IceBoneLord", Title = "Страж холода" },
 		-- 3. Плавильный реактор
-		Smelter = { Name = "Андроид-плавильщик", Asset = "Mob_RedAndroid", Height = 6, Glow = Color3.fromRGB(255, 140, 40), Builder = "FireImp" },
-		HeavyMech = { Name = "Тяжёлый мех", Asset = "Mob_Mech", Height = 6.5, Tint = Color3.fromRGB(90, 70, 60), TintAmount = 0.4, Glow = Color3.fromRGB(255, 120, 30), Builder = "MagmaGolem" },
-		SlagBot = { Name = "Шлакобот", Asset = "Mob_Bot2", Height = 5, Tint = Color3.fromRGB(255, 130, 40), TintAmount = 0.4, Glow = Color3.fromRGB(255, 160, 60), Builder = "GoblinSmith" },
-		MoltenColossus = { Name = "Плавильный колосс", Boss = true, Asset = "Boss_Molten", AltAsset = "Mob_Android", Height = 6.2, Tint = Color3.fromRGB(255, 110, 30), TintAmount = 0.45, Glow = Color3.fromRGB(255, 150, 40), Builder = "FireChief" },
-		-- 4. Ядро Нексуса
-		NexusSentinel = { Name = "Страж Нексуса", Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(120, 60, 200), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
-		NexusDrone = { Name = "Дрон Нексуса", Asset = "Mob_Robot", Height = 5.5, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.45, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye" },
-		PhaseAndroid = { Name = "Фазовый андроид", Asset = "Mob_RedAndroid", Height = 6, Tint = Color3.fromRGB(170, 80, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost" },
-		Juggernaut = { Name = "Джаггернаут", Boss = true, Asset = "Boss_Juggernaut", Height = 6.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord" },
+		SlagBot = { Name = "Шлакобот", Role = "Swarm", Asset = "Mob_SpiderBot", Height = 2.8, Tint = Color3.fromRGB(255, 130, 40), TintAmount = 0.45, Glow = Color3.fromRGB(255, 160, 60), Builder = "GoblinSmith" },
+		Smelter = { Name = "Андроид-плавильщик", Role = "Melee", Asset = "Mob_RedAndroid", Height = 6, Glow = Color3.fromRGB(255, 140, 40), Builder = "FireImp" },
+		SmeltGunner = { Name = "Литейный стрелок", Role = "Ranged", Asset = "Mob_Sniper", Height = 5.6, Tint = Color3.fromRGB(255, 120, 50), TintAmount = 0.3, Glow = Color3.fromRGB(255, 140, 40), Builder = "SkeletonArcher" },
+		SmeltShield = { Name = "Жаростойкий щитоносец", Role = "Shield", Asset = "Mob_ShieldBearer", Height = 6.2, Tint = Color3.fromRGB(255, 120, 50), TintAmount = 0.3, Glow = Color3.fromRGB(255, 140, 40), Builder = "MagmaGolem" },
+		SmeltMedic = { Name = "Ремонтный дрон", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(255, 150, 70), TintAmount = 0.3, Glow = Color3.fromRGB(255, 160, 60), Builder = "FlyingEye", Float = true },
+		MoltenColossus = { Name = "Плавильный колосс", Boss = true, Asset = "Boss_Molten", AltAsset = "Mob_Android", Height = 6.2, Tint = Color3.fromRGB(255, 110, 30), TintAmount = 0.45, Glow = Color3.fromRGB(255, 150, 40), Builder = "FireChief", Title = "Сердце плавильни" },
+		-- 4. Заражённый сектор
+		InfectedCrawler = { Name = "Заражённый ползун", Role = "Swarm", Asset = "Mob_InfectedCrawler", AltAsset = "Mob_SpiderBot", Height = 2.8, Glow = Color3.fromRGB(120, 255, 90), Builder = "IceSpider" },
+		InfectedBrute = { Name = "Заражённый громила", Role = "Melee", Asset = "Mob_InfectedBrute", AltAsset = "Mob_Android", Height = 6.2, Glow = Color3.fromRGB(120, 255, 90), Builder = "Yeti" },
+		InfectedSpitter = { Name = "Плевун", Role = "Ranged", Asset = "Mob_Sniper", Height = 5.6, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "SkeletonArcher" },
+		InfectedMedic = { Name = "Спороносец", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "FlyingEye", Float = true },
+		HiveMother = { Name = "Матка улья", Boss = true, Asset = "Boss_HiveMother", AltAsset = "Mob_Overseer", Height = 6.4, Glow = Color3.fromRGB(120, 255, 90), Builder = "AbyssLord", Title = "Источник заражения" },
+		-- 5. Ядро Нексуса
+		PhaseAndroid = { Name = "Фазовый андроид", Role = "Swarm", Asset = "Mob_RedAndroid", Height = 4.2, Tint = Color3.fromRGB(170, 80, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost" },
+		NexusSentinel = { Name = "Страж Нексуса", Role = "Melee", Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(120, 60, 200), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
+		NexusDrone = { Name = "Дрон Нексуса", Role = "Ranged", Asset = "Mob_Robot", Height = 5.2, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.45, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye" },
+		NexusShield = { Name = "Бастион Нексуса", Role = "Shield", Asset = "Mob_ShieldBearer", Height = 6.2, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.35, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
+		NexusMedic = { Name = "Корректор", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(170, 90, 255), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye", Float = true },
+		Juggernaut = { Name = "Джаггернаут", Boss = true, Asset = "Boss_Juggernaut", Height = 6.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord", Title = "Воля Нексуса" },
 	},
 }
 for id, def in pairs(Config.Mobs.Defs) do
 	def.Id = id
 end
 
--- The mob definition for a room: a boss in boss rooms, else kind 1..3.
-function Config.MobFor(room: number, kindIndex: number)
-	local biome = Config.Mobs.Biomes[math.min(#Config.Mobs.Biomes, math.ceil(room / Config.Dungeon.BossEvery))]
-	if Config.IsBossRoom(room) then
-		return Config.Mobs.Defs[biome.Boss]
-	end
-	return Config.Mobs.Defs[biome.Kinds[(kindIndex - 1) % #biome.Kinds + 1]]
-end
+-- Enemy behaviour (server MobAI). Every attack is telegraphed: the mob
+-- flashes red, ranged shots draw their line on the floor, area attacks
+-- draw a circle / rectangle that fills up, and only then hit.
+--   Health / Damage = x of Config.MobHealth / MobDamage of the tier,
+--   Speed = walk speed, Range = attack reach (from the mob's surface),
+--   Cooldown / Telegraph = seconds.
+-- Run results: grade by time (x ParSeconds of the location) and deaths;
+-- the boss chest of a better grade holds more items (Items) and its first
+-- item is at least a step rarer (MinStep). Damage taken lowers a grade
+-- by one when it is above DamagedShare of the team's max health x 4.
+Config.Grades = {
+	{ Id = "S", Time = 1, Items = 2, MinStep = 1, Color = Color3.fromRGB(255, 201, 60) },
+	{ Id = "A", Time = 1.35, Items = 1, MinStep = 0, Color = Color3.fromRGB(170, 90, 255) },
+	{ Id = "B", Time = 1.8, Items = 0, MinStep = 0, Color = Color3.fromRGB(70, 140, 255) },
+	{ Id = "C", Time = math.huge, Items = 0, MinStep = 0, Color = Color3.fromRGB(150, 160, 175) },
+	DeathStep = 1, -- every death of the team: one grade lower
+	ReturnSeconds = 60, -- after the boss: back to the hub
+	Texts = {
+		Title = "ИТОГИ",
+		Won = "Врата закрыты",
+		Failed = "Провал",
+		Left = "Забег прерван",
+		Time = "Время",
+		Damage = "Урон",
+		Kills = "Убито",
+		Deaths = "Смертей",
+		Bonus = "Бонус оценки: +%d предм. в сундуке",
+		Loot = "Добыча",
+		NoLoot = "Ничего не подобрано",
+		Again = "Ещё раз",
+		Hub = "В хаб",
+		Return = "Возврат в хаб через %d с",
+	},
+}
+
+-- Red Gates: a server event. Every Interval seconds (first after First)
+-- red gates open in the Gate hall for Duration seconds: harder enemies,
+-- the Red loot table for everything, no way out before the boss is down.
+Config.RedGate = {
+	First = 240,
+	Interval = 900,
+	Duration = 300,
+	Health = 1.8, -- enemy health x
+	Damage = 1.4, -- enemy damage x
+	ExtraWaves = 1, -- per zone
+	Color = Color3.fromRGB(255, 50, 60),
+	Texts = {
+		Open = "Открылись Красные Врата!",
+		OpenLine = "%s  •  ранг %s  •  %d:%02d",
+		Closed = "Красные Врата закрылись",
+		Name = "КРАСНЫЕ ВРАТА",
+		NoExit = "Из Красных Врат не выйти до победы",
+		Enter = "Войти в Красные Врата",
+	},
+}
+
+-- Groups (PartyService): invites, search, start together.
+Config.Party = {
+	Max = 4,
+	InviteSeconds = 20,
+	SearchSeconds = 30, -- search: start with whoever is found after this
+	Countdown = 3, -- seconds before the group is sent through the gate
+	Texts = {
+		Invite = "%s зовёт тебя в группу",
+		Accept = "Принять",
+		Decline = "Отказаться",
+		Joined = "%s в группе",
+		Left = "%s покинул группу",
+		Full = "Группа полна",
+		InGroup = "Игрок уже в группе",
+		Search = "Поиск группы…  %d с",
+		Starting = "Отправление через %d…",
+		Leave = "Покинуть группу",
+		InviteTitle = "Пригласить",
+		Nobody = "Других игроков на сервере нет",
+		Group = "ГРУППА",
+		Solo = "Ты один. Пригласи игроков или найди группу.",
+	},
+}
+
+Config.Enemies = {
+	Roles = {
+		Melee = { Health = 1, Damage = 1, Speed = 12, Range = 4.5, Cooldown = 1.6, Telegraph = 0.55 },
+		Swarm = { Health = 0.35, Damage = 0.45, Speed = 17, Range = 3.5, Cooldown = 1.1, Telegraph = 0.35, Pack = 3 },
+		Ranged = { Health = 0.75, Damage = 0.9, Speed = 10, Range = 40, Keep = 22, Cooldown = 2.8, Telegraph = 0.8, Width = 2.6 },
+		Shield = { Health = 1.7, Damage = 1.1, Speed = 8, Range = 5, Cooldown = 2.2, Telegraph = 0.7, Front = 70, Block = 0.8 },
+		Healer = { Health = 0.7, Damage = 0, Speed = 11, Keep = 26, Every = 4, Heal = 0.18, Range = 30 },
+	},
+	RoleNames = { Melee = "ближний бой", Swarm = "рой", Ranged = "стрелок", Shield = "щитоносец", Healer = "лекарь" },
+	Elite = {
+		Scale = 1.35,
+		Health = 4,
+		Damage = 1.6,
+		Aura = Color3.fromRGB(255, 201, 60),
+		Shockwave = { Every = 7, Radius = 11, Telegraph = 1, Mult = 2 }, -- the extra attack
+		Prefix = "Элитный ",
+	},
+	Boss = {
+		Phases = { 0.66, 0.33 }, -- health shares where phase 2 / 3 start
+		Every = 3.4, -- seconds between special attacks (x Speed of the phase)
+		PhaseSpeed = { 1, 0.8, 0.62 },
+		Slam = { Radius = 16, Telegraph = 1.2, Mult = 2.5 },
+		Charge = { Length = 36, Width = 8, Telegraph = 1, Mult = 2.2, Speed = 70 },
+		Barrage = { Count = 3, PerPhase = 2, Radius = 7, Telegraph = 1.1, Mult = 1.7 },
+		Summon = { Count = 3, FromPhase = 2 },
+		IntroSeconds = 3,
+		Texts = { Phase = "ФАЗА %d", Intro = "%s", Summon = "%s зовёт подкрепление!" },
+	},
+	TelegraphColor = Color3.fromRGB(255, 70, 60),
+	HealColor = Color3.fromRGB(90, 230, 110),
+}
 
 -- The player in combat. Health regenerates only when nothing hit the
 -- player for RegenDelay seconds (the default Roblox regen is disabled).
@@ -535,14 +778,21 @@ Config.Combat = {
 	Pulse = { Range = 12, Combo = { 1, 1.1, 1.3 }, ComboWindow = 1.4, ThirdRadius = 11 }, -- 3rd hit: everyone around
 	Gunner = { Range = 70, VolleyEvery = 3, VolleyTargets = 3, VolleyMult = 0.8, ChargeSeconds = 0.9, ChargeMult = 3 },
 	Block = { Reduction = 0.7, WalkSpeed = 8, Key = Enum.KeyCode.F },
-	Dash = { Distance = 16, Cooldown = 4, Seconds = 0.22, PulseMult = 1.4, Width = 6 },
+	Dash = { Distance = 16, Cooldown = 4, Seconds = 0.22, PulseMult = 1.4, Width = 6, IFrames = 0.35 }, -- invulnerable for IFrames seconds
 	AutoAim = 26, -- abilities without a target hit the nearest enemy within this range
 	MaxStun = 4, -- seconds
 	SlowFactor = 0.45, -- slowed mobs move at this share of their speed
 	OnHitStun = 0.8, -- seconds of a StunOnHit proc
 	OnHitSlow = 2,
 	FxColor = Color3.fromRGB(46, 230, 255),
+	-- Feel of a hit: knockback impulse (studs/s, crits and abilities x
+	-- CritMult), a short stagger of the mob, client hitstop and combo.
+	Knockback = { Normal = 10, CritMult = 2.2, Stagger = 0.18, EliteMult = 0.4 },
+	HitStop = { Normal = 0.045, Crit = 0.09 },
+	Combo = { Window = 2, Text = "КОМБО x%d" },
 	Texts = {
+		Dodge = "УКЛОНЕНИЕ",
+		Blocked = "ЩИТ",
 		NeedClass = "Сначала выбери класс",
 		Cooldown = "Перезарядка",
 		NoTarget = "Нет цели рядом",
@@ -1067,7 +1317,7 @@ end
 Config.System = {
 	Tag = "[ СИСТЕМА ]",
 	Width = 440,
-	Top = 96, -- px from the top (under the objective line)
+	Top = 236, -- px from the top (under the wave panel and the boss bar)
 	Seconds = 4,
 	Max = 3,
 	Fill = Color3.fromRGB(8, 26, 38),
@@ -1167,10 +1417,10 @@ Config.Progression = {
 		Pool = {
 			{ Id = "kill30", Kind = "Kill", Target = 30, Text = "Убей 30 мобов", Credits = 40 },
 			{ Id = "kill80", Kind = "Kill", Target = 80, Text = "Убей 80 мобов", Credits = 110 },
-			{ Id = "room5", Kind = "Room", Target = 5, Text = "Дойди до этапа 5", Credits = 60 },
-			{ Id = "room10", Kind = "Room", Target = 10, Text = "Дойди до этапа 10", Credits = 180 },
+			{ Id = "room5", Kind = "Room", Target = 4, Text = "Закрой Врата «Сборочный цех»", Credits = 60 },
+			{ Id = "room10", Kind = "Room", Target = 10, Text = "Закрой Врата «Плавильный реактор»", Credits = 180 },
 			{ Id = "boss2", Kind = "Boss", Target = 2, Text = "Победи 2 боссов", Credits = 120 },
-			{ Id = "runs3", Kind = "Run", Target = 3, Text = "Соверши 3 забега", Credits = 45 },
+			{ Id = "runs3", Kind = "Run", Target = 3, Text = "Войди во Врата 3 раза", Credits = 45 },
 		},
 		PerDay = 3,
 	},
@@ -1260,8 +1510,8 @@ Config.Assets = {
 	-- Names the game looks for (AssetService reports the missing ones).
 	Expected = {
 		Weapons = { "Weapon_Sword_1", "Weapon_Sword_2", "Weapon_Spear_1", "Weapon_Spear_2", "Weapon_Blaster_1", "Weapon_Blaster_2", "Weapon_Blaster_3" },
-		Mobs = { "Boss_Juggernaut", "Boss_Foreman", "Boss_Cryo", "Boss_Molten", "Mob_SpiderBot", "Mob_Mech", "Mob_RedAndroid", "Mob_Overseer", "Mob_Robot", "Mob_Android", "Mob_BlueBot", "Mob_Bot2" },
-		Props = { "Prop_Crate", "Prop_Door", "Prop_Lamp", "Prop_Pipes", "Prop_Hologram", "Prop_Barrel", "Prop_Misc_1", "Prop_Misc_2", "Prop_Misc_3", "Prop_Misc_4" },
+		Mobs = { "Boss_Juggernaut", "Boss_Foreman", "Boss_Cryo", "Boss_Molten", "Boss_HiveMother", "Mob_InfectedCrawler", "Mob_InfectedBrute", "Mob_ShieldBearer", "Mob_MedicDrone", "Mob_Sniper", "Mob_SpiderBot", "Mob_Mech", "Mob_RedAndroid", "Mob_Overseer", "Mob_Robot", "Mob_Android", "Mob_BlueBot", "Mob_Bot2" },
+		Props = { "Landmark_Assembly", "Landmark_Cryo", "Landmark_Smelter", "Landmark_Infected", "Landmark_Nexus", "Prop_Crate", "Prop_Door", "Prop_Lamp", "Prop_Pipes", "Prop_Hologram", "Prop_Barrel", "Prop_Misc_1", "Prop_Misc_2", "Prop_Misc_3", "Prop_Misc_4" },
 		Trainers = { "Trainer_Dummy", "Trainer_Bag", "Trainer_Machine", "Trainer_Refiner", "Trainer_Weights" },
 	},
 	-- Weapon look by class (Config.Weapons[i].Class): the first entry whose
@@ -1327,6 +1577,10 @@ Config.Remotes = {
 	Items = "RemoteFunction", -- ("Equip", uid) | ("Unequip", slot) | ("Lock", uid) | ("Salvage", { uid, ... }) | ("SalvageRarity", rarityId) -> ok, message
 	Forge = "RemoteFunction", -- ("Enhance", uid) | ("Ascend", uid) | ("Reforge", uid, propIndex) -> ok, message, extra
 	Artifacts = "RemoteFunction", -- ("Equip", id) | ("Unequip", id) | ("Upgrade", id) -> ok, message
+	Gate = "RemoteFunction", -- ("Start", locationId) | ("Again") | ("Red") -> ok, message
+	GateState = "RemoteEvent", -- S->C ("Wave", state) | ("Boss", intro) | ("Phase", n) | ("Result", summary) | ("Red", info)
+	Party = "RemoteFunction", -- ("Invite", userId) | ("Accept", partyId) | ("Decline", partyId) | ("Leave") | ("Search", locationId) | ("Cancel") -> ok, message
+	PartyEvent = "RemoteEvent", -- S->C ("State", party) | ("Invite", info) | ("Search", info)
 	Status = "RemoteFunction", -- ("Add", attributeId, count) | ("Reset") -> ok, message
 	System = "RemoteEvent", -- S->C (title, { lines }, kind) "[СИСТЕМА]" notification window
 	Travel = "RemoteFunction", -- ("Hub") | ("Room", n) -> ok, message
@@ -1702,20 +1956,20 @@ Config.Quests = {
 			Talk = "Роботы роняют оружие и броню. Луч над предметом показывает редкость. Подходи и удерживай E." },
 		{ Id = "craft", Title = "Первая заточка", Text = "Заточи предмет в Кузнице (Фабрикатор).", Kind = "Enhance", Target = 1, Place = "Forge", Xp = 60, Credits = 150,
 			Talk = "Ненужные предметы разбирай на нано-ядра, а лучшие — затачивай. Кузница — в Фабрикаторе на северо-востоке." },
-		{ Id = "boss", Title = "Первый босс", Text = "Победи босса на 5-м этапе.", Kind = "Boss", Target = 1, Place = "Gates", Xp = 80, Credits = 150, Artifact = "Reactor",
-			Talk = "Каждый 5-й этап — босс. Покажи ему, на что способен твой класс." },
-		{ Id = "room7", Title = "Глубже", Text = "Дойди до 7-го этапа.", Kind = "Room", Target = 7, Place = "Gates", Xp = 90, Credits = 180,
-			Talk = "Дальше — Криолаборатория. Дойди до 7-го этапа." },
+		{ Id = "boss", Title = "Первый босс", Text = "Закрой первые Врата ранга E: победи их босса.", Kind = "Boss", Target = 1, Place = "Gates", Xp = 80, Credits = 150, Artifact = "Reactor",
+			Talk = "В конце каждых Врат — арена босса. Пройди волны и покажи ему, на что способен твой класс." },
+		{ Id = "room7", Title = "Глубже", Text = "Закрой Врата «Криолаборатория».", Kind = "Room", Target = 7, Place = "Gates", Xp = 90, Credits = 180,
+			Talk = "Следующие Врата — Криолаборатория. Там холодно и стреляют издалека." },
 		{ Id = "skills5", Title = "Сборка", Text = "Вложи 5 очков в дерево навыков.", Kind = "Learn", Target = 5, Xp = 90, Credits = 180,
 			Talk = "Собери свою сборку: вложи пять очков в навыки." },
 		{ Id = "level10", Title = "Оператор", Text = "Достигни 10-го уровня.", Kind = "Level", Target = 10, Xp = 100, Credits = 220,
 			Talk = "Звание Оператора — на 10-м уровне. Продолжай!" },
-		{ Id = "room10", Title = "Второй босс", Text = "Дойди до 10-го этапа.", Kind = "Room", Target = 10, Place = "Gates", Xp = 120, Credits = 300,
-			Talk = "На 10-м этапе ждёт следующий босс." },
+		{ Id = "room10", Title = "Ранг D", Text = "Закрой Врата «Плавильный реактор».", Kind = "Room", Target = 10, Place = "Gates", Xp = 120, Credits = 300,
+			Talk = "Ранг D открыт. Плавильный реактор — первые серьёзные Врата." },
 		{ Id = "craft3", Title = "Арсенал", Text = "Сделай 5 успешных заточек в Кузнице.", Kind = "Enhance", Target = 5, Place = "Forge", Xp = 120, Credits = 300,
 			Talk = "Сильное снаряжение — главный источник силы. Заточи своё оружие и броню ещё пять раз." },
-		{ Id = "room15", Title = "Сердце реактора", Text = "Дойди до 15-го этапа.", Kind = "Room", Target = 15, Place = "Gates", Xp = 160, Credits = 500,
-			Talk = "Плавильный реактор горяч. Дойди до 15-го этапа." },
+		{ Id = "room15", Title = "Ядро Нексуса", Text = "Закрой Врата «Ядро Нексуса».", Kind = "Room", Target = 15, Place = "Gates", Xp = 160, Credits = 500,
+			Talk = "Последние Врата ранга D — Ядро Нексуса. Возьми группу, если тяжело." },
 		{ Id = "level30", Title = "Страж", Text = "Достигни 30-го уровня.", Kind = "Level", Target = 30, Xp = 200, Credits = 800,
 			Talk = "Страж Цитадели — 30-й уровень. Ты почти легенда." },
 	},
@@ -1757,30 +2011,37 @@ Config.DungeonLayout = {
 	-- the biome's "hot" color (molten channel, cryo tanks, data cores).
 	-- Atmosphere / Lighting tint the haze and the ambient per biome.
 	-- WallMaterial / FloorMaterial / PanelMaterial = the biome's surfaces;
+	-- FloorVariant = AI MaterialVariant of the gate maps (MaterialService,
+	-- falls back to FloorMaterial), Landmark = AI model (GameAssets/Props);
 	-- Decor = its side-wall set (Assembly: conveyor, Cryo: cryo tanks and
 	-- frost, Smelter: molten channel under grating, Nexus: server racks
 	-- and data pillars).
 	Biomes = {
-		{ Name = "Сборочный цех", Theme = "Assembly", WallMaterial = Enum.Material.Concrete, FloorMaterial = Enum.Material.DiamondPlate, PanelMaterial = Enum.Material.Metal, Decor = "Assembly",
+		{ Name = "Сборочный цех", Theme = "Assembly", FloorVariant = "GateAssemblyFloor", Landmark = "Landmark_Assembly", WallMaterial = Enum.Material.Concrete, FloorMaterial = Enum.Material.DiamondPlate, PanelMaterial = Enum.Material.Metal, Decor = "Assembly",
 			StoneA = Color3.fromRGB(128, 130, 138), StoneB = Color3.fromRGB(108, 110, 118), Floor = Color3.fromRGB(62, 64, 70), FloorB = Color3.fromRGB(52, 54, 60),
 			Metal = Color3.fromRGB(70, 74, 84), Accent = Color3.fromRGB(255, 190, 60), Light = Color3.fromRGB(255, 222, 180), Glow = Color3.fromRGB(255, 170, 50),
 			Atmosphere = { Color = Color3.fromRGB(140, 130, 115), Decay = Color3.fromRGB(80, 70, 60) },
 			Lighting = { Ambient = Color3.fromRGB(92, 88, 82), OutdoorAmbient = Color3.fromRGB(80, 78, 76) } },
-		{ Name = "Криолаборатория", Theme = "Cryo", WallMaterial = Enum.Material.SmoothPlastic, FloorMaterial = Enum.Material.SmoothPlastic, PanelMaterial = Enum.Material.Glass, Decor = "Cryo",
+		{ Name = "Криолаборатория", Theme = "Cryo", FloorVariant = "GateCryoFloor", Landmark = "Landmark_Cryo", WallMaterial = Enum.Material.SmoothPlastic, FloorMaterial = Enum.Material.SmoothPlastic, PanelMaterial = Enum.Material.Glass, Decor = "Cryo",
 			StoneA = Color3.fromRGB(176, 196, 214), StoneB = Color3.fromRGB(150, 172, 192), Floor = Color3.fromRGB(64, 78, 96), FloorB = Color3.fromRGB(54, 66, 84),
 			Metal = Color3.fromRGB(90, 104, 122), Accent = Color3.fromRGB(46, 230, 255), Light = Color3.fromRGB(220, 240, 255), Glow = Color3.fromRGB(120, 230, 255),
 			Atmosphere = { Color = Color3.fromRGB(150, 180, 205), Decay = Color3.fromRGB(80, 105, 135) },
 			Lighting = { Ambient = Color3.fromRGB(84, 92, 104), OutdoorAmbient = Color3.fromRGB(80, 88, 100) } },
-		{ Name = "Плавильный реактор", Theme = "Smelter", WallMaterial = Enum.Material.Metal, FloorMaterial = Enum.Material.DiamondPlate, PanelMaterial = Enum.Material.Metal, Decor = "Smelter",
+		{ Name = "Плавильный реактор", Theme = "Smelter", FloorVariant = "GateSmelterFloor", Landmark = "Landmark_Smelter", WallMaterial = Enum.Material.Metal, FloorMaterial = Enum.Material.DiamondPlate, PanelMaterial = Enum.Material.Metal, Decor = "Smelter",
 			StoneA = Color3.fromRGB(122, 104, 96), StoneB = Color3.fromRGB(102, 86, 80), Floor = Color3.fromRGB(56, 46, 44), FloorB = Color3.fromRGB(46, 38, 36),
 			Metal = Color3.fromRGB(70, 60, 58), Accent = Color3.fromRGB(255, 120, 40), Light = Color3.fromRGB(255, 200, 150), Glow = Color3.fromRGB(255, 110, 30),
 			Atmosphere = { Color = Color3.fromRGB(170, 120, 95), Decay = Color3.fromRGB(110, 60, 40) },
 			Lighting = { Ambient = Color3.fromRGB(100, 82, 74), OutdoorAmbient = Color3.fromRGB(88, 74, 68) } },
-		{ Name = "Ядро Нексуса", Theme = "Nexus", WallMaterial = Enum.Material.Foil, FloorMaterial = Enum.Material.SmoothPlastic, PanelMaterial = Enum.Material.Foil, Decor = "Nexus",
+		{ Name = "Ядро Нексуса", Theme = "Nexus", FloorVariant = "GateNexusFloor", Landmark = "Landmark_Nexus", WallMaterial = Enum.Material.Foil, FloorMaterial = Enum.Material.SmoothPlastic, PanelMaterial = Enum.Material.Foil, Decor = "Nexus",
 			StoneA = Color3.fromRGB(96, 92, 120), StoneB = Color3.fromRGB(80, 76, 104), Floor = Color3.fromRGB(40, 38, 56), FloorB = Color3.fromRGB(32, 30, 46),
 			Metal = Color3.fromRGB(58, 54, 78), Accent = Color3.fromRGB(255, 61, 184), Light = Color3.fromRGB(230, 210, 255), Glow = Color3.fromRGB(46, 230, 255),
 			Atmosphere = { Color = Color3.fromRGB(130, 115, 160), Decay = Color3.fromRGB(70, 55, 105) },
 			Lighting = { Ambient = Color3.fromRGB(86, 80, 102), OutdoorAmbient = Color3.fromRGB(78, 72, 96) } },
+		{ Name = "Заражённый сектор", Theme = "Infected", FloorVariant = "GateInfectedFloor", Landmark = "Landmark_Infected", WallMaterial = Enum.Material.CorrodedMetal, FloorMaterial = Enum.Material.Mud, PanelMaterial = Enum.Material.Metal, Decor = "Infected",
+			StoneA = Color3.fromRGB(86, 96, 82), StoneB = Color3.fromRGB(70, 80, 68), Floor = Color3.fromRGB(46, 54, 42), FloorB = Color3.fromRGB(38, 46, 36),
+			Metal = Color3.fromRGB(62, 70, 60), Accent = Color3.fromRGB(120, 255, 90), Light = Color3.fromRGB(210, 255, 200), Glow = Color3.fromRGB(120, 255, 90),
+			Atmosphere = { Color = Color3.fromRGB(120, 150, 100), Decay = Color3.fromRGB(60, 90, 50) },
+			Lighting = { Ambient = Color3.fromRGB(80, 94, 76), OutdoorAmbient = Color3.fromRGB(74, 88, 70) } },
 	},
 	BossBarrierColor = Color3.fromRGB(255, 61, 184),
 
@@ -1816,10 +2077,10 @@ Config.MobLooks = {
 Config.Hud = {
 	TopLeftReserved = Vector2.new(320, 60), -- never put UI here (Roblox buttons)
 	Objectives = {
-		Hub = "Войди в подземелье!",
+		Hub = "Открой Врата!",
 		Fight = "Уничтожь врагов!",
 		Cleared = "Иди дальше!",
-		Done = "Данж пройден! Улучшай снаряжение",
+		Done = "Улучшай снаряжение и бери Врата выше",
 	},
 	ToastSeconds = 4,
 	ShakeCrit = { Amplitude = 0.25, Seconds = 0.15 },
@@ -1864,7 +2125,7 @@ Config.Ui = {
 	-- window (modes), in the dungeon it brings you back to the hub.
 	Play = { Text = "ИГРАТЬ", Back = "В ХАБ", BackKey = Enum.KeyCode.B },
 	Modes = {
-		{ Id = "Dungeon", Name = "Нано-фабрика", Text = "Подземелье: 20 этапов, босс каждые 5", Icon = "gate" },
+		{ Id = "Dungeon", Name = "Врата", Text = "Ранги E → S: локации, волны, боссы", Icon = "gate" },
 		{ Id = "Bosses", Name = "Испытание боссов", Text = "Скоро", Icon = "skull", Locked = true },
 		{ Id = "Raid", Name = "Рейд Нексуса", Text = "Скоро · группы до 4 игроков", Icon = "crown", Locked = true },
 	},

@@ -360,6 +360,11 @@ hintPlate.Visible = false
 
 local hintRoom = nil
 local function refreshHint()
+	-- the gate runs show waves instead (GateHud); the old room hint is off
+	if true then
+		hintPlate.Visible = false
+		return
+	end
 	if not hintRoom then
 		hintPlate.Visible = false
 		return
@@ -387,6 +392,7 @@ end
 
 local function refreshObjective()
 	local zone = player:GetAttribute("Zone")
+	objective.Visible = zone ~= "Dungeon" -- GateHud shows the waves there
 	local reached = player:GetAttribute("RoomReached") or 0
 	if zone ~= "Dungeon" then
 		setObjective(if reached >= Config.Dungeon.Rooms then Config.Hud.Objectives.Done else Config.Hud.Objectives.Hub)

@@ -1,22 +1,44 @@
 --[[
 	DungeonRuns.luau
-	Personal dungeon runs. Every portal entry starts a NEW run from room
-	1 in the player's own lane (private mobs, private barriers). Only the
-	current and the next room exist; passed rooms are destroyed.
+	Gate runs ("Врата"). A run = one location (Config.Gates.Locations)
+	for a solo player or a group (up to Config.Party.Max), built for the
+	run by GateMap and destroyed when it ends.
 
-	Run ends on: death, "Назад"/leaving, clearing room 20. The best room
-	is kept in RoomReached (record for the leaderboard and rebirth).
-	Loot comes with the drop stage (LootService).
-	Mob AI / player damage: see MobAI.
+	Flow: the team appears at zone 1. When someone steps into a zone its
+	waves start: enemies step out of the spawn portals (the portal glows
+	first), "Волна 2/4" and the enemy counter go to every member
+	(GateState "Wave"), a short rest between waves, the last wave of a
+	zone brings elites. A cleared zone opens its exit barrier. The boss
+	arena closes behind the team, the boss gets an intro (GateState
+	"Boss") and fights in phases (MobAI). After the boss: grade S/A/B/C by
+	time and deaths, every member gets a boss chest (better grade -> more
+	items), the results window ("Result") and the way back after
+	Config.Grades.ReturnSeconds.
+
+	Difficulty grows with the team: more enemies (Config.Waves.GroupCount)
+	and more health (GroupHealth) per extra member. Red runs
+	(Config.RedGate) are harder, use the Red loot table and can't be left
+	before the boss is down.
+
+	A member who dies leaves the run (back to the hub on respawn); the run
+	ends when nobody is left. Kills give every member XP / credits and
+	personal loot (hooks below).
+
+	The old API stays for the rest of the game: HasRun, GetRun, EndRun,
+	IsMob, MobsNear, NearestMob, Damage, Hit, RunOf, RecoveryCFrame and
+	the hooks OnMobSpawned / OnMobRemoved / OnKill / OnRoomCleared /
+	OnRunStarted / OnRunEnded / OnRunClosed.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local DungeonGenerator = require(script.Parent.DungeonGenerator)
+local DataService = require(script.Parent.DataService)
 local Effects = require(script.Parent.Effects)
+local GateMap = require(script.Parent.GateMap)
 local MobBuilder = require(script.Parent.MobBuilder)
 local PlayerState = require(script.Parent.PlayerState)
 local StatService = require(script.Parent.StatService)
@@ -25,316 +47,520 @@ local WorldKit = require(script.Parent.WorldKit)
 
 local DungeonRuns = {}
 
-local D = Config.Dungeon
+local W = Config.Waves
+local E = Config.Enemies
+local CB = Config.Combat
 local Looks = Config.MobLooks
-local Texts = Config.DungeonLayout.Texts
+local GR = Config.Grades
 
-local world -- DungeonGenerator.Init() result
-local runs = {} -- [player] = run
-local laneOwner = {} -- [lane] = player
-local mobInfo = {} -- [model] = { run = run, room = index }
+local runs = {} -- [run] = true
+local runOf = {} -- [player] = run
+local slots = {} -- [slot] = run
+local mobInfo = {} -- [model] = { run = run, zone = index|"Boss" }
+local nextRunId = 0
 
--- Hooks: MobAI listens to mob spawn/removal, TravelService to run end,
--- ProgressionService to kills / clears / run starts, LootService to
--- kills (position, kind, boss).
-DungeonRuns.OnMobSpawned = nil
-DungeonRuns.OnMobRemoved = nil
-DungeonRuns.OnRunEnded = nil
-DungeonRuns.OnKill = nil
-DungeonRuns.OnRoomCleared = nil
-DungeonRuns.OnRunStarted = nil
-DungeonRuns.OnRunClosed = nil -- every run end, any reason (LootService clears drops)
+-- Hooks (other services set them)
+DungeonRuns.OnMobSpawned = nil -- (run, model)
+DungeonRuns.OnMobRemoved = nil -- (model)
+DungeonRuns.OnRunEnded = nil -- (player) sent back to the hub (not on death)
+DungeonRuns.OnKill = nil -- (player, tier, isBoss, position, kind, info)
+DungeonRuns.OnRoomCleared = nil -- (player, tier) a location was closed (its boss tier)
+DungeonRuns.OnRunStarted = nil -- (player)
+DungeonRuns.OnRunClosed = nil -- (player) left the run for any reason
+DungeonRuns.OnBossDefeated = nil -- (run, chestPosition, grade)
 
 ---------------------------------------------------------------------
--- Rooms and mobs
+-- Helpers
 ---------------------------------------------------------------------
 
-local function buildMob(run, room, spot)
-	local isBoss = room.IsBoss
-	local def = Config.MobFor(room.Index, spot.Kind)
-	local facing = Vector3.new(room.Entry.Position.X, spot.Position.Y, room.Entry.Position.Z)
-	local model = MobBuilder.Build(def, if isBoss then Looks.BossScale else 1, CFrame.lookAt(spot.Position, facing))
-	local health = Config.MobHealth(room.Index, isBoss)
+local function members(run)
+	local list = {}
+	for _, player in ipairs(run.players) do
+		if player.Parent and runOf[player] == run then
+			table.insert(list, player)
+		end
+	end
+	return list
+end
+DungeonRuns.Members = members
+
+local function rootOf(player)
+	local character = player.Character
+	return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+local function send(run, kind: string, payload)
+	for _, player in ipairs(members(run)) do
+		Remotes.Get("GateState"):FireClient(player, kind, payload)
+	end
+end
+
+local function notifyAll(run, text: string, kind: string?)
+	for _, player in ipairs(members(run)) do
+		Remotes.Notify(player, text, kind)
+	end
+end
+
+-- Extra team members make waves bigger and enemies tougher.
+local function teamScale(run)
+	local extra = math.max(0, #run.players - 1)
+	return 1 + W.GroupCount * extra, 1 + W.GroupHealth * extra
+end
+
+local function inside(position: Vector3, center: Vector3, size: number): boolean
+	return math.abs(position.X - center.X) <= size / 2 and math.abs(position.Z - center.Z) <= size / 2
+end
+
+local function anyMemberIn(run, center: Vector3, size: number): boolean
+	for _, player in ipairs(members(run)) do
+		local root = rootOf(player)
+		if root and inside(root.Position, center, size - 6) then
+			return true
+		end
+	end
+	return false
+end
+
+---------------------------------------------------------------------
+-- Mobs
+---------------------------------------------------------------------
+
+local function waveState(run)
+	local zone = run.zones[run.zoneIndex]
+	return {
+		Location = run.location.Name,
+		Zone = run.zoneIndex,
+		Zones = #run.location.Zones,
+		Wave = run.wave,
+		Waves = if zone then zone.Waves else 0,
+		Alive = run.alive,
+		Total = run.total,
+		Elite = run.eliteWave == true,
+		Rest = run.restUntil,
+		Phase = run.phase,
+		Red = run.red,
+	}
+end
+
+local function pushState(run)
+	send(run, "Wave", waveState(run))
+end
+
+-- Portal glow, then the enemy appears.
+local function openPortal(run, position: Vector3, color: Color3)
+	local ring = WorldKit.Part(run.fxFolder, {
+		Name = "PortalFx",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.3, 1, 1),
+		CFrame = CFrame.new(position.X, run.groundY + 0.25, position.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = color,
+		Material = Enum.Material.Neon,
+		Transparency = 0.2,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CastShadow = false,
+	})
+	local column = WorldKit.Part(run.fxFolder, {
+		Name = "PortalBeam",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(10, 4, 4),
+		CFrame = CFrame.new(position.X, run.groundY + 5, position.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = color,
+		Material = Enum.Material.Neon,
+		Transparency = 1,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CastShadow = false,
+	})
+	TweenService:Create(ring, TweenInfo.new(W.PortalSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = Vector3.new(0.3, 7, 7) }):Play()
+	TweenService:Create(column, TweenInfo.new(W.PortalSeconds), { Transparency = 0.55 }):Play()
+	task.delay(W.PortalSeconds + 0.4, function()
+		TweenService:Create(ring, TweenInfo.new(0.5), { Transparency = 1 }):Play()
+		TweenService:Create(column, TweenInfo.new(0.5), { Transparency = 1 }):Play()
+		task.delay(0.6, function()
+			ring:Destroy()
+			column:Destroy()
+		end)
+	end)
+end
+
+local function decorateElite(model)
+	local aura = Instance.new("Highlight")
+	aura.Name = "EliteAura"
+	aura.FillTransparency = 0.85
+	aura.FillColor = E.Elite.Aura
+	aura.OutlineColor = E.Elite.Aura
+	aura.OutlineTransparency = 0.1
+	aura.DepthMode = Enum.HighlightDepthMode.Occluded
+	aura.Parent = model
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Color = ColorSequence.new(E.Elite.Aura, Color3.new(1, 1, 1))
+	emitter.LightEmission = 0.6
+	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	emitter.Lifetime = NumberRange.new(0.8, 1.4)
+	emitter.Speed = NumberRange.new(1, 3)
+	emitter.SpreadAngle = Vector2.new(180, 180)
+	emitter.Rate = 14
+	emitter.Parent = model.PrimaryPart
+end
+
+-- Energy plate in front of a shield bearer (blocks hits from the front).
+local function addShield(model)
+	local root = model.PrimaryPart
+	local height = model:GetAttribute("Height") or 6
+	local plate = Instance.new("Part")
+	plate.Name = "EnergyShield"
+	plate.Size = Vector3.new(4.2, height * 0.75, 0.25)
+	plate.Material = Enum.Material.ForceField
+	plate.Color = model:GetAttribute("Color") or Config.Theme.Cyan
+	plate.Transparency = 0.15
+	plate.CanCollide = false
+	plate.CanQuery = true
+	plate.CanTouch = false
+	plate.Massless = true
+	plate.CFrame = root.CFrame * CFrame.new(0, 0, -(root.Size.Z / 2 + 1.4))
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = root
+	weld.Part1 = plate
+	weld.Parent = plate
+	plate.Parent = model
+end
+
+-- Builds and registers one enemy. opts: Elite, Boss, Tier
+local function spawnMob(run, defId: string, position: Vector3, opts)
+	local def = Config.Mobs.Defs[defId]
+	if not def then
+		return nil
+	end
+	opts = opts or {}
+	local isBoss = opts.Boss == true
+	local elite = opts.Elite == true
+	local role = E.Roles[def.Role or "Melee"] or E.Roles.Melee
+	local scale = if isBoss then Looks.BossScale elseif elite then E.Elite.Scale else 1
+	local facing = run.facing or (position + Vector3.new(0, 0, 10))
+	local model = MobBuilder.Build(def, scale, CFrame.lookAt(position, Vector3.new(facing.X, position.Y, facing.Z)))
+	local _, healthScale = teamScale(run)
+	local tier = opts.Tier or run.location.Tier
+	local health = Config.MobHealth(tier, isBoss) * (if isBoss then 1 else role.Health) * healthScale
+	local damage = Config.MobDamage(tier, isBoss) * (if isBoss then 1 else role.Damage)
+	if elite then
+		health *= E.Elite.Health
+		damage *= E.Elite.Damage
+	end
+	if run.red then
+		health *= Config.RedGate.Health
+		damage *= Config.RedGate.Damage
+	end
+	health = math.max(1, math.floor(health))
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	humanoid.MaxHealth = health
 	humanoid.Health = health
-	model:SetAttribute("Room", room.Index)
+	local name = (if elite then E.Elite.Prefix else "") .. def.Name
+	model:SetAttribute("Room", tier) -- clients find mobs by this attribute
 	model:SetAttribute("Boss", isBoss)
+	model:SetAttribute("Elite", elite)
+	model:SetAttribute("Role", if isBoss then "Boss" else def.Role or "Melee")
 	model:SetAttribute("Kind", def.Id)
-	model:SetAttribute("MobName", def.Name)
-	model:SetAttribute("Damage", Config.MobDamage(room.Index, isBoss))
+	model:SetAttribute("MobName", name)
+	model:SetAttribute("Damage", math.max(1, math.floor(damage)))
 	local height = model:GetAttribute("Height") or 6
-	WorldKit.HealthGui(model.PrimaryPart, if isBoss then def.Name else nil, height - (model.PrimaryPart.Position.Y - spot.Position.Y) + 1.5)
+	WorldKit.HealthGui(model.PrimaryPart, if isBoss or elite then name else nil, height - (model.PrimaryPart.Position.Y - position.Y) + 1.5)
 	WorldKit.UpdateHealth(model.PrimaryPart, health, health)
-	model.Parent = room.Model
+	if elite then
+		decorateElite(model)
+	end
+	if def.Role == "Shield" then
+		addShield(model)
+	end
+	model.Parent = run.mobFolder
+	mobInfo[model] = { run = run, zone = opts.Zone or run.zoneIndex }
+	run.mobs[model] = true
+	if DungeonRuns.OnMobSpawned then
+		DungeonRuns.OnMobSpawned(run, model)
+	end
 	return model
 end
+DungeonRuns.SpawnMob = spawnMob
 
-local function roomBarrierText(room, alive, total)
-	if room.Barrier then
-		local label = room.Barrier:FindFirstChild("Text") and room.Barrier.Text:FindFirstChild("Enemies", true)
-		if label then
-			label.Text = if alive <= 0 then Texts.Cleared else Texts.Enemies:format(total - alive, total)
-			if alive <= 0 then
-				label.TextColor3 = Config.Theme.Green
+-- Enemies of a wave: roles mixed, swarm comes in packs; the last wave
+-- of a zone adds elites.
+local function waveList(run, zoneIndex: number, wave: number, waves: number)
+	local countScale = teamScale(run)
+	local count = math.floor((W.Base + W.PerWave * (wave - 1) + (zoneIndex - 1)) * countScale + 0.5)
+	local pool = run.location.Mobs
+	local list = {}
+	local rng = run.rng
+	while #list < count do
+		local id = pool[rng:NextInteger(1, #pool)]
+		local def = Config.Mobs.Defs[id]
+		local role = E.Roles[def and def.Role or "Melee"]
+		-- healers: at most one per wave
+		if def and def.Role == "Healer" then
+			local has = false
+			for _, entry in ipairs(list) do
+				if Config.Mobs.Defs[entry.Id].Role == "Healer" then
+					has = true
+				end
+			end
+			if has or wave == 1 then
+				continue
 			end
 		end
+		for _ = 1, (role and role.Pack) or 1 do
+			table.insert(list, { Id = id })
+		end
+	end
+	if wave == waves then
+		for _ = 1, W.Elites + math.max(0, #run.players - 2) do
+			local id
+			repeat
+				id = pool[rng:NextInteger(1, #pool)]
+			until Config.Mobs.Defs[id].Role ~= "Swarm" and Config.Mobs.Defs[id].Role ~= "Healer"
+			table.insert(list, { Id = id, Elite = true })
+		end
+	end
+	return list
+end
+
+local function spawnWave(run, zone, wave: number)
+	local list = waveList(run, zone.Index, wave, zone.Waves)
+	run.alive = 0
+	run.total = #list
+	run.eliteWave = wave == zone.Waves
+	run.phase = "Fight"
+	run.restUntil = nil
+	run.facing = zone.Center
+	local color = if run.red then Config.RedGate.Color else run.map.Biome.Accent
+	local tier = run.location.Tier + (zone.Index - 1) * run.location.TierStep
+	for i, entry in ipairs(list) do
+		local portal = zone.Portals[(i - 1) % #zone.Portals + 1]
+		local jitter = Vector3.new(run.rng:NextNumber(-2.5, 2.5), 0, run.rng:NextNumber(-2.5, 2.5))
+		local position = portal.Position + jitter
+		run.alive += 1
+		task.delay((i - 1) * 0.18, function()
+			if not runs[run] then
+				return
+			end
+			openPortal(run, position, if entry.Elite then E.Elite.Aura else color)
+			task.wait(W.PortalSeconds)
+			if runs[run] then
+				spawnMob(run, entry.Id, position, { Elite = entry.Elite, Tier = tier, Zone = zone.Index })
+			end
+		end)
+	end
+	pushState(run)
+end
+
+local function openBarrier(part)
+	if not part then
+		return
+	end
+	part.CanCollide = false
+	TweenService:Create(part, TweenInfo.new(0.8), { Transparency = 1 }):Play()
+	local light = part:FindFirstChildOfClass("PointLight")
+	if light then
+		light.Enabled = false
 	end
 end
 
--- The barrier is private, so its "Рекомендуемый урон" line can be
--- colored for this player: green when their damage is enough.
-local function refreshRecommended(run, room)
-	if not room or not room.Barrier then
+local function closeBarrier(part)
+	if not part then
 		return
 	end
-	local label = room.Barrier:FindFirstChild("Text") and room.Barrier.Text:FindFirstChild("Recommended", true)
-	if label then
-		local enough = StatService.Get(run.player).Damage >= Config.RecommendedDamage(room.Index)
-		label.TextColor3 = if enough then Config.Theme.Green else Config.Theme.Red
-	end
+	part.CanCollide = true
+	TweenService:Create(part, TweenInfo.new(0.4), { Transparency = 0.2 }):Play()
 end
 
-local function openBarrier(room)
-	local barrier = room.Barrier
-	if not barrier then
+---------------------------------------------------------------------
+-- Run flow
+---------------------------------------------------------------------
+
+local function waitUntil(run, check)
+	while runs[run] and not check() do
+		task.wait(0.25)
+	end
+	return runs[run] ~= nil
+end
+
+local function gradeFor(run)
+	local elapsed = os.clock() - run.started
+	local par = run.location.ParSeconds or 300
+	local index = #GR
+	for i, grade in ipairs(GR) do
+		if elapsed <= par * grade.Time then
+			index = i
+			break
+		end
+	end
+	index = math.min(#GR, index + run.deaths * GR.DeathStep)
+	return GR[index], elapsed
+end
+
+local function summaryFor(run, player, result: string, grade, elapsed)
+	local stats = run.stats[player] or { damage = 0, kills = 0, deaths = 0 }
+	return {
+		Result = result,
+		Location = run.location.Name,
+		LocationId = run.location.Id,
+		Rank = run.location.Rank,
+		Red = run.red,
+		Grade = grade and grade.Id or nil,
+		Bonus = grade and grade.Items or 0,
+		Time = math.floor(elapsed or (os.clock() - run.started)),
+		Damage = math.floor(stats.damage),
+		Kills = stats.kills,
+		Deaths = run.deaths,
+		Loot = run.loot[player] or {},
+		Return = GR.ReturnSeconds,
+	}
+end
+
+local endRun -- defined below
+
+local function bossFight(run)
+	local arena = run.map.Arena
+	run.zoneIndex = #run.zones + 1
+	run.phase = "Enter"
+	pushState(run)
+	if not waitUntil(run, function()
+		return anyMemberIn(run, arena.Center, arena.Size)
+	end) then
 		return
 	end
-	barrier.CanCollide = false
-	TweenService:Create(barrier, TweenInfo.new(0.6), { Transparency = 1 }):Play()
-	task.delay(2, function()
-		local gui = barrier:FindFirstChild("Text")
-		if gui then
-			gui.Enabled = false
+	-- pull stragglers in and close the arena
+	task.wait(1)
+	for _, player in ipairs(members(run)) do
+		local root = rootOf(player)
+		if root and not inside(root.Position, arena.Center, arena.Size) then
+			player.Character:PivotTo(arena.Entry)
+		end
+	end
+	closeBarrier(arena.Gate)
+	local def = Config.Mobs.Defs[run.location.Boss]
+	run.phase = "Boss"
+	run.alive, run.total, run.wave = 1, 1, 0
+	pushState(run)
+	send(run, "Boss", { Name = def.Name, Title = def.Title or "", Seconds = E.Boss.IntroSeconds, Position = arena.Spawn.Position })
+	openPortal(run, arena.Spawn.Position, Config.DungeonLayout.BossBarrierColor)
+	task.wait(E.Boss.IntroSeconds)
+	if not runs[run] then
+		return
+	end
+	run.facing = arena.Center + Vector3.new(0, 0, arena.Size)
+	local boss = spawnMob(run, run.location.Boss, arena.Spawn.Position, { Boss = true, Tier = run.location.BossTier, Zone = "Boss" })
+	run.boss = boss
+end
+
+local function zoneFlow(run, zone)
+	if not waitUntil(run, function()
+		return anyMemberIn(run, zone.Center, zone.Size)
+	end) then
+		return false
+	end
+	run.zoneIndex = zone.Index
+	run.wave = 0
+	run.phase = "Rest"
+	run.restUntil = Workspace:GetServerTimeNow() + W.StartDelay
+	pushState(run)
+	task.wait(W.StartDelay)
+	for wave = 1, zone.Waves do
+		if not runs[run] then
+			return false
+		end
+		run.wave = wave
+		spawnWave(run, zone, wave)
+		if not waitUntil(run, function()
+			return run.alive <= 0
+		end) then
+			return false
+		end
+		if wave < zone.Waves then
+			run.phase = "Rest"
+			run.restUntil = Workspace:GetServerTimeNow() + W.RestSeconds
+			pushState(run)
+			task.wait(W.RestSeconds)
+		end
+	end
+	run.phase = "Cleared"
+	pushState(run)
+	openBarrier(zone.Exit)
+	notifyAll(run, W.Texts.Cleared, "gold")
+	return true
+end
+
+local function runFlow(run)
+	for _, zone in ipairs(run.zones) do
+		if not zoneFlow(run, zone) then
+			return
+		end
+	end
+	bossFight(run)
+end
+
+-- Boss down: grade, chests, results, the way back.
+local function bossDefeated(run, position: Vector3)
+	run.finished = true
+	local grade, elapsed = gradeFor(run)
+	run.grade = grade
+	run.phase = "Done"
+	pushState(run)
+	local tier = run.location.BossTier
+	for _, player in ipairs(members(run)) do
+		local data = DataService.Get(player)
+		if data then
+			data.Gates = if type(data.Gates) == "table" then data.Gates else { Cleared = {} }
+			data.Gates.Cleared = if type(data.Gates.Cleared) == "table" then data.Gates.Cleared else {}
+			local best = data.Gates.Cleared[run.location.Id]
+			local order = { S = 1, A = 2, B = 3, C = 4 }
+			if not best or order[grade.Id] < (order[best] or 9) then
+				data.Gates.Cleared[run.location.Id] = grade.Id
+			end
+			PlayerState.Sync(player)
+		end
+		if PlayerState.ReachRoom(player, tier) then
+			Remotes.Notify(player, Config.DungeonLayout.Texts.NewRecord, "gold")
+		end
+		if DungeonRuns.OnRoomCleared then
+			DungeonRuns.OnRoomCleared(player, tier)
+		end
+	end
+	if DungeonRuns.OnBossDefeated then
+		DungeonRuns.OnBossDefeated(run, position, grade)
+	end
+	task.delay(6, function()
+		for _, player in ipairs(members(run)) do
+			Remotes.Get("GateState"):FireClient(player, "Result", summaryFor(run, player, "Won", grade, elapsed))
+		end
+	end)
+	task.delay(GR.ReturnSeconds, function()
+		if runs[run] then
+			for _, player in ipairs(members(run)) do
+				endRun(player, "Won")
+			end
 		end
 	end)
 end
 
-local function ensureRoom(run, index)
-	if index > D.Rooms or run.rooms[index] then
-		return
-	end
-	local x = DungeonGenerator.LaneX(run.lane)
-	if index > 1 then
-		DungeonGenerator.BuildCorridor(run.folder, index, x)
-	end
-	local room = DungeonGenerator.BuildRoom(run.folder, index, x)
-	if index == 1 then
-		DungeonGenerator.Seal(room) -- nothing behind room 1
-	end
-	room.Alive = 0
-	room.Total = #room.MobSpots
-	room.Mobs = {}
-	for _, spot in ipairs(room.MobSpots) do
-		local model = buildMob(run, room, spot)
-		mobInfo[model] = { run = run, room = index }
-		room.Mobs[model] = true
-		room.Alive += 1
-		if DungeonRuns.OnMobSpawned then
-			DungeonRuns.OnMobSpawned(run, model)
-		end
-	end
-	run.rooms[index] = room
-	refreshRecommended(run, room)
-end
-
-local function destroyRoom(run, index)
-	local room = run.rooms[index]
-	if not room then
-		return
-	end
-	for model in pairs(room.Mobs) do
-		mobInfo[model] = nil
-		if DungeonRuns.OnMobRemoved then
-			DungeonRuns.OnMobRemoved(model)
-		end
-	end
-	room.Model:Destroy()
-	local corridor = run.folder:FindFirstChild(("Corridor%02d"):format(index))
-	if corridor then
-		corridor:Destroy()
-	end
-	run.rooms[index] = nil
-end
-
 ---------------------------------------------------------------------
--- Runs
+-- Kills and damage
 ---------------------------------------------------------------------
 
-local function freeLane(): number?
-	for lane = 1, D.Lanes.Max do
-		if not laneOwner[lane] then
-			return lane
-		end
-	end
-	return nil
-end
-
-local function endRun(player, reason: string)
-	local run = runs[player]
-	if not run then
-		return
-	end
-	runs[player] = nil
-	laneOwner[run.lane] = nil
-	if run.diedConnection then
-		run.diedConnection:Disconnect()
-	end
-	for index in pairs(run.rooms) do
-		destroyRoom(run, index)
-	end
-	run.folder:Destroy()
-
-	local record = PlayerState.GetRoomReached(player)
-	Remotes.Get("RunEnded"):FireClient(player, reason, run.best, run.loot, record, run.newRecord)
-	player:SetAttribute("Zone", "Hub")
-	if DungeonRuns.OnRunClosed then
-		DungeonRuns.OnRunClosed(player)
-	end
-	if reason ~= "Died" and DungeonRuns.OnRunEnded then
-		DungeonRuns.OnRunEnded(player)
-	end
-end
-
-function DungeonRuns.EndRun(player, reason: string?)
-	endRun(player, reason or "Left")
-end
-
-function DungeonRuns.HasRun(player): boolean
-	return runs[player] ~= nil
-end
-
-function DungeonRuns.GetRun(player)
-	return runs[player]
-end
-
--- Starts a fresh run. Returns the entry CFrame or nil, message.
-function DungeonRuns.StartRun(player)
-	if runs[player] then
-		endRun(player, "Left")
-	end
-	local lane = freeLane()
-	if not lane then
-		return nil, "Все полосы заняты, попробуй через минуту"
-	end
-	local run = {
-		player = player,
-		lane = lane,
-		folder = DungeonGenerator.LaneFolder(lane),
-		rooms = {},
-		current = 1,
-		best = 0,
-		loot = {}, -- items picked up this run: { B, K, R, L } (LootService fills it)
-		newRecord = false,
-	}
-	runs[player] = run
-	laneOwner[lane] = player
-	for index = 1, 1 + D.RoomsAhead do
-		ensureRoom(run, index)
-	end
-	for index, room in pairs(run.rooms) do
-		roomBarrierText(room, room.Alive, room.Total)
-		Remotes.Get("RoomState"):FireClient(player, index, room.Alive, room.Total)
-	end
-	if DungeonRuns.OnRunStarted then
-		DungeonRuns.OnRunStarted(player)
-	end
-
-	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		run.diedConnection = humanoid.Died:Connect(function()
-			if runs[player] == run then
-				endRun(player, "Died")
-			end
-		end)
-	end
-	return run.rooms[1].Entry
-end
-
--- Where to put a player who left the map: the entrance of the room
--- they are in by Z (or of the run's current room).
-function DungeonRuns.RecoveryCFrame(player): CFrame?
-	local run = runs[player]
-	if not run then
-		return nil
-	end
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if root then
-		for _, room in pairs(run.rooms) do
-			if root.Position.Z <= room.ZFront and root.Position.Z >= room.ZBack then
-				return room.Entry
-			end
-		end
-	end
-	local room = run.rooms[run.current] or run.rooms[run.best]
-	return room and room.Entry
-end
-
--- The room behind `index` is gone: remove it and the corridor between,
--- plug the doorway and pull the player in if they stayed behind.
-local function sealBehind(run, index)
-	local room = run.rooms[index]
-	if not room then
-		return
-	end
-	destroyRoom(run, index - 1)
-	local corridor = run.folder:FindFirstChild(("Corridor%02d"):format(index))
-	if corridor then
-		corridor:Destroy()
-	end
-	DungeonGenerator.Seal(room)
-	local character = run.player.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if root and root.Position.Z > room.ZFront - 1.5 then
-		root.AssemblyLinearVelocity = Vector3.zero
-		character:PivotTo(room.Entry)
-	end
-end
-
-local function roomCleared(run, index)
-	local room = run.rooms[index]
-	openBarrier(room)
-	run.best = math.max(run.best, index)
-	if DungeonRuns.OnRoomCleared then
-		DungeonRuns.OnRoomCleared(run.player, index)
-	end
-	if PlayerState.ReachRoom(run.player, index) then
-		run.newRecord = true
-		Remotes.Notify(run.player, Texts.NewRecord, "gold")
-	end
-	if index == D.Rooms then
-		Remotes.Notify(run.player, Texts.RunWon, "gold")
-		task.delay(4, function()
-			if runs[run.player] == run then
-				endRun(run.player, "Won")
-			end
-		end)
-		return
-	end
-	Remotes.Notify(run.player, ("Этап %d пройден!"):format(index), "gold")
-	run.current = index + 1
-	ensureRoom(run, index + 1 + D.RoomsAhead)
-	local nextRoom = run.rooms[index + 1 + D.RoomsAhead]
-	if nextRoom then
-		Remotes.Get("RoomState"):FireClient(run.player, nextRoom.Index, nextRoom.Alive, nextRoom.Total)
-	end
-	sealBehind(run, index)
-end
-
-local function kill(model)
+local function kill(model, killer)
 	local info = mobInfo[model]
 	mobInfo[model] = nil
 	local run = info.run
-	local room = run.rooms[info.room]
+	run.mobs[model] = nil
 	if DungeonRuns.OnMobRemoved then
 		DungeonRuns.OnMobRemoved(model)
 	end
-
 	local position = model:GetPivot().Position
 	local isBoss = model:GetAttribute("Boss") == true
+	local elite = model:GetAttribute("Elite") == true
 	local kind = model:GetAttribute("Kind")
+	local tier = model:GetAttribute("Room") or run.location.Tier
 	local color = model:GetAttribute("Color") or Config.Theme.Magenta
-	-- Clients break the model apart (MobFx) while it still exists.
 	model:SetAttribute("Dying", true)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if humanoid then
@@ -353,22 +579,28 @@ local function kill(model)
 	task.delay(0.15, function()
 		model:Destroy()
 	end)
-	Effects.Burst(position, color, if isBoss then 90 else 25, if isBoss then 35 else 22, if isBoss then 2 else 1)
+	Effects.Burst(position, color, if isBoss then 90 elseif elite then 45 else 25, if isBoss then 35 else 22, if isBoss then 2 else 1)
 
-	local player = run.player
-	Remotes.Get("ClickHit"):FireClient(player, "Kill", position, isBoss)
-	if DungeonRuns.OnKill then
-		DungeonRuns.OnKill(player, info.room, isBoss, position, kind)
+	local enemy = if run.red and not isBoss then "Red" elseif isBoss then "Boss" elseif elite then "Elite" else "Normal"
+	local role = model:GetAttribute("Role")
+	local weight = W.Reward * (if elite then W.EliteReward elseif role == "Swarm" then W.SwarmReward else 1)
+	local lootInfo = { Rank = run.location.Rank, Enemy = enemy, Elite = elite, Red = run.red, Weight = weight }
+	if killer and run.stats[killer] then
+		run.stats[killer].kills += 1
 	end
-
-	if room then
-		room.Mobs[model] = nil
-		room.Alive -= 1
-		roomBarrierText(room, room.Alive, room.Total)
-		Remotes.Get("RoomState"):FireClient(player, info.room, room.Alive, room.Total)
-		if room.Alive <= 0 then
-			roomCleared(run, info.room)
+	for _, player in ipairs(members(run)) do
+		Remotes.Get("ClickHit"):FireClient(player, "Kill", position, isBoss)
+		if DungeonRuns.OnKill then
+			DungeonRuns.OnKill(player, tier, isBoss, position, kind, lootInfo)
 		end
+	end
+	if isBoss then
+		bossDefeated(run, Vector3.new(position.X, run.groundY, position.Z))
+		return
+	end
+	if info.zone == run.zoneIndex then
+		run.alive = math.max(0, run.alive - 1)
+		pushState(run)
 	end
 end
 
@@ -376,46 +608,36 @@ function DungeonRuns.IsMob(model): boolean
 	return mobInfo[model] ~= nil
 end
 
--- Closest living mob of the player's run within `range` studs.
-function DungeonRuns.NearestMob(player, position: Vector3, range: number)
-	local run = runs[player]
-	if not run then
-		return nil
-	end
-	local best, bestDistance = nil, range
-	for _, room in pairs(run.rooms) do
-		for model in pairs(room.Mobs) do
-			local root = model.PrimaryPart
-			if root then
-				-- big mobs (bosses) are measured from their surface, not the center
-				local distance = (root.Position - position).Magnitude - math.max(root.Size.X, root.Size.Z) / 2
-				if distance <= bestDistance then
-					best, bestDistance = model, distance
-				end
-			end
+function DungeonRuns.RunOf(model)
+	local info = mobInfo[model]
+	return info and info.run
+end
+
+local function liveMobs(run)
+	local list = {}
+	for model in pairs(run.mobs) do
+		local humanoid = model:FindFirstChildOfClass("Humanoid")
+		if model.PrimaryPart and humanoid and humanoid.Health > 0 and not model:GetAttribute("Dying") then
+			table.insert(list, model)
 		end
 	end
-	return best
+	return list
 end
+DungeonRuns.LiveMobs = liveMobs
 
 -- Every living mob of the player's run within `range` of `position`
 -- (measured from the mob's surface), nearest first.
 function DungeonRuns.MobsNear(player, position: Vector3, range: number)
-	local run = runs[player]
+	local run = runOf[player]
 	local list = {}
 	if not run then
 		return list
 	end
-	for _, room in pairs(run.rooms) do
-		for model in pairs(room.Mobs) do
-			local root = model.PrimaryPart
-			local humanoid = model:FindFirstChildOfClass("Humanoid")
-			if root and humanoid and humanoid.Health > 0 and not model:GetAttribute("Dying") then
-				local distance = (root.Position - position).Magnitude - math.max(root.Size.X, root.Size.Z) / 2
-				if distance <= range then
-					table.insert(list, { model = model, distance = distance })
-				end
-			end
+	for _, model in ipairs(liveMobs(run)) do
+		local root = model.PrimaryPart
+		local distance = (root.Position - position).Magnitude - math.max(root.Size.X, root.Size.Z) / 2
+		if distance <= range then
+			table.insert(list, { model = model, distance = distance })
 		end
 	end
 	table.sort(list, function(a, b)
@@ -424,70 +646,288 @@ function DungeonRuns.MobsNear(player, position: Vector3, range: number)
 	return list
 end
 
--- Called by ClickService after cooldown and range checks.
+function DungeonRuns.NearestMob(player, position: Vector3, range: number)
+	local near = DungeonRuns.MobsNear(player, position, range)
+	return near[1] and near[1].model
+end
+
 function DungeonRuns.Hit(player, model)
 	local damage, isCrit = StatService.RollHit(player)
 	return DungeonRuns.Damage(player, model, damage, isCrit)
+end
+
+-- A shield bearer blocks hits that come from its front.
+local function blocked(model, player): boolean
+	if model:GetAttribute("Role") ~= "Shield" or (model:GetAttribute("StunUntil") or 0) > Workspace:GetServerTimeNow() then
+		return false
+	end
+	local root, from = model.PrimaryPart, rootOf(player)
+	if not root or not from then
+		return false
+	end
+	local to = from.Position - root.Position
+	to = Vector3.new(to.X, 0, to.Z)
+	if to.Magnitude < 0.1 then
+		return false
+	end
+	local look = root.CFrame.LookVector
+	local angle = math.deg(math.acos(math.clamp(to.Unit:Dot(Vector3.new(look.X, 0, look.Z).Unit), -1, 1)))
+	return angle <= E.Roles.Shield.Front
 end
 
 -- Deals a ready-made amount of damage to a mob of the player's run
 -- (abilities, basic attacks). Returns the damage dealt (0 if none).
 function DungeonRuns.Damage(player, model, damage: number, isCrit: boolean?)
 	local info = mobInfo[model]
-	if not info or info.run.player ~= player then
+	if not info or runOf[player] ~= info.run then
 		return 0
 	end
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then
 		return 0
 	end
+	local run = info.run
+	local isBlocked = blocked(model, player)
+	if isBlocked then
+		damage *= 1 - E.Roles.Shield.Block
+	end
 	damage = math.max(1, math.floor(damage))
 	humanoid.Health = math.max(0, humanoid.Health - damage)
 	model:SetAttribute("Hits", (model:GetAttribute("Hits") or 0) + 1)
 	WorldKit.UpdateHealth(model.PrimaryPart, humanoid.Health, humanoid.MaxHealth)
-	Remotes.Get("ClickHit"):FireClient(player, "Hit", model, damage, isCrit == true)
+	local stats = run.stats[player]
+	if stats then
+		stats.damage += damage
+	end
+	Remotes.Get("ClickHit"):FireClient(player, "Hit", model, damage, isCrit == true, isBlocked)
+	-- knockback + a short stagger (not on bosses)
+	local root, from = model.PrimaryPart, rootOf(player)
+	if root and from and not model:GetAttribute("Boss") and humanoid.Health > 0 and not isBlocked then
+		local away = root.Position - from.Position
+		away = Vector3.new(away.X, 0, away.Z)
+		if away.Magnitude > 0.1 then
+			local k = CB.Knockback
+			local speed = k.Normal * (if isCrit then k.CritMult else 1) * (if model:GetAttribute("Elite") then k.EliteMult else 1)
+			root.AssemblyLinearVelocity = away.Unit * speed + Vector3.new(0, speed * 0.25, 0)
+			model:SetAttribute("StaggerUntil", Workspace:GetServerTimeNow() + k.Stagger)
+		end
+	end
 	if humanoid.Health <= 0 then
-		kill(model)
+		kill(model, player)
 	end
 	return damage
 end
 
--- Weapon changed mid-run: recolor the hint on the rooms that exist.
-function DungeonRuns.RefreshHints(player)
-	local run = runs[player]
-	if run then
-		for _, room in pairs(run.rooms) do
-			refreshRecommended(run, room)
-		end
+-- MobAI reports damage a member took (for the grade / results).
+function DungeonRuns.NoteDamageTaken(player, amount: number)
+	local run = runOf[player]
+	if run and run.stats[player] then
+		run.stats[player].taken += amount
 	end
 end
 
-function DungeonRuns.RunOf(model)
-	local info = mobInfo[model]
-	return info and info.run
+---------------------------------------------------------------------
+-- Start / end
+---------------------------------------------------------------------
+
+local function freeSlot(): number?
+	for slot = 1, Config.GateMap.MaxRuns do
+		if not slots[slot] then
+			return slot
+		end
+	end
+	return nil
+end
+
+local function leave(player, reason: string)
+	local run = runOf[player]
+	if not run then
+		return
+	end
+	runOf[player] = nil
+	local index = table.find(run.players, player)
+	if index then
+		table.remove(run.players, index)
+	end
+	local connections = run.connections[player]
+	if connections then
+		for _, c in ipairs(connections) do
+			c:Disconnect()
+		end
+		run.connections[player] = nil
+	end
+	if player.Parent then
+		player:SetAttribute("Zone", "Hub")
+		player:SetAttribute("Biome", "")
+		player:SetAttribute("GateRun", "")
+		-- a failed run gets its results; leaving on purpose just goes home
+		if not run.finished and reason == "Died" then
+			Remotes.Get("GateState"):FireClient(player, "Result", summaryFor(run, player, "Failed", nil, nil))
+		end
+	end
+	if DungeonRuns.OnRunClosed then
+		DungeonRuns.OnRunClosed(player)
+	end
+	if reason ~= "Died" and DungeonRuns.OnRunEnded and player.Parent then
+		DungeonRuns.OnRunEnded(player)
+	end
+	-- nobody left: the run and its map go away
+	if #members(run) == 0 and runs[run] then
+		runs[run] = nil
+		slots[run.slot] = nil
+		for model in pairs(run.mobs) do
+			mobInfo[model] = nil
+			if DungeonRuns.OnMobRemoved then
+				DungeonRuns.OnMobRemoved(model)
+			end
+		end
+		run.map.Folder:Destroy()
+	end
+end
+endRun = leave
+
+function DungeonRuns.EndRun(player, reason: string?)
+	leave(player, reason or "Left")
+end
+
+function DungeonRuns.HasRun(player): boolean
+	return runOf[player] ~= nil
+end
+
+function DungeonRuns.GetRun(player)
+	return runOf[player]
+end
+
+-- Can this player leave the run right now? (Red gates: only after the boss)
+function DungeonRuns.CanLeave(player): boolean
+	local run = runOf[player]
+	return not run or not run.red or run.finished == true
+end
+
+-- Starts a run of `location` for `players` (opts.Red). Teleports them
+-- to the start. Returns run or nil, message.
+function DungeonRuns.Start(location, players, opts)
+	opts = opts or {}
+	local slot = freeSlot()
+	if not slot then
+		return nil, "Все Врата заняты, попробуй через минуту"
+	end
+	for _, player in ipairs(players) do
+		if runOf[player] then
+			leave(player, "Left")
+		end
+	end
+	nextRunId += 1
+	local run = {
+		id = nextRunId,
+		slot = slot,
+		location = location,
+		players = table.clone(players),
+		red = opts.Red == true,
+		mobs = {},
+		stats = {},
+		loot = {},
+		connections = {},
+		deaths = 0,
+		zoneIndex = 1,
+		wave = 0,
+		alive = 0,
+		total = 0,
+		phase = "Enter",
+		rng = Random.new(),
+		groundY = GateMap.GroundY(),
+	}
+	slots[slot] = run
+	runs[run] = true
+	local zonesWaves = {}
+	for i, waves in ipairs(location.Zones) do
+		zonesWaves[i] = waves + (if run.red then Config.RedGate.ExtraWaves else 0)
+	end
+	run.map = GateMap.Build(location, slot)
+	run.zones = run.map.Zones
+	for i, zone in ipairs(run.zones) do
+		zone.Waves = zonesWaves[i]
+	end
+	local mobFolder = Instance.new("Folder")
+	mobFolder.Name = "Mobs"
+	mobFolder.Parent = run.map.Folder
+	run.mobFolder = mobFolder
+	local fxFolder = Instance.new("Folder")
+	fxFolder.Name = "Fx"
+	fxFolder.Parent = run.map.Folder
+	run.fxFolder = fxFolder
+	run.started = os.clock()
+
+	for i, player in ipairs(players) do
+		runOf[player] = run
+		run.stats[player] = { damage = 0, kills = 0, taken = 0 }
+		run.loot[player] = {}
+		local character = player.Character
+		if character then
+			character:PivotTo(run.map.Start * CFrame.new((i - 1) * 3 - 4.5, 0, 0))
+		end
+		player:SetAttribute("Zone", "Dungeon")
+		player:SetAttribute("Biome", location.Biome)
+		player:SetAttribute("GateRun", location.Id)
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+		local list = {}
+		if humanoid then
+			table.insert(list, humanoid.Died:Connect(function()
+				if runOf[player] == run then
+					if run.finished then
+						return -- the boss is down: a late death changes nothing
+					end
+					run.deaths += 1
+					task.delay(2, function()
+						if runOf[player] == run then
+							leave(player, "Died")
+						end
+					end)
+				end
+			end))
+		end
+		run.connections[player] = list
+		if DungeonRuns.OnRunStarted then
+			DungeonRuns.OnRunStarted(player)
+		end
+	end
+	pushState(run)
+	task.spawn(runFlow, run)
+	return run
+end
+
+-- Where to put a player who fell off: the entry of the zone they are in.
+function DungeonRuns.RecoveryCFrame(player): CFrame?
+	local run = runOf[player]
+	if not run then
+		return nil
+	end
+	if run.zoneIndex > #run.zones then
+		return run.map.Arena.Entry
+	end
+	local zone = run.zones[run.zoneIndex] or run.zones[1]
+	return zone.Entry
+end
+
+-- Something picked up during the run (LootService): for the results.
+function DungeonRuns.NoteLoot(player, entry)
+	local run = runOf[player]
+	if run and run.loot[player] then
+		table.insert(run.loot[player], entry)
+	end
 end
 
 function DungeonRuns.Init()
-	world = DungeonGenerator.Init()
+	GateMap.Init()
 	Players.PlayerRemoving:Connect(function(player)
-		if runs[player] then
-			endRun(player, "Left")
+		if runOf[player] then
+			leave(player, "Left")
 		end
 	end)
-	local function watch(player)
-		player.CharacterRemoving:Connect(function()
-			if runs[player] then
-				endRun(player, "Died")
-			end
-		end)
-		player:GetAttributeChangedSignal("ClickPower"):Connect(function()
-			DungeonRuns.RefreshHints(player)
-		end)
-	end
-	Players.PlayerAdded:Connect(watch)
-	for _, player in ipairs(Players:GetPlayers()) do
-		watch(player)
-	end
+end
+
+function DungeonRuns.GroundY(): number
+	return GateMap.GroundY()
 end
 
 return DungeonRuns

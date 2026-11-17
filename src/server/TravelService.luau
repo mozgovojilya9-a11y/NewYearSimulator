@@ -1,19 +1,20 @@
 --[[
 	TravelService.luau
-	Moves characters between the hub and the dungeon and keeps the
+	Moves characters between the hub and the gate runs and keeps the
 	player's "Zone" attribute ("Hub" | "Dungeon") up to date.
 
-	- Travel:InvokeServer("Dungeon") or touching the portal starts a NEW
-	  run (DungeonRuns.StartRun) and teleports to room 1 of its lane.
-	- Travel:InvokeServer("Hub"), key B / Back button, ends the run and
-	  teleports to the hub spawn.
+	- Entering the gates: GateService (Gate remote, the gates window).
+	- Touching the big gate in the Gate hall opens the gates window
+	  (GateState "Open" to that player).
+	- Travel:InvokeServer("Hub"), key B / the "В хаб" button, leaves the
+	  run and teleports to the hub spawn. Red Gates can't be left before
+	  their boss is down.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
@@ -35,32 +36,20 @@ end
 
 function TravelService.ToHub(player, reason: string?)
 	if DungeonRuns.HasRun(player) then
+		if not DungeonRuns.CanLeave(player) then
+			return false, Config.RedGate.Texts.NoExit
+		end
 		DungeonRuns.EndRun(player, reason or "Left")
+		return true, "Hub" -- OnRunEnded teleports
 	end
 	return teleport(player, hub.SpawnCFrame, "Hub")
-end
-
-function TravelService.EnterDungeon(player)
-	local character = player.Character
-	if not character or not character:FindFirstChild("HumanoidRootPart") then
-		return false, "Персонаж ещё не появился"
-	end
-	if (player:GetAttribute("Class") or "") == "" then
-		Remotes.Notify(player, Config.Combat.Texts.NeedClass, "bad")
-		return false, Config.Combat.Texts.NeedClass
-	end
-	local entry, message = DungeonRuns.StartRun(player)
-	if not entry then
-		return false, message
-	end
-	return teleport(player, entry, "Dungeon")
 end
 
 function TravelService.Init(hubInfo)
 	hub = hubInfo
 	local allow = RateLimit.new(1)
 
-	-- Runs that end without a death (Back, room 20, leaving) return here.
+	-- Runs that end without a death (leaving, a closed location) return here.
 	DungeonRuns.OnRunEnded = function(player)
 		teleport(player, hub.SpawnCFrame, "Hub")
 	end
@@ -70,25 +59,30 @@ function TravelService.Init(hubInfo)
 			return false, "Подожди секунду"
 		end
 		if destination == "Hub" then
-			return TravelService.ToHub(player, "Left")
-		elseif destination == "Dungeon" then
-			return TravelService.EnterDungeon(player)
+			local ok, message = TravelService.ToHub(player, "Left")
+			if not ok then
+				Remotes.Notify(player, message, "bad")
+			end
+			return ok, message
 		end
 		return false, "Неверный запрос"
 	end
 
-	local portalAllow = RateLimit.new(2)
+	-- the big gate opens the gates window
+	local portalAllow = RateLimit.new(3)
 	hub.Portal.Touched:Connect(function(hit)
 		local character = hit:FindFirstAncestorOfClass("Model")
 		local player = character and Players:GetPlayerFromCharacter(character)
 		if player and PlayerState.IsReady(player) and portalAllow(player) and not DungeonRuns.HasRun(player) then
-			TravelService.EnterDungeon(player)
+			Remotes.Get("GateState"):FireClient(player, "Open")
 		end
 	end)
 
 	Players.PlayerAdded:Connect(function(player)
 		player.CharacterAdded:Connect(function()
-			player:SetAttribute("Zone", "Hub")
+			if not DungeonRuns.HasRun(player) then
+				player:SetAttribute("Zone", "Hub")
+			end
 		end)
 	end)
 end

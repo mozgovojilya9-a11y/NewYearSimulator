@@ -27,7 +27,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local DungeonGenerator = require(script.Parent.DungeonGenerator)
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local GameEvents = require(script.Parent.GameEvents)
 local ItemService = require(script.Parent.ItemService)
@@ -109,30 +108,41 @@ local function spawnDrop(player, kind: string, payload, position: Vector3, extra
 	return id
 end
 
--- One gear drop of a room for the player at `position`.
-function LootService.DropItem(player, room: number, enemy: string, position: Vector3, minRarity: string?)
-	local rank = Config.RankForRoom(room)
+-- One gear drop of a tier for the player at `position` (rank: the gate
+-- rank of the run, else the rank of the tier).
+function LootService.DropItem(player, room: number, enemy: string, position: Vector3, minRarity: string?, rank: string?)
+	rank = rank or Config.RankForRoom(room)
 	local rarityId = LootService.RollRarity(player, rank, enemy, minRarity)
 	local instance = ItemService.Generate(player, itemLevel(room), rarityId)
 	return spawnDrop(player, "Item", instance, position)
 end
 
-function LootService.DropChest(player, room: number, position: Vector3, enemy: string?)
-	return spawnDrop(player, "Chest", { Rank = Config.RankForRoom(room) }, position, { room = room, enemy = enemy or "Boss" })
+-- Boss chest. opts: Rank, Extra (more items: the run grade), MinStep
+-- (first item a step rarer), Red.
+function LootService.DropChest(player, room: number, position: Vector3, enemy: string?, opts)
+	opts = opts or {}
+	local rank = opts.Rank or Config.RankForRoom(room)
+	return spawnDrop(player, "Chest", { Rank = rank, Red = opts.Red }, position, { room = room, enemy = enemy or "Boss", rank = rank, extra = opts.Extra or 0, minStep = opts.MinStep or 0 })
 end
 
-function LootService.OnKill(player, room: number, isBoss: boolean, position: Vector3, _kind: string)
-	if not PlayerState.IsReady(player) then
+-- info (gate runs): { Rank, Enemy = "Normal" | "Elite" | "Red", Red }.
+-- Bosses drop their chest from DungeonRuns.OnBossDefeated (grade bonus).
+function LootService.OnKill(player, room: number, isBoss: boolean, position: Vector3, _kind: string, info)
+	if not PlayerState.IsReady(player) or isBoss then
 		return
 	end
-	local ground = Vector3.new(position.X, DungeonGenerator.GroundY(), position.Z)
-	if isBoss then
-		LootService.DropChest(player, room, ground)
-		return
-	end
-	local chance = LOOT.DropChance.Normal + (StatService.Get(player).DropChance or 0)
+	info = info or {}
+	local enemy = info.Enemy or "Normal"
+	local ground = Vector3.new(position.X, DungeonRuns.GroundY(), position.Z)
+	-- spread a little so drops of a group don't sit in one spot
+	ground += Vector3.new(rng:NextNumber(-1.5, 1.5), 0, rng:NextNumber(-1.5, 1.5))
+	local chance = (LOOT.DropChance[enemy] or LOOT.DropChance.Normal) + (StatService.Get(player).DropChance or 0)
 	if rng:NextNumber() < chance then
-		LootService.DropItem(player, room, "Normal", ground)
+		LootService.DropItem(player, room, enemy, ground, nil, info.Rank)
+	end
+	-- elites and red-gate enemies may drop an artifact too
+	if LootService.RollArtifact and rng:NextNumber() < (LOOT.ArtifactChance[enemy] or 0) then
+		spawnDrop(player, "Artifact", { Id = LootService.RollArtifact(player, info.Rank or Config.RankForRoom(room)) }, ground + Vector3.new(2, 0, 0))
 	end
 end
 
@@ -140,12 +150,12 @@ local function openChest(player, id, drop)
 	drops[id] = nil
 	Remotes.Get("Loot"):FireClient(player, "Open", id)
 	local room, enemy = drop.room or 1, drop.enemy or "Boss"
-	local rank = Config.RankForRoom(room)
+	local rank = drop.rank or Config.RankForRoom(room)
 	task.delay(LOOT.Chest.OpenSeconds, function()
 		if not player.Parent then
 			return
 		end
-		local count = LOOT.BossItems
+		local count = LOOT.BossItems + (drop.extra or 0)
 		local artifact = LootService.RollArtifact and rng:NextNumber() < (LOOT.ArtifactChance[enemy] or 0) and LootService.RollArtifact(player, rank)
 		local total = count + (if artifact then 1 else 0)
 		local start = rng:NextNumber() * math.pi * 2
@@ -153,7 +163,15 @@ local function openChest(player, id, drop)
 			local angle = start + (i - 1) * math.pi * 2 / total
 			local position = drop.position + Vector3.new(math.cos(angle) * LOOT.SpreadRadius, 0, math.sin(angle) * LOOT.SpreadRadius)
 			if i <= count then
-				LootService.DropItem(player, room, enemy, position, if i == 1 then LOOT.BossMinRarity[rank] else nil)
+				local minRarity = nil
+				if i == 1 then
+					minRarity = LOOT.BossMinRarity[rank]
+					for _ = 1, drop.minStep or 0 do
+						local nextRarity = Config.Rarities[Config.Rarity[minRarity].Index + 1]
+						minRarity = if nextRarity then nextRarity.Id else minRarity
+					end
+				end
+				LootService.DropItem(player, room, enemy, position, minRarity, rank)
 			else
 				spawnDrop(player, "Artifact", { Id = artifact }, position)
 			end
@@ -193,9 +211,8 @@ local function pickUp(player, id)
 	end
 	drops[id] = nil
 	local view = ItemService.Give(player, drop.payload)
-	local run = DungeonRuns.GetRun(player)
-	if run and view then
-		table.insert(run.loot, { B = drop.payload.B, K = drop.payload.K, R = drop.payload.R, L = drop.payload.L })
+	if view then
+		DungeonRuns.NoteLoot(player, { B = drop.payload.B, K = drop.payload.K, R = drop.payload.R, L = drop.payload.L, E = 0 })
 	end
 	Remotes.Get("Loot"):FireClient(player, "Picked", id, "Item", drop.payload)
 	GameEvents.Fire(player, "Loot", 1)
@@ -230,6 +247,18 @@ function LootService.Init()
 		LootService.OnKill(player, room, isBoss, position, kind)
 	end
 	DungeonRuns.OnRunClosed = LootService.Clear
+	-- boss down: a chest for every member, more items for a better grade
+	DungeonRuns.OnBossDefeated = function(run, position, grade)
+		for i, player in ipairs(DungeonRuns.Members(run)) do
+			local offset = Vector3.new((i - 1) * 6 - (#run.players - 1) * 3, 0, 4)
+			LootService.DropChest(player, run.location.BossTier, position + offset, if run.red then "Red" else "Boss", {
+				Rank = run.location.Rank,
+				Extra = grade.Items,
+				MinStep = grade.MinStep,
+				Red = run.red,
+			})
+		end
+	end
 	Players.PlayerRemoving:Connect(LootService.Clear)
 
 	task.spawn(function()
