@@ -1,123 +1,381 @@
 --[[
 	MobAI.luau
-	Brains for dungeon mobs (one tick every Config.Dungeon.Mob tick):
-	- see the run's player within AggroRange -> Humanoid:MoveTo them,
-	- within AttackRange -> telegraph (model attribute "Telegraph", the
-	  client flashes it red) then hit the player's Humanoid,
-	- bosses additionally slam the ground every BossSlamEvery seconds:
-	  a red warning circle appears for BossSlamWarning seconds, then
-	  everyone still inside takes heavy damage (you can run out).
-	Also handles the player's out-of-combat health regeneration.
+	Brains of the gate enemies (Config.Enemies). Every attack warns first:
+	  Melee   walks up, flashes red (model "Telegraph"), hits in front
+	  Swarm   fast and weak, comes in packs, short wind-up
+	  Ranged  keeps its distance, draws its shot line on the floor, fires
+	          along it: whoever is still on the line is hit
+	  Shield  slow, its energy shield blocks hits from the front
+	          (DungeonRuns), bashes up close
+	  Healer  stays away from the players and heals the most hurt ally
+	          (green beam), never attacks
+	Elites (bigger, aura) also do a shockwave: a circle around them.
+	Bosses: phases at Config.Enemies.Boss.Phases of health (banner
+	"ФАЗА 2"), special attacks every few seconds - Slam (circle around),
+	Charge (rectangle, then a dash along it), Barrage (circles under the
+	players), Summon (adds from the arena portals, from phase 2); later
+	phases attack faster. Between specials the boss chases and hits.
+
+	A target = the nearest living member of the run. Stun / slow from the
+	skills (StunUntil / SlowUntil) and the short hit stagger (StaggerUntil)
+	stop or slow the brain. Also: the player's out-of-combat regeneration.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local AbilityService = require(script.Parent.AbilityService)
 local DungeonRuns = require(script.Parent.DungeonRuns)
+local Remotes = require(script.Parent.Remotes)
 local StatService = require(script.Parent.StatService)
-local WorldKit = require(script.Parent.WorldKit)
+local Telegraph = require(script.Parent.Telegraph)
 
 local MobAI = {}
 
-local M = Config.Dungeon.Mob
+local E = Config.Enemies
+local BOSS = E.Boss
 local P = Config.Player
-local TICK = 0.3
+local TICK = 0.2
+local RED = E.TelegraphColor
 
-local mobs = {} -- [model] = { run, humanoid, root, lastAttack, busy, lastSlam }
+local mobs = {} -- [model] = state
 local lastDamaged = {} -- [player] = os.clock() of the last hit taken
 
-local function damagePlayer(player, amount: number, attacker: Model?)
+local function now(): number
+	return Workspace:GetServerTimeNow()
+end
+
+function MobAI.DamagePlayer(player, amount: number, attacker: Model?)
 	local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if humanoid and humanoid.Health > 0 then
 		local taken = amount * (1 - StatService.Get(player).Defense) -- armor
-		taken = AbilityService.Incoming(player, taken, attacker) -- shield, block, thorns, cheat death
+		taken = AbilityService.Incoming(player, taken, attacker) -- dodge, shield, block, thorns, cheat death
 		if taken > 0 then
 			humanoid:TakeDamage(math.max(1, taken))
+			DungeonRuns.NoteDamageTaken(player, taken)
 		end
 		lastDamaged[player] = os.clock()
 	end
 end
+local damagePlayer = MobAI.DamagePlayer
 
--- Control effects of the skills (attributes = server time they end).
 local function statusOf(model): (boolean, number)
-	local t = Workspace:GetServerTimeNow()
-	local stunned = (model:GetAttribute("StunUntil") or 0) > t
+	local t = now()
+	local stunned = (model:GetAttribute("StunUntil") or 0) > t or (model:GetAttribute("StaggerUntil") or 0) > t
 	local slow = if (model:GetAttribute("SlowUntil") or 0) > t then Config.Combat.SlowFactor else 1
 	return stunned, slow
 end
 
-local function playerRoot(run)
-	local character = run.player.Character
-	return character and character:FindFirstChild("HumanoidRootPart")
+local function rootOf(player)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then
+		return nil
+	end
+	return character:FindFirstChild("HumanoidRootPart")
 end
 
-local function attack(state, model, root)
+-- Nearest living member of the run: player, root, surface distance.
+local function target(state)
+	local best, bestRoot, bestDistance = nil, nil, math.huge
+	for _, player in ipairs(DungeonRuns.Members(state.run)) do
+		local root = rootOf(player)
+		if root then
+			local d = (root.Position - state.root.Position).Magnitude - state.reach
+			if d < bestDistance then
+				best, bestRoot, bestDistance = player, root, d
+			end
+		end
+	end
+	return best, bestRoot, bestDistance
+end
+
+local function groundOf(state): number
+	return state.run.groundY or (state.root.Position.Y - 3)
+end
+
+local function face(state, position: Vector3)
+	local p = state.root.Position
+	local flat = Vector3.new(position.X, p.Y, position.Z)
+	if (flat - p).Magnitude > 0.1 then
+		state.root.CFrame = CFrame.lookAt(p, flat)
+	end
+end
+
+local function stop(state)
+	state.humanoid:MoveTo(state.root.Position)
+end
+
+local function membersIn(state, test)
+	local list = {}
+	for _, player in ipairs(DungeonRuns.Members(state.run)) do
+		local root = rootOf(player)
+		if root and test(root.Position) then
+			table.insert(list, player)
+		end
+	end
+	return list
+end
+
+---------------------------------------------------------------------
+-- Basic attacks
+---------------------------------------------------------------------
+
+local function melee(state, model, role)
 	state.busy = true
 	model:SetAttribute("Telegraph", true)
-	task.wait(M.TelegraphSeconds)
+	task.wait(role.Telegraph)
 	model:SetAttribute("Telegraph", false)
 	if mobs[model] and model.Parent then
-		local target = playerRoot(state.run)
-		if target and (target.Position - state.root.Position).Magnitude - state.reach <= M.AttackRange + 2 then
-			damagePlayer(state.run.player, model:GetAttribute("Damage") or 1, model)
+		local player, _, distance = target(state)
+		if player and distance <= role.Range + 2.5 then
+			damagePlayer(player, model:GetAttribute("Damage") or 1, model)
 		end
 	end
 	state.lastAttack = os.clock()
 	state.busy = false
 end
 
-local function slam(state, model)
+local function shoot(state, model, role)
 	state.busy = true
-	local center = state.root.Position
-	local groundY = center.Y - state.root.Size.Y / 2 - (state.humanoid.HipHeight or 0)
-	local warning = WorldKit.Part(Workspace, {
-		Name = "SlamWarning",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.3, M.BossSlamRadius * 2, M.BossSlamRadius * 2),
-		CFrame = CFrame.new(center.X, groundY + 0.3, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = Config.Theme.Red,
-		Material = Enum.Material.Neon,
-		Transparency = 0.55,
-		CanCollide = false,
-		CanQuery = false,
-		CanTouch = false,
-	})
-	TweenService:Create(warning, TweenInfo.new(M.BossSlamWarning, Enum.EasingStyle.Linear), { Transparency = 0.15 }):Play()
-	task.wait(M.BossSlamWarning)
-	warning:Destroy()
+	local _, root = target(state)
+	if not root then
+		state.busy = false
+		return
+	end
+	stop(state)
+	face(state, root.Position)
+	local from = state.root.Position + Vector3.new(0, 1.5, 0)
+	local direction = Vector3.new(root.Position.X - from.X, 0, root.Position.Z - from.Z)
+	local to = from + (if direction.Magnitude > 0.1 then direction.Unit else state.root.CFrame.LookVector) * role.Range
+	to = Vector3.new(to.X, root.Position.Y, to.Z)
+	model:SetAttribute("Telegraph", true)
+	Telegraph.Line(state.run.fxFolder, from, to, role.Width, role.Telegraph, RED)
+	task.wait(role.Telegraph)
+	model:SetAttribute("Telegraph", false)
 	if mobs[model] and model.Parent then
-		local flash = WorldKit.Part(Workspace, {
-			Name = "SlamHit",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(0.5, M.BossSlamRadius * 2, M.BossSlamRadius * 2),
-			CFrame = CFrame.new(center.X, groundY + 0.4, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
-			Color = Config.Theme.Gold,
-			Material = Enum.Material.Neon,
-			Transparency = 0.2,
-			CanCollide = false,
-			CanQuery = false,
-			CanTouch = false,
-		})
-		TweenService:Create(flash, TweenInfo.new(0.4), { Transparency = 1 }):Play()
-		task.delay(0.4, flash.Destroy, flash)
-		local target = playerRoot(state.run)
-		if target then
-			local flat = Vector3.new(target.Position.X - center.X, 0, target.Position.Z - center.Z)
-			if flat.Magnitude <= M.BossSlamRadius then
-				damagePlayer(state.run.player, (model:GetAttribute("Damage") or 1) * M.BossSlamDamageMultiplier)
-			end
+		AbilityService.Fx("Beam", from, to, model:GetAttribute("Color") or RED, 0.5)
+		for _, player in ipairs(membersIn(state, function(p)
+			return Telegraph.ToSegment(p, from, to) <= role.Width / 2 + 1
+		end)) do
+			damagePlayer(player, model:GetAttribute("Damage") or 1, model)
 		end
 	end
-	state.lastSlam = os.clock()
+	state.lastAttack = os.clock()
 	state.busy = false
 end
 
+local function heal(state, model, role)
+	state.busy = true
+	local best, worst = nil, 1
+	for _, other in ipairs(DungeonRuns.LiveMobs(state.run)) do
+		local humanoid = other:FindFirstChildOfClass("Humanoid")
+		if other ~= model and humanoid and (other.PrimaryPart.Position - state.root.Position).Magnitude <= role.Range then
+			local share = humanoid.Health / humanoid.MaxHealth
+			if share < worst then
+				best, worst = other, share
+			end
+		end
+	end
+	if best then
+		local humanoid = best:FindFirstChildOfClass("Humanoid")
+		AbilityService.Fx("Beam", state.root.Position + Vector3.new(0, 1, 0), best.PrimaryPart.Position, E.HealColor, 0.6)
+		AbilityService.Fx("Heal", best)
+		humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + humanoid.MaxHealth * role.Heal)
+		local gui = best.PrimaryPart:FindFirstChild("HealthGui")
+		if gui then
+			require(script.Parent.WorldKit).UpdateHealth(best.PrimaryPart, humanoid.Health, humanoid.MaxHealth)
+		end
+	end
+	state.lastAttack = os.clock()
+	task.wait(0.4)
+	state.busy = false
+end
+
+-- Elite / boss: circle around the mob.
+local function shockwave(state, model, radius: number, seconds: number, mult: number)
+	state.busy = true
+	stop(state)
+	local center = Vector3.new(state.root.Position.X, groundOf(state), state.root.Position.Z)
+	model:SetAttribute("Telegraph", true)
+	Telegraph.Circle(state.run.fxFolder, center, radius, seconds, RED)
+	task.wait(seconds)
+	model:SetAttribute("Telegraph", false)
+	if mobs[model] and model.Parent then
+		AbilityService.Fx("Ring", center, radius, Config.Theme.Gold)
+		for _, player in ipairs(membersIn(state, function(p)
+			return Telegraph.InCircle(p, center, radius)
+		end)) do
+			damagePlayer(player, (model:GetAttribute("Damage") or 1) * mult, model)
+		end
+	end
+	state.busy = false
+end
+
+---------------------------------------------------------------------
+-- Boss specials
+---------------------------------------------------------------------
+
+local function charge(state, model)
+	state.busy = true
+	local _, root = target(state)
+	if not root then
+		state.busy = false
+		return
+	end
+	stop(state)
+	local c = BOSS.Charge
+	face(state, root.Position)
+	local start = Vector3.new(state.root.Position.X, groundOf(state), state.root.Position.Z)
+	local look = Vector3.new(root.Position.X - start.X, 0, root.Position.Z - start.Z)
+	look = if look.Magnitude > 0.1 then look.Unit else Vector3.new(0, 0, 1)
+	local cf = CFrame.lookAt(start, start + look)
+	model:SetAttribute("Telegraph", true)
+	Telegraph.Rect(state.run.fxFolder, cf, c.Length, c.Width, c.Telegraph, RED)
+	task.wait(c.Telegraph)
+	model:SetAttribute("Telegraph", false)
+	if not (mobs[model] and model.Parent) then
+		state.busy = false
+		return
+	end
+	-- the dash itself
+	state.humanoid.WalkSpeed = c.Speed
+	state.humanoid:MoveTo(start + look * c.Length)
+	for _, player in ipairs(membersIn(state, function(p)
+		return Telegraph.InRect(p, cf, c.Length, c.Width)
+	end)) do
+		damagePlayer(player, (model:GetAttribute("Damage") or 1) * c.Mult, model)
+	end
+	task.wait(c.Length / c.Speed + 0.1)
+	state.humanoid.WalkSpeed = state.speed
+	state.busy = false
+end
+
+local function barrage(state, model)
+	state.busy = true
+	stop(state)
+	local b = BOSS.Barrage
+	local spots = {}
+	for _, player in ipairs(DungeonRuns.Members(state.run)) do
+		local root = rootOf(player)
+		if root then
+			table.insert(spots, Vector3.new(root.Position.X, groundOf(state), root.Position.Z))
+		end
+	end
+	local count = b.Count + (state.phase - 1) * b.PerPhase
+	local center = state.run.map and state.run.map.Arena.Center or state.root.Position
+	local half = (state.run.map and state.run.map.Arena.Size or 60) * 0.38
+	while #spots < count do
+		table.insert(spots, Vector3.new(center.X + state.run.rng:NextNumber(-half, half), groundOf(state), center.Z + state.run.rng:NextNumber(-half, half)))
+	end
+	model:SetAttribute("Telegraph", true)
+	for _, spot in ipairs(spots) do
+		Telegraph.Circle(state.run.fxFolder, spot, b.Radius, b.Telegraph, RED)
+	end
+	task.wait(b.Telegraph)
+	model:SetAttribute("Telegraph", false)
+	if mobs[model] and model.Parent then
+		for _, spot in ipairs(spots) do
+			AbilityService.Fx("Ring", spot, b.Radius, Config.Theme.Orange)
+			AbilityService.Fx("Beam", spot + Vector3.new(0, 30, 0), spot, Config.Theme.Orange, 1.2)
+		end
+		for _, player in ipairs(membersIn(state, function(p)
+			for _, spot in ipairs(spots) do
+				if Telegraph.InCircle(p, spot, b.Radius) then
+					return true
+				end
+			end
+			return false
+		end)) do
+			damagePlayer(player, (model:GetAttribute("Damage") or 1) * b.Mult, model)
+		end
+	end
+	state.busy = false
+end
+
+local function summon(state, model)
+	state.busy = true
+	stop(state)
+	local run = state.run
+	local arena = run.map and run.map.Arena
+	local pool = run.location.Mobs
+	model:SetAttribute("Telegraph", true)
+	task.wait(0.6)
+	model:SetAttribute("Telegraph", false)
+	for _, player in ipairs(DungeonRuns.Members(run)) do
+		Remotes.Notify(player, BOSS.Texts.Summon:format(model:GetAttribute("MobName") or ""), "red")
+	end
+	if arena then
+		for i = 1, BOSS.Summon.Count do
+			local portal = arena.Portals[(i - 1) % #arena.Portals + 1]
+			local id = pool[run.rng:NextInteger(1, #pool)]
+			task.delay(i * 0.25, function()
+				if mobs[model] then
+					DungeonRuns.SpawnMob(run, id, portal.Position, { Tier = run.location.BossTier - 1, Zone = "Boss" })
+				end
+			end)
+		end
+	end
+	state.busy = false
+end
+
+local function bossPhase(state, model)
+	local humanoid = state.humanoid
+	local share = humanoid.Health / math.max(1, humanoid.MaxHealth)
+	local phase = 1
+	for i, threshold in ipairs(BOSS.Phases) do
+		if share <= threshold then
+			phase = i + 1
+		end
+	end
+	if phase > state.phase then
+		state.phase = phase
+		model:SetAttribute("Phase", phase)
+		for _, player in ipairs(DungeonRuns.Members(state.run)) do
+			Remotes.Get("GateState"):FireClient(player, "Phase", phase)
+		end
+		-- a short roar: everyone around is pushed back
+		task.spawn(shockwave, state, model, 10, 0.8, 1)
+		return true
+	end
+	return false
+end
+
+local function bossSpecial(state, model)
+	local options = { slam = true, charge = true, barrage = true }
+	if state.phase >= BOSS.Summon.FromPhase and not state.summoned then
+		state.summoned = true
+		return summon(state, model)
+	end
+	local keys = {}
+	for key in pairs(options) do
+		if key ~= state.lastPick then
+			table.insert(keys, key)
+		end
+	end
+	local pick = keys[state.run.rng:NextInteger(1, #keys)]
+	state.lastPick = pick
+	if pick == "slam" then
+		local s = BOSS.Slam
+		shockwave(state, model, s.Radius + (state.phase - 1) * 2, s.Telegraph, s.Mult)
+	elseif pick == "charge" then
+		charge(state, model)
+	else
+		barrage(state, model)
+	end
+	if state.phase >= 3 then
+		state.summoned = false -- phase 3 summons again now and then
+	end
+end
+
+---------------------------------------------------------------------
+-- Brain tick
+---------------------------------------------------------------------
+
 local function tick()
-	local now = os.clock()
+	local clock = os.clock()
 	for model, state in pairs(mobs) do
 		if not model.Parent or state.humanoid.Health <= 0 or model:GetAttribute("Dying") then
 			mobs[model] = nil
@@ -126,32 +384,80 @@ local function tick()
 		if state.busy then
 			continue
 		end
-		local target = playerRoot(state.run)
-		if not target then
+		local player, targetRoot, distance = target(state)
+		if not player then
+			stop(state)
 			continue
 		end
 		local stunned, slow = statusOf(model)
 		if stunned then
-			state.humanoid:MoveTo(state.root.Position)
 			continue
 		end
-		-- measured from the mob's surface, so big bosses reach as far as small mobs
-		local distance = (target.Position - state.root.Position).Magnitude - state.reach
-		local isBoss = model:GetAttribute("Boss") == true
+		state.humanoid.WalkSpeed = state.speed * slow
+		local role = state.role
 
-		if isBoss and distance <= M.AggroRange and now - state.lastSlam >= M.BossSlamEvery then
-			state.humanoid:MoveTo(state.root.Position)
-			task.spawn(slam, state, model)
-		elseif distance <= M.AttackRange then
-			state.humanoid:MoveTo(state.root.Position)
-			if now - state.lastAttack >= M.AttackCooldown then
-				task.spawn(attack, state, model, state.root)
+		if state.isBoss then
+			if bossPhase(state, model) then
+				continue
 			end
-		elseif distance <= M.AggroRange then
-			state.humanoid.WalkSpeed = (if isBoss then M.BossWalkSpeed else M.WalkSpeed) * slow
-			state.humanoid:MoveTo(target.Position)
+			local every = BOSS.Every * BOSS.PhaseSpeed[state.phase]
+			if clock - state.lastSpecial >= every then
+				state.lastSpecial = clock
+				task.spawn(bossSpecial, state, model)
+			elseif distance <= 6 then
+				stop(state)
+				if clock - state.lastAttack >= 1.6 * BOSS.PhaseSpeed[state.phase] then
+					task.spawn(melee, state, model, { Telegraph = 0.6, Range = 6 })
+				end
+			else
+				state.humanoid:MoveTo(targetRoot.Position)
+			end
+			continue
+		end
+
+		if state.elite and clock - state.lastShock >= E.Elite.Shockwave.Every and distance <= E.Elite.Shockwave.Radius then
+			state.lastShock = clock
+			local s = E.Elite.Shockwave
+			task.spawn(shockwave, state, model, s.Radius, s.Telegraph, s.Mult)
+			continue
+		end
+
+		local kind = model:GetAttribute("Role")
+		if kind == "Healer" then
+			-- keep away from the players, heal now and then
+			if distance < role.Keep then
+				local away = state.root.Position - targetRoot.Position
+				away = Vector3.new(away.X, 0, away.Z)
+				state.humanoid:MoveTo(state.root.Position + (if away.Magnitude > 0.1 then away.Unit else Vector3.new(1, 0, 0)) * 10)
+			else
+				stop(state)
+			end
+			if clock - state.lastAttack >= role.Every then
+				task.spawn(heal, state, model, role)
+			end
+		elseif kind == "Ranged" then
+			if distance > role.Range - 4 then
+				state.humanoid:MoveTo(targetRoot.Position)
+			elseif distance < role.Keep * 0.6 then
+				local away = state.root.Position - targetRoot.Position
+				away = Vector3.new(away.X, 0, away.Z)
+				state.humanoid:MoveTo(state.root.Position + (if away.Magnitude > 0.1 then away.Unit else Vector3.new(1, 0, 0)) * 8)
+			else
+				stop(state)
+				if clock - state.lastAttack >= role.Cooldown then
+					task.spawn(shoot, state, model, role)
+				end
+			end
 		else
-			state.humanoid:MoveTo(state.root.Position)
+			if distance <= role.Range then
+				stop(state)
+				face(state, targetRoot.Position)
+				if clock - state.lastAttack >= role.Cooldown then
+					task.spawn(melee, state, model, role)
+				end
+			else
+				state.humanoid:MoveTo(targetRoot.Position)
+			end
 		end
 	end
 end
@@ -177,7 +483,29 @@ function MobAI.Register(run, model)
 		return
 	end
 	pcall(root.SetNetworkOwner, root, nil) -- the server drives mobs
-	mobs[model] = { run = run, humanoid = humanoid, root = root, reach = math.max(root.Size.X, root.Size.Z) / 2, lastAttack = 0, lastSlam = os.clock(), busy = false }
+	local isBoss = model:GetAttribute("Boss") == true
+	local roleName = model:GetAttribute("Role") or "Melee"
+	local role = E.Roles[roleName] or E.Roles.Melee
+	local speed = if isBoss then Config.Dungeon.Mob.BossWalkSpeed + 3 else role.Speed
+	humanoid.WalkSpeed = speed
+	mobs[model] = {
+		run = run,
+		humanoid = humanoid,
+		root = root,
+		reach = math.max(root.Size.X, root.Size.Z) / 2,
+		role = role,
+		speed = speed,
+		isBoss = isBoss,
+		elite = model:GetAttribute("Elite") == true,
+		phase = 1,
+		lastAttack = os.clock() - math.random() * 1.5,
+		lastSpecial = os.clock(),
+		lastShock = os.clock() - math.random() * 3,
+		busy = false,
+	}
+	if isBoss then
+		model:SetAttribute("Phase", 1)
+	end
 end
 
 function MobAI.Unregister(model)
