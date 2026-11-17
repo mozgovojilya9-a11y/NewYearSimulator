@@ -196,14 +196,32 @@ end
 function Window.Group(entries)
 	for _, entry in ipairs(entries) do
 		local frame = entry.Window.Frame
+		-- The bar lives on the top layer of the UI (not inside the window):
+		-- inside, it ended up under the window's translucent body. It
+		-- follows the window's header and shows only while it is open.
 		local bar = Instance.new("Frame")
 		bar.Name = "GroupTabs"
 		bar.AnchorPoint = Vector2.new(1, 0)
-		bar.Position = UDim2.new(1, -60, 0, 14)
-		bar.Size = UDim2.new(0.55, 0, 0, 34)
+		bar.Size = UDim2.fromOffset(3 * 124, 34)
 		bar.BackgroundTransparency = 1
-		bar.ZIndex = 34
-		bar.Parent = frame
+		bar.ZIndex = 40
+		bar.Visible = false
+		bar.Parent = Style.Gui
+		local function follow()
+			bar.Visible = frame.Visible
+			if frame.Visible then
+				-- absolute pixels -> offsets of the scaled root GUI
+				local k = math.max(0.01, Style.Scale.Scale)
+				local pos = frame.AbsolutePosition / k
+				local size = frame.AbsoluteSize / k
+				bar.Position = UDim2.fromOffset(pos.X + size.X - 60, pos.Y + 14)
+			end
+		end
+		frame:GetPropertyChangedSignal("Visible"):Connect(follow)
+		frame:GetPropertyChangedSignal("AbsolutePosition"):Connect(follow)
+		frame:GetPropertyChangedSignal("AbsoluteSize"):Connect(follow)
+		Style.Scale:GetPropertyChangedSignal("Scale"):Connect(follow)
+		follow()
 		local layout = Instance.new("UIListLayout")
 		layout.FillDirection = Enum.FillDirection.Horizontal
 		layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
@@ -216,12 +234,10 @@ function Window.Group(entries)
 			tab.LayoutOrder = order
 			tab.Size = UDim2.fromOffset(120, 34)
 			tab.BackgroundTransparency = 1
-			tab.Font = Style.Font
-			tab.TextSize = 15
-			tab.Text = Style.Upper(other.Text)
-			tab.TextColor3 = if other.Window == entry.Window then C.Gold else C.Muted
-			tab.ZIndex = 35
+			tab.Text = ""
+			tab.ZIndex = 41
 			tab.Parent = bar
+			Style.Label(tab, Style.Upper(other.Text), 14, if other.Window == entry.Window then C.Gold else C.Text, { Size = UDim2.fromScale(1, 1), ZIndex = 42 })
 			local underline = Instance.new("Frame")
 			underline.AnchorPoint = Vector2.new(0.5, 1)
 			underline.Position = UDim2.new(0.5, 0, 1, 0)
@@ -229,7 +245,7 @@ function Window.Group(entries)
 			underline.BackgroundColor3 = C.Gold
 			underline.BorderSizePixel = 0
 			underline.Visible = other.Window == entry.Window
-			underline.ZIndex = 35
+			underline.ZIndex = 42
 			underline.Parent = tab
 			labels[order] = tab
 			tab.Activated:Connect(function()

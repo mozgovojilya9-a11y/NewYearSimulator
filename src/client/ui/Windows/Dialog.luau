@@ -115,14 +115,14 @@ function Dialog.Open(payload)
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	openedAt = root and root.Position
 	panel.Visible = true
-	Style.PlaySound("Open")
+	Style.PlaySound("Ui", 0.9, 0.5)
 end
 
 claimButton.Activated:Connect(function()
 	local ok, message = ReplicatedStorage:WaitForChild("Quest"):InvokeServer("Claim")
 	if ok then
 		Popups.Toast(message, "gold")
-		Style.PlaySound("Reward")
+		Style.PlaySound(Config.Sounds.Buy, 1, 0.6)
 		Dialog.Close()
 		-- the next step at once
 		local next = ReplicatedStorage.Quest:InvokeServer("Talk", "Mentor")

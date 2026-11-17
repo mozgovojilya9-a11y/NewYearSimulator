@@ -34,7 +34,10 @@ local Popups = require(script.Parent.Popups)
 local Style = require(script.Parent.Style)
 local Window = require(script.Parent.Windows.Window)
 local Gates = require(script.Parent.Windows.Gates)
+local Artifacts = require(script.Parent.Windows.Artifacts)
 local Inventory = require(script.Parent.Windows.Inventory)
+local Status = require(script.Parent.Windows.Status)
+local SystemNotice = require(script.Parent.SystemNotice)
 local Reward = require(script.Parent.Windows.Reward)
 local Settings = require(script.Parent.Windows.Settings)
 local Skills = require(script.Parent.Windows.Skills)
@@ -53,7 +56,8 @@ local LEFT = 14
 local Hud = {}
 Hud.OnAbility = nil -- (slot) set by the combat module: a tap on an ability slot
 
--- Inventory [G] shows two tabs: gear and materials.
+-- Inventory [G] and Status [C] share header tabs with the artifacts.
+Window.Group({ { Window = Inventory.Window, Text = "Инвентарь" }, { Window = Artifacts.Window, Text = "Артефакты" }, { Window = Status.Window, Text = "Статус" } })
 
 local function decode(attribute: string)
 	local raw = player:GetAttribute(attribute)
@@ -191,7 +195,8 @@ barLayout.SortOrder = Enum.SortOrder.LayoutOrder
 barLayout.Parent = bar
 
 local actions = {
-	Inventory = { Open = Inventory.Open, Windows = { Inventory.Window } },
+	Inventory = { Open = Inventory.Open, Windows = { Inventory.Window, Artifacts.Window } },
+	Status = { Open = Status.Open, Windows = { Status.Window } },
 	Skills = { Open = Skills.Open, Windows = { Skills.Window } },
 	Quests = { Open = Reward.OpenQuests, Windows = { Reward.Window } },
 	Shop = { Open = function()
@@ -260,10 +265,11 @@ UserInputService.InputBegan:Connect(function(input, processed)
 end)
 
 local function refreshBadges()
+	barButtons.Status.Badge(player:GetAttribute("StatPoints") or 0)
 	barButtons.Skills.Badge(player:GetAttribute("SkillPoints") or 0)
 	barButtons.Quests.Badge(if player:GetAttribute("RewardReady") then 1 else (player:GetAttribute("QuestsReady") or 0))
 end
-for _, attribute in ipairs({ "SkillPoints", "RewardReady", "QuestsReady" }) do
+for _, attribute in ipairs({ "SkillPoints", "StatPoints", "RewardReady", "QuestsReady" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshBadges)
 end
 refreshBadges()
@@ -298,9 +304,17 @@ local qTrack, qFill = Style.Bar(tracker, { Position = UDim2.fromOffset(10, 80), 
 local _ = qTrack
 local qCount = Style.Label(tracker, "", 12, C.Text, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 74), Size = UDim2.fromOffset(48, 16), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 6 })
 
+local lastQuest, lastReady = nil, false
 local function refreshTracker()
 	local q = decode("Tracker")
 	if type(q) == "table" and q.Title then
+		local ST = Config.System.Texts
+		if lastQuest ~= nil and q.Title ~= lastQuest then
+			SystemNotice.Show(ST.NewQuest, { q.Title, q.Text or "" })
+		elseif lastQuest == q.Title and q.Ready and not lastReady then
+			SystemNotice.Show(ST.QuestDone, { q.Title, ST.QuestBack }, "gold")
+		end
+		lastQuest, lastReady = q.Title, q.Ready == true
 		qTitle.Text = q.Title
 		qText.Text = q.Text or ""
 		local target = math.max(1, tonumber(q.Target) or 1)
@@ -743,14 +757,16 @@ levelUpRemote.OnClientEvent:Connect(function(level, points)
 	level = tonumber(level) or 1
 	task.wait(0.1) -- let the new MaxHealth attribute arrive
 	local rank = Config.RankFor(level)
+	local ST = Config.System.Texts
+	local gained = tonumber(points) or 1
 	local lines = {
-		LT.Points:format(tonumber(points) or 1),
+		ST.Level:format(level) .. "  •  " .. ST.SkillPoints:format(gained) .. "  •  " .. ST.StatPoints:format(gained * Config.Attributes.PointsPerLevel),
 		LT.Growth:format(Format.Number(player:GetAttribute("ClickPower") or 1), Format.Number(player:GetAttribute("MaxHealth") or Config.Player.Health)),
 	}
 	if rank.Level == level then
-		table.insert(lines, 1, "Новое звание: " .. rank.Name)
+		table.insert(lines, ST.Rank:format(rank.Name))
 	end
-	Popups.Banner(LT.Title, ("Ур. %d"):format(level), lines, C.Gold)
+	SystemNotice.Show(ST.LevelUp, lines, "gold")
 	Popups.Flash(C.Gold)
 	Style.PlaySound("Forged", 1.2, 0.7)
 end)

@@ -30,6 +30,7 @@ local Popups = require(script.Parent.ui.Popups)
 local ItemIcon = require(script.Parent.ui.ItemIcon)
 local Icons = require(script.Parent.ui.Icons)
 local Style = require(script.Parent.ui.Style)
+local SystemNotice = require(script.Parent.ui.SystemNotice)
 local Inventory = require(script.Parent.ui.Windows.Inventory)
 
 local LOOT = Config.Loot
@@ -461,9 +462,17 @@ lootRemote.OnClientEvent:Connect(function(action, id, kind, payload, position)
 		if kind == "Item" then
 			LootFx.FeedItem(payload)
 			local rarity = Config.Rarity[payload.R] or Config.Rarity.Common
+			if rarity.Index >= Config.Rarity[Config.System.ItemFrom].Index then
+				local view = Items.Resolve(payload)
+				SystemNotice.Show(Config.System.Texts.Got:format(view.Name), { rarity.Name .. "  •  " .. Config.Items.Texts.Level:format(view.ItemLevel) }, if rarity.Index >= FLASH_FROM then "gold" else nil)
+			end
 			Style.PlaySound(Config.Sounds.Pickup, 1.4 + rarity.Index * 0.08, 0.5)
 		elseif kind == "Artifact" then
 			LootFx.FeedArtifact(payload)
+			local def = Config.ArtifactById[payload and payload.Id or ""]
+			if def then
+				SystemNotice.Show(Config.System.Texts.Artifact:format(def.Name), { Config.ArtifactText(def, payload.Level or 1) }, "gold")
+			end
 			Style.PlaySound(Config.Sounds.Pickup, 2, 0.6)
 		end
 		remove(id)

@@ -37,8 +37,12 @@ end
 
 load(ui, "Style")
 load(ui, "Popups")
+load(ui, "SystemNotice")
 load(windows, "Window")
 load(windows, "Inventory")
+load(windows, "Forge")
+load(windows, "Artifacts")
+load(windows, "Status")
 load(windows, "Store")
 load(windows, "Reward")
 load(windows, "Settings")

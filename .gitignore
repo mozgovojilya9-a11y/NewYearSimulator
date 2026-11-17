@@ -1,2 +1,3 @@
 # Local screenshots for Claude to review (not published)
 screenshots/
+tools/__pycache__/

@@ -9,14 +9,16 @@ the balance) and plays a typical active player from zero, run after run:
     (Damage >= RecommendedDamage(room)); a mob takes
     HP / (damage x crit average) hits at Pacing.HitsPerSecond, plus
     Pacing.MoveSeconds of walking, rooms add Pacing.RoomSeconds;
-  - every kill gives XP (Config.Progression.Level), and materials:
-    expected drops per kill with Config.Rarities / Config.Loot and the
-    mob drop lists, picked like LootService (nearest lower rarity, else
-    nearest higher);
-  - between runs (Pacing.RunOverhead) the player crafts every recipe that
-    is affordable and better than what is equipped;
-  - Damage = weapon Damage x LevelMult(level) x armor set bonus.
-Pets, passes, boosts, quests and skills are NOT counted.
+  - every kill gives XP (Config.Progression.Level) and credits, and may
+    drop an item: Config.Loot (drop chance, tables by gate rank and enemy
+    type, boss chest), item level by room, stats like Shared.Items;
+  - a better item is worn, the rest is salvaged into cores; between runs
+    (Pacing.RunOverhead) the weapon and the armor are enhanced while the
+    credits and cores last (chance and pity above +9 as in the game);
+  - Damage = weapon damage (with enhance) x LevelMult(level) x Сила
+    (Pacing.StrShare of the stat points).
+Passes, boosts, quests, skills and artifacts are NOT counted. The drops
+are random: the run uses a fixed seed, so the table is repeatable.
 
 Usage:
   python3 tools/pacing.py            table + events (from Config)
@@ -150,22 +152,14 @@ class Game:
         self.S = cfg["Stats"]
         self.P = cfg["Pacing"]
         self.loot = cfg["Loot"]
+        self.items = cfg["Items"]
+        self.forge = cfg["Forge"]
+        self.credits = cfg["Credits"]
+        self.attrs = cfg["Attributes"]
+        self.ranks = cfg["Gates"]["RankByRoom"]
         self.rarities = cfg["Rarities"]
         self.rarity_index = {r["Id"]: i + 1 for i, r in enumerate(self.rarities)}
-        self.materials = {m["Id"]: m for m in cfg["Materials"]}
-        self.weapons = {w["Id"]: w for w in cfg["Weapons"]}
-        self.sets = cfg["ArmorSets"]
-        self.recipes = cfg["Recipes"]
         self.mobs = cfg["Mobs"]
-        self.armor = {}
-        for set_id, st in self.sets.items():
-            for slot in ("Helmet", "Chest", "Legs"):
-                self.armor[set_id + slot] = {
-                    "Id": set_id + slot, "Set": set_id, "Slot": slot,
-                    "Health": math.floor(st["Health"] * 1.5) if slot == "Chest" else st["Health"],
-                    "ItemLevel": st["ItemLevel"],
-                }
-        self.per_kill = {}  # (biome, boss) -> {materialId: expected count}
 
     # Config.RecommendedDamage
     def recommended(self, room):
@@ -186,8 +180,8 @@ class Game:
     def is_boss(self, room):
         return room % self.D["BossEvery"] == 0
 
-    def biome(self, room):
-        return min(len(self.mobs["Biomes"]), math.ceil(room / self.D["BossEvery"]))
+    def rank(self, room):
+        return self.ranks[max(1, min(len(self.ranks), room)) - 1]
 
     def xp_to_next(self, level):
         return math.floor(self.L["XpBase"] * max(1, level) ** self.L["XpExponent"])
@@ -195,46 +189,73 @@ class Game:
     def level_mult(self, level):
         return 1 + (max(1, level) - 1) * self.S["DamagePerLevel"]
 
-    def item_level(self, item):
+    def kill_credits(self, room, boss):
+        c = self.credits
+        return max(1, math.floor(c["PerKill"] * c["Growth"] ** (max(1, room) - 1) * (c["BossMultiplier"] if boss else 1)))
+
+    # Shared.Items
+    def weapon_damage(self, item):
+        i = self.items
+        base = i["Weapon"]["Base"] * i["Weapon"]["Growth"] ** item["L"] * i["RarityMult"][item["R"]] * item["Q"]
+        return max(1, math.floor(base * (1 + self.forge["PerLevel"] * item["E"]) + 0.5))
+
+    def armor_health(self, item):
+        i = self.items
+        a = i["Armor"]
+        base = (a["HealthBase"] + a["HealthPerLevel"] * item["L"]) * i["RarityMult"][item["R"]] * item["Q"]
+        if item["Slot"] == "Chest":
+            base *= a["ChestMult"]
+        return math.floor(base * (1 + self.forge["PerLevel"] * item["E"]) + 0.5)
+
+    def score(self, item):
         if item is None:
             return 0
-        if item.get("ItemLevel"):
-            return item["ItemLevel"]
-        return math.floor(1 + self.cfg["ItemLevel"]["WeaponK"] * math.log10(max(1, item["Damage"])))
+        return math.floor(item["L"] * self.items["ScoreRarity"][item["R"]] + self.items["ScorePerEnhance"] * item["E"] + 0.5)
 
-    # Expected materials of one kill (LootService.rollRarity + pickMaterial)
-    def materials_per_kill(self, room):
-        boss = self.is_boss(room)
-        key = (self.biome(room), boss)
-        if key in self.per_kill:
-            return self.per_kill[key]
-        biome = self.mobs["Biomes"][key[0] - 1]
-        kinds = [biome["Boss"]] if boss else biome["Kinds"]
-        luck = self.loot["BossLuck"] if boss else 1
-        luck_from = self.rarity_index[self.loot["LuckFrom"]]
-        weights = []
-        for i, r in enumerate(self.rarities):
-            weights.append(r["Chance"] * (luck if i + 1 >= luck_from else 1))
-        total = sum(weights)
-        probs = [w / total for w in weights]
-        drops = self.loot["BossDrops"] if boss else 1 + self.loot["ExtraDropChance"]
-        result = {}
-        for kind in kinds:
-            by_rarity = {}
-            for mid in self.mobs["Defs"][kind]["Drops"]:
-                by_rarity.setdefault(self.rarity_index[self.materials[mid]["Rarity"]], []).append(mid)
-            for ri, p in enumerate(probs, start=1):
-                chosen = None
-                for j in list(range(ri, 0, -1)) + list(range(ri + 1, len(self.rarities) + 1)):
-                    if j in by_rarity:
-                        chosen = by_rarity[j]
-                        break
-                if not chosen:
-                    continue
-                for mid in chosen:
-                    result[mid] = result.get(mid, 0) + p * drops / len(chosen) / len(kinds)
-        self.per_kill[key] = result
-        return result
+    def enhance_cost(self, item):
+        target = item["E"] + 1
+        e = self.forge["Enhance"]
+        credits = math.floor(e["Credits"] * (1 + item["L"] / 10) * e["Growth"] ** (target - 1) + 0.5)
+        cores = math.ceil(target * e["CoresPerLevel"] * self.rarity_index[item["R"]] / 2)
+        return credits, cores
+
+    def enhance_chance(self, item):
+        target = item["E"] + 1
+        index = int(target - self.forge["ChanceFrom"])
+        chances = self.forge["Chance"]
+        base = chances[index] if 0 <= index < len(chances) else 1
+        return min(1, base + (item.get("F", 0) * self.forge["Pity"] if base < 1 else 0))
+
+    def salvage(self, item):
+        return max(1, math.floor(self.forge["Salvage"]["Cores"][item["R"]] * (1 + item["L"] / 50) + 0.5))
+
+    # LootService.RollRarity (luck 1)
+    def roll_rarity(self, rng, rank, enemy, min_rarity=None):
+        weights = self.loot["Tables"][rank][enemy]
+        allowed = [r["Id"] for r in self.rarities if weights.get(r["Id"], 0) > 0]
+        floor = 0
+        if min_rarity:
+            floor = min(self.rarity_index[min_rarity], self.rarity_index[allowed[-1]])
+        pool = [(rid, weights[rid]) for rid in allowed if self.rarity_index[rid] >= floor]
+        roll = rng.random() * sum(w for _, w in pool)
+        for rid, w in pool:
+            roll -= w
+            if roll <= 0:
+                return rid
+        return pool[-1][0]
+
+    def generate(self, rng, room, rarity):
+        i = self.items
+        level = max(1, min(int(i["MaxLevel"]), int(room * i["LevelPerRoom"]) + rng.randint(-int(i["LevelSpread"]), int(i["LevelSpread"]))))
+        item = {"L": level, "R": rarity, "Q": round(i["Roll"][0] + (i["Roll"][1] - i["Roll"][0]) * rng.random(), 2), "E": 0}
+        if rng.random() < i["WeaponShare"]:
+            item["Slot"] = "Weapon"
+            # own class OwnClassChance of the time, else one of three at random
+            item["Usable"] = rng.random() < i["OwnClassChance"] + (1 - i["OwnClassChance"]) / 3
+        else:
+            item["Slot"] = rng.choice(["Helmet", "Chest", "Legs"])
+            item["Usable"] = True
+        return item
 
 
 # ---------------------------------------------------------------------------
@@ -243,33 +264,42 @@ class Game:
 
 
 class Player:
-    def __init__(self, game):
+    def __init__(self, game, seed=1):
+        import random
         self.g = game
+        self.rng = random.Random(seed)
         self.t = 0.0
         self.level = 1
         self.xp = 0.0
         self.record = 0
-        self.weapon = game.weapons["Stick"]
-        self.armor = {"Helmet": None, "Chest": None, "Legs": None}
-        self.mats = {}
-        self.owned = set(["Stick"])
+        # the starter weapon (Stick: damage 1)
+        self.gear = {"Weapon": {"L": 1, "R": "Common", "Q": 0.55, "E": 0, "Slot": "Weapon", "Usable": True}, "Helmet": None, "Chest": None, "Legs": None}
+        self.credits = 0
+        self.cores = 0
+        self.best_rarity = 1
         self.events = []
-        self.snaps = []  # (time, level, record, weapon, gear score, damage)
+        self.snaps = []  # (time, level, record, weapon text, gear score, damage)
 
-    def set_bonus(self):
-        sets = {a["Set"] for a in self.armor.values() if a}
-        if len(sets) == 1 and all(self.armor.values()):
-            return self.g.sets[sets.pop()]["Bonus"]
-        return 0
+    def strength(self):
+        # a typical build: StrShare of the stat points go into Сила
+        a = self.g.attrs
+        points = (self.level - 1) * a["PointsPerLevel"] * self.g.P.get("StrShare", 0.6)
+        return 1 + points * 0.01
 
     def damage(self):
-        return max(1, math.floor(self.weapon["Damage"] * self.g.level_mult(self.level) * (1 + self.set_bonus())))
+        w = self.gear["Weapon"]
+        return max(1, math.floor(self.g.weapon_damage(w) * self.g.level_mult(self.level) * self.strength()))
 
     def gear_score(self):
-        return self.g.item_level(self.weapon) + sum(self.g.item_level(a) for a in self.armor.values())
+        return sum(self.g.score(i) for i in self.gear.values())
+
+    def weapon_text(self):
+        w = self.gear["Weapon"]
+        names = {r["Id"]: r["Name"] for r in self.g.rarities}
+        return "%s, ур. %d%s" % (names[w["R"]], w["L"], (" +%d" % w["E"]) if w["E"] else "")
 
     def snapshot(self):
-        self.snaps.append((self.t, self.level, self.record, self.weapon["Id"], self.gear_score(), self.damage()))
+        self.snaps.append((self.t, self.level, self.record, self.weapon_text(), self.gear_score(), self.damage()))
 
     def add_xp(self, amount):
         self.xp += amount
@@ -279,49 +309,54 @@ class Player:
             if self.level % 10 == 0:
                 self.events.append((self.t, "level", self.level))
 
-    def craft(self):
-        """Best affordable weapon; armor a whole set at a time (so the set
-        bonus is never lost by swapping one piece)."""
-        recipes = {r["Id"]: r for r in self.g.recipes}
-        crafted = True
-        while crafted:
-            crafted = False
-            for r in self.g.recipes:
-                if r["Kind"] != "Weapon" or r["Id"] in self.owned:
+    def power(self, item):
+        if item is None:
+            return 0
+        return self.g.weapon_damage(item) if item["Slot"] == "Weapon" else self.g.armor_health(item)
+
+    def take(self, item):
+        """A picked item: worn when it is better, else salvaged."""
+        g = self.g
+        ri = g.rarity_index[item["R"]]
+        if ri > self.best_rarity and ri >= 3:
+            self.best_rarity = ri
+            self.events.append((self.t, "rarity", item["R"]))
+        worn = self.gear[item["Slot"]]
+        if item["Usable"] and self.power(item) > self.power(worn):
+            if worn and not (item["Slot"] == "Weapon" and worn["L"] == 1 and worn["R"] == "Common"):
+                self.cores += g.salvage(worn)
+            self.gear[item["Slot"]] = item
+        else:
+            self.cores += g.salvage(item)
+
+    def forge(self):
+        """Between runs: enhance the weapon first, then the armor, while
+        there are credits and cores (up to +9 freely, above with the chance)."""
+        g = self.g
+        for _ in range(60):
+            best = None
+            for slot in ("Weapon", "Chest", "Helmet", "Legs"):
+                item = self.gear[slot]
+                if not item or item["E"] >= g.forge["MaxEnhance"]:
                     continue
-                item = self.g.weapons[r["Id"]]
-                if item["Damage"] <= self.weapon["Damage"]:
-                    continue
-                if any(self.mats.get(m, 0) < n for m, n in r["Materials"].items()):
-                    continue
-                for m, n in r["Materials"].items():
-                    self.mats[m] -= n
-                self.owned.add(r["Id"])
-                self.weapon = item
-                self.events.append((self.t, "craft", r["Id"]))
-                crafted = True
-            current = next(iter({a["Set"] for a in self.armor.values() if a}), None)
-            order = [k for k, v in self.g.sets.items() if not v.get("Robux")]
-            for set_id in order:
-                if current and self.g.sets[set_id]["ItemLevel"] <= self.g.sets[current]["ItemLevel"]:
-                    continue
-                pieces = [recipes.get(set_id + slot) for slot in ("Helmet", "Chest", "Legs")]
-                if None in pieces:
-                    continue
-                need = {}
-                for r in pieces:
-                    for m, n in r["Materials"].items():
-                        need[m] = need.get(m, 0) + n
-                if any(self.mats.get(m, 0) < n for m, n in need.items()):
-                    continue
-                for m, n in need.items():
-                    self.mats[m] -= n
-                for r in pieces:
-                    self.owned.add(r["Id"])
-                    self.armor[self.g.armor[r["Id"]]["Slot"]] = self.g.armor[r["Id"]]
-                self.events.append((self.t, "armor", set_id))
-                crafted = True
-                break
+                credits, cores = g.enhance_cost(item)
+                if credits <= self.credits * (1.0 if slot == "Weapon" else 0.5) and cores <= self.cores:
+                    if best is None or item["E"] < best[0]["E"] or slot == "Weapon":
+                        best = (item, credits, cores)
+                        if slot == "Weapon":
+                            break
+            if not best:
+                return
+            item, credits, cores = best
+            self.credits -= credits
+            self.cores -= cores
+            if self.rng.random() < g.enhance_chance(item):
+                item["E"] += 1
+                item["F"] = 0
+                if item["Slot"] == "Weapon" and item["E"] in (5, 10, 15):
+                    self.events.append((self.t, "enhance", item["E"]))
+            else:
+                item["F"] = item.get("F", 0) + 1
 
     def kill(self, room):
         g = self.g
@@ -330,23 +365,23 @@ class Player:
         hits = g.mob_health(room, boss) / (self.damage() * (1 + crit))
         self.t += hits / g.P["HitsPerSecond"] + g.P["MoveSeconds"]
         self.add_xp((g.L["XpPerBoss"] if boss else g.L["XpPerKill"]) * room)
-        for m, n in g.materials_per_kill(room).items():
-            self.mats[m] = self.mats.get(m, 0) + n
+        self.credits += g.kill_credits(room, boss)
+        rank = g.rank(room)
+        if boss:
+            for n in range(int(g.loot["BossItems"])):
+                rarity = g.roll_rarity(self.rng, rank, "Boss", g.loot["BossMinRarity"][rank] if n == 0 else None)
+                self.take(g.generate(self.rng, room, rarity))
+        elif self.rng.random() < g.loot["DropChance"]["Normal"]:
+            self.take(g.generate(self.rng, room, g.roll_rarity(self.rng, rank, "Normal")))
 
     def run(self):
         g = self.g
         room = 1
         mobs = (g.D["MobsMin"] + g.D["MobsMax"]) / 2
         while room <= g.D["Rooms"] and self.damage() >= g.recommended(room):
-            count = 1 if g.is_boss(room) else mobs
-            whole = int(count)
-            for _ in range(whole):
+            count = 1 if g.is_boss(room) else round(mobs)
+            for _ in range(count):
                 self.kill(room)
-            if count > whole:  # fractional mob: its share of time / rewards
-                t0, xp0, mats0 = self.t, self.xp, dict(self.mats)
-                self.kill(room)
-                frac = count - whole
-                self.t = t0 + (self.t - t0) * frac
             self.t += g.P["RoomSeconds"]
             if room > self.record:
                 self.record = room
@@ -354,7 +389,7 @@ class Player:
                     self.events.append((self.t, "stage", room))
             room += 1
         self.t += g.P["RunOverhead"]
-        self.craft()
+        self.forge()
         self.snapshot()
 
 
@@ -452,26 +487,26 @@ def report(cfg):
     game = Game(cfg)
     minutes = [int(m) for m in cfg["Pacing"]["ReportMinutes"]]
     p = simulate(game, minutes[-1])
-    names = {w["Id"]: w["Id"] for w in cfg["Weapons"]}
     rows = ["| Минута | Уровень | Этап (рекорд) | Урон | Рек. урон следующего этапа | Gear Score | Оружие |", "|---:|---:|---:|---:|---:|---:|---|"]
     for m in minutes:
         t, level, record, weapon, gs, dmg = state_at(p, m)
         nxt = game.recommended(min(game.D["Rooms"], record + 1))
-        rows.append("| %d | %d | %d | %s | %s | %d | %s |" % (m, level, record, fmt(dmg), fmt(nxt), gs, names[weapon]))
+        rows.append("| %d | %d | %d | %s | %s | %d | %s |" % (m, level, record, fmt(dmg), fmt(nxt), gs, weapon))
     table = "\n".join(rows)
 
+    names = {r["Id"]: r["Name"] for r in cfg["Rarities"]}
     ev = ["| Событие | Минута |", "|---|---:|"]
     for t, kind, value in p.events:
         if kind == "stage":
-            ev.append("| Этап %d (рек. урон %s) | %.1f |" % (value, fmt(game.recommended(value)), t / 60))
+            ev.append("| Этап %d, ранг Врат %s (рек. урон %s) | %.1f |" % (value, game.rank(value), fmt(game.recommended(value)), t / 60))
     for t, kind, value in p.events:
         if kind == "level":
             ev.append("| Уровень %d | %.1f |" % (value, t / 60))
     for t, kind, value in p.events:
-        if kind == "armor":
-            ev.append("| Скрафчен сет брони: %s (ур. предмета %d) | %.1f |" % (value, game.sets[value]["ItemLevel"], t / 60))
-        elif kind == "craft" and value in game.weapons:
-            ev.append("| Скрафчено: %s (урон %d, ур. предмета %d) | %.1f |" % (value, game.weapons[value]["Damage"], game.item_level(game.weapons[value]), t / 60))
+        if kind == "rarity":
+            ev.append("| Первый предмет редкости «%s» | %.1f |" % (names[value], t / 60))
+        elif kind == "enhance":
+            ev.append("| Оружие заточено до +%d | %.1f |" % (value, t / 60))
     events = "\n".join(ev)
     return table, events
 
@@ -482,8 +517,9 @@ def write_readme(table, events):
     block = (
         start
         + "\n_Сгенерировано `python3 tools/pacing.py --readme` из `Config.luau`. "
-        "Модель: активная игра забегами от 1-й комнаты, крафт лучшего доступного снаряжения; "
-        "без питомцев, пассов, бустов, заданий и навыков._\n\n"
+        "Модель: активная игра забегами от 1-й комнаты; предметы падают по таблицам рангов Врат, "
+        "лучшее надевается, остальное разбирается на ядра, оружие и броня затачиваются между забегами; "
+        "60% очков характеристик идут в Силу. Без пассов, бустов, заданий, навыков и артефактов._\n\n"
         + table + "\n\n" + events + "\n" + end
     )
     if start in text:
