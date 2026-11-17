@@ -117,6 +117,12 @@ end)
 button("Случайный артефакт", Style.Colors.Card, function()
 	call("Artifact")
 end)
+button("Открыть ранги Врат", Style.Colors.Card, function()
+	call("Unlock")
+end)
+button("Красные Врата сейчас", Style.Colors.Red, function()
+	call("Red")
+end)
 
 order += 1
 Style.Label(panel, "Случайный предмет:", 15, Style.Colors.Gold, { Size = UDim2.fromOffset(226, 20), LayoutOrder = order, ZIndex = 21 })

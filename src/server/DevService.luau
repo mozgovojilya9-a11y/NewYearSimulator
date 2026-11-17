@@ -91,6 +91,28 @@ function actions.Artifact(player)
 	return true, "Артефакт: " .. Config.ArtifactById[id].Name
 end
 
+-- Gates: open every rank (marks a location of each ready rank cleared),
+-- start the Red Gates now.
+function actions.Unlock(player)
+	local data = DataService.Get(player)
+	data.Gates = if type(data.Gates) == "table" then data.Gates else { Cleared = {} }
+	data.Gates.Cleared = data.Gates.Cleared or {}
+	for _, location in ipairs(Config.Gates.Locations) do
+		if location.Ready and not data.Gates.Cleared[location.Id] then
+			data.Gates.Cleared[location.Id] = "C"
+		end
+	end
+	data.Level = math.max(data.Level, 16)
+	PlayerState.Sync(player)
+	require(script.Parent.GateService).Publish(player)
+	return true, "Ранги E и D открыты"
+end
+
+function actions.Red()
+	require(script.Parent.GateService).OpenRed()
+	return true, "Красные Врата открыты"
+end
+
 function DevService.Init()
 	if not RunService:IsStudio() then
 		return -- never in a live game
