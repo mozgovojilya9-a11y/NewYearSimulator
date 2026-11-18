@@ -139,6 +139,7 @@ local function pull(player, bannerId, count)
 		PlayerState.AddCores(player, cores)
 	end
 	PlayerState.Sync(player)
+	require(script.Parent.ProgressionService).Count(player, "Pulls", count)
 	if GachaService.OnPulled then
 		GachaService.OnPulled(player, count)
 	end

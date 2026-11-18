@@ -1,7 +1,8 @@
 --[[
 	Store.luau
-	"Магазин" (Robux). Tabs: Пассы / Аура / Бусты / Сундуки / Эксклюзив.
-	Every card shows icon, name, what it does and the price. Items whose
+	"Магазин" (Robux). Tabs (Config.Store.Tabs): Кристаллы / Пассы / Бусты /
+	Смена класса, each with a line on what the section is for. Every card
+	shows icon, name, what it gives and the price. Items whose
 	id in Config is still 0 show a grey "Скоро" button. Buying opens the
 	Roblox purchase prompt; the server grants it (passes: Passes.luau,
 	products: StoreService ProcessReceipt) and confirms with a toast.
@@ -24,11 +25,12 @@ local Store = {}
 
 local window = Window.new("Магазин", Style.Colors.Cyan, Vector2.new(720, 500))
 local content = window.Content
-local tabs, selectTab = Window.Tabs(content, Config.Store.Tabs, Style.Colors.Cyan, 128)
+local tabs, selectTab = Window.Tabs(content, Config.Store.Tabs, Style.Colors.Cyan, 156)
 
+local tabLine = Style.Label(content, "", 13, Style.Colors.Muted, { Position = UDim2.fromOffset(4, 46), Size = UDim2.new(1, -8, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 33 })
 local holder = Instance.new("Frame")
-holder.Position = UDim2.fromOffset(0, 48)
-holder.Size = UDim2.new(1, 0, 1, -48)
+holder.Position = UDim2.fromOffset(0, 70)
+holder.Size = UDim2.new(1, 0, 1, -70)
 holder.BackgroundTransparency = 1
 holder.ZIndex = 32
 holder.Parent = content
@@ -39,9 +41,15 @@ local cards = {} -- { card, tab, refresh }
 
 local function describe(product): string
 	if product.Kind == "Credits" then
-		return ("+%s кредитов: сброс навыков, косметика"):format(Format.Number(product.Amount))
+		return ("+%s нано-кредитов: заточка в Кузнице, сбросы"):format(Format.Number(product.Amount))
+	elseif product.Kind == "Crystals" then
+		return ("+%d Кристаллов: %d круток x1 в Терминале снабжения"):format(product.Amount, math.floor(product.Amount / Config.Gacha.Cost.One))
+	elseif product.Kind == "ClassChange" then
+		local cc = Config.ClassChange
+		return ("Выбери новый класс в Академии. Оплата там: Robux, %d Кристаллов или кредиты"):format(cc.Crystals)
 	elseif product.Kind == "Boost" then
-		return ("На %d минут, время складывается"):format(product.Minutes)
+		local what = ({ Xp = "весь опыт", Damage = "весь урон", Loot = "шанс редкой добычи" })[product.Boost] or ""
+		return ("x2 %s на %d минут. Время складывается"):format(what, product.Minutes)
 	elseif product.Kind == "Chest" then
 		return ("%d предмета ранга %s, первый не ниже «%s»"):format(product.Rolls, product.Rank, Config.Rarity[Config.Loot.BossMinRarity[product.Rank]].Name)
 	elseif product.Kind == "Weapon" then
@@ -63,12 +71,15 @@ local function card(tab: string, order: number, icon: string, name: string, text
 	glyph.AnchorPoint = Vector2.new(0.5, 0)
 	glyph.Position = UDim2.new(0.5, 0, 0, 10)
 	Style.Label(c, name, 18, Style.Colors.Gold, { Position = UDim2.fromOffset(6, 48), Size = UDim2.new(1, -12, 0, 22), TextScaled = true, ZIndex = 35 })
-	Style.Label(c, text, 14, Style.Colors.Text, { Position = UDim2.fromOffset(8, 72), Size = UDim2.new(1, -16, 0, 50), TextWrapped = true, ZIndex = 35 })
+	Style.Label(c, text, 13, Style.Colors.Text, { Position = UDim2.fromOffset(8, 72), Size = UDim2.new(1, -16, 0, 52), TextWrapped = true, ZIndex = 35 })
 	local button, setColor = Style.Button(c, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -8), Size = UDim2.new(1, -20, 0, 40), Color = Style.Colors.Green, Text = "", TextSize = 18, ZIndex = 36, Shadow = false })
 	local function refresh()
 		c.Visible = tabs.Current == tab
-		if id <= 0 then
-			button.Text = "Скоро"
+		if tab == "ClassChange" then
+			button.Text = "Выбрать класс"
+			setColor(Style.Colors.Gold)
+		elseif id <= 0 then
+			button.Text = ("R$ %d · скоро"):format(price)
 			setColor(GREY)
 		elseif isOwned and isOwned() then
 			button.Text = "Куплено"
@@ -79,7 +90,9 @@ local function card(tab: string, order: number, icon: string, name: string, text
 		end
 	end
 	button.Activated:Connect(function()
-		if id <= 0 then
+		if tab == "ClassChange" then
+			onBuy() -- the class screen: pay with credits, Кристаллы or Robux there
+		elseif id <= 0 then
 			Popups.Toast("Скоро в продаже!", "gold")
 		elseif isOwned and isOwned() then
 			Popups.Toast("Уже куплено", "good")
@@ -109,9 +122,15 @@ end
 -- Products
 for order, product in ipairs(Config.Products) do
 	if not product.Tab then
-		continue -- bought elsewhere (class change dialog)
+		continue -- not sold in the store
 	end
-	card(product.Tab, order, product.Icon or "gem", product.Name, describe(product), product.Price, product.Id, function()
+	local sort = order + (if product.Kind == "Crystals" then -100 else 0)
+	card(product.Tab, sort, product.Icon or "gem", product.Name, describe(product), product.Price, product.Id, function()
+		if product.Kind == "ClassChange" then
+			window.Close()
+			require(script.Parent.Parent.ClassSelect).Open(true) -- pick the class, pay there
+			return
+		end
 		MarketplaceService:PromptProductPurchase(player, product.Id)
 	end, nil)
 end
@@ -120,9 +139,14 @@ local function refresh()
 	for _, c in ipairs(cards) do
 		c.refresh()
 	end
+	for _, t in ipairs(Config.Store.Tabs) do
+		if t.Id == tabs.Current then
+			tabLine.Text = t.Line or ""
+		end
+	end
 end
 tabs.Changed = refresh
-selectTab("Passes")
+selectTab("Crystals")
 PlayerData.Changed({ "Passes" }, function()
 	if window.IsOpen() then
 		refresh()
@@ -143,7 +167,7 @@ end)
 
 Store.Window = window
 function Store.Open(tab: string?)
-	selectTab(tab or "Passes")
+	selectTab(tab or "Crystals")
 	window.Open()
 end
 return Store

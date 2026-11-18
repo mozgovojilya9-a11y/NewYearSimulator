@@ -1,8 +1,9 @@
 --[[
 	Reward.luau
 	"Награды" window with three tabs, all backed by the Progression
-	remote: Ежедневная (7-day streak), Задания (3 daily quests) and
-	Колесо (free spin every N hours, spins the hub wheel visually).
+	remote: Ежедневная (7-day login calendar, Кристаллы on day 7),
+	Задания (the story step, 3 daily and 3 weekly quests: reward, progress
+	bar, "Забрать") and Колесо (free spin every N hours).
 ]]
 
 local Players = game:GetService("Players")
@@ -21,7 +22,7 @@ local progression = ReplicatedStorage:WaitForChild("Progression")
 
 local Reward = {}
 
-local window = Window.new("Награды", Style.Colors.Gold, Vector2.new(540, 440))
+local window = Window.new("Награды", Style.Colors.Gold, Vector2.new(620, 520))
 local content = window.Content
 
 local tabBar = Instance.new("Frame")
@@ -69,13 +70,13 @@ local function clock(seconds: number): string
 end
 
 local busy = false
-local function call(action, arg, onDone)
+local function call(action, arg, onDone, arg2)
 	if busy then
 		return
 	end
 	busy = true
 	task.spawn(function()
-		local ok, payload, extra = progression:InvokeServer(action, arg)
+		local ok, payload, extra = progression:InvokeServer(action, arg, arg2)
 		busy = false
 		onDone(ok, payload, extra)
 	end)
@@ -108,7 +109,7 @@ for day = 1, 7 do
 	Style.Label(cell, "День " .. day, 16, Style.Colors.Text, { Position = UDim2.fromOffset(0, 6), Size = UDim2.new(1, 0, 0, 20), ZIndex = 34 })
 	local amount = Style.Label(cell, "", 20, Style.Colors.Gold, { Position = UDim2.fromOffset(0, 30), Size = UDim2.new(1, 0, 0, 24), ZIndex = 34 })
 	local note = Style.Label(cell, if day == 7 then "+ x2 буст" else "", 13, Style.Colors.Text, { Position = UDim2.fromOffset(0, 54), Size = UDim2.new(1, 0, 0, 16), ZIndex = 34 })
-	dailyCells[day] = { cell = cell, stroke = stroke, amount = amount }
+	dailyCells[day] = { cell = cell, stroke = stroke, amount = amount, note = note }
 end
 local dailyInfo = Style.Label(dailyPage, "", 18, Style.Colors.Text, { Position = UDim2.fromOffset(0, 180), Size = UDim2.new(1, 0, 0, 24), ZIndex = 34 })
 local dailyButton, setDailyColor = Style.Button(dailyPage, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 214), Size = UDim2.fromOffset(280, 54), Color = Style.Colors.Green, Text = "Забрать", TextSize = 22, ZIndex = 34, Shadow = false })
@@ -117,49 +118,133 @@ local dailyButton, setDailyColor = Style.Button(dailyPage, { AnchorPoint = Vecto
 -- Quests
 ---------------------------------------------------------------------
 
-local questRows = {}
-local questList = Instance.new("Frame")
+local HttpService = game:GetService("HttpService")
+local questRemote = ReplicatedStorage:WaitForChild("Quest")
+
+local questList = Instance.new("ScrollingFrame")
 questList.Size = UDim2.fromScale(1, 1)
 questList.BackgroundTransparency = 1
+questList.BorderSizePixel = 0
+questList.ScrollBarThickness = 5
+questList.ScrollBarImageColor3 = Style.Colors.Gold
+questList.CanvasSize = UDim2.new()
+questList.AutomaticCanvasSize = Enum.AutomaticSize.Y
 questList.ZIndex = 33
 questList.Parent = questPage
 local questLayout = Instance.new("UIListLayout")
-questLayout.Padding = UDim.new(0, 10)
+questLayout.Padding = UDim.new(0, 8)
 questLayout.SortOrder = Enum.SortOrder.LayoutOrder
 questLayout.Parent = questList
-for i = 1, Config.Progression.Quests.PerDay do
+
+local function section(order: number, text: string)
+	return Style.Label(questList, text, 14, Style.Colors.Gold, { Font = Style.FontTitle, LayoutOrder = order, Size = UDim2.new(1, -10, 0, 20), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
+end
+
+-- One quest card: title, reward line, progress bar, button.
+local function questCard(order: number, onClaim)
 	local card = Instance.new("Frame")
-	card.LayoutOrder = i
-	card.Size = UDim2.new(1, -8, 0, 84)
-	card.BackgroundColor3 = Style.Darker(Style.Colors.Green, 0.72)
+	card.LayoutOrder = order
+	card.Size = UDim2.new(1, -10, 0, 78)
+	card.BackgroundTransparency = 1
 	card.ZIndex = 33
 	card.Parent = questList
-	Style.Corner(card, UDim.new(0, 14))
-	Style.Stroke(card, 3, Style.Colors.Green)
-	local text = Style.Label(card, "", 18, Style.Colors.Text, { Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -180, 0, 24), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
+	Style.Chamfer(card, { Fill = Style.Colors.PanelDark, Transparency = 0.05, Border = Style.Colors.Line, Cut = 8, Thickness = 1.5 })
+	local title = Style.Label(card, "", 16, Style.Colors.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -170, 0, 20), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 34 })
+	local reward = Style.Label(card, "", 12, Style.Colors.Gold, { Position = UDim2.fromOffset(12, 28), Size = UDim2.new(1, -170, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
 	local track = Instance.new("Frame")
-	track.Position = UDim2.fromOffset(14, 42)
-	track.Size = UDim2.new(1, -190, 0, 22)
-	track.BackgroundColor3 = Style.Colors.PanelDark
+	track.Position = UDim2.fromOffset(12, 50)
+	track.Size = UDim2.new(1, -182, 0, 16)
+	track.BackgroundColor3 = Color3.fromRGB(28, 28, 34)
+	track.BorderSizePixel = 0
 	track.ZIndex = 34
 	track.Parent = card
-	Style.Corner(track, UDim.new(0.5, 0))
 	local fill = Instance.new("Frame")
 	fill.Size = UDim2.fromScale(0, 1)
-	fill.BackgroundColor3 = Style.Colors.Green
+	fill.BackgroundColor3 = Style.Colors.Gold
+	fill.BorderSizePixel = 0
 	fill.ZIndex = 35
 	fill.Parent = track
-	Style.Corner(fill, UDim.new(0.5, 0))
-	local progressText = Style.Label(track, "", 14, Style.Colors.Text, { Size = UDim2.fromScale(1, 1), ZIndex = 36 })
-	local button, setColor = Style.Button(card, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -12, 0.5, 0), Size = UDim2.fromOffset(150, 50), Color = Style.Colors.Gold, TextSize = 16, ZIndex = 35, Shadow = false })
-	button.Activated:Connect(function()
-		call("ClaimQuest", i, function(ok, message)
-			Popups.Toast(message or "", if ok then "gold" else "bad")
-			Reward.Refresh()
-		end)
-	end)
-	questRows[i] = { card = card, text = text, fill = fill, progressText = progressText, button = button, setColor = setColor }
+	local progress = Style.Label(track, "", 12, Style.Colors.Text, { Size = UDim2.fromScale(1, 1), ZIndex = 36 })
+	local button, setColor = Style.Button(card, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0), Size = UDim2.fromOffset(146, 44), Color = Style.Colors.Gold, TextSize = 15, ZIndex = 35, Shadow = false })
+	button.Activated:Connect(onClaim)
+	local row = { card = card, title = title, reward = reward, fill = fill, progress = progress, button = button, setColor = setColor }
+	function row.Set(q, rewardText)
+		card.Visible = q ~= nil
+		if not q then
+			return
+		end
+		title.Text = q.Text
+		reward.Text = rewardText
+		local share = math.clamp(q.Progress / math.max(1, q.Target), 0, 1)
+		fill.Size = UDim2.fromScale(share, 1)
+		fill.BackgroundColor3 = if share >= 1 then Style.Colors.Green else Style.Colors.Gold
+		progress.Text = ("%s / %s"):format(Format.Number(q.Progress), Format.Number(q.Target))
+		if q.Claimed then
+			button.Text = "Получено"
+			setColor(Color3.fromRGB(70, 70, 80))
+		elseif q.Progress >= q.Target then
+			button.Text = "Забрать"
+			setColor(Style.Colors.Green)
+		else
+			button.Text = "В процессе"
+			setColor(Style.Colors.CardDark)
+		end
+	end
+	return row
 end
+
+local function rewardLine(q): string
+	local parts = { ("+%s кр."):format(Format.Number(q.Credits or 0)) }
+	if (q.Xp or 0) > 0 then
+		table.insert(parts, ("+%s XP"):format(Format.Number(q.Xp)))
+	end
+	if (q.Crystals or 0) > 0 then
+		table.insert(parts, ("+%d Кристаллов"):format(q.Crystals))
+	end
+	return "Награда: " .. table.concat(parts, "  ·  ")
+end
+
+local claimQuest -- defined below (needs Reward.Refresh)
+section(1, "СЮЖЕТ")
+local storyRow = questCard(2, function()
+	task.spawn(function()
+		local ok, message = questRemote:InvokeServer("Claim")
+		Popups.Toast(message or "", if ok then "gold" else "bad")
+		if ok then
+			Style.PlaySound("Forged", 1.2, 0.5)
+		end
+		Reward.Refresh()
+	end)
+end)
+local dailyHeader = section(10, "ЕЖЕДНЕВНЫЕ")
+local questRows = {}
+for i = 1, Config.Progression.Quests.PerDay do
+	questRows[i] = questCard(10 + i, function()
+		claimQuest(i, "Daily")
+	end)
+end
+local weeklyHeader = section(20, "НЕДЕЛЬНЫЕ")
+local weeklyRows = {}
+for i = 1, Config.Progression.Weekly.PerWeek do
+	weeklyRows[i] = questCard(20 + i, function()
+		claimQuest(i, "Weekly")
+	end)
+end
+
+local function renderStory()
+	local ok, q = pcall(HttpService.JSONDecode, HttpService, player:GetAttribute("Tracker") or "")
+	if not ok or type(q) ~= "table" or not q.Title then
+		storyRow.Set(nil)
+		return
+	end
+	local target = tonumber(q.Target) or 1
+	local progress = if q.Ready then target else (tonumber(q.Progress) or 0)
+	storyRow.Set({ Text = q.Title .. " — " .. (q.Text or ""), Progress = progress, Target = target, Claimed = false }, q.Reward or "Награда у Наставника: опыт и кредиты")
+	if q.Ready or progress >= target then
+		storyRow.button.Text = "Забрать"
+	end
+end
+player:GetAttributeChangedSignal("Tracker"):Connect(renderStory)
 
 ---------------------------------------------------------------------
 -- Wheel
@@ -231,7 +316,10 @@ local function render(s)
 	lastStatus = s
 	-- Daily
 	for day, cell in ipairs(dailyCells) do
+		local crystals = (s.DailyCrystals or {})[day] or 0
 		cell.amount.Text = Format.Number(s.Daily.Credits[day] or 0) .. " кр."
+		cell.note.Text = (if crystals > 0 then "+" .. crystals .. " крист." else "") .. (if day == 7 then " · x2" else "")
+		cell.note.TextColor3 = if crystals > 0 then Config.Crystals.Color else Style.Colors.Text
 		local claimed = day <= (s.Daily.Streak % 7) and not (s.Daily.Streak % 7 == 0 and day == 7)
 		local isNext = day == s.Daily.NextDay
 		cell.stroke.Color = if isNext then Style.Colors.Green elseif claimed then Style.Colors.Purple else Style.Colors.Gold
@@ -248,27 +336,18 @@ local function render(s)
 		setDailyColor(Color3.fromRGB(120, 120, 140))
 	end
 	-- Quests
+	renderStory()
 	for i, row in ipairs(questRows) do
 		local q = s.Quests[i]
-		if q then
-			row.card.Visible = true
-			row.text.Text = q.Text .. ("  (+%s кр.)"):format(Format.Number(q.Credits))
-			row.fill.Size = UDim2.fromScale(math.clamp(q.Progress / q.Target, 0, 1), 1)
-			row.progressText.Text = ("%d / %d"):format(q.Progress, q.Target)
-			if q.Claimed then
-				row.button.Text = "Получено"
-				row.setColor(Color3.fromRGB(120, 120, 140))
-			elseif q.Progress >= q.Target then
-				row.button.Text = "Забрать"
-				row.setColor(Style.Colors.Gold)
-			else
-				row.button.Text = "В процессе"
-				row.setColor(Color3.fromRGB(150, 140, 170))
-			end
-		else
-			row.card.Visible = false
-		end
+		row.Set(q, if q then rewardLine(q) else "")
 	end
+	for i, row in ipairs(weeklyRows) do
+		local q = s.Weekly and s.Weekly[i]
+		row.Set(q, if q then rewardLine(q) else "")
+	end
+	dailyHeader.Text = ("ЕЖЕДНЕВНЫЕ  ·  новые через %s"):format(clock(s.DayLeft or 0))
+	local week = s.WeekLeft or 0
+	weeklyHeader.Text = ("НЕДЕЛЬНЫЕ  ·  новые через %d д %d ч"):format(week // 86400, (week % 86400) // 3600)
 	-- Wheel
 	if s.Wheel.CanSpin then
 		wheelInfo.Text = Config.HubLayout.Texts.WheelFree
@@ -281,11 +360,34 @@ local function render(s)
 	end
 end
 
-function Reward.Refresh()
-	call("Status", nil, function(ok, payload)
-		if ok and type(payload) == "table" then
-			render(payload)
+claimQuest = function(index: number, setName: string)
+	call("ClaimQuest", index, function(ok, message)
+		Popups.Toast(message or "", if ok then "gold" else "bad")
+		if ok then
+			Style.PlaySound("Forged", 1.2, 0.5)
+			Popups.Flash(Style.Colors.Gold)
 		end
+		Reward.Refresh()
+	end, setName)
+end
+
+-- Status is asked right after a claim; the server's rate limit may turn
+-- it down, so it is asked again a moment later until it answers.
+function Reward.Refresh(tries: number?)
+	task.delay(0.35, function()
+		if busy then
+			if (tries or 0) < 5 then
+				Reward.Refresh((tries or 0) + 1)
+			end
+			return
+		end
+		call("Status", nil, function(ok, payload)
+			if ok and type(payload) == "table" then
+				render(payload)
+			elseif (tries or 0) < 5 then
+				Reward.Refresh((tries or 0) + 1)
+			end
+		end)
 	end)
 end
 
@@ -334,7 +436,9 @@ task.spawn(function()
 	end
 end)
 
-window.OnOpen = Reward.Refresh
+window.OnOpen = function()
+	Reward.Refresh()
+end
 Reward.ShowTab("Daily")
 
 Reward.Window = window

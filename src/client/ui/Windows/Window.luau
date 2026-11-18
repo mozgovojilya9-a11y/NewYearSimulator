@@ -202,7 +202,7 @@ function Window.Group(entries)
 		local bar = Instance.new("Frame")
 		bar.Name = "GroupTabs"
 		bar.AnchorPoint = Vector2.new(1, 0)
-		bar.Size = UDim2.fromOffset(3 * 124, 34)
+		bar.Size = UDim2.fromOffset(#entries * 124, 34)
 		bar.BackgroundTransparency = 1
 		bar.ZIndex = 40
 		bar.Visible = false
@@ -317,7 +317,9 @@ function Window.Tabs(parent, defs, _accent: Color3?, width: number?)
 	layout.Padding = UDim.new(0, 4)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = bar
-	Style.Rule(bar, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, 1), Color = C.Line, ZIndex = 33 })
+	-- the line under the tabs lives outside the bar (the list layout would
+	-- place it as one more tab and push the tabs off to the right)
+	Style.Rule(parent, { Position = UDim2.fromOffset(0, 39), Size = UDim2.new(1, 0, 0, 1), Color = C.Line, ZIndex = 33 })
 
 	local tabs = { Changed = nil, Bar = bar, Current = nil }
 	local looks = {}

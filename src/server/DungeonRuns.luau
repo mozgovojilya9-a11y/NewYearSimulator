@@ -517,6 +517,13 @@ local function bossDefeated(run, position: Vector3)
 			if not best or order[grade.Id] < (order[best] or 9) then
 				data.Gates.Cleared[run.location.Id] = grade.Id
 			end
+			-- the fastest clear of this location (Статистика)
+			data.Gates.BestTime = if type(data.Gates.BestTime) == "table" then data.Gates.BestTime else {}
+			local seconds = math.floor(elapsed)
+			local old = tonumber(data.Gates.BestTime[run.location.Id])
+			if not old or seconds < old then
+				data.Gates.BestTime[run.location.Id] = seconds
+			end
 			PlayerState.Sync(player)
 		end
 		if PlayerState.ReachRoom(player, tier) then
@@ -879,6 +886,11 @@ function DungeonRuns.Start(location, players, opts)
 						return -- the boss is down: a late death changes nothing
 					end
 					run.deaths += 1
+					local d = DataService.Get(player)
+					if d then
+						d.Stats = if type(d.Stats) == "table" then d.Stats else {}
+						d.Stats.Deaths = (tonumber(d.Stats.Deaths) or 0) + 1
+					end
 					task.delay(2, function()
 						if runOf[player] == run then
 							leave(player, "Died")

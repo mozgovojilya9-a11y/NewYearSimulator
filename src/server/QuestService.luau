@@ -87,6 +87,10 @@ end
 
 local notified = {} -- [player] = step already announced as done
 
+local function rewardText(def, data): string
+	return Q.Texts.Reward:format(Format.Number(def.Xp * math.max(1, data.Level or 1)), Format.Number(def.Credits))
+end
+
 local function publish(player)
 	local data = DataService.Get(player)
 	if not data then
@@ -106,6 +110,9 @@ local function publish(player)
 		Progress = progress,
 		Target = def.Target,
 		Ready = ready,
+		Reward = rewardText(def, data),
+		Step = s.Step,
+		Steps = #STORY,
 	}))
 	local unseen = s.Seen < s.Step
 	player:SetAttribute("StoryMarker", ready or unseen)
@@ -117,9 +124,6 @@ local function publish(player)
 end
 QuestService.Refresh = publish
 
-local function rewardText(def, data): string
-	return Q.Texts.Reward:format(Format.Number(def.Xp * math.max(1, data.Level or 1)), Format.Number(def.Credits))
-end
 
 local function talk(player, npcId)
 	local data = DataService.Get(player)

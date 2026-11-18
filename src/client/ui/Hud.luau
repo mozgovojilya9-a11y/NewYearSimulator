@@ -58,7 +58,8 @@ local Hud = {}
 Hud.OnAbility = nil -- (slot) set by the combat module: a tap on an ability slot
 
 -- Inventory [G] and Status [C] share header tabs with the artifacts.
-Window.Group({ { Window = Inventory.Window, Text = "Инвентарь" }, { Window = Artifacts.Window, Text = "Артефакты" }, { Window = Status.Window, Text = "Статус" } })
+local Stats = require(script.Parent.Windows.Stats)
+Window.Group({ { Window = Inventory.Window, Text = "Инвентарь" }, { Window = Artifacts.Window, Text = "Артефакты" }, { Window = Status.Window, Text = "Статус" }, { Window = Stats.Window, Text = "Статистика" } })
 
 local function decode(attribute: string)
 	local raw = player:GetAttribute(attribute)
@@ -80,6 +81,22 @@ local profile = Style.Panel(Style.Gui, {
 	Size = UDim2.fromOffset(P.Width, P.Height),
 	ZIndex = 5,
 })
+
+-- the profile opens the Статистика window
+local profileButton = Instance.new("TextButton")
+profileButton.Name = "OpenStats"
+profileButton.Size = UDim2.fromScale(1, 1)
+profileButton.BackgroundTransparency = 1
+profileButton.Text = ""
+profileButton.ZIndex = 9
+profileButton.Parent = profile
+profileButton.Activated:Connect(function()
+	if Window.Current() == Stats.Window then
+		Window.CloseAll()
+	else
+		Stats.Open()
+	end
+end)
 
 local avatarFrame = Style.Panel(profile, {
 	Position = UDim2.fromOffset(10, (P.Height - P.Avatar) / 2),

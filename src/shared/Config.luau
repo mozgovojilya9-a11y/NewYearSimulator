@@ -35,6 +35,8 @@ Config.StartingData = {
 	Daily = { LastClaim = 0, Streak = 0 },
 	WheelLast = 0,
 	Quests = { Day = 0, List = {} },
+	Weekly = { Week = 0, List = {} },
+	Stats = { Kills = 0, Bosses = 0, Runs = 0, Deaths = 0, PlaySeconds = 0, Pulls = 0 }, -- the Статистика window
 	Level = 1,
 	Xp = 0,
 	SkillPoints = 0, -- old field (points are now Config.Skills.PointsAtLevel per class)
@@ -261,14 +263,14 @@ Config.GamePasses = {
 -- Chest (Rank, Rolls: gear rolled from the Boss table of that gate rank),
 -- Weapon / ArmorSet (exclusive gear, granted once), WheelSkip.
 Config.Products = {
-	{ Key = "CreditsSmall", Id = 0, Tab = "Packs", Icon = "credits", Name = "Горсть кредитов", Price = 25, Kind = "Credits", Amount = 400 },
-	{ Key = "CreditsMedium", Id = 0, Tab = "Packs", Icon = "credits", Name = "Пачка кредитов", Price = 79, Kind = "Credits", Amount = 1500 },
-	{ Key = "CreditsLarge", Id = 0, Tab = "Packs", Icon = "credits", Name = "Сейф кредитов", Price = 199, Kind = "Credits", Amount = 5000 },
-	{ Key = "WheelSkip", Id = 0, Tab = "Packs", Icon = "wheel", Name = "Крутить колесо сейчас", Price = 25, Kind = "WheelSkip" },
-	{ Key = "CrystalsSmall", Id = 0, Tab = "Packs", Icon = "crystal", Name = "Горсть кристаллов", Price = 49, Kind = "Crystals", Amount = 60 },
-	{ Key = "CrystalsLarge", Id = 0, Tab = "Packs", Icon = "crystal", Name = "Россыпь кристаллов", Price = 199, Kind = "Crystals", Amount = 300 },
+	{ Key = "CreditsSmall", Id = 0, Tab = "Crystals", Icon = "credits", Name = "Горсть кредитов", Price = 25, Kind = "Credits", Amount = 400 },
+	{ Key = "CreditsMedium", Id = 0, Tab = "Crystals", Icon = "credits", Name = "Пачка кредитов", Price = 79, Kind = "Credits", Amount = 1500 },
+	{ Key = "CreditsLarge", Id = 0, Tab = "Crystals", Icon = "credits", Name = "Сейф кредитов", Price = 199, Kind = "Credits", Amount = 5000 },
+	{ Key = "WheelSkip", Id = 0, Tab = "Boosts", Icon = "wheel", Name = "Крутить колесо сейчас", Price = 25, Kind = "WheelSkip" },
+	{ Key = "CrystalsSmall", Id = 0, Tab = "Crystals", Icon = "crystal", Name = "Горсть кристаллов", Price = 49, Kind = "Crystals", Amount = 60 },
+	{ Key = "CrystalsLarge", Id = 0, Tab = "Crystals", Icon = "crystal", Name = "Россыпь кристаллов", Price = 199, Kind = "Crystals", Amount = 300 },
 	-- not in the store: bought from the class change dialog (Academy)
-	{ Key = "ClassChange", Id = 0, Icon = "reset", Name = "Смена класса", Price = 99, Kind = "ClassChange" },
+	{ Key = "ClassChange", Id = 0, Tab = "ClassChange", Icon = "reset", Name = "Смена класса", Price = 99, Kind = "ClassChange" },
 
 	{ Key = "BoostXp15", Id = 0, Tab = "Boosts", Icon = "star", Name = "x2 Опыт · 15 мин", Price = 25, Kind = "Boost", Boost = "Xp", Minutes = 15 },
 	{ Key = "BoostXp60", Id = 0, Tab = "Boosts", Icon = "star", Name = "x2 Опыт · 60 мин", Price = 69, Kind = "Boost", Boost = "Xp", Minutes = 60 },
@@ -277,15 +279,15 @@ Config.Products = {
 	{ Key = "BoostLoot15", Id = 0, Tab = "Boosts", Icon = "gem", Name = "x2 Удача добычи · 15 мин", Price = 29, Kind = "Boost", Boost = "Loot", Minutes = 15 },
 	{ Key = "BoostLoot60", Id = 0, Tab = "Boosts", Icon = "gem", Name = "x2 Удача добычи · 60 мин", Price = 79, Kind = "Boost", Boost = "Loot", Minutes = 60 },
 
-	{ Key = "ChestCatacombs", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер цеха", Price = 49, Kind = "Chest", Rank = "E", Rolls = 3 },
-	{ Key = "ChestIce", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер криолаборатории", Price = 99, Kind = "Chest", Rank = "D", Rolls = 3 },
-	{ Key = "ChestLava", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер реактора", Price = 149, Kind = "Chest", Rank = "C", Rolls = 3 },
-	{ Key = "ChestAbyss", Id = 0, Tab = "Chests", Icon = "chest", Name = "Контейнер Нексуса", Price = 199, Kind = "Chest", Rank = "B", Rolls = 3 },
+	{ Key = "ChestCatacombs", Id = 0, Icon = "chest", Name = "Контейнер цеха", Price = 49, Kind = "Chest", Rank = "E", Rolls = 3 },
+	{ Key = "ChestIce", Id = 0, Icon = "chest", Name = "Контейнер криолаборатории", Price = 99, Kind = "Chest", Rank = "D", Rolls = 3 },
+	{ Key = "ChestLava", Id = 0, Icon = "chest", Name = "Контейнер реактора", Price = 149, Kind = "Chest", Rank = "C", Rolls = 3 },
+	{ Key = "ChestAbyss", Id = 0, Icon = "chest", Name = "Контейнер Нексуса", Price = 199, Kind = "Chest", Rank = "B", Rolls = 3 },
 
-	{ Key = "WeaponPatron", Id = 0, Tab = "Exclusive", Icon = "sword", Name = "Клинок Покровителя", Price = 149, Kind = "Weapon", Item = "PatronBlade" },
-	{ Key = "WeaponComet", Id = 0, Tab = "Exclusive", Icon = "spear", Name = "Кометное копьё", Price = 249, Kind = "Weapon", Item = "CometSword" },
-	{ Key = "WeaponCrown", Id = 0, Tab = "Exclusive", Icon = "crown", Name = "Коронный излучатель", Price = 399, Kind = "Weapon", Item = "CrownBlade" },
-	{ Key = "ArmorRoyal", Id = 0, Tab = "Exclusive", Icon = "shield", Name = "Королевский сет", Price = 299, Kind = "ArmorSet", Item = "Royal" },
+	{ Key = "WeaponPatron", Id = 0, Icon = "sword", Name = "Клинок Покровителя", Price = 149, Kind = "Weapon", Item = "PatronBlade" },
+	{ Key = "WeaponComet", Id = 0, Icon = "spear", Name = "Кометное копьё", Price = 249, Kind = "Weapon", Item = "CometSword" },
+	{ Key = "WeaponCrown", Id = 0, Icon = "crown", Name = "Коронный излучатель", Price = 399, Kind = "Weapon", Item = "CrownBlade" },
+	{ Key = "ArmorRoyal", Id = 0, Icon = "shield", Name = "Королевский сет", Price = 299, Kind = "ArmorSet", Item = "Royal" },
 }
 Config.ProductById = {} -- [product id] = product (only real ids)
 Config.ProductByKey = {}
@@ -298,12 +300,13 @@ end
 Config.Store = {
 	PurchaseStore = "AuraClicker_Purchases_v1", -- PurchaseId -> granted (idempotent receipts)
 	DuplicateCreditsPerRobux = 20, -- an exclusive you already own turns into credits
+	-- Products without a Tab are not sold in the store (the gear chests are
+	-- paid random items: off until they follow the PolicyService rules).
 	Tabs = {
-		{ Id = "Passes", Text = "Пассы" },
-		{ Id = "Packs", Text = "Кредиты" },
-		{ Id = "Boosts", Text = "Бусты" },
-		{ Id = "Chests", Text = "Сундуки" },
-		{ Id = "Exclusive", Text = "Эксклюзив" },
+		{ Id = "Crystals", Text = "Кристаллы", Line = "Кристаллы — крутки в Терминале снабжения и смена класса. Кредиты — Кузница и сбросы." },
+		{ Id = "Passes", Text = "Пассы", Line = "Навсегда: покупаются один раз и работают всегда." },
+		{ Id = "Boosts", Text = "Бусты", Line = "На время: x2 к опыту, урону или удаче. Время складывается." },
+		{ Id = "ClassChange", Text = "Смена класса", Line = "Смени класс в Академии. Прогресс дерева навыков каждого класса сохраняется." },
 	},
 }
 
@@ -1493,6 +1496,7 @@ Config.Progression = {
 		CooldownHours = 20, -- can claim again after this
 		StreakWindowHours = 48, -- longer gap resets the streak
 		Credits = { 25, 40, 60, 90, 130, 180, 300 }, -- day 1..7 (Нано-кредиты), x (1 + record room / 4)
+		Crystals = { 0, 0, 3, 0, 5, 0, 20 }, -- day 1..7 Кристаллы (the big one on day 7)
 		Day7Boost = true, -- day 7 also grants a boost
 	},
 	Wheel = {
@@ -1511,14 +1515,25 @@ Config.Progression = {
 	Boost = { Multiplier = 2 }, -- every timed boost (Config.BoostKinds) doubles its stat
 	Quests = { -- 3 per day are picked from this pool
 		Pool = {
-			{ Id = "kill30", Kind = "Kill", Target = 30, Text = "Убей 30 мобов", Credits = 40 },
-			{ Id = "kill80", Kind = "Kill", Target = 80, Text = "Убей 80 мобов", Credits = 110 },
-			{ Id = "room5", Kind = "Room", Target = 4, Text = "Закрой Врата «Сборочный цех»", Credits = 60 },
-			{ Id = "room10", Kind = "Room", Target = 10, Text = "Закрой Врата «Плавильный реактор»", Credits = 180 },
-			{ Id = "boss2", Kind = "Boss", Target = 2, Text = "Победи 2 боссов", Credits = 120 },
-			{ Id = "runs3", Kind = "Run", Target = 3, Text = "Войди во Врата 3 раза", Credits = 45 },
+			{ Id = "kill30", Kind = "Kill", Target = 30, Text = "Убей 30 роботов", Credits = 40, Crystals = 3 },
+			{ Id = "kill80", Kind = "Kill", Target = 80, Text = "Убей 80 роботов", Credits = 110, Crystals = 5 },
+			{ Id = "room5", Kind = "Room", Target = 4, Text = "Закрой Врата «Сборочный цех»", Credits = 60, Crystals = 3 },
+			{ Id = "room10", Kind = "Room", Target = 10, Text = "Закрой Врата «Плавильный реактор»", Credits = 180, Crystals = 5 },
+			{ Id = "boss2", Kind = "Boss", Target = 2, Text = "Победи 2 боссов", Credits = 120, Crystals = 4 },
+			{ Id = "runs3", Kind = "Run", Target = 3, Text = "Войди во Врата 3 раза", Credits = 45, Crystals = 3 },
 		},
 		PerDay = 3,
+	},
+	-- 3 per week, bigger goals, Кристаллы and x XpMult quest XP
+	Weekly = {
+		Pool = {
+			{ Id = "w_kill500", Kind = "Kill", Target = 500, Text = "Убей 500 роботов", Credits = 600, Crystals = 25, XpMult = 5 },
+			{ Id = "w_boss15", Kind = "Boss", Target = 15, Text = "Победи 15 боссов", Credits = 700, Crystals = 30, XpMult = 5 },
+			{ Id = "w_runs20", Kind = "Run", Target = 20, Text = "Пройди Врата 20 раз", Credits = 500, Crystals = 20, XpMult = 4 },
+			{ Id = "w_enhance10", Kind = "Enhance", Target = 10, Text = "Заточи снаряжение 10 раз", Credits = 400, Crystals = 20, XpMult = 3 },
+			{ Id = "w_quest10", Kind = "Quest", Target = 10, Text = "Выполни 10 ежедневных заданий", Credits = 500, Crystals = 30, XpMult = 4 },
+		},
+		PerWeek = 3,
 	},
 	-- Player level. XP: kills, bosses, quests and a little for training.
 	-- Every level: +SkillPointsPerLevel skill point, damage and max HP grow

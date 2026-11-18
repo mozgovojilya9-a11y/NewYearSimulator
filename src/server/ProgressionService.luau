@@ -58,24 +58,39 @@ end
 -- Quests
 ---------------------------------------------------------------------
 
-local function ensureQuests(data)
-	local today = dayIndex()
-	if data.Quests.Day == today and #data.Quests.List > 0 then
-		return
+-- Two quest sets with the same rules: Daily (data.Quests, new every
+-- day) and Weekly (data.Weekly, new every week). Rewards: credits (x the
+-- record room), XP and Кристаллы.
+local SETS = {
+	Daily = { Config = P.Quests, Field = "Quests", Key = "Day", Count = P.Quests.PerDay, Period = 86400, Salt = 17 },
+	Weekly = { Config = P.Weekly, Field = "Weekly", Key = "Week", Count = P.Weekly.PerWeek, Period = 86400 * 7, Salt = 31 },
+}
+
+local function ensureSet(data, set)
+	local index = math.floor(os.time() / set.Period)
+	local bucket = data[set.Field]
+	if type(bucket) == "table" and bucket[set.Key] == index and type(bucket.List) == "table" and #bucket.List > 0 then
+		return bucket
 	end
-	local pool = table.clone(P.Quests.Pool)
-	local rng = Random.new(today * 7919 + 17)
+	local pool = table.clone(set.Config.Pool)
+	local rng = Random.new(index * 7919 + set.Salt)
 	local list = {}
-	for _ = 1, math.min(P.Quests.PerDay, #pool) do
-		local pick = rng:NextInteger(1, #pool)
-		local def = table.remove(pool, pick)
+	for _ = 1, math.min(set.Count, #pool) do
+		local def = table.remove(pool, rng:NextInteger(1, #pool))
 		table.insert(list, { Id = def.Id, Progress = 0, Claimed = false })
 	end
-	data.Quests = { Day = today, List = list }
+	bucket = { [set.Key] = index, List = list }
+	data[set.Field] = bucket
+	return bucket
 end
 
-local function questDef(id: string)
-	for _, def in ipairs(P.Quests.Pool) do
+local function ensureQuests(data)
+	ensureSet(data, SETS.Daily)
+	ensureSet(data, SETS.Weekly)
+end
+
+local function defIn(set, id: string)
+	for _, def in ipairs(set.Config.Pool) do
 		if def.Id == id then
 			return def
 		end
@@ -90,16 +105,18 @@ local function questProgress(player, kind: string, amount: number, absolute: boo
 	end
 	ensureQuests(data)
 	local changed = false
-	for _, quest in ipairs(data.Quests.List) do
-		local def = questDef(quest.Id)
-		if def and def.Kind == kind and not quest.Claimed and quest.Progress < def.Target then
-			local before = quest.Progress
-			quest.Progress = if absolute then math.max(quest.Progress, amount) else quest.Progress + amount
-			quest.Progress = math.min(quest.Progress, def.Target)
-			if quest.Progress ~= before then
-				changed = true
-				if quest.Progress >= def.Target then
-					Remotes.Notify(player, "Задание выполнено: " .. def.Text, "gold")
+	for _, set in pairs(SETS) do
+		for _, quest in ipairs(data[set.Field].List) do
+			local def = defIn(set, quest.Id)
+			if def and def.Kind == kind and not quest.Claimed and quest.Progress < def.Target then
+				local before = quest.Progress
+				quest.Progress = if absolute then math.max(quest.Progress, amount) else quest.Progress + amount
+				quest.Progress = math.min(quest.Progress, def.Target)
+				if quest.Progress ~= before then
+					changed = true
+					if quest.Progress >= def.Target then
+						Remotes.Notify(player, "Задание выполнено: " .. def.Text, "gold")
+					end
 				end
 			end
 		end
@@ -108,6 +125,7 @@ local function questProgress(player, kind: string, amount: number, absolute: boo
 		ProgressionService.RefreshReady(player)
 	end
 end
+ProgressionService.QuestProgress = questProgress
 
 ---------------------------------------------------------------------
 -- Levels
@@ -201,11 +219,12 @@ function ProgressionService.RefreshReady(player)
 	ensureQuests(data)
 	local ready = dailyState(data) or wheelState(data)
 	if not ready then
-		for _, quest in ipairs(data.Quests.List) do
-			local def = questDef(quest.Id)
-			if def and not quest.Claimed and quest.Progress >= def.Target then
-				ready = true
-				break
+		for _, set in pairs(SETS) do
+			for _, quest in ipairs(data[set.Field].List) do
+				local def = defIn(set, quest.Id)
+				if def and not quest.Claimed and quest.Progress >= def.Target then
+					ready = true
+				end
 			end
 		end
 	end
@@ -220,13 +239,20 @@ local function status(player)
 	ensureQuests(data)
 	local canDaily, nextDay, dailyWait, streak = dailyState(data)
 	local canSpin, spinWait = wheelState(data)
-	local quests = {}
-	for i, quest in ipairs(data.Quests.List) do
-		local def = questDef(quest.Id)
-		if def then
-			quests[i] = { Text = def.Text, Target = def.Target, Progress = quest.Progress, Claimed = quest.Claimed, Credits = math.floor(def.Credits * creditScale(data)) }
+	local function listOf(set)
+		local list = {}
+		for i, quest in ipairs(data[set.Field].List) do
+			local def = defIn(set, quest.Id)
+			if def then
+				list[i] = { Text = def.Text, Target = def.Target, Progress = quest.Progress, Claimed = quest.Claimed, Credits = math.floor(def.Credits * creditScale(data)), Crystals = def.Crystals or 0, Xp = P.Level.XpPerQuest * data.Level * (def.XpMult or 1) }
+			end
 		end
+		return list
 	end
+	local quests = listOf(SETS.Daily)
+	local weekly = listOf(SETS.Weekly)
+	local weekLeft = SETS.Weekly.Period - (os.time() % SETS.Weekly.Period)
+	local dayLeft = SETS.Daily.Period - (os.time() % SETS.Daily.Period)
 	local dailyCredits = {}
 	for day, amount in ipairs(P.Daily.Credits) do
 		dailyCredits[day] = math.floor(amount * creditScale(data))
@@ -235,6 +261,10 @@ local function status(player)
 		Daily = { CanClaim = canDaily, NextDay = nextDay, Wait = dailyWait, Streak = streak, Credits = dailyCredits },
 		Wheel = { CanSpin = canSpin, Wait = spinWait },
 		Quests = quests,
+		Weekly = weekly,
+		DayLeft = dayLeft,
+		WeekLeft = weekLeft,
+		DailyCrystals = P.Daily.Crystals,
 		Level = data.Level,
 		Xp = data.Xp,
 		XpNext = xpToNext(data.Level),
@@ -255,6 +285,11 @@ local function claimDaily(player)
 	data.Daily.LastClaim = os.time()
 	data.Daily.Streak = streak + 1
 	local message = ("День %d: +%s нано-кредитов"):format(nextDay, Format.Number(amount))
+	local crystals = (P.Daily.Crystals or {})[nextDay] or 0
+	if crystals > 0 then
+		PlayerState.AddCrystals(player, crystals)
+		message ..= (", +%d Кристаллов"):format(crystals)
+	end
 	if nextDay == 7 and P.Daily.Day7Boost then
 		giveBoost(player, data, 30)
 		message ..= " и x2 Опыт на 30 мин!"
@@ -299,14 +334,15 @@ local function spin(player)
 	return true, message, index
 end
 
-local function claimQuest(player, index)
+local function claimQuest(player, index, setName)
 	local data = DataService.Get(player)
-	if not data or type(index) ~= "number" then
+	local set = SETS[setName or "Daily"]
+	if not data or type(index) ~= "number" or not set then
 		return false, "Неверный запрос"
 	end
 	ensureQuests(data)
-	local quest = data.Quests.List[index]
-	local def = quest and questDef(quest.Id)
+	local quest = data[set.Field].List[index]
+	local def = quest and defIn(set, quest.Id)
 	if not def then
 		return false, "Нет такого задания"
 	end
@@ -318,10 +354,76 @@ local function claimQuest(player, index)
 	end
 	quest.Claimed = true
 	local amount = earnCredits(player, def.Credits * creditScale(data))
-	local xp = P.Level.XpPerQuest * data.Level
+	local xp = P.Level.XpPerQuest * data.Level * (def.XpMult or 1)
 	addXp(player, data, xp)
+	local crystals = PlayerState.AddCrystals(player, def.Crystals or 0)
 	ProgressionService.RefreshReady(player)
-	return true, ("+%s нано-кредитов, +%s XP"):format(Format.Number(amount), Format.Number(xp))
+	GameEvents.Fire(player, "Quest", 1)
+	local text = ("+%s нано-кредитов, +%s XP"):format(Format.Number(amount), Format.Number(xp))
+	if crystals > 0 then
+		text ..= (", +%d Кристаллов"):format(crystals)
+	end
+	return true, text
+end
+
+---------------------------------------------------------------------
+-- Statistics (data.Stats, the Статистика window): counters
+---------------------------------------------------------------------
+
+function ProgressionService.Count(player, key: string, amount: number)
+	local data = DataService.Get(player)
+	if not data then
+		return
+	end
+	data.Stats = if type(data.Stats) == "table" then data.Stats else {}
+	data.Stats[key] = (tonumber(data.Stats[key]) or 0) + amount
+end
+
+-- Everything about the character for the Статистика window.
+function ProgressionService.Summary(player)
+	local data = DataService.Get(player)
+	if not data then
+		return nil
+	end
+	local st = StatService.Get(player)
+	local stats = if type(data.Stats) == "table" then data.Stats else {}
+	local gates = {}
+	local cleared = (type(data.Gates) == "table" and type(data.Gates.Cleared) == "table") and data.Gates.Cleared or {}
+	local best = (type(data.Gates) == "table" and type(data.Gates.BestTime) == "table") and data.Gates.BestTime or {}
+	for _, location in ipairs(Config.Gates.Locations) do
+		if location.Ready then
+			table.insert(gates, { Name = location.Name, Rank = location.Rank, Grade = cleared[location.Id], Seconds = best[location.Id] })
+		end
+	end
+	local attrs = type(data.Attributes) == "table" and data.Attributes or {}
+	return {
+		Level = data.Level,
+		Xp = data.Xp,
+		XpNext = xpToNext(data.Level),
+		Class = data.Class or "",
+		Title = Config.RankFor(data.Level).Name,
+		Damage = st.Damage,
+		MaxHealth = st.MaxHealth,
+		Defense = st.Defense,
+		CritChance = st.CritChance,
+		CritDamage = st.CritDamage,
+		AttackSpeed = st.AttackSpeed,
+		Luck = st.Luck,
+		Regen = st.Regen,
+		GearScore = st.GearScore,
+		Attributes = { Str = attrs.Str or 0, Agi = attrs.Agi or 0, Vit = attrs.Vit or 0, Per = attrs.Per or 0 },
+		Kills = stats.Kills or 0,
+		Bosses = stats.Bosses or 0,
+		Runs = stats.Runs or 0,
+		Deaths = stats.Deaths or 0,
+		Pulls = stats.Pulls or 0,
+		PlaySeconds = stats.PlaySeconds or 0,
+		Credits = data.Credits or 0,
+		Cores = data.Cores or 0,
+		Crystals = (data.Crystals or 0) + (data.CrystalsPaid or 0),
+		Gates = gates,
+		Achievements = if type(data.Achievements) == "table" then data.Achievements else {},
+	}
 end
 
 ---------------------------------------------------------------------
@@ -342,7 +444,9 @@ function ProgressionService.OnKill(player, room: number, isBoss: boolean, positi
 	end
 	questProgress(player, "Kill", 1)
 	GameEvents.Fire(player, "Kill", 1)
+	ProgressionService.Count(player, "Kills", 1)
 	if isBoss then
+		ProgressionService.Count(player, "Bosses", 1)
 		questProgress(player, "Boss", 1)
 		GameEvents.Fire(player, "Boss", 1)
 	end
@@ -356,12 +460,13 @@ end
 
 function ProgressionService.OnRunStarted(player)
 	questProgress(player, "Run", 1)
+	ProgressionService.Count(player, "Runs", 1)
 end
 
 
 function ProgressionService.Init()
 	local allow = RateLimit.new(0.3)
-	Remotes.Get("Progression").OnServerInvoke = function(player, action, arg)
+	Remotes.Get("Progression").OnServerInvoke = function(player, action, arg, arg2)
 		if not allow(player) or not PlayerState.IsReady(player) then
 			return false, "Подожди секунду"
 		end
@@ -371,11 +476,31 @@ function ProgressionService.Init()
 			return claimDaily(player)
 		elseif action == "Spin" then
 			return spin(player)
+		elseif action == "Stats" then
+			return true, ProgressionService.Summary(player)
 		elseif action == "ClaimQuest" then
-			return claimQuest(player, arg)
+			return claimQuest(player, arg, if arg2 == "Weekly" then "Weekly" else "Daily")
 		end
 		return false, "Неверный запрос"
 	end
+
+	-- the forge and claimed quests feed the weekly goals
+	GameEvents.Connect(function(player, kind, amount)
+		if kind == "Enhance" or kind == "Quest" then
+			questProgress(player, kind, amount or 1)
+		end
+	end)
+	-- time in the game (Статистика)
+	task.spawn(function()
+		while true do
+			task.wait(60)
+			for _, player in ipairs(Players:GetPlayers()) do
+				if PlayerState.IsReady(player) then
+					ProgressionService.Count(player, "PlaySeconds", 60)
+				end
+			end
+		end
+	end)
 
 	DungeonRuns.OnKill = ProgressionService.OnKill
 	DungeonRuns.OnRoomCleared = ProgressionService.OnRoomCleared
