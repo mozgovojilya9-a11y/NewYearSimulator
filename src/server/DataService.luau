@@ -393,6 +393,10 @@ function DataService.Sanitize(data)
 	end
 	number("Cores", 0)
 	number("Crystals", 0)
+	number("CrystalsPaid", 0)
+	if type(data.Gacha) ~= "table" then
+		data.Gacha = {}
+	end
 	data.Cores = math.max(0, math.floor(data.Cores))
 	number("NextItem", 1)
 	-- items: drop broken ones, keep every field in range

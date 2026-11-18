@@ -17,6 +17,7 @@ local Store = require(script.Parent.ui.Windows.Store)
 local Reward = require(script.Parent.ui.Windows.Reward)
 local ClassSelect = require(script.Parent.ui.ClassSelect)
 local Dialog = require(script.Parent.ui.Windows.Dialog)
+local Supply = require(script.Parent.ui.Windows.Supply)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -32,6 +33,9 @@ local ACTIONS = {
 	end,
 	Wheel = function()
 		Reward.OpenWheel()
+	end,
+	OpenSupply = function()
+		Supply.Open()
 	end,
 	OpenClasses = function()
 		ClassSelect.Open(true)
@@ -90,7 +94,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	circle.Text = ""
 	circle.Parent = gui
 	Style.Corner(circle, UDim.new(0.5, 0))
-	Style.Stroke(circle, 2, Style.Colors.Gold)
+	Style.Stroke(circle, 2, Style.Colors.Gold).LineJoinMode = Enum.LineJoinMode.Round
 
 	-- hold fill (loot): a gold disc that grows from the centre
 	local fill = Instance.new("Frame")

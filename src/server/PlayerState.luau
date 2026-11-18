@@ -91,25 +91,46 @@ function PlayerState.SpendCredits(player, cost: number): boolean
 	return true
 end
 
--- Кристаллы (the rare currency): same rules as credits.
-function PlayerState.AddCrystals(player, amount: number): number
+-- Кристаллы (the rare currency) in two pockets: earned (data.Crystals)
+-- and bought for Robux (data.CrystalsPaid). Attributes: Crystals = all,
+-- CrystalsFree = earned only.
+local function publishCrystals(player, data)
+	player:SetAttribute("Crystals", (data.Crystals or 0) + (data.CrystalsPaid or 0))
+	player:SetAttribute("CrystalsFree", data.Crystals or 0)
+end
+
+function PlayerState.AddCrystals(player, amount: number, paid: boolean?): number
 	local data = DataService.Get(player)
 	amount = math.floor(amount)
 	if not data or amount <= 0 then
 		return 0
 	end
-	data.Crystals = (data.Crystals or 0) + amount
-	player:SetAttribute("Crystals", data.Crystals)
+	if paid then
+		data.CrystalsPaid = (data.CrystalsPaid or 0) + amount
+	else
+		data.Crystals = (data.Crystals or 0) + amount
+	end
+	publishCrystals(player, data)
 	return amount
 end
 
-function PlayerState.SpendCrystals(player, cost: number): boolean
+-- Spends earned crystals first, then bought ones (freeOnly: never the
+-- bought ones). Returns true on success.
+function PlayerState.SpendCrystals(player, cost: number, freeOnly: boolean?): boolean
 	local data = DataService.Get(player)
-	if not data or (data.Crystals or 0) < cost then
+	if not data then
 		return false
 	end
-	data.Crystals -= cost
-	player:SetAttribute("Crystals", data.Crystals)
+	local free, paid = data.Crystals or 0, if freeOnly then 0 else (data.CrystalsPaid or 0)
+	if free + paid < cost then
+		return false
+	end
+	local fromFree = math.min(free, cost)
+	data.Crystals = free - fromFree
+	if cost > fromFree then
+		data.CrystalsPaid = (data.CrystalsPaid or 0) - (cost - fromFree)
+	end
+	publishCrystals(player, data)
 	return true
 end
 
@@ -298,7 +319,7 @@ function PlayerState.Sync(player)
 		return
 	end
 	player:SetAttribute("Credits", data.Credits or 0)
-	player:SetAttribute("Crystals", data.Crystals or 0)
+	publishCrystals(player, data)
 	player:SetAttribute("RoomReached", data.RoomReached)
 	player:SetAttribute("Level", data.Level)
 	player:SetAttribute("Xp", data.Xp)

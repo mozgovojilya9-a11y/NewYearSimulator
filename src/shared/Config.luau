@@ -18,7 +18,9 @@ Config.DataStoreName = "AuraClicker_v1"
 Config.StartingData = {
 	Credits = 0, -- "Нано-кредиты" (монеты): forge, resets, cosmetics
 	Cores = 0, -- "Нано-ядра": from salvaged items, spent in the forge
-	Crystals = 0, -- "Кристаллы": rare currency (bosses, first clears, Robux): class change, pulls
+	Crystals = 0, -- "Кристаллы" earned in the game (quests, achievements, login, bosses, codes)
+	CrystalsPaid = 0, -- "Кристаллы" bought for Robux (kept apart: PolicyService may forbid paid pulls)
+	Gacha = {}, -- [bannerId] = { Pulls, SinceEpic, SinceLegendary }
 	-- Gear: item instances (Shared.Items). [uid] = { U, B = base id, K = "W" | "A",
 	-- R = rarity, L = item level, Q = stat roll, E = enhance, P = bonus props,
 	-- Lk = locked, F = failed enhances in a row, C = "Any" (class-free), St = starter }
@@ -787,6 +789,42 @@ Config.Crystals = {
 	Boss = 2,
 	FirstClear = 15,
 	Texts = { Got = "+%d кристаллов", NotEnough = "Нужно %d кристаллов" },
+}
+
+-- Pulls at the Терминал снабжения (GachaService, window Supply). A pull
+-- gives a ready item of the banner's kind for the player's class, item
+-- level = the player's best gate tier x Items.LevelPerRoom (at least
+-- MinLevel). Rates are shown in the window as they are here (percent).
+-- Pity: the SinceEpic-th pull without Epic+ is Epic+; the SinceLegendary-th
+-- without Legendary+ is Legendary. An item whose base and rarity the player
+-- already owns is a duplicate: it turns into Нано-ядра (DuplicateCores).
+-- Paid pulls (Кристаллы bought for Robux) are off where
+-- PolicyService.ArePaidRandomItemsRestricted: then only earned ones count.
+Config.Gacha = {
+	Banners = {
+		{ Id = "Weapon", Name = "Оружие", Kind = "W", Icon = "sword", Text = "Мечи, копья и бластеры твоего класса" },
+		{ Id = "Armor", Name = "Броня", Kind = "A", Icon = "shield", Text = "Шлемы, нагрудники и поножи" },
+	},
+	Cost = { One = 10, Ten = 90 },
+	Rates = { Uncommon = 55, Rare = 33, Epic = 9, Legendary = 2.6, Mythic = 0.4 },
+	Pity = { Epic = 10, Legendary = 60 },
+	MinLevel = 10,
+	DuplicateCores = { Common = 2, Uncommon = 4, Rare = 10, Epic = 25, Legendary = 60, Mythic = 150, Secret = 400 },
+	RevealSeconds = 0.9, -- one capsule opening
+	Texts = {
+		Title = "ТЕРМИНАЛ СНАБЖЕНИЯ",
+		One = "Крутка x1",
+		Ten = "Крутка x10",
+		Rates = "Шансы",
+		PityEpic = "Эпик гарантирован через %d",
+		PityLegendary = "Легендарный через %d",
+		Duplicate = "Дубликат: +%d ядер",
+		Restricted = "В твоём регионе крутки за купленные Кристаллы недоступны — тратятся только заработанные",
+		NotEnough = "Нужно %d Кристаллов",
+		Full = "Инвентарь полон",
+		Skip = "Пропустить",
+		Done = "Готово",
+	},
 }
 
 -- Class change in the Academy (the first pick is free): Нано-кредиты,
@@ -1718,6 +1756,7 @@ Config.Remotes = {
 	Announce = "RemoteEvent", -- S->all (text, color) system chat line + toast
 	StoreNotify = "RemoteEvent", -- S->C (text) after a Robux purchase was granted
 	LevelUp = "RemoteEvent", -- S->C (level, skillPoints gained) big "Новый уровень!" banner
+	Gacha = "RemoteFunction", -- ("Info") | ("Pull", bannerId, 1|10) -> ok, results | message, info
 	Class = "RemoteFunction", -- ("Choose", classId) | ("Learn", nodeId) | ("Reset") | ("Equip", slot, nodeId|nil) -> ok, message
 	Ability = "RemoteEvent", -- C->S ("Use", slot, aim) | ("Dash", direction) | ("Block", on) | ("Charge"); S->C ("Dash", direction, distance, seconds); S->all ("Fx", kind, ...)
 	Quest = "RemoteFunction", -- ("Talk", npcId) -> dialog payload | ("Claim") -> ok, message
@@ -1975,7 +2014,7 @@ Config.HubLayout = {
 		{ Id = "Training", Name = "Тренировочный зал", Icon = "sword", At = { -112, -60 }, Face = { -140, -90 } },
 		{ Id = "Forge", Name = "Кузница", Icon = "hammer", At = { 112, -132 }, Face = { 131, -132 } },
 		{ Id = "Academy", Name = "Академия классов", Icon = "academy", At = { 112, -45 }, Face = { 131, -45 } },
-		{ Id = "Supply", Name = "Терминал снабжения", Icon = "crystal", At = { -52, -60 }, Face = { -66, -60 } },
+		{ Id = "Supply", Name = "Терминал снабжения", Icon = "crystal", At = { -57, -60 }, Face = { -66, -60 } },
 	},
 	Leaderboards = { -- on the atrium north wall, either side of the Gate hall arch
 		{ Kind = "Level", Title = "Топ уровней", At = -42 },

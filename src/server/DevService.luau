@@ -120,6 +120,11 @@ function actions.Class(player)
 	return true, "Класс: " .. class.Name
 end
 
+function actions.Crystals(player)
+	PlayerState.AddCrystals(player, 200)
+	return true, "+200 Кристаллов"
+end
+
 function actions.Red()
 	require(script.Parent.GateService).OpenRed()
 	return true, "Красные Врата открыты"

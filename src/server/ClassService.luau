@@ -145,7 +145,7 @@ function ClassService.GrantPaidChange(player): string?
 		local _, message = apply(player, data, classId, false)
 		return message
 	end
-	PlayerState.AddCrystals(player, CC.Crystals)
+	PlayerState.AddCrystals(player, CC.Crystals, true)
 	return Config.Crystals.Texts.Got:format(CC.Crystals)
 end
 
