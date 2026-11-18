@@ -392,12 +392,15 @@ function WorldKit.UpdateHealth(body: BasePart, health: number, maxHealth: number
 end
 
 -- Styled ProximityPrompt. The client draws it (Style = Custom).
-function WorldKit.Prompt(parent: Instance, actionText: string, objectText: string, attributes: { [string]: any }?, distance: number?, holdDuration: number?)
+-- Interaction point (Config.Interact): a plain press (no hold), drawn by
+-- the client as a circle with "E" and one short word (Prompts.luau).
+function WorldKit.Prompt(parent: Instance, actionText: string, objectText: string, attributes: { [string]: any }?, _distance: number?, holdDuration: number?)
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.ActionText = actionText
 	prompt.ObjectText = objectText
-	prompt.HoldDuration = holdDuration or 0.3
-	prompt.MaxActivationDistance = distance or 12
+	prompt.HoldDuration = holdDuration or 0
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.MaxActivationDistance = Config.Interact.Distance
 	prompt.RequiresLineOfSight = false
 	prompt.Style = Enum.ProximityPromptStyle.Custom
 	for key, value in pairs(attributes or {}) do

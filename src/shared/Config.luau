@@ -554,7 +554,7 @@ Config.Loot = {
 	Feed = { Max = 5, Seconds = 6 }, -- loot feed on the right side of the screen
 	Texts = {
 		Pickup = "Подобрать",
-		OpenChest = "Открыть сундук",
+		OpenChest = "Открыть",
 		ChestName = "Сундук босса",
 		Announce = "%s выбил %s предмет: %s!",
 		Better = "Лучше надетого",
@@ -670,7 +670,7 @@ Config.RedGate = {
 		Closed = "Красные Врата закрылись",
 		Name = "КРАСНЫЕ ВРАТА",
 		NoExit = "Из Красных Врат не выйти до победы",
-		Enter = "Войти в Красные Врата",
+		Enter = "Войти",
 	},
 }
 
@@ -1609,6 +1609,14 @@ Config.Leaderboards = {
 	Top = 10,
 }
 
+-- Interaction circles (ProximityPrompt, drawn by the client Prompts.luau):
+-- a plain press within Distance studs; only loot is held (Loot.HoldSeconds).
+Config.Interact = {
+	Distance = 10,
+	Size = 54, -- px, the circle
+	Key = "E",
+}
+
 -- Shop categories (what is owned / equipped and how to describe it).
 Config.ItemById = { Weapon = {} } -- [category][id] = base item
 for _, item in ipairs(Config.Weapons) do
@@ -2014,12 +2022,14 @@ Config.HubLayout = {
 		Wheel = "КОЛЕСО УДАЧИ",
 		WheelFree = "Бесплатное вращение!",
 	},
+	-- one short word under the "E" circle (Config.Interact)
 	Prompts = {
-		Forge = "Фабрикатор",
-		Academy = "Сменить класс",
-		Talk = "Поговорить",
+		Forge = "Кузница",
+		Academy = "Классы",
+		Talk = "Говорить",
 		Board = "Задания",
-		Train = "Тренироваться",
+		Train = "Тренировка",
+		Supply = "Крутки",
 	},
 }
 
