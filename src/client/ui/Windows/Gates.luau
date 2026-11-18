@@ -399,7 +399,7 @@ function refresh()
 		if ui.card.Visible then
 			ui.rec.Text = "Рек.: " .. recommendText(location)
 			local boss = Config.Mobs.Defs[location.Boss]
-			ui.info.Text = T.Zones:format(#location.Zones, location.Waves, boss and boss.Name or "?")
+			ui.info.Text = T.Zones:format(#location.Sections, location.Enemies, boss and boss.Name or "?")
 			ui.grade.Text = best[location.Id] or ""
 			ui.grade.TextColor3 = C.Gold
 			ui.soon.Visible = not location.Ready
@@ -424,7 +424,7 @@ function refresh()
 		dName.Text = Style.Upper(location.Name)
 		dText.Text = location.Text or ""
 		dRec.Text = "Рекомендуется: " .. recommendText(location)
-		dInfo.Text = T.Zones:format(#location.Zones, location.Waves, boss and boss.Name or "?") .. "\n" .. (if best[location.Id] then T.Best:format(best[location.Id]) else "")
+		dInfo.Text = T.Zones:format(#location.Sections, location.Enemies, boss and boss.Name or "?") .. "\n" .. (if best[location.Id] then T.Best:format(best[location.Id]) else "")
 		dDrop.Text = dropText(location.Rank)
 		local canStart = location.Ready and rankIsOpen
 		local leader = not party or party.Leader == player.UserId

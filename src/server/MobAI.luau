@@ -16,6 +16,10 @@
 	players), Summon (adds from the arena portals, from phase 2); later
 	phases attack faster. Between specials the boss chases and hits.
 
+	Section groups stand still on their post until a member comes within
+	Config.Sections.Aggro studs or one of them is hit ("Awake"); then the
+	whole group (same "Group" attribute) wakes with a short "!" reaction.
+
 	A target = the nearest living member of the run. Stun / slow from the
 	skills (StunUntil / SlowUntil) and the short hit stagger (StaggerUntil)
 	stop or slow the brain. Also: the player's out-of-combat regeneration.
@@ -39,6 +43,7 @@ local BOSS = E.Boss
 local P = Config.Player
 local TICK = 0.2
 local RED = E.TelegraphColor
+local SECTIONS = Config.Sections
 
 local mobs = {} -- [model] = state
 local lastDamaged = {} -- [player] = os.clock() of the last hit taken
@@ -374,6 +379,16 @@ end
 -- Brain tick
 ---------------------------------------------------------------------
 
+-- Wakes every sleeping mob of the same section group.
+local function wakeGroup(state, model)
+	local group = model:GetAttribute("Group")
+	for other, otherState in pairs(mobs) do
+		if otherState.run == state.run and other:GetAttribute("Group") == group and not other:GetAttribute("Awake") then
+			other:SetAttribute("Awake", true)
+		end
+	end
+end
+
 local function tick()
 	local clock = os.clock()
 	for model, state in pairs(mobs) do
@@ -387,6 +402,23 @@ local function tick()
 		local player, targetRoot, distance = target(state)
 		if not player then
 			stop(state)
+			continue
+		end
+		-- asleep on the post: notice a player close by, then the group comes
+		if not state.awake then
+			if not model:GetAttribute("Awake") and distance <= SECTIONS.Aggro then
+				model:SetAttribute("Awake", true)
+			end
+			if model:GetAttribute("Awake") then
+				state.awake = true
+				state.readyAt = clock + 0.35 + math.random() * 0.4 -- the "!" moment
+				state.lastAttack = clock - math.random()
+				wakeGroup(state, model)
+				face(state, targetRoot.Position)
+			end
+			continue
+		end
+		if clock < (state.readyAt or 0) then
 			continue
 		end
 		local stunned, slow = statusOf(model)
@@ -498,6 +530,7 @@ function MobAI.Register(run, model)
 		isBoss = isBoss,
 		elite = model:GetAttribute("Elite") == true,
 		phase = 1,
+		awake = model:GetAttribute("Awake") ~= false,
 		lastAttack = os.clock() - math.random() * 1.5,
 		lastSpecial = os.clock(),
 		lastShock = os.clock() - math.random() * 3,

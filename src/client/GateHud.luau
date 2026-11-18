@@ -1,9 +1,8 @@
 --[[
 	GateHud.luau
 	On-screen life of a gate run (GateState from DungeonRuns):
-	  * the wave panel at the top: "ЗОНА 1/3 • Сборочный цех",
-	    "ВОЛНА 2/4" (elite wave in gold), the enemy counter / the rest
-	    timer / "проход открыт" / the boss arena; red border in Red Gates;
+	  * the run panel at the top: the location, "УЧАСТОК 2/3 · врагов 4/6"
+	    with a kill bar (or the boss arena); red border in Red Gates;
 	  * the boss intro: black bars, the camera looks at the boss portal,
 	    the boss name and title, then back to the player;
 	  * "ФАЗА 2" banners;
@@ -23,8 +22,7 @@ local Popups = require(script.Parent.ui.Popups)
 local Style = require(script.Parent.ui.Style)
 
 local C = Style.Colors
-local W = Config.Waves
-local WT = W.Texts
+local WT = Config.Sections.Texts
 local player = Players.LocalPlayer
 local stateRemote = ReplicatedStorage:WaitForChild("GateState")
 local partyRemote = ReplicatedStorage:WaitForChild("Party")
@@ -49,9 +47,23 @@ local panel, shape = Style.Panel(Style.Gui, {
 	ZIndex = 6,
 	Visible = false,
 })
-local zoneLine = Style.Label(panel, "", 12, C.Muted, { Position = UDim2.fromOffset(0, 6), Size = UDim2.new(1, 0, 0, 14), ZIndex = 7 })
-local waveLine = Style.Label(panel, "", 26, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 30), ZIndex = 7 })
-local countLine = Style.Label(panel, "", 14, C.Text, { Position = UDim2.fromOffset(0, 52), Size = UDim2.new(1, 0, 0, 18), ZIndex = 7 })
+local zoneLine = Style.Label(panel, "", 12, C.Muted, { Position = UDim2.fromOffset(0, 7), Size = UDim2.new(1, 0, 0, 14), ZIndex = 7 })
+local waveLine = Style.Label(panel, "", 23, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 22), Size = UDim2.new(1, 0, 0, 28), ZIndex = 7 })
+local countLine = Style.Label(panel, "", 13, C.Muted, { Position = UDim2.fromOffset(0, 52), Size = UDim2.new(1, 0, 0, 16), ZIndex = 7, Visible = false })
+local barBack = Instance.new("Frame")
+barBack.AnchorPoint = Vector2.new(0.5, 0)
+barBack.Position = UDim2.new(0.5, 0, 0, 56)
+barBack.Size = UDim2.new(1, -60, 0, 6)
+barBack.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+barBack.BorderSizePixel = 0
+barBack.ZIndex = 7
+barBack.Parent = panel
+local barFill = Instance.new("Frame")
+barFill.Size = UDim2.fromScale(0, 1)
+barFill.BackgroundColor3 = C.Gold
+barFill.BorderSizePixel = 0
+barFill.ZIndex = 8
+barFill.Parent = barBack
 local waveScale = Instance.new("UIScale")
 waveScale.Parent = waveLine
 
@@ -64,39 +76,29 @@ local function render()
 	if not panel.Visible then
 		return
 	end
-	shape.SetBorder(if s.Red then Config.RedGate.Color elseif s.Elite and s.Phase == "Fight" then C.Gold else C.GoldDim)
-	local zoneText = if s.Zone > s.Zones then WT.Boss else WT.Zone:format(s.Zone, s.Zones)
-	zoneLine.Text = Style.Upper(zoneText .. "  •  " .. (s.Location or "")) .. (if s.Red then "  •  " .. Config.RedGate.Texts.Name else "")
+	shape.SetBorder(if s.Red then Config.RedGate.Color else C.GoldDim)
+	zoneLine.Text = Style.Upper(s.Location or "") .. (if s.Red then "  •  " .. Config.RedGate.Texts.Name else "")
 	zoneLine.TextColor3 = if s.Red then Config.RedGate.Color else C.Muted
-	if s.Phase == "Boss" or (s.Zone > s.Zones and s.Phase ~= "Done") then
+	countLine.Visible = false
+	barBack.Visible = true
+	if s.Phase == "Done" then
+		waveLine.Text = Style.Upper(Config.Grades.Texts.Won)
+		waveLine.TextColor3 = C.Gold
+		barBack.Visible = false
+	elseif s.Zone > s.Zones then
 		waveLine.Text = WT.Boss
 		waveLine.TextColor3 = Config.DungeonLayout.BossBarrierColor
-		countLine.Text = if s.Phase == "Enter" then WT.Enter else ""
-	elseif s.Phase == "Done" then
-		waveLine.Text = Config.Grades.Texts.Won
-		waveLine.TextColor3 = C.Gold
-		countLine.Text = ""
-	elseif s.Phase == "Cleared" then
-		waveLine.Text = Style.Upper(WT.Cleared:match("^[^—]+") or WT.Cleared)
-		waveLine.TextColor3 = C.Green
-		countLine.Text = WT.Cleared:match("—%s*(.+)$") or ""
-	elseif s.Phase == "Enter" or (s.Wave == 0 and s.Phase ~= "Rest") then
-		waveLine.Text = WT.Zone:format(s.Zone, s.Zones)
-		waveLine.TextColor3 = C.Text
+		barBack.Visible = false
+		countLine.Visible = s.Phase == "Enter"
 		countLine.Text = WT.Enter
 	else
-		local title = WT.Wave:format(math.max(1, if s.Phase == "Rest" then s.Wave + 1 else s.Wave), s.Waves)
-		waveLine.Text = if s.Elite and s.Phase == "Fight" then WT.Elite .. "  " .. title:match("%d+/%d+") else title
-		waveLine.TextColor3 = if s.Elite and s.Phase == "Fight" then C.Gold else C.Text
-		if s.Phase == "Rest" and s.Rest then
-			countLine.Text = WT.Rest:format(math.max(0, math.ceil(s.Rest - Workspace:GetServerTimeNow())))
-			countLine.TextColor3 = C.Muted
-		else
-			countLine.Text = WT.Enemies:format(s.Alive or 0)
-			countLine.TextColor3 = C.Text
-		end
+		local total = math.max(1, s.Total or 1)
+		local alive = s.Alive or 0
+		waveLine.Text = WT.Section:format(s.Zone, s.Zones) .. "  ·  " .. Style.Upper(WT.Enemies:format(alive, total))
+		waveLine.TextColor3 = if alive == 0 then C.Green else C.Text
+		Style.Tween(barFill, 0.2, { Size = UDim2.fromScale(1 - alive / total, 1) })
 	end
-	local key = tostring(s.Zone) .. ":" .. tostring(s.Wave) .. ":" .. tostring(s.Phase)
+	local key = tostring(s.Zone) .. ":" .. tostring(s.Phase)
 	if key ~= lastWave then
 		lastWave = key
 		waveScale.Scale = 1.25
@@ -104,14 +106,6 @@ local function render()
 	end
 end
 
-task.spawn(function()
-	while true do
-		task.wait(0.25)
-		if state and state.Phase == "Rest" then
-			render()
-		end
-	end
-end)
 player:GetAttributeChangedSignal("Zone"):Connect(function()
 	if player:GetAttribute("Zone") ~= "Dungeon" then
 		state = nil

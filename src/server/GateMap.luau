@@ -3,16 +3,16 @@
 	Builds the map of a gate location for one run (Config.Gates.Locations,
 	Config.GateMap, the biome look of Config.DungeonLayout.Biomes):
 
-	  [start] Zone 1 -> corridor -> Zone 2 -> ... -> corridor -> Boss arena
+	  [start] Section 1 -> corridor -> Section 2 -> ... -> corridor -> Boss arena
 
-	A zone is a square hall without a roof: floor with the biome's AI
+	A section ("zone" in code) is a square hall with a roof: floor with the biome's AI
 	material (FloorVariant), walls with pilasters and a thin accent line,
 	cover blocks in a ring (the middle stays free to fight), the biome's
 	AI landmark model (or the procedural machine) in a corner, the biome
-	decor along a wall, lamp pylons and spawn portals (hatches) by the
-	walls. Zones snake left / right (seeded per location, so a location
+	decor along a wall and lamp pylons. Post = where the section's enemy
+	group stands (in front of the exit). Zones snake left / right (seeded per location, so a location
 	always looks the same). The exit of a zone is an energy barrier that
-	the run opens when the zone is cleared; the boss arena is an octagon
+	the run opens as soon as the section's group is dead; the boss arena is an octagon
 	with a platform, big pylons and the landmark.
 
 	GateMap.Build(location, slot) -> map (see the end of Build), built in
@@ -335,21 +335,6 @@ roof = function(parent, biome, center: Vector3, sizeX: number, sizeZ: number, he
 	end
 end
 
--- Spawn portal / hatch: a dark disc with a thin ring (the run makes it
--- glow when an enemy comes out).
-local function portal(parent, biome, position: Vector3)
-	local m = NanoKit.Model(parent, "Portal")
-	NanoKit.Cylinder(m, "Hatch", 0.3, 6, CFrame.new(position + Vector3.new(0, 0.12, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(18, 18, 22), M.Metal).CanCollide = false
-	local ring = NanoKit.Cylinder(m, "Ring", 0.32, 6.6, CFrame.new(position + Vector3.new(0, 0.1, 0)) * CFrame.Angles(0, 0, math.rad(90)), biome.Accent, M.Neon)
-	ring.CanCollide = false
-	ring.Transparency = 0.5
-	for i = 0, 3 do
-		local a = i * math.pi / 2
-		Panel(m, "Clamp", Vector3.new(1, 0.5, 1.6), CFrame.new(position + Vector3.new(math.cos(a) * 3.2, 0.25, math.sin(a) * 3.2)) * CFrame.Angles(0, -a, 0), biome.Metal, M.Metal)
-	end
-	return m, ring
-end
-
 local function pylon(parent, biome, position: Vector3)
 	local m = NanoKit.Model(parent, "Pylon")
 	Panel(m, "Foot", Vector3.new(2.6, 1, 2.6), CFrame.new(position + Vector3.new(0, 0.5, 0)), biome.Metal, M.Metal)
@@ -452,14 +437,13 @@ local function buildZone(folder, biome, rng: Random, index: number, center: Vect
 			table.insert(covers, cover(m, biome, CFrame.lookAt(p, Vector3.new(center.X, p.Y, center.Z)), rng))
 		end
 	end
-	-- spawn portals by the walls
-	local portals = {}
-	local spots = { Vector3.new(-half + 8, 0, -half * 0.3), Vector3.new(half - 8, 0, -half * 0.3), Vector3.new(-half * 0.45, 0, -half + 8), Vector3.new(half * 0.45, 0, -half + 8), Vector3.new(-half + 8, 0, half * 0.35), Vector3.new(half - 8, 0, half * 0.35) }
-	for i = 1, math.min(G.Portals, #spots) do
-		local p = center + spots[(i + index) % #spots + 1]
-		local _, ringPart = portal(m, biome, p)
-		table.insert(portals, { Position = p + Vector3.new(0, 3, 0), Ring = ringPart })
+	-- where the section's group stands: the far half, in front of the exit
+	local post = center + Vector3.new((exitX or 0) * 0.5, 0, -half * 0.3)
+	local blocks = {}
+	for _, c in ipairs(covers) do
+		table.insert(blocks, c:GetPivot().Position)
 	end
+	table.insert(blocks, lmPos)
 	roof(m, biome, center, size, size, H)
 	m.Parent = folder
 	return {
@@ -467,7 +451,8 @@ local function buildZone(folder, biome, rng: Random, index: number, center: Vect
 		Model = m,
 		Center = center,
 		Size = size,
-		Portals = portals,
+		Post = post,
+		Blocks = blocks,
 		Exit = exitBarrier,
 		Entry = CFrame.lookAt(center + Vector3.new(entryX or 0, 3, half - 8), center + Vector3.new(0, 3, 0)),
 	}
@@ -580,13 +565,13 @@ function GateMap.Build(location, slot: number)
 	-- bedrock under the whole run
 	local zones = {}
 	local entryX = 0
-	for index = 1, #location.Zones do
+	for index = 1, #location.Sections do
 		local exitX = rng:NextInteger(-math.floor(size * 0.28), math.floor(size * 0.28))
 		local zone = buildZone(folder, biome, rng, index, center, size, entryX, exitX)
 		table.insert(zones, zone)
 		-- the next room's door sits right in front of this exit
 		local doorOut = center + Vector3.new(exitX, 0, -size / 2)
-		local nextSize = if index == #location.Zones then G.BossSize else size
+		local nextSize = if index == #location.Sections then G.BossSize else size
 		local nextEntryX = rng:NextInteger(-math.floor(nextSize * 0.2), math.floor(nextSize * 0.2))
 		local nextCenter = Vector3.new(doorOut.X - nextEntryX, center.Y, doorOut.Z - C.Length - nextSize / 2)
 		buildCorridor(folder, biome, doorOut, Vector3.new(doorOut.X, center.Y, doorOut.Z - C.Length))

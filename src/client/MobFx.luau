@@ -141,6 +141,30 @@ local function watch(model: Model)
 	model:GetAttributeChangedSignal("Hits"):Connect(function()
 		state.recoil = 1
 	end)
+	-- the group noticed the player: a short "!" over the head
+	model:GetAttributeChangedSignal("Awake"):Connect(function()
+		if model:GetAttribute("Awake") and not Style.HideEffects then
+			local tag = Instance.new("BillboardGui")
+			tag.Name = "Alert"
+			tag.Size = UDim2.fromOffset(40, 48)
+			tag.StudsOffsetWorldSpace = Vector3.new(0, (model:GetAttribute("Height") or 6) * 0.6 + 2.5, 0)
+			tag.AlwaysOnTop = true
+			tag.LightInfluence = 0
+			tag.Adornee = root
+			local label = Style.Label(tag, Config.Sections.Texts.Alert, 40, Style.Colors.Gold, { Font = Style.FontTitle, Size = UDim2.fromScale(1, 1) })
+			local scale = Instance.new("UIScale")
+			scale.Scale = 0.2
+			scale.Parent = label
+			tag.Parent = root
+			Style.Tween(scale, 0.18, { Scale = 1.15 })
+			task.delay(0.9, function()
+				Style.Tween(label, 0.25, { TextTransparency = 1 })
+				task.delay(0.3, function()
+					tag:Destroy()
+				end)
+			end)
+		end
+	end)
 	model:GetAttributeChangedSignal("Dying"):Connect(function()
 		if model:GetAttribute("Dying") then
 			mobs[model] = nil

@@ -366,38 +366,39 @@ Config.Gates = {
 		A = { Name = "Ранг A", Level = 34, Requires = "B", Text = "Скоро" },
 		S = { Name = "Ранг S", Level = 42, Requires = "A", Text = "Скоро" },
 	},
-	-- Locations: a big map of Zones (each: Waves count) + a boss arena.
-	-- Biome = look (Config.DungeonLayout.Biomes[*].Theme); Mobs = enemy
-	-- kinds of the waves (Config.Mobs.Defs), Boss = the arena boss.
-	-- Tier = difficulty of zone 1 (+TierStep per zone, the boss = last + 1).
+	-- Locations: a path of Sections (each: how many enemies already stand
+	-- there as one group) + a boss arena. No waves: kill the group, the
+	-- way on opens at once. Biome = look (Config.DungeonLayout.Biomes[*].Theme);
+	-- Mobs = enemy kinds (Config.Mobs.Defs), Boss = the arena boss.
+	-- Tier = difficulty of section 1 (+TierStep per section, the boss = last + 1).
 	-- Level / GearScore = what is recommended. ParSeconds = time of an S.
 	-- Ready = false: a placeholder (shown as "Скоро"), add data to open it.
 	Locations = {
 		{ Id = "E_Assembly", Rank = "E", Biome = "Assembly", Name = "Сборочный цех", Text = "Конвейеры встали, роботы-сборщики вышли из-под контроля.",
-			Tier = 1, TierStep = 1, Zones = { 3, 3, 4 }, Level = 1, GearScore = 10, ParSeconds = 300, Seed = 11,
+			Tier = 1, TierStep = 1, Sections = { 5, 6, 4 }, Level = 1, GearScore = 10, ParSeconds = 200, Seed = 11,
 			Mobs = { "SpiderBot", "Assembler", "AsmGunner", "AsmShield" }, Boss = "ForemanMech", Icon = "gear" },
 		{ Id = "E_Cryo", Rank = "E", Biome = "Cryo", Name = "Криолаборатория", Text = "Ледяные камеры треснули. Внутри — то, что держали в холоде.",
-			Tier = 4, TierStep = 1, Zones = { 3, 4, 4 }, Level = 5, GearScore = 60, ParSeconds = 330, Seed = 23,
+			Tier = 4, TierStep = 1, Sections = { 5, 6, 5 }, Level = 5, GearScore = 60, ParSeconds = 210, Seed = 23,
 			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic" }, Boss = "CryoOverseer", Icon = "vortex" },
 		{ Id = "D_Smelter", Rank = "D", Biome = "Smelter", Name = "Плавильный реактор", Text = "Каналы расплава, жар и тяжёлые мехи плавильни.",
-			Tier = 7, TierStep = 1, Zones = { 3, 4, 4 }, Level = 9, GearScore = 140, ParSeconds = 360, Seed = 37,
+			Tier = 7, TierStep = 1, Sections = { 6, 6, 5 }, Level = 9, GearScore = 140, ParSeconds = 230, Seed = 37,
 			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic" }, Boss = "MoltenColossus", Icon = "flame" },
 		{ Id = "D_Infected", Rank = "D", Biome = "Infected", Name = "Заражённый сектор", Text = "Нано-биомасса пожирает металл. Роботы стали её носителями.",
-			Tier = 9, TierStep = 1, Zones = { 4, 4, 4, 5 }, Level = 12, GearScore = 190, ParSeconds = 420, Seed = 41,
+			Tier = 9, TierStep = 1, Sections = { 5, 6, 6, 5 }, Level = 12, GearScore = 190, ParSeconds = 270, Seed = 41,
 			Mobs = { "InfectedCrawler", "InfectedBrute", "InfectedSpitter", "InfectedMedic" }, Boss = "HiveMother", Icon = "skull" },
 		{ Id = "D_Nexus", Rank = "D", Biome = "Nexus", Name = "Ядро Нексуса", Text = "Сердце ИИ. Его стражи не знают пощады.",
-			Tier = 11, TierStep = 1, Zones = { 4, 4, 5, 5 }, Level = 15, GearScore = 250, ParSeconds = 450, Seed = 53,
+			Tier = 11, TierStep = 1, Sections = { 6, 6, 7, 5 }, Level = 15, GearScore = 250, ParSeconds = 280, Seed = 53,
 			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
 		-- placeholders: data is enough to open them later
-		{ Id = "C_Foundry", Rank = "C", Biome = "Smelter", Name = "Глубинная литейная", Ready = false, Tier = 14, TierStep = 1, Zones = { 4, 4, 5, 5 }, Level = 18, GearScore = 330, ParSeconds = 480, Seed = 61,
+		{ Id = "C_Foundry", Rank = "C", Biome = "Smelter", Name = "Глубинная литейная", Ready = false, Tier = 14, TierStep = 1, Sections = { 6, 7, 7, 6 }, Level = 18, GearScore = 330, ParSeconds = 300, Seed = 61,
 			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic" }, Boss = "MoltenColossus", Icon = "flame" },
-		{ Id = "C_Hive", Rank = "C", Biome = "Infected", Name = "Улей биомассы", Ready = false, Tier = 15, TierStep = 1, Zones = { 4, 5, 5, 5 }, Level = 20, GearScore = 360, ParSeconds = 480, Seed = 67,
+		{ Id = "C_Hive", Rank = "C", Biome = "Infected", Name = "Улей биомассы", Ready = false, Tier = 15, TierStep = 1, Sections = { 6, 7, 7, 6 }, Level = 20, GearScore = 360, ParSeconds = 300, Seed = 67,
 			Mobs = { "InfectedCrawler", "InfectedBrute", "InfectedSpitter", "InfectedMedic" }, Boss = "HiveMother", Icon = "skull" },
-		{ Id = "B_Core", Rank = "B", Biome = "Nexus", Name = "Ядро-2", Ready = false, Tier = 17, TierStep = 1, Zones = { 5, 5, 5, 5 }, Level = 26, GearScore = 440, ParSeconds = 510, Seed = 71,
+		{ Id = "B_Core", Rank = "B", Biome = "Nexus", Name = "Ядро-2", Ready = false, Tier = 17, TierStep = 1, Sections = { 7, 7, 8, 6 }, Level = 26, GearScore = 440, ParSeconds = 320, Seed = 71,
 			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
-		{ Id = "A_Citadel", Rank = "A", Biome = "Cryo", Name = "Ледяная цитадель", Ready = false, Tier = 19, TierStep = 1, Zones = { 5, 5, 5, 5 }, Level = 34, GearScore = 520, ParSeconds = 540, Seed = 79,
+		{ Id = "A_Citadel", Rank = "A", Biome = "Cryo", Name = "Ледяная цитадель", Ready = false, Tier = 19, TierStep = 1, Sections = { 7, 8, 8, 7 }, Level = 34, GearScore = 520, ParSeconds = 340, Seed = 79,
 			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic" }, Boss = "CryoOverseer", Icon = "vortex" },
-		{ Id = "S_Throne", Rank = "S", Biome = "Nexus", Name = "Трон Нексуса", Ready = false, Tier = 21, TierStep = 1, Zones = { 5, 5, 5, 5 }, Level = 42, GearScore = 600, ParSeconds = 600, Seed = 83,
+		{ Id = "S_Throne", Rank = "S", Biome = "Nexus", Name = "Трон Нексуса", Ready = false, Tier = 21, TierStep = 1, Sections = { 8, 8, 8, 7 }, Level = 42, GearScore = 600, ParSeconds = 360, Seed = 83,
 			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
 	},
 	Texts = {
@@ -407,7 +408,7 @@ Config.Gates = {
 		NeedRank = "Пройди любые Врата ранга %s",
 		Soon = "Скоро",
 		Recommended = "Рекомендуется: ур. %d  •  Gear Score %d",
-		Zones = "Зон: %d  •  Волн: %d  •  Босс: %s",
+		Zones = "Участков: %d  •  Врагов: %d  •  Босс: %s",
 		Solo = "Соло",
 		Party = "Группой",
 		Best = "Лучшая оценка: %s",
@@ -423,11 +424,11 @@ Config.LocationById = {}
 for order, location in ipairs(Config.Gates.Locations) do
 	location.Order = order
 	location.Ready = location.Ready ~= false
-	location.Waves = 0
-	for _, waves in ipairs(location.Zones) do
-		location.Waves += waves
+	location.Enemies = 0
+	for _, count in ipairs(location.Sections) do
+		location.Enemies += count
 	end
-	location.BossTier = location.Tier + #location.Zones * location.TierStep
+	location.BossTier = location.Tier + #location.Sections * location.TierStep
 	Config.LocationById[location.Id] = location
 end
 
@@ -448,33 +449,30 @@ Config.GateMap = {
 	Texts = { Zone = "ЗОНА %d", Boss = "АРЕНА" },
 }
 
--- Waves in every zone. Count of a wave = Base + PerWave x (wave - 1)
--- (+ GroupCount per extra player); the last wave of a zone adds Elites
--- elite enemies. Health x (1 + GroupHealth per extra player).
-Config.Waves = {
-	Base = 3,
-	PerWave = 1,
-	Elites = 1,
-	EliteFromZone = 1, -- the last wave of every zone has elites
-	RestSeconds = 4,
-	PortalSeconds = 1.1, -- the portal opens this long before the enemy steps out
-	StartDelay = 1.5, -- after entering a zone
+-- Sections of a location (no waves): every section already holds its
+-- group of enemies, standing in the far half of the hall. They notice a
+-- player within Aggro studs (or when hit) and the whole group attacks
+-- together. Killing the group opens the way on at once.
+--   Elites[n] = elites inside the group of section n (the last value
+--   repeats), counted in the section's number.
+--   Extra players: + GroupCount enemies and x (1 + GroupHealth) health each.
+--   XP / credits of a kill x Reward, elites x EliteReward, swarm x SwarmReward.
+Config.Sections = {
+	Elites = { 0, 1, 1, 1 },
+	Aggro = 30, -- studs
+	Spread = 10, -- radius of a group
 	GroupCount = 0.35,
 	GroupHealth = 0.6,
-	-- XP / credits of a kill x Reward (a wave run has many more enemies
-	-- than the old rooms), elites x EliteReward, swarm x SwarmReward
-	Reward = 0.45,
-	EliteReward = 4,
-	SwarmReward = 0.4,
+	Reward = 1,
+	EliteReward = 3,
+	SwarmReward = 0.6,
 	Texts = {
-		Wave = "ВОЛНА %d/%d",
-		Zone = "Зона %d/%d",
-		Enemies = "Врагов: %d",
-		Rest = "Следующая волна через %d",
-		Elite = "ЭЛИТНАЯ ВОЛНА",
-		Cleared = "Зона зачищена — проход открыт",
+		Section = "УЧАСТОК %d/%d",
+		Enemies = "врагов %d/%d",
+		Cleared = "Участок зачищен — проход открыт",
 		Boss = "АРЕНА БОССА",
-		Enter = "Войди в зону",
+		Enter = "Иди вперёд",
+		Alert = "!",
 	},
 }
 
@@ -656,7 +654,7 @@ Config.RedGate = {
 	Duration = 300,
 	Health = 1.8, -- enemy health x
 	Damage = 1.4, -- enemy damage x
-	ExtraWaves = 1, -- per zone
+	ExtraEnemies = 2, -- per section
 	Color = Color3.fromRGB(255, 50, 60),
 	Texts = {
 		Open = "Открылись Красные Врата!",

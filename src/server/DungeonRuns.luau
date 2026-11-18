@@ -4,21 +4,22 @@
 	for a solo player or a group (up to Config.Party.Max), built for the
 	run by GateMap and destroyed when it ends.
 
-	Flow: the team appears at zone 1. When someone steps into a zone its
-	waves start: enemies step out of the spawn portals (the portal glows
-	first), "Волна 2/4" and the enemy counter go to every member
-	(GateState "Wave"), a short rest between waves, the last wave of a
-	zone brings elites. A cleared zone opens its exit barrier. The boss
-	arena closes behind the team, the boss gets an intro (GateState
-	"Boss") and fights in phases (MobAI). After the boss: grade S/A/B/C by
-	time and deaths, every member gets a boss chest (better grade -> more
-	items), the results window ("Result") and the way back after
-	Config.Grades.ReturnSeconds.
+	Flow (no waves, no waiting): the team appears at section 1. Every
+	section already holds its group of enemies (Config.Gates.Locations
+	Sections = { 5, 6, 4 }), standing in front of the exit. They notice a
+	player who comes close (Config.Sections.Aggro) or hits one of them and
+	the whole group attacks together (MobAI). The moment the group is dead
+	the exit barrier opens. "УЧАСТОК 2/3 · врагов 4/6" goes to every member
+	(GateState "Wave"). The boss arena closes behind the team, the boss
+	gets an intro (GateState "Boss") and fights in phases (MobAI). After
+	the boss: grade S/A/B/C by time and deaths, every member gets a boss
+	chest (better grade -> more items), the results window ("Result") and
+	the way back after Config.Grades.ReturnSeconds.
 
-	Difficulty grows with the team: more enemies (Config.Waves.GroupCount)
+	Difficulty grows with the team: more enemies (Config.Sections.GroupCount)
 	and more health (GroupHealth) per extra member. Red runs
-	(Config.RedGate) are harder, use the Red loot table and can't be left
-	before the boss is down.
+	(Config.RedGate) are harder (more enemies per section), use the Red
+	loot table and can't be left before the boss is down.
 
 	A member who dies leaves the run (back to the hub on respawn); the run
 	ends when nobody is left. Kills give every member XP / credits and
@@ -47,7 +48,8 @@ local WorldKit = require(script.Parent.WorldKit)
 
 local DungeonRuns = {}
 
-local W = Config.Waves
+local W = Config.Sections
+local PORTAL_SECONDS = 1.1 -- the boss portal glows this long
 local E = Config.Enemies
 local CB = Config.Combat
 local Looks = Config.MobLooks
@@ -101,7 +103,7 @@ local function notifyAll(run, text: string, kind: string?)
 	end
 end
 
--- Extra team members make waves bigger and enemies tougher.
+-- Extra team members make groups bigger and enemies tougher.
 local function teamScale(run)
 	local extra = math.max(0, #run.players - 1)
 	return 1 + W.GroupCount * extra, 1 + W.GroupHealth * extra
@@ -126,17 +128,13 @@ end
 ---------------------------------------------------------------------
 
 local function waveState(run)
-	local zone = run.zones[run.zoneIndex]
+	local zone = run.zones and run.zones[run.zoneIndex]
 	return {
 		Location = run.location.Name,
 		Zone = run.zoneIndex,
-		Zones = #run.location.Zones,
-		Wave = run.wave,
-		Waves = if zone then zone.Waves else 0,
-		Alive = run.alive,
-		Total = run.total,
-		Elite = run.eliteWave == true,
-		Rest = run.restUntil,
+		Zones = if run.zones then #run.zones else 0,
+		Alive = if zone then zone.Alive else run.alive,
+		Total = if zone then zone.Total else run.total,
 		Phase = run.phase,
 		Red = run.red,
 	}
@@ -174,9 +172,9 @@ local function openPortal(run, position: Vector3, color: Color3)
 		CanTouch = false,
 		CastShadow = false,
 	})
-	TweenService:Create(ring, TweenInfo.new(W.PortalSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = Vector3.new(0.3, 7, 7) }):Play()
-	TweenService:Create(column, TweenInfo.new(W.PortalSeconds), { Transparency = 0.55 }):Play()
-	task.delay(W.PortalSeconds + 0.4, function()
+	TweenService:Create(ring, TweenInfo.new(PORTAL_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = Vector3.new(0.3, 7, 7) }):Play()
+	TweenService:Create(column, TweenInfo.new(PORTAL_SECONDS), { Transparency = 0.55 }):Play()
+	task.delay(PORTAL_SECONDS + 0.4, function()
 		TweenService:Create(ring, TweenInfo.new(0.5), { Transparency = 1 }):Play()
 		TweenService:Create(column, TweenInfo.new(0.5), { Transparency = 1 }):Play()
 		task.delay(0.6, function()
@@ -228,7 +226,7 @@ local function addShield(model)
 	plate.Parent = model
 end
 
--- Builds and registers one enemy. opts: Elite, Boss, Tier
+-- Builds and registers one enemy. opts: Elite, Boss, Tier, Zone, Asleep
 local function spawnMob(run, defId: string, position: Vector3, opts)
 	local def = Config.Mobs.Defs[defId]
 	if not def then
@@ -274,6 +272,8 @@ local function spawnMob(run, defId: string, position: Vector3, opts)
 	if def.Role == "Shield" then
 		addShield(model)
 	end
+	model:SetAttribute("Group", if type(opts.Zone) == "number" then opts.Zone else 0)
+	model:SetAttribute("Awake", opts.Asleep ~= true)
 	model.Parent = run.mobFolder
 	mobInfo[model] = { run = run, zone = opts.Zone or run.zoneIndex }
 	run.mobs[model] = true
@@ -284,73 +284,90 @@ local function spawnMob(run, defId: string, position: Vector3, opts)
 end
 DungeonRuns.SpawnMob = spawnMob
 
--- Enemies of a wave: roles mixed, swarm comes in packs; the last wave
--- of a zone adds elites.
-local function waveList(run, zoneIndex: number, wave: number, waves: number)
+-- The group of a section: roles mixed, at most one healer (never in
+-- section 1), elites by Config.Sections.Elites.
+local function groupList(run, zoneIndex: number, count: number)
 	local countScale = teamScale(run)
-	local count = math.floor((W.Base + W.PerWave * (wave - 1) + (zoneIndex - 1)) * countScale + 0.5)
+	count = math.floor(count * countScale + 0.5) + (if run.red then Config.RedGate.ExtraEnemies else 0)
+	local elites = W.Elites[math.min(zoneIndex, #W.Elites)] + (if #run.players > 2 then 1 else 0)
+	elites = math.min(elites, count - 1)
 	local pool = run.location.Mobs
 	local list = {}
 	local rng = run.rng
-	while #list < count do
+	local healer = false
+	while #list < count - elites do
 		local id = pool[rng:NextInteger(1, #pool)]
 		local def = Config.Mobs.Defs[id]
-		local role = E.Roles[def and def.Role or "Melee"]
-		-- healers: at most one per wave
 		if def and def.Role == "Healer" then
-			local has = false
-			for _, entry in ipairs(list) do
-				if Config.Mobs.Defs[entry.Id].Role == "Healer" then
-					has = true
-				end
-			end
-			if has or wave == 1 then
+			if healer or zoneIndex == 1 then
 				continue
 			end
+			healer = true
 		end
-		for _ = 1, (role and role.Pack) or 1 do
-			table.insert(list, { Id = id })
-		end
+		table.insert(list, { Id = id })
 	end
-	if wave == waves then
-		for _ = 1, W.Elites + math.max(0, #run.players - 2) do
-			local id
-			repeat
-				id = pool[rng:NextInteger(1, #pool)]
-			until Config.Mobs.Defs[id].Role ~= "Swarm" and Config.Mobs.Defs[id].Role ~= "Healer"
-			table.insert(list, { Id = id, Elite = true })
-		end
+	for _ = 1, elites do
+		local id
+		repeat
+			id = pool[rng:NextInteger(1, #pool)]
+		until Config.Mobs.Defs[id].Role ~= "Swarm" and Config.Mobs.Defs[id].Role ~= "Healer"
+		table.insert(list, { Id = id, Elite = true })
 	end
 	return list
 end
 
-local function spawnWave(run, zone, wave: number)
-	local list = waveList(run, zone.Index, wave, zone.Waves)
-	run.alive = 0
-	run.total = #list
-	run.eliteWave = wave == zone.Waves
-	run.phase = "Fight"
-	run.restUntil = nil
-	run.facing = zone.Center
-	local color = if run.red then Config.RedGate.Color else run.map.Biome.Accent
-	local tier = run.location.Tier + (zone.Index - 1) * run.location.TierStep
-	for i, entry in ipairs(list) do
-		local portal = zone.Portals[(i - 1) % #zone.Portals + 1]
-		local jitter = Vector3.new(run.rng:NextNumber(-2.5, 2.5), 0, run.rng:NextNumber(-2.5, 2.5))
-		local position = portal.Position + jitter
-		run.alive += 1
-		task.delay((i - 1) * 0.18, function()
-			if not runs[run] then
-				return
+-- Spots of a group around the zone's post, away from covers / landmark.
+local function groupSpots(run, zone, count: number)
+	local spots = {}
+	local post = zone.Post
+	local tries = 0
+	while #spots < count and tries < 200 do
+		tries += 1
+		local p
+		if #spots == 0 then
+			p = post
+		else
+			local a = run.rng:NextNumber(0, math.pi * 2)
+			local r = run.rng:NextNumber(3.5, W.Spread)
+			p = post + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r * 0.7)
+		end
+		local free = true
+		for _, b in ipairs(zone.Blocks) do
+			if Vector3.new(p.X - b.X, 0, p.Z - b.Z).Magnitude < 7 then
+				free = false
 			end
-			openPortal(run, position, if entry.Elite then E.Elite.Aura else color)
-			task.wait(W.PortalSeconds)
-			if runs[run] then
-				spawnMob(run, entry.Id, position, { Elite = entry.Elite, Tier = tier, Zone = zone.Index })
+		end
+		for _, q in ipairs(spots) do
+			if (p - q).Magnitude < 3.6 then
+				free = false
 			end
-		end)
+		end
+		if free or tries > 150 then
+			table.insert(spots, p)
+		end
 	end
-	pushState(run)
+	return spots
+end
+
+-- Puts the section's group on its post (asleep until a player comes).
+local function placeGroup(run, zone, count: number)
+	local list = groupList(run, zone.Index, count)
+	local spots = groupSpots(run, zone, #list)
+	local tier = run.location.Tier + (zone.Index - 1) * run.location.TierStep
+	zone.Total = #list
+	zone.Alive = #list
+	run.facing = zone.Entry.Position -- they look at the way the team comes from
+	for i, entry in ipairs(list) do
+		local position = Vector3.new(spots[i].X, run.groundY + 3, spots[i].Z)
+		local model = spawnMob(run, entry.Id, position, { Elite = entry.Elite, Tier = tier, Zone = zone.Index, Asleep = true })
+		if not model then
+			zone.Alive -= 1
+			zone.Total -= 1
+		end
+		if i % 3 == 0 then
+			task.wait()
+		end
+	end
 end
 
 local function openBarrier(part)
@@ -440,7 +457,7 @@ local function bossFight(run)
 	closeBarrier(arena.Gate)
 	local def = Config.Mobs.Defs[run.location.Boss]
 	run.phase = "Boss"
-	run.alive, run.total, run.wave = 1, 1, 0
+	run.alive, run.total = 1, 1
 	pushState(run)
 	send(run, "Boss", { Name = def.Name, Title = def.Title or "", Seconds = E.Boss.IntroSeconds, Position = arena.Spawn.Position })
 	openPortal(run, arena.Spawn.Position, Config.DungeonLayout.BossBarrierColor)
@@ -453,38 +470,16 @@ local function bossFight(run)
 	run.boss = boss
 end
 
+-- A section is done the moment its group is dead: the exit opens.
 local function zoneFlow(run, zone)
+	run.zoneIndex = zone.Index
+	run.phase = "Fight"
+	pushState(run)
 	if not waitUntil(run, function()
-		return anyMemberIn(run, zone.Center, zone.Size)
+		return zone.Alive <= 0
 	end) then
 		return false
 	end
-	run.zoneIndex = zone.Index
-	run.wave = 0
-	run.phase = "Rest"
-	run.restUntil = Workspace:GetServerTimeNow() + W.StartDelay
-	pushState(run)
-	task.wait(W.StartDelay)
-	for wave = 1, zone.Waves do
-		if not runs[run] then
-			return false
-		end
-		run.wave = wave
-		spawnWave(run, zone, wave)
-		if not waitUntil(run, function()
-			return run.alive <= 0
-		end) then
-			return false
-		end
-		if wave < zone.Waves then
-			run.phase = "Rest"
-			run.restUntil = Workspace:GetServerTimeNow() + W.RestSeconds
-			pushState(run)
-			task.wait(W.RestSeconds)
-		end
-	end
-	run.phase = "Cleared"
-	pushState(run)
 	openBarrier(zone.Exit)
 	notifyAll(run, W.Texts.Cleared, "gold")
 	return true
@@ -598,9 +593,12 @@ local function kill(model, killer)
 		bossDefeated(run, Vector3.new(position.X, run.groundY, position.Z))
 		return
 	end
-	if info.zone == run.zoneIndex then
-		run.alive = math.max(0, run.alive - 1)
-		pushState(run)
+	local zone = type(info.zone) == "number" and run.zones[info.zone]
+	if zone then
+		zone.Alive = math.max(0, zone.Alive - 1)
+		if info.zone == run.zoneIndex then
+			pushState(run)
+		end
 	end
 end
 
@@ -692,6 +690,9 @@ function DungeonRuns.Damage(player, model, damage: number, isCrit: boolean?)
 		damage *= 1 - E.Roles.Shield.Block
 	end
 	damage = math.max(1, math.floor(damage))
+	if not model:GetAttribute("Awake") then
+		model:SetAttribute("Awake", true) -- MobAI wakes the whole group
+	end
 	humanoid.Health = math.max(0, humanoid.Health - damage)
 	model:SetAttribute("Hits", (model:GetAttribute("Hits") or 0) + 1)
 	WorldKit.UpdateHealth(model.PrimaryPart, humanoid.Health, humanoid.MaxHealth)
@@ -830,7 +831,6 @@ function DungeonRuns.Start(location, players, opts)
 		connections = {},
 		deaths = 0,
 		zoneIndex = 1,
-		wave = 0,
 		alive = 0,
 		total = 0,
 		phase = "Enter",
@@ -839,15 +839,8 @@ function DungeonRuns.Start(location, players, opts)
 	}
 	slots[slot] = run
 	runs[run] = true
-	local zonesWaves = {}
-	for i, waves in ipairs(location.Zones) do
-		zonesWaves[i] = waves + (if run.red then Config.RedGate.ExtraWaves else 0)
-	end
 	run.map = GateMap.Build(location, slot)
 	run.zones = run.map.Zones
-	for i, zone in ipairs(run.zones) do
-		zone.Waves = zonesWaves[i]
-	end
 	local mobFolder = Instance.new("Folder")
 	mobFolder.Name = "Mobs"
 	mobFolder.Parent = run.map.Folder
@@ -890,6 +883,10 @@ function DungeonRuns.Start(location, players, opts)
 		if DungeonRuns.OnRunStarted then
 			DungeonRuns.OnRunStarted(player)
 		end
+	end
+	-- every section's group stands ready before anyone gets there
+	for i, zone in ipairs(run.zones) do
+		placeGroup(run, zone, location.Sections[i] or location.Sections[#location.Sections])
 	end
 	pushState(run)
 	task.spawn(runFlow, run)
