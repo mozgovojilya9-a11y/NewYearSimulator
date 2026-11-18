@@ -32,6 +32,7 @@ local Workspace = game:GetService("Workspace")
 local Config = require(ReplicatedStorage.Shared.Config)
 local AbilityService = require(script.Parent.AbilityService)
 local DungeonRuns = require(script.Parent.DungeonRuns)
+local EquipmentService = require(script.Parent.EquipmentService)
 local Remotes = require(script.Parent.Remotes)
 local StatService = require(script.Parent.StatService)
 local Telegraph = require(script.Parent.Telegraph)
@@ -47,6 +48,7 @@ local SECTIONS = Config.Sections
 
 local mobs = {} -- [model] = state
 local lastDamaged = {} -- [player] = os.clock() of the last hit taken
+local lastHurt = {} -- [player] = os.clock() of the last flinch
 
 local function now(): number
 	return Workspace:GetServerTimeNow()
@@ -60,6 +62,12 @@ function MobAI.DamagePlayer(player, amount: number, attacker: Model?)
 		if taken > 0 then
 			humanoid:TakeDamage(math.max(1, taken))
 			DungeonRuns.NoteDamageTaken(player, taken)
+			-- the "hit taken" flinch (not too often, never over an attack)
+			local t = os.clock()
+			if t - (lastHurt[player] or 0) >= Config.Combat.HurtEvery then
+				lastHurt[player] = t
+				EquipmentService.Act(player, "Hurt")
+			end
 		end
 		lastDamaged[player] = os.clock()
 	end
@@ -550,6 +558,7 @@ function MobAI.Init()
 	DungeonRuns.OnMobRemoved = MobAI.Unregister
 	Players.PlayerRemoving:Connect(function(player)
 		lastDamaged[player] = nil
+		lastHurt[player] = nil
 	end)
 	task.spawn(function()
 		while true do

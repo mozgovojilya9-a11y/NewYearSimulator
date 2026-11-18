@@ -674,8 +674,10 @@ local function blocked(model, player): boolean
 end
 
 -- Deals a ready-made amount of damage to a mob of the player's run
--- (abilities, basic attacks). Returns the damage dealt (0 if none).
-function DungeonRuns.Damage(player, model, damage: number, isCrit: boolean?)
+-- (abilities, basic attacks). flag = "Heavy" (3rd combo hit, ability) or
+-- "Execute" (finisher): stronger knockback and feedback on the client.
+-- Returns the damage dealt (0 if none).
+function DungeonRuns.Damage(player, model, damage: number, isCrit: boolean?, flag: string?)
 	local info = mobInfo[model]
 	if not info or runOf[player] ~= info.run then
 		return 0
@@ -700,7 +702,7 @@ function DungeonRuns.Damage(player, model, damage: number, isCrit: boolean?)
 	if stats then
 		stats.damage += damage
 	end
-	Remotes.Get("ClickHit"):FireClient(player, "Hit", model, damage, isCrit == true, isBlocked)
+	Remotes.Get("ClickHit"):FireClient(player, "Hit", model, damage, isCrit == true, isBlocked, flag)
 	-- knockback + a short stagger (not on bosses)
 	local root, from = model.PrimaryPart, rootOf(player)
 	if root and from and not model:GetAttribute("Boss") and humanoid.Health > 0 and not isBlocked then
@@ -708,7 +710,8 @@ function DungeonRuns.Damage(player, model, damage: number, isCrit: boolean?)
 		away = Vector3.new(away.X, 0, away.Z)
 		if away.Magnitude > 0.1 then
 			local k = CB.Knockback
-			local speed = k.Normal * (if isCrit then k.CritMult else 1) * (if model:GetAttribute("Elite") then k.EliteMult else 1)
+			local strength = if flag == "Execute" then CB.Execute.Knockback elseif flag == "Heavy" or isCrit then k.CritMult else 1
+			local speed = k.Normal * strength * (if model:GetAttribute("Elite") then k.EliteMult else 1)
 			root.AssemblyLinearVelocity = away.Unit * speed + Vector3.new(0, speed * 0.25, 0)
 			model:SetAttribute("StaggerUntil", Workspace:GetServerTimeNow() + k.Stagger)
 		end

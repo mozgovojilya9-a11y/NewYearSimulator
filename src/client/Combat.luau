@@ -70,6 +70,37 @@ local function mobFromPart(part)
 	return nil
 end
 
+-- The character turns to what it hits: the clicked mob, or the nearest
+-- one in reach (we own our character's physics, so this is instant).
+local FACE_RANGE = 16
+local function faceTarget(target)
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root or player:GetAttribute("Zone") ~= "Dungeon" then
+		return
+	end
+	local goal = target and target.PrimaryPart
+	if not goal then
+		local best = FACE_RANGE
+		for _, run in ipairs(lanesFolder:GetChildren()) do
+			local mobs = run:FindFirstChild("Mobs")
+			for _, model in ipairs(if mobs then mobs:GetChildren() else {}) do
+				if model:IsA("Model") and not model:GetAttribute("Dying") and model.PrimaryPart then
+					local d = (model.PrimaryPart.Position - root.Position).Magnitude
+					if d < best then
+						best, goal = d, model.PrimaryPart
+					end
+				end
+			end
+		end
+	end
+	if goal then
+		local flat = Vector3.new(goal.Position.X, root.Position.Y, goal.Position.Z)
+		if (flat - root.Position).Magnitude > 0.5 then
+			root.CFrame = CFrame.lookAt(root.Position, flat)
+		end
+	end
+end
+
 local function click(ray: Ray, charged: boolean?)
 	if Window.AnyOpen() then
 		return
@@ -87,7 +118,8 @@ local function click(ray: Ray, charged: boolean?)
 		local result = Workspace:Raycast(ray.Origin, ray.Direction * 300, hubParams)
 		target = result and dummyFromPart(result.Instance)
 	end
-	Swing.Local()
+	faceTarget(target)
+	Swing.Local(charged == true)
 	clickHit:FireServer(target, charged == true)
 end
 
@@ -139,8 +171,7 @@ local function useSlot(slot: string)
 		local on = not player:GetAttribute("Blocking")
 		abilityRemote:FireServer("Block", on)
 	else
-		abilityRemote:FireServer("Use", slot, aimPoint())
-		Swing.Local()
+		abilityRemote:FireServer("Use", slot, aimPoint()) -- the server starts the move's animation
 	end
 end
 Hud.OnAbility = useSlot
@@ -342,12 +373,19 @@ end
 
 clickHit.OnClientEvent:Connect(function(kind, ...)
 	if kind == "Hit" then
-		local model, damage, isCrit, isBlocked = ...
+		local model, damage, isCrit, isBlocked, flag = ...
 		if not model or not model.Parent then
 			return
 		end
-		Popups.World(topOf(model), (if isCrit then "КРИТ! " else "") .. Format.Number(damage), if isBlocked then Style.Colors.Muted elseif isCrit then Style.Colors.Gold else Style.Colors.Text, if isCrit then 44 else 30, isCrit)
-		flash(model, isCrit)
+		local execute = flag == "Execute"
+		local heavy = flag == "Heavy" or execute
+		local size = if execute then 50 elseif isCrit then 44 elseif heavy then 36 else 30
+		local color = if isBlocked then Style.Colors.Muted elseif execute then Style.Colors.Red elseif isCrit then Style.Colors.Gold else Style.Colors.Text
+		Popups.World(topOf(model), (if isCrit then "КРИТ! " else "") .. Format.Number(damage), color, size, isCrit or execute)
+		if execute then
+			Popups.World(topOf(model) + Vector3.new(0, 2.2, 0), CB.Execute.Text, Style.Colors.Gold, 30, true)
+		end
+		flash(model, isCrit or execute)
 		local at = model:GetPivot().Position
 		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 		if root then
@@ -358,15 +396,22 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 				at += toUs.Unit * 1.5 + Vector3.new(0, 1, 0)
 			end
 		end
-		hitParticles(at, if isCrit then Style.Colors.Gold else Style.Colors.Orange, if isCrit then 16 else 7)
-		sparks(at, if isBlocked then Style.Colors.Cyan elseif isCrit then Style.Colors.Gold else Style.Colors.Orange, if isCrit then 22 else 10)
-		hitStop(model, if isCrit then CB.HitStop.Crit else CB.HitStop.Normal)
+		hitParticles(at, if isCrit then Style.Colors.Gold else Style.Colors.Orange, if heavy then 20 elseif isCrit then 16 else 8)
+		sparks(at, if isBlocked then Style.Colors.Cyan elseif isCrit or execute then Style.Colors.Gold else Style.Colors.Orange, if heavy then 28 elseif isCrit then 22 else 12)
+		hitStop(model, if heavy then CB.HitStop.Heavy elseif isCrit then CB.HitStop.Crit else CB.HitStop.Normal)
 		GateHud.Hit(isCrit)
 		if isBlocked then
 			GateHud.Blocked(model)
 		end
-		Style.PlaySound(Config.Sounds.Hit, if isCrit then 0.8 else 1 + (math.random() - 0.5) * 0.2, 0.4)
-		if isCrit then
+		Style.PlaySound(if isBlocked then Config.Sounds.Blocked else Config.Sounds.Hit, if heavy then 0.8 elseif isCrit then 0.9 else 1 + (math.random() - 0.5) * 0.2, if heavy then 0.6 else 0.45)
+		if heavy then
+			Style.PlaySound(Config.Sounds.HeavyHit, 1, 0.45)
+		end
+		if execute then
+			Popups.Shake(CB.Shake.Execute[1], CB.Shake.Execute[2])
+		elseif heavy then
+			Popups.Shake(CB.Shake.Heavy[1], CB.Shake.Heavy[2])
+		elseif isCrit then
 			Popups.Shake(Config.Hud.ShakeCrit.Amplitude, Config.Hud.ShakeCrit.Seconds)
 		end
 	elseif kind == "Dodge" then
@@ -390,6 +435,8 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 	elseif kind == "Kill" then
 		local position, isBoss = ...
 		hitParticles(position, if isBoss then Style.Colors.Gold else Style.Colors.Magenta, if isBoss then 60 else 20)
+		sparks(position + Vector3.new(0, 1.5, 0), Style.Colors.Orange, if isBoss then 60 else 26)
+		Style.PlaySound(Config.Sounds.MobDeath, 0.9 + math.random() * 0.25, 0.5)
 		if isBoss then
 			Popups.Shake(Config.Hud.ShakeBoss.Amplitude, Config.Hud.ShakeBoss.Seconds)
 			Popups.Toast("Босс побеждён!", "gold")
@@ -397,5 +444,21 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 		end
 	end
 end)
+
+-- Our character takes a hit: a small shake and a thud (the flinch
+-- animation itself is played by Swing for everyone).
+local function watchHurt(character)
+	character:GetAttributeChangedSignal("Act"):Connect(function()
+		local act = character:GetAttribute("Act")
+		if type(act) == "string" and act:match("^Hurt#") then
+			Popups.Shake(0.18, 0.12)
+			Style.PlaySound(Config.Sounds.Hurt, 0.9, 0.35)
+		end
+	end)
+end
+if player.Character then
+	watchHurt(player.Character)
+end
+player.CharacterAdded:Connect(watchHurt)
 
 return Combat

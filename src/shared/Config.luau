@@ -786,8 +786,14 @@ Config.Combat = {
 	-- Feel of a hit: knockback impulse (studs/s, crits and abilities x
 	-- CritMult), a short stagger of the mob, client hitstop and combo.
 	Knockback = { Normal = 10, CritMult = 2.2, Stagger = 0.18, EliteMult = 0.4 },
-	HitStop = { Normal = 0.045, Crit = 0.09 },
+	HitStop = { Normal = 0.05, Crit = 0.1, Heavy = 0.12 }, -- Heavy: 3rd combo hit, finisher, skills
 	Combo = { Window = 2, Text = "КОМБО x%d" },
+	-- Finisher: a hit on a (non-boss) enemy below Threshold of its health
+	-- is a finishing blow: x Mult damage, extra knockback, "ДОБИВАНИЕ".
+	Execute = { Threshold = 0.25, Mult = 2.2, Knockback = 2.5, Text = "ДОБИВАНИЕ" },
+	-- Camera shake (amplitude in studs, seconds) by hit strength.
+	Shake = { Heavy = { 0.35, 0.18 }, Execute = { 0.5, 0.22 }, Skill = { 0.45, 0.25 } },
+	HurtEvery = 0.6, -- seconds: the "hit taken" reaction plays at most this often
 	Texts = {
 		Dodge = "УКЛОНЕНИЕ",
 		Blocked = "ЩИТ",
@@ -1460,20 +1466,73 @@ Config.Equipment = {
 	Shield = { Size = 2.6, Color = Color3.fromRGB(46, 200, 255), Offset = CFrame.new(-0.35, 0, 0) },
 }
 
--- Weapon swing. Procedural by default: the right shoulder Motor6D goes
--- base -> Wind -> Strike -> base (rotations are in the torso's space:
--- X = pitch forward, Y = yaw, applied as Yaw * Pitch) while the torso
--- leans by Lean degrees. The variants are played in turn.
--- SwingIds: put your own uploaded animation ids here (rbxassetid://...)
--- and they are played instead, in turn. Never guess ids.
+-- Character animations of the fight.
+-- Clips = animations made with Studio's animation generator (R15,
+-- published to the owner's account). A generated clip is long (3-6 s)
+-- with a slow start and end, so only its working part is played:
+-- From..To seconds of the clip, squeezed into Seconds of game time; Hit
+-- = the strike moment inside the clip (found by the arm's peak speed).
+-- Id = "" -> the procedural animation (Motor6D.Transform) plays instead;
+-- R6 characters always use the procedural one.
+-- Acts = what plays for each action, by class: Combo1..3 (Стрелок:
+-- Shot1, Shot2, Charged), Idle (loop while standing with the weapon),
+-- skills by ability Kind (Config.SkillTrees), and the shared Dash,
+-- Block (held), Hurt.
 Config.Animations = {
-	SwingIds = {},
 	MaxTracks = 24, -- an Animator never plays more (Roblox errors at 64)
+	Clips = {
+		SwordSlash1 = { Id = "rbxassetid://136210508179524", From = 0.38, To = 1.23, Hit = 0.83, Seconds = 0.42 },
+		SwordSlash2 = { Id = "rbxassetid://93604454715885", From = 1.28, To = 2.13, Hit = 1.73, Seconds = 0.42 },
+		SwordSmash = { Id = "rbxassetid://87950893403080", From = 0.5, To = 1.5, Hit = 1.03, Seconds = 0.55 },
+		SwordIdle = { Id = "rbxassetid://125664549981285", Loop = true },
+		SwordHeavy = { Id = "rbxassetid://107123547953664", From = 0.55, To = 1.6, Hit = 1.1, Seconds = 0.55 },
+		SwordWave = { Id = "rbxassetid://122640080183190", From = 1.3, To = 2.3, Hit = 1.8, Seconds = 0.55 },
+		SwordSpin = { Id = "rbxassetid://78714300612876", From = 1.0, To = 2.45, Hit = 1.77, Seconds = 0.65 },
+		SpearThrust = { Id = "rbxassetid://76759074633869", From = 0.75, To = 1.6, Hit = 1.2, Seconds = 0.42 },
+		SpearSweep = { Id = "rbxassetid://121352172884864", From = 1.0, To = 1.87, Hit = 1.47, Seconds = 0.42 },
+		SpearSpin = { Id = "rbxassetid://104179323207140", From = 1.2, To = 2.9, Hit = 2.53, Seconds = 0.6 },
+		SpearIdle = { Id = "rbxassetid://80574096637117", Loop = true },
+		SpearLunge = { Id = "rbxassetid://73055006392143", From = 0.03, To = 1.0, Hit = 0.4, Seconds = 0.5 },
+		GunShot = { Id = "rbxassetid://84649004068561", From = 1.15, To = 1.9, Hit = 1.47, Seconds = 0.38 },
+		GunDouble = { Id = "rbxassetid://127333728223574", From = 0, To = 0.7, Hit = 0.27, Seconds = 0.38 },
+		GunCharged = { Id = "rbxassetid://88934243533431", From = 0.2, To = 1.6, Hit = 0.6, Seconds = 0.6 },
+		GunIdle = { Id = "rbxassetid://94483026609745", Loop = true },
+		GunVolley = { Id = "rbxassetid://129533674789949", From = 0.5, To = 2.2, Hit = 1.07, Seconds = 0.7 },
+		Throw = { Id = "rbxassetid://118240859467871", From = 1.4, To = 2.7, Hit = 2.23, Seconds = 0.6 },
+		Place = { Id = "rbxassetid://126675350485473", From = 0.3, To = 1.8, Hit = 1.3, Seconds = 0.7 },
+		Slam = { Id = "rbxassetid://83194661398095", From = 0.9, To = 2.3, Hit = 1.8, Seconds = 0.65 },
+		Push = { Id = "rbxassetid://104404196640182", From = 1.3, To = 2.4, Hit = 1.87, Seconds = 0.55 },
+		PowerUp = { Id = "rbxassetid://121673287359084", From = 0.8, To = 2.0, Hit = 1.5, Seconds = 0.7 },
+		Dash = { Id = "rbxassetid://87760445192930", From = 0.4, To = 1.3, Hit = 0.93, Seconds = 0.3 },
+		Block = { Id = "rbxassetid://84003068317087", From = 0.7, To = 1.3, Hit = 1.0, Seconds = 0.2, Hold = true },
+		Hurt = { Id = "rbxassetid://93499960758644", From = 0.7, To = 1.4, Hit = 0.87, Seconds = 0.35 },
+	},
+	Acts = {
+		Blade = {
+			Combo1 = "SwordSlash1", Combo2 = "SwordSlash2", Combo3 = "SwordSmash", Idle = "SwordIdle",
+			Strike = "SwordHeavy", Stun = "SwordHeavy", Wave = "SwordWave", Spin = "SwordSpin",
+			Quake = "Slam", Trap = "Slam", Pull = "Push", Rage = "PowerUp", Shield = "PowerUp", Heal = "PowerUp",
+		},
+		Pulse = {
+			Combo1 = "SpearThrust", Combo2 = "SpearSweep", Combo3 = "SpearSpin", Idle = "SpearIdle",
+			Strike = "SpearLunge", Stun = "SpearThrust", Wave = "SpearLunge", Spin = "SpearSpin",
+			Quake = "Slam", Trap = "Slam", Pull = "Push", Rage = "PowerUp", Shield = "PowerUp", Heal = "PowerUp",
+		},
+		Gunner = {
+			Shot1 = "GunShot", Shot2 = "GunDouble", Charged = "GunCharged", Idle = "GunIdle",
+			Shot = "GunCharged", Stun = "GunShot", Volley = "GunVolley", Haste = "PowerUp",
+			Barrage = "Throw", Trap = "Throw", Quake = "Slam", Pull = "Push", Turret = "Place", Shield = "PowerUp", Heal = "PowerUp",
+		},
+		Shared = { Dash = "Dash", Block = "Block", Hurt = "Hurt" },
+	},
+	-- Procedural fallback (no clip / R6): the right shoulder goes
+	-- base -> Wind -> Strike -> base (X = pitch forward, Y = yaw) while the
+	-- torso leans by Lean degrees; Combo1..3 use variants 2, 3, 1.
 	Swing = {
-		WindSeconds = 0.07,
+		WindSeconds = 0.09,
 		StrikeSeconds = 0.08,
-		ReturnSeconds = 0.09,
-		TrailSeconds = 0.3,
+		ReturnSeconds = 0.12,
+		TrailSeconds = 0.35,
 		Variants = {
 			{ Name = "Overhead", Wind = { Pitch = 165, Yaw = 0 }, Strike = { Pitch = 35, Yaw = 0 }, Lean = 14 },
 			{ Name = "Horizontal", Wind = { Pitch = 90, Yaw = -75 }, Strike = { Pitch = 90, Yaw = 60 }, Lean = 6, Twist = 22 },
@@ -1505,6 +1564,7 @@ end
 -- Owner-made models (ServerStorage/GameAssets/<Category>/<Name>, see
 -- Shared.Assets and README). Missing model -> procedural fallback.
 Config.Assets = {
+	Animations = Config.Animations.Clips, -- (see Config.Animations)
 	-- Names the game looks for (AssetService reports the missing ones).
 	Expected = {
 		Weapons = { "Weapon_Sword_1", "Weapon_Sword_2", "Weapon_Spear_1", "Weapon_Spear_2", "Weapon_Blaster_1", "Weapon_Blaster_2", "Weapon_Blaster_3" },
@@ -2170,11 +2230,18 @@ Config.Sounds = {
 	Forged = "rbxasset://sounds/victory.wav",
 	Unsheath = "rbxasset://sounds/unsheath.wav",
 	Music = "", -- TODO: your uploaded background music (rbxassetid://...)
-	Hit = "rbxasset://sounds/swordslash.wav",
+	-- fight (built-in engine sounds, checked in Studio; replace with your own ids)
+	Hit = "rbxasset://sounds/metal.ogg", -- a hit on a robot
+	HeavyHit = "rbxasset://sounds/collide.wav", -- 3rd combo hit / finisher / ability, on top of Hit
+	Blocked = "rbxasset://sounds/flashbulb.wav", -- energy shield of a shield bearer
+	MobDeath = "rbxasset://sounds/glassbreak.wav", -- a robot breaks apart
+	GunShot = "rbxasset://sounds/paintball.wav", -- Стрелок's plasma shot (played pitched up)
+	Explosion = "rbxasset://sounds/impact_explosion_03.mp3", -- area abilities, boss slam
+	Hurt = "rbxasset://sounds/hit.wav", -- the player takes a hit
 	Buy = "rbxasset://sounds/electronicpingshort.wav",
-	Barrier = "", -- TODO: barrier dissolve
+	Barrier = "rbxasset://sounds/swordlunge.wav", -- a section's way opens (played low)
 	Portal = "", -- TODO: portal whoosh
-	BossDeath = "", -- TODO: boss explosion
+	BossDeath = "rbxasset://sounds/impact_explosion_03.mp3",
 	Ui = "", -- TODO: button click
 }
 

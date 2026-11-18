@@ -179,10 +179,18 @@ function AbilityService.Slow(player, model: Model, seconds: number)
 	setStatus(model, "SlowUntil", seconds * (1 + (stats.ControlPct or 0)))
 end
 
--- One hit on an enemy (mob or dummy) with on-hit effects.
-local function hit(player, model: Model, damage: number, isCrit: boolean?)
+-- One hit on an enemy (mob or dummy) with on-hit effects. heavy = the
+-- 3rd combo hit or an ability (stronger hitstop / shake / knockback).
+-- A hit on a weakened enemy is a finisher (Config.Combat.Execute).
+local function hit(player, model: Model, damage: number, isCrit: boolean?, heavy: boolean?)
 	if DungeonRuns.IsMob(model) then
-		local dealt = DungeonRuns.Damage(player, model, damage, isCrit)
+		local flag = if heavy then "Heavy" else nil
+		local humanoid = model:FindFirstChildOfClass("Humanoid")
+		if humanoid and not model:GetAttribute("Boss") and humanoid.Health / math.max(1, humanoid.MaxHealth) <= CB.Execute.Threshold then
+			damage *= CB.Execute.Mult
+			flag = "Execute"
+		end
+		local dealt = DungeonRuns.Damage(player, model, damage, isCrit, flag)
 		if dealt > 0 then
 			local stats = StatService.Get(player)
 			if (stats.Lifesteal or 0) > 0 then
@@ -238,18 +246,20 @@ function AbilityService.Basic(player, target, charged: boolean?): boolean
 	local stats = StatService.Get(player)
 	if classId == "Gunner" then
 		local G = CB.Gunner
-		local main = pickTarget(player, target, G.Range)
-		if not main then
-			return false
-		end
 		local isCharged = false
 		if charged and s.chargeStart and os.clock() - s.chargeStart >= G.ChargeSeconds * 0.9 then
 			isCharged = true
 		end
+		EquipmentService.Swing(player, if isCharged then "Charged" elseif s.shots % 2 == 0 then "Shot1" else "Shot2")
+		local main = pickTarget(player, target, G.Range)
+		if not main then
+			s.chargeStart = nil
+			return false
+		end
 		s.chargeStart = nil
 		s.shots += 1
 		local damage, isCrit = roll(player, if isCharged then G.ChargeMult * (1 + (stats.ChargeBonus or 0)) else 1)
-		hit(player, main, damage, isCrit)
+		hit(player, main, damage, isCrit, isCharged)
 		fx("Beam", root.Position + Vector3.new(0, 1, 0), main:GetPivot().Position, if isCharged then Config.Theme.Gold else CB.FxColor, if isCharged then 0.8 else 0.35)
 		if s.shots % G.VolleyEvery == 0 then
 			local count = G.VolleyTargets + math.floor(stats.VolleyBonus or 0)
@@ -269,6 +279,7 @@ function AbilityService.Basic(player, target, charged: boolean?): boolean
 	local def = if classId == "Pulse" then CB.Pulse elseif classId == "Blade" then CB.Blade else nil
 	if not def then
 		-- no class yet: a plain hit
+		EquipmentService.Swing(player, "Combo1")
 		local main = pickTarget(player, target, Config.Click.MeleeRange)
 		if main then
 			local damage, isCrit = StatService.RollHit(player)
@@ -281,12 +292,14 @@ function AbilityService.Basic(player, target, charged: boolean?): boolean
 	s.combo = if t - s.lastHit <= def.ComboWindow then s.combo % 3 + 1 else 1
 	s.lastHit = t
 	local step = s.combo
+	EquipmentService.Swing(player, "Combo" .. step)
+	local heavy = step == 3
 	local power = def.Combo[step] * (if step == 3 then 1 + (stats.ComboBonus or 0) else 1)
 	if classId == "Pulse" and step == 3 then
 		local any = false
 		for _, e in ipairs(enemiesNear(player, root.Position, def.ThirdRadius)) do
 			local d, c = roll(player, power)
-			hit(player, e.model, d, c)
+			hit(player, e.model, d, c, heavy)
 			any = true
 		end
 		fx("Ring", root.Position, def.ThirdRadius, Config.ClassById.Pulse.Color)
@@ -297,13 +310,13 @@ function AbilityService.Basic(player, target, charged: boolean?): boolean
 		return false
 	end
 	local damage, isCrit = roll(player, power)
-	hit(player, main, damage, isCrit)
+	hit(player, main, damage, isCrit, heavy)
 	if classId == "Blade" and step == 3 then
 		local center = main:GetPivot().Position
 		for _, e in ipairs(enemiesNear(player, center, def.ThirdArc)) do
 			if e.model ~= main then
 				local d, c = roll(player, power * 0.6)
-				hit(player, e.model, d, c)
+				hit(player, e.model, d, c, heavy)
 			end
 		end
 		fx("Ring", center, def.ThirdArc, Config.ClassById.Blade.Color)
@@ -447,7 +460,7 @@ local function execute(player, node, rank: number, aim): (boolean, string?)
 				local center = if r then r.Position else origin
 				for _, e in ipairs(enemiesNear(player, center, radius)) do
 					local d, c = roll(player, power, true)
-					hit(player, e.model, d, c)
+					hit(player, e.model, d, c, true)
 					if kind == "Quake" and e.model.Parent then
 						AbilityService.Stun(player, e.model, Config.RankValue(ability.Duration, rank))
 					end
@@ -474,7 +487,7 @@ local function execute(player, node, rank: number, aim): (boolean, string?)
 				end
 			end
 			local d, c = roll(player, power, true)
-			hit(player, e.model, d, c)
+			hit(player, e.model, d, c, true)
 			if e.model.Parent then
 				AbilityService.Stun(player, e.model, Config.RankValue(ability.Duration, rank))
 			end
@@ -485,7 +498,7 @@ local function execute(player, node, rank: number, aim): (boolean, string?)
 		local list = enemiesInFront(player, origin, direction, ability.Range or 16, 35)
 		for _, e in ipairs(list) do
 			local d, c = roll(player, power, true)
-			hit(player, e.model, d, c)
+			hit(player, e.model, d, c, true)
 			if e.model.Parent then
 				AbilityService.Slow(player, e.model, Config.RankValue(ability.Duration, rank))
 			end
@@ -502,7 +515,7 @@ local function execute(player, node, rank: number, aim): (boolean, string?)
 		end
 		for i = 1, math.min(#list, ability.Targets or 3) do
 			local d, c = roll(player, power, true)
-			hit(player, list[i].model, d, c)
+			hit(player, list[i].model, d, c, true)
 			fx("Beam", origin + Vector3.new(0, 1, 0), list[i].model:GetPivot().Position, color, 0.4)
 		end
 		return true
@@ -521,7 +534,7 @@ local function execute(player, node, rank: number, aim): (boolean, string?)
 		return false, Config.Combat.Texts.NoTarget
 	end
 	local d, c = roll(player, power, true)
-	hit(player, target, d, c)
+	hit(player, target, d, c, true)
 	if kind == "Stun" and target.Parent then
 		AbilityService.Stun(player, target, Config.RankValue(ability.Duration, rank))
 	end
@@ -561,12 +574,12 @@ function AbilityService.Use(player, slot: string, aim)
 	if not node or not node.Active or rank <= 0 then
 		return
 	end
+	EquipmentService.Swing(player, node.Ability.Kind)
 	local ok, message = execute(player, node, rank, aim)
 	if ok then
 		local stats = StatService.Get(player)
 		local cooldown = Config.RankValue(node.Ability.Cooldown, rank) * (1 - math.min(0.5, stats.CooldownPct or 0))
 		setCooldown(player, slot, cooldown)
-		EquipmentService.Swing(player)
 	elseif message then
 		Remotes.Notify(player, message, "bad")
 	end
@@ -593,6 +606,7 @@ function AbilityService.Dash(player, direction)
 	local distance = CB.Dash.Distance + (stats.Dash or 0)
 	setCooldown(player, "Dash", CB.Dash.Cooldown)
 	state(player).iframeUntil = os.clock() + CB.Dash.IFrames -- dodge: no damage for a moment
+	EquipmentService.Act(player, "Dash")
 	Remotes.Get("Ability"):FireClient(player, "Dash", flat, distance, CB.Dash.Seconds)
 	fx("Dash", player.Character, CB.Dash.Seconds)
 	if classId == "Pulse" then

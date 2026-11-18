@@ -22,7 +22,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AbilityService = require(script.Parent.AbilityService)
-local EquipmentService = require(script.Parent.EquipmentService)
 local PlayerState = require(script.Parent.PlayerState)
 local Remotes = require(script.Parent.Remotes)
 local StatService = require(script.Parent.StatService)
@@ -39,7 +38,7 @@ local function click(player, target, charged)
 	if not root or not humanoid or humanoid.Health <= 0 then
 		return
 	end
-	EquipmentService.Swing(player)
+	-- the swing / shot animation is started inside (it knows the combo step)
 	-- Class attacks (combo / 360 / shots) on run mobs in the dungeon and
 	-- on the Polygon dummies in the hub (AbilityService picks the targets).
 	AbilityService.Basic(player, target, charged == true)

@@ -145,10 +145,25 @@ local function refreshAll(player)
 end
 EquipmentService.Refresh = refreshAll
 
--- Called after an accepted click / trainer tick.
-function EquipmentService.Swing(player)
+-- An action every client animates (Swing.luau): "Act" = "<name>#<n>",
+-- name = Combo1..3 / Shot1 / Shot2 / Charged / an ability Kind / Dash /
+-- Hurt (Config.Animations.Acts).
+function EquipmentService.Act(player, name: string)
 	local character = player.Character
 	if character then
+		local n = (character:GetAttribute("ActN") or 0) + 1
+		character:SetAttribute("ActN", n)
+		character:SetAttribute("Act", name .. "#" .. n)
+	end
+end
+
+-- Called after an accepted attack / ability (weapon trail + the action).
+function EquipmentService.Swing(player, act: string?)
+	local character = player.Character
+	if character then
+		if act then
+			EquipmentService.Act(player, act)
+		end
 		character:SetAttribute("Swing", (character:GetAttribute("Swing") or 0) + 1)
 	end
 end

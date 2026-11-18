@@ -1,18 +1,20 @@
 --[[
 	Swing.luau
-	Weapon swing for every character. The server bumps a character's
-	"Swing" attribute on every accepted click, trainer tick and hit, so
-	all clients see everyone's swings; the local player also swings at
-	once on their own click (Swing.Local) so it feels instant.
+	Fight animations of every character. The server sets the character's
+	"Act" attribute ("Combo2#57": the action and a counter) on every
+	attack, ability, dash and hit taken, so all clients see everyone's
+	moves; the local player plays its own attacks at once on the click
+	(Swing.Local) so they feel instant, and the echo is skipped.
 
-	Procedural: every frame (RunService.Stepped, after the Animator)
-	the right shoulder (R6 "Right Shoulder", R15 "RightShoulder"; Motor6D
-	or AnimationConstraint) gets a rotation through its Transform:
-	base -> wind-up -> strike -> base; the torso leans via the root
-	joint. C0 is never written (read-only in new rigs). The weapon's
-	Trail is switched on during the swing. Three variants play in turn: overhead, horizontal, thrust
-	(Config.Animations.Swing). If Config.Animations.SwingIds has ids,
-	those animations are played instead.
+	Act -> clip: Config.Animations.Acts[class][act] (or .Shared) names a
+	clip of Config.Animations.Clips. A generated clip plays only its
+	working part From..To squeezed into Seconds (R15 only). Without a clip
+	(no id, R6 rig) the procedural swing plays: the right shoulder and the
+	torso through Motor6D.Transform (C0 is never written). The weapon's
+	Trail is on during melee moves.
+
+	Also: the class idle stance (looped) while standing with a weapon, the
+	block pose held while "Blocking", and the AnimationTrack guard.
 ]]
 
 local Players = game:GetService("Players")
@@ -23,50 +25,32 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Style = require(script.Parent.ui.Style)
 
 local player = Players.LocalPlayer
-local S = Config.Animations.Swing
+local A = Config.Animations
+local S = A.Swing
+local CB = Config.Combat
 
 local Swing = {}
 
-local active = {} -- [character] = { started, variant, shoulder, root }
-local swinging = {} -- [character] = true
-local variantOf = {} -- [character] = index of the next variant
-local tracks = {} -- [character] = { AnimationTrack }
+local MELEE = { Combo1 = true, Combo2 = true, Combo3 = true, Strike = true, Stun = true, Wave = true, Spin = true, Quake = true, Trap = true }
+local PROCEDURAL_VARIANT = { Combo1 = 2, Combo2 = 3, Combo3 = 1, Shot1 = 3, Shot2 = 3, Charged = 3, Strike = 1, Stun = 3, Wave = 2, Spin = 2, Quake = 1 }
 
-local function findJoint(character, names)
-	for _, name in ipairs(names) do
-		local joint = character:FindFirstChild(name, true)
-		if joint and (joint:IsA("Motor6D") or joint:IsA("AnimationConstraint")) then
-			return joint
-		end
-	end
-	return nil
+local chars = {} -- [character] = state
+local active = {} -- [character] = procedural swing { started, variant, shoulder, root }
+
+---------------------------------------------------------------------
+-- Helpers
+---------------------------------------------------------------------
+
+local function ownerClass(character): string
+	local owner = Players:GetPlayerFromCharacter(character)
+	return owner and owner:GetAttribute("Class") or ""
 end
 
--- R15 "RightShoulder" / "Root", R6 "Right Shoulder" / "RootJoint".
--- Motor6D or (new avatar joints) AnimationConstraint: both have Transform.
-local function joints(character)
-	return findJoint(character, { "RightShoulder", "Right Shoulder" }), findJoint(character, { "Root", "RootJoint" })
-end
-
--- Rotation of the joint frame inside its parent part (C0 for a Motor6D,
--- Attachment0 for an AnimationConstraint). Only READ, never written.
-local function jointRotation(joint): CFrame
-	if joint:IsA("Motor6D") then
-		return joint.C0.Rotation
-	end
-	local attachment = joint.Attachment0
-	return if attachment then attachment.CFrame.Rotation else CFrame.identity
-end
-
--- Transform offset that turns the joint's child by `world` (a rotation
--- in the parent part's space) whatever the joint's own axes are.
-local function offsetFor(joint, world: CFrame): CFrame
-	local r = jointRotation(joint)
-	return r:Inverse() * world * r
-end
-
-local function pose(key): CFrame
-	return CFrame.Angles(0, math.rad(key.Yaw or 0), 0) * CFrame.Angles(math.rad(key.Pitch or 0), 0, 0)
+local function clipFor(character, act: string)
+	local acts = A.Acts[ownerClass(character)]
+	local name = (acts and acts[act]) or A.Acts.Shared[act]
+	local clip = name and A.Clips[name]
+	return clip, name
 end
 
 local function setTrail(character, enabled: boolean)
@@ -78,74 +62,89 @@ local function setTrail(character, enabled: boolean)
 	end
 end
 
--- Uploaded animations (optional).
-local function playUploaded(character, index: number): boolean
-	local ids = Config.Animations.SwingIds
-	if #ids == 0 then
-		return false
+local function stateOf(character)
+	local s = chars[character]
+	if not s then
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		s = {
+			humanoid = humanoid,
+			animator = humanoid and humanoid:FindFirstChildOfClass("Animator"),
+			r15 = humanoid ~= nil and humanoid.RigType == Enum.HumanoidRigType.R15,
+			tracks = {}, -- [clip name] = AnimationTrack
+			current = nil, -- { track, ends }
+			idle = nil, -- { name, track }
+			busyUntil = 0,
+		}
+		chars[character] = s
 	end
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
-	if not animator then
-		return false
+	return s
+end
+
+-- Loaded track of a clip (R15 + id), or nil.
+local function trackOf(character, name: string?, clip)
+	if not name or not clip or (clip.Id or "") == "" then
+		return nil
 	end
-	tracks[character] = tracks[character] or {}
-	local slot = (index - 1) % #ids + 1
-	local track = tracks[character][slot]
+	local s = stateOf(character)
+	if not s.r15 then
+		return nil
+	end
+	if not s.animator or not s.animator.Parent then
+		s.animator = s.humanoid and s.humanoid:FindFirstChildOfClass("Animator")
+		if not s.animator then
+			return nil
+		end
+	end
+	local track = s.tracks[name]
+	if track == false then
+		return nil
+	end
 	if not track then
 		local animation = Instance.new("Animation")
-		animation.AnimationId = ids[slot]
-		local ok, loaded = pcall(animator.LoadAnimation, animator, animation)
-		if not ok then
-			return false
+		animation.AnimationId = clip.Id
+		local ok, loaded = pcall(s.animator.LoadAnimation, s.animator, animation)
+		if not ok or not loaded then
+			s.tracks[name] = false
+			return nil
 		end
 		track = loaded
-		track.Priority = Enum.AnimationPriority.Action
-		tracks[character][slot] = track
+		track.Looped = clip.Loop == true
+		track.Priority = if clip.Loop then Enum.AnimationPriority.Idle elseif clip.Hold then Enum.AnimationPriority.Action3 else Enum.AnimationPriority.Action2
+		s.tracks[name] = track
 	end
-	track:Play(0.05)
-	return true
+	return track
 end
 
-local function play(character)
-	if swinging[character] then
-		return
-	end
-	local index = variantOf[character] or 1
-	variantOf[character] = index % #S.Variants + 1
+---------------------------------------------------------------------
+-- Procedural swing (fallback)
+---------------------------------------------------------------------
 
-	swinging[character] = true
-	setTrail(character, true)
-	task.delay(S.TrailSeconds, function()
-		if character.Parent then
-			setTrail(character, false)
+local function findJoint(character, names)
+	for _, name in ipairs(names) do
+		local joint = character:FindFirstChild(name, true)
+		if joint and (joint:IsA("Motor6D") or joint:IsA("AnimationConstraint")) then
+			return joint
 		end
-	end)
-
-	if playUploaded(character, index) then
-		task.wait(S.WindSeconds + S.StrikeSeconds + S.ReturnSeconds)
-		swinging[character] = nil
-		return
 	end
-
-	local shoulder, rootJoint = joints(character)
-	if not shoulder then
-		swinging[character] = nil
-		return
-	end
-	active[character] = {
-		started = os.clock(),
-		variant = S.Variants[index],
-		shoulder = shoulder,
-		root = rootJoint,
-	}
-	task.wait(S.WindSeconds + S.StrikeSeconds + S.ReturnSeconds)
-	swinging[character] = nil
+	return nil
 end
 
----------------------------------------------------------------------
--- Procedural pose, applied every frame on top of the Animator
----------------------------------------------------------------------
+local function jointRotation(joint): CFrame
+	if joint:IsA("Motor6D") then
+		return joint.C0.Rotation
+	end
+	local attachment = joint.Attachment0
+	return if attachment then attachment.CFrame.Rotation else CFrame.identity
+end
+
+local function offsetFor(joint, world: CFrame): CFrame
+	local r = jointRotation(joint)
+	return r:Inverse() * world * r
+end
+
+local function pose(key): CFrame
+	return CFrame.Angles(0, math.rad(key.Yaw or 0), 0) * CFrame.Angles(math.rad(key.Pitch or 0), 0, 0)
+end
 
 local function quadOut(t)
 	return 1 - (1 - t) * (1 - t)
@@ -154,8 +153,6 @@ local function quadIn(t)
 	return t * t
 end
 
--- Arm and torso rotations (parent space) at time t of a swing, or nil
--- when the swing is over.
 local function sample(swing, t: number): (CFrame?, CFrame?)
 	local v = swing.variant
 	local wind, strike = pose(v.Wind), pose(v.Strike)
@@ -179,9 +176,8 @@ local function sample(swing, t: number): (CFrame?, CFrame?)
 end
 
 -- The Animator rewrites Transform each frame while it plays something;
--- when it does not, our last value would stay and pile up. Remember
--- what we wrote and what the Animator's own value was.
-local written = {} -- [joint] = { mine = CFrame, base = CFrame }
+-- when it does not, our last value would stay and pile up.
+local written = {} -- [joint] = { mine, base }
 
 local function apply(joint, rotation: CFrame?)
 	if not joint or not joint.Parent then
@@ -212,49 +208,190 @@ RunService.Stepped:Connect(function()
 	end
 end)
 
-local lastLocal = 0
-local lastSeen = {} -- [character] = last Swing value handled
+local function procedural(character, act: string)
+	local index = PROCEDURAL_VARIANT[act]
+	if not index then
+		return
+	end
+	local shoulder = findJoint(character, { "RightShoulder", "Right Shoulder" })
+	if not shoulder then
+		return
+	end
+	active[character] = {
+		started = os.clock(),
+		variant = S.Variants[index],
+		shoulder = shoulder,
+		root = findJoint(character, { "Root", "RootJoint" }),
+	}
+end
+
+---------------------------------------------------------------------
+-- Playing an action
+---------------------------------------------------------------------
+
+local function stopIdle(s)
+	if s.idle then
+		s.idle.track:Stop(0.15)
+		s.idle = nil
+	end
+end
+
+local function play(character, act: string)
+	if not character.Parent then
+		return
+	end
+	local s = stateOf(character)
+	local clip, name = clipFor(character, act)
+	local seconds = if clip and clip.Seconds then clip.Seconds else S.WindSeconds + S.StrikeSeconds + S.ReturnSeconds
+	-- a flinch never cuts an attack or an ability
+	if act == "Hurt" and os.clock() < s.busyUntil then
+		return
+	end
+	if MELEE[act] then
+		setTrail(character, true)
+		task.delay(math.max(S.TrailSeconds, seconds), function()
+			if character.Parent then
+				setTrail(character, false)
+			end
+		end)
+	end
+	if act ~= "Hurt" then
+		s.busyUntil = os.clock() + seconds
+	end
+	local track = trackOf(character, name, clip)
+	if not track then
+		procedural(character, act)
+		return
+	end
+	stopIdle(s)
+	if s.current and s.current.track ~= track and s.current.track.IsPlaying then
+		s.current.track:Stop(0.06)
+	end
+	local speed = (clip.To - clip.From) / math.max(0.05, clip.Seconds)
+	track:Play(0.06, 1, speed)
+	track.TimePosition = clip.From
+	local entry = { track = track }
+	s.current = entry
+	task.delay(clip.Seconds, function()
+		if s.current ~= entry then
+			return
+		end
+		if clip.Hold and s.busyUntil == math.huge then
+			track:AdjustSpeed(0) -- held (block) until released
+			return
+		end
+		track:Stop(0.15)
+		s.current = nil
+	end)
+end
+
+-- Block: the pose is held while the owner's "Blocking" is on.
+local function setBlock(character, on: boolean)
+	local s = stateOf(character)
+	if on then
+		play(character, "Block")
+		s.busyUntil = math.huge
+	else
+		s.busyUntil = 0
+		local clip, name = clipFor(character, "Block")
+		local track = trackOf(character, name, clip)
+		if track and track.IsPlaying then
+			track:Stop(0.15)
+		end
+		if s.current and s.current.track == track then
+			s.current = nil
+		end
+	end
+end
+
+---------------------------------------------------------------------
+-- Idle stance with the weapon (looped, Idle priority: walking wins)
+---------------------------------------------------------------------
+
+task.spawn(function()
+	while true do
+		task.wait(0.2)
+		local now = os.clock()
+		for character, s in pairs(chars) do
+			if not character.Parent then
+				chars[character] = nil
+				continue
+			end
+			local humanoid = s.humanoid
+			local standing = humanoid and humanoid.Health > 0 and humanoid.MoveDirection.Magnitude < 0.1
+				and character:FindFirstChild("EquippedWeapon") ~= nil and now >= s.busyUntil
+			local clip, name = clipFor(character, "Idle")
+			if standing and clip then
+				if not s.idle or s.idle.name ~= name then
+					stopIdle(s)
+					local track = trackOf(character, name, clip)
+					if track then
+						track:Play(0.3)
+						s.idle = { name = name, track = track }
+					end
+				end
+			elseif s.idle then
+				stopIdle(s)
+			end
+		end
+	end
+end)
+
+---------------------------------------------------------------------
+-- Watching characters
+---------------------------------------------------------------------
+
+local lastLocal = {} -- [act] = os.clock() of the local prediction
 
 local function watch(character)
-	lastSeen[character] = character:GetAttribute("Swing") or 0
-	character:GetAttributeChangedSignal("Swing"):Connect(function()
-		local value = character:GetAttribute("Swing") or 0
-		if value == lastSeen[character] then
+	stateOf(character)
+	local owner = Players:GetPlayerFromCharacter(character)
+	character:GetAttributeChangedSignal("Act"):Connect(function()
+		local value = character:GetAttribute("Act")
+		local act = type(value) == "string" and value:match("^([^#]+)")
+		if not act then
 			return
 		end
-		lastSeen[character] = value
-		-- The local player already played this swing on click.
-		if character == player.Character and os.clock() - lastLocal < 0.3 then
+		-- the local player already played this attack on click
+		if character == player.Character and os.clock() - (lastLocal[act] or 0) < 0.4 then
 			return
 		end
-		task.spawn(play, character)
+		task.spawn(play, character, act)
 	end)
+	if owner then
+		owner:GetAttributeChangedSignal("Blocking"):Connect(function()
+			if owner.Character == character then
+				setBlock(character, owner:GetAttribute("Blocking") == true)
+			end
+		end)
+	end
 	character.Destroying:Connect(function()
-		swinging[character] = nil
-		variantOf[character] = nil
-		for _, track in pairs(tracks[character] or {}) do
-			track:Stop(0)
-			track:Destroy()
+		local s = chars[character]
+		if s then
+			for _, track in pairs(s.tracks) do
+				if track then
+					track:Stop(0)
+					track:Destroy()
+				end
+			end
 		end
-		tracks[character] = nil
-		lastSeen[character] = nil
+		chars[character] = nil
 		active[character] = nil
 	end)
 end
 
--- Guard against "AnimationTrack limit of 64 tracks exceeded": whatever
--- plays animations on a rig (default Animate, emotes, owner models), an
+-- Guard against "AnimationTrack limit of 64 tracks exceeded": an
 -- Animator never keeps more than MaxTracks playing; the oldest one-shot
 -- tracks are stopped and destroyed first (looped idle/walk survive).
-local MAX_TRACKS = Config.Animations.MaxTracks or 24
+local MAX_TRACKS = A.MaxTracks or 24
 local function guardAnimator(animator: Animator)
-	local order = {} -- tracks in the order they started
+	local order = {}
 	animator.AnimationPlayed:Connect(function(track)
 		table.insert(order, track)
 		local playing = animator:GetPlayingAnimationTracks()
 		if #playing <= MAX_TRACKS then
 			if #order > MAX_TRACKS * 2 then
-				order = playing -- drop finished ones from the list
+				order = playing
 			end
 			return
 		end
@@ -263,7 +400,6 @@ local function guardAnimator(animator: Animator)
 		for _, old in ipairs(order) do
 			if excess > 0 and old ~= track and not old.Looped and old.IsPlaying then
 				old:Stop(0)
-				old:Destroy()
 				excess -= 1
 			elseif old.IsPlaying then
 				table.insert(kept, old)
@@ -272,45 +408,74 @@ local function guardAnimator(animator: Animator)
 		order = kept
 	end)
 end
-local function guardCharacter(character)
+
+local function onCharacter(character)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	local animator = humanoid and humanoid:WaitForChild("Animator", 10)
 	if animator then
 		guardAnimator(animator)
 	end
+	watch(character)
 end
 
 local function watchPlayer(other)
 	if other.Character then
-		task.spawn(guardCharacter, other.Character)
+		task.spawn(onCharacter, other.Character)
 	end
 	other.CharacterAdded:Connect(function(character)
-		task.spawn(guardCharacter, character)
+		task.spawn(onCharacter, character)
 	end)
-	if other.Character then
-		watch(other.Character)
-	end
-	other.CharacterAdded:Connect(watch)
 end
 for _, other in ipairs(Players:GetPlayers()) do
 	watchPlayer(other)
 end
 Players.PlayerAdded:Connect(watchPlayer)
 
--- Instant local swing on our own click.
--- Hitstop: every running swing holds its pose for `seconds`.
+---------------------------------------------------------------------
+-- API
+---------------------------------------------------------------------
+
+-- Hitstop: running procedural swings hold their pose for `seconds`
+-- (animation tracks are paused by Combat).
 function Swing.Freeze(seconds: number)
 	for _, swing in pairs(active) do
 		swing.started += seconds
 	end
 end
 
-function Swing.Local()
-	lastLocal = os.clock()
-	if player.Character then
-		Style.PlaySound(Config.Sounds.Swing, 1.25 + (math.random() - 0.5) * 0.2, 0.18)
-		task.spawn(play, player.Character)
+-- The local player's attack, predicted on the click: the same combo
+-- step the server will count (Config.Combat[class].ComboWindow).
+local combo, lastAttack, shots = 0, 0, 0
+function Swing.Local(charged: boolean?)
+	local character = player.Character
+	if not character then
+		return
 	end
+	local class = player:GetAttribute("Class") or ""
+	local act
+	if class == "Gunner" then
+		act = if charged then "Charged" elseif shots % 2 == 0 then "Shot1" else "Shot2"
+		shots += 1
+	else
+		local def = CB[class]
+		local now = os.clock()
+		combo = if def and now - lastAttack <= def.ComboWindow then combo % 3 + 1 else 1
+		lastAttack = now
+		act = "Combo" .. combo
+	end
+	lastLocal[act] = os.clock()
+	if class == "Gunner" then
+		Style.PlaySound(Config.Sounds.GunShot, (if charged then 1.1 else 1.6) + (math.random() - 0.5) * 0.15, if charged then 0.5 else 0.3)
+	else
+		Style.PlaySound(Config.Sounds.Swing, 1.25 + (math.random() - 0.5) * 0.2 - (if act == "Combo3" then 0.25 else 0), 0.22)
+	end
+	task.spawn(play, character, act)
+	return act
+end
+
+-- The local combo step that was just played (Combat uses it for juice).
+function Swing.Step(): number
+	return combo
 end
 
 return Swing

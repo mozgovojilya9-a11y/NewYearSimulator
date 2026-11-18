@@ -53,11 +53,69 @@ local debrisFolder = Instance.new("Folder")
 debrisFolder.Name = "LocalMobDebris"
 debrisFolder.Parent = Workspace
 
+-- Metal shards and sparks flying out (one-piece models have no parts to
+-- throw, so they shatter into these).
+local function shards(model, center: Vector3)
+	local color = model:GetAttribute("Color") or Style.Colors.Magenta
+	local size = model:GetExtentsSize()
+	local count = math.clamp(math.floor(size.Y * 2), 6, 16)
+	for i = 1, count do
+		local chunk = Instance.new("Part")
+		local s = math.random() * 0.5 + 0.35
+		chunk.Size = Vector3.new(s, s * (0.4 + math.random()), s)
+		chunk.Color = if i % 3 == 0 then color else Color3.fromRGB(70, 72, 80)
+		chunk.Material = if i % 3 == 0 then Enum.Material.Neon else Enum.Material.Metal
+		chunk.Anchored = true
+		chunk.CanCollide = false
+		chunk.CanQuery = false
+		chunk.CanTouch = false
+		chunk.CastShadow = false
+		local start = CFrame.new(center + Vector3.new((math.random() - 0.5) * size.X, (math.random() - 0.3) * size.Y * 0.8, (math.random() - 0.5) * size.Z))
+		chunk.CFrame = start
+		chunk.Parent = debrisFolder
+		local away = start.Position - center
+		away = Vector3.new(away.X, 0, away.Z)
+		away = if away.Magnitude > 0.01 then away.Unit else Vector3.new(1, 0, 0)
+		local velocity = away * math.random(12, 26) + Vector3.new(0, math.random(14, 26), 0)
+		local spin = CFrame.Angles(math.random() * 8 - 4, math.random() * 8 - 4, math.random() * 8 - 4)
+		local born = os.clock()
+		local connection
+		connection = RunService.RenderStepped:Connect(function()
+			local t = os.clock() - born
+			if t > 1 or not chunk.Parent then
+				connection:Disconnect()
+				chunk:Destroy()
+				return
+			end
+			chunk.CFrame = CFrame.new(start.Position + velocity * t + Vector3.new(0, -50 * t * t, 0)) * CFrame.identity:Lerp(spin, t)
+			chunk.Transparency = math.max(0, (t - 0.6) / 0.4)
+		end)
+	end
+	-- a flash of light where it broke
+	local flash = Instance.new("Part")
+	flash.Shape = Enum.PartType.Ball
+	flash.Size = Vector3.new(2, 2, 2)
+	flash.CFrame = CFrame.new(center)
+	flash.Color = color
+	flash.Material = Enum.Material.Neon
+	flash.Transparency = 0.2
+	flash.Anchored = true
+	flash.CanCollide = false
+	flash.CanQuery = false
+	flash.CastShadow = false
+	flash.Parent = debrisFolder
+	Style.Tween(flash, 0.25, { Size = Vector3.new(1, 1, 1) * math.max(5, size.Y * 1.2), Transparency = 1 })
+	task.delay(0.3, function()
+		flash:Destroy()
+	end)
+end
+
 local function burst(model)
 	if Style.HideEffects then
 		return
 	end
 	local center = model:GetPivot().Position
+	shards(model, center)
 	for _, p in ipairs(model:GetDescendants()) do
 		if p:IsA("BasePart") and p.Transparency < 1 then
 			local chunk = p:Clone()
@@ -114,6 +172,7 @@ local function watch(model: Model)
 		float = model:GetAttribute("Float") == true,
 		hop = model:GetAttribute("Hop") == true,
 	}
+	state.solid = #state.joints <= 1 -- one-piece model: only the Core moves
 	mobs[model] = state
 
 	local highlight
@@ -222,15 +281,21 @@ RunService.Stepped:Connect(function(_, dt)
 			local cf
 			local role = j.role
 			if role == "Core" then
+				-- the whole body: wind-up = lean back and rise, strike = lunge
+				-- forward and dip, hit = pushed back; a step bob while walking.
+				-- One-piece models (owner / AI meshes) get it stronger.
+				local k = if s.solid then 1.6 else 1
 				local lift = 0
 				if s.float then
 					lift = math.sin(t * 2.4 + s.phase) * 0.5
 				elseif s.hop then
 					lift = math.abs(math.sin(t * 7 + s.phase)) * 0.6 * s.walk
+				else
+					lift = math.abs(math.sin(t * 9 + s.phase)) * 0.22 * s.walk * k
 				end
 				local squash = if s.hop then 1 else 0
-				cf = CFrame.new(0, lift + breathe * (1 + squash * 4), 0)
-					* A(-s.recoil * 0.25 + s.windup * 0.1 - strikeArc * 0.18, 0, math.sin(t * 9 + s.phase) * 0.05 * s.walk)
+				cf = CFrame.new(0, lift + breathe * (1 + squash * 4) + s.windup * 0.25 * k, (-strikeArc * 1.1 + s.recoil * 0.5) * k)
+					* A((s.recoil * 0.3 + s.windup * 0.25 - strikeArc * 0.4) * k, 0, math.sin(t * 9 + s.phase) * 0.07 * s.walk * k)
 			elseif role == "Head" then
 				cf = A(breathe * 1.5 - s.recoil * 0.4, math.sin(p * 0.5) * 0.15, 0)
 			elseif role == "ArmR" then

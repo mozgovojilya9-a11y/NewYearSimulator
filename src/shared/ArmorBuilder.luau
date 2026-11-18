@@ -2,7 +2,8 @@
 	ArmorBuilder.luau
 	Armor from Parts. A piece (Config.Armor entry) is a list of small
 	parts, each placed relative to a body anchor: "Head", "Torso",
-	"LeftShin", "RightShin". The same list is used to
+	"Left/RightUpperArm", "Left/RightForearm" (the chest piece covers the
+	arms too), "Left/RightThigh", "Left/RightShin". The same list is used to
 	  - dress a real character (Attach: parts welded to the rig, R6 / R15),
 	  - build a standalone model for previews and forge stands (Build,
 	    BuildSet: parts placed where an R6 body would have them).
@@ -30,6 +31,12 @@ local DUMMY = {
 	Torso = CFrame.new(0, 3, 0),
 	LeftShin = CFrame.new(-0.5, 0.5, 0),
 	RightShin = CFrame.new(0.5, 0.5, 0),
+	LeftThigh = CFrame.new(-0.5, 1.5, 0),
+	RightThigh = CFrame.new(0.5, 1.5, 0),
+	LeftUpperArm = CFrame.new(-1.5, 3.5, 0),
+	RightUpperArm = CFrame.new(1.5, 3.5, 0),
+	LeftForearm = CFrame.new(-1.5, 2.5, 0),
+	RightForearm = CFrame.new(1.5, 2.5, 0),
 }
 
 local function rad(x, y, z)
@@ -104,6 +111,17 @@ local function specs(piece)
 			add("Torso", "PauldronLayer", Vector3.new(0.9, 0.3, 1.18), CFrame.new(x * 1.5, 0.62, 0) * rad(0, 0, x * -18), trim, METAL)
 			add("Torso", "PauldronLight", Vector3.new(0.6, 0.06, 1.2), CFrame.new(x * 1.42, 1.17, 0) * rad(0, 0, x * -14), glow, glowMat)
 		end
+		-- arms: sleeves under the pauldrons and bracers on the forearms, so
+		-- the suit reads as one piece and moves with the arms
+		for _, side in ipairs({ "Left", "Right" }) do
+			local x = if side == "Left" then -1 else 1
+			add(side .. "UpperArm", "Sleeve", Vector3.new(1.1, 1.02, 1.1), CFrame.new(0, 0, 0), main)
+			add(side .. "UpperArm", "SleeveBand", Vector3.new(1.16, 0.14, 1.16), CFrame.new(0, -0.38, 0), trim, METAL)
+			add(side .. "Forearm", "Bracer", Vector3.new(1.12, 0.86, 1.12), CFrame.new(0, 0.05, 0), main)
+			add(side .. "Forearm", "BracerPlate", Vector3.new(0.14, 0.62, 0.8), CFrame.new(x * 0.6, 0.05, 0), trim, METAL)
+			add(side .. "Forearm", "BracerLight", Vector3.new(0.06, 0.5, 0.14), CFrame.new(x * 0.68, 0.05, 0), glow, glowMat)
+			add(side .. "Forearm", "Cuff", Vector3.new(1.16, 0.14, 1.16), CFrame.new(0, -0.38, 0), trim, METAL)
+		end
 		-- back power pack
 		add("Torso", "Pack", Vector3.new(1.4, 1.5, 0.5), CFrame.new(0, 0.2, 0.8), trim, METAL)
 		add("Torso", "PackCore", Vector3.new(0.5, 0.9, 0.08), CFrame.new(0, 0.2, 1.06), glow, glowMat)
@@ -127,6 +145,11 @@ local function specs(piece)
 			add("Torso", "Cape", Vector3.new(1.9, 2.8, 0.12), CFrame.new(0, -0.55, 0.92) * rad(-6, 0, 0), Color3.fromRGB(40, 60, 110), Enum.Material.Fabric)
 		end
 	else -- Legs
+		for _, side in ipairs({ "Left", "Right" }) do
+			add(side .. "Thigh", "Cuisse", Vector3.new(1.1, 0.96, 1.1), CFrame.new(0, 0, 0), main)
+			add(side .. "Thigh", "CuissePlate", Vector3.new(0.8, 0.6, 0.14), CFrame.new(0, 0.05, -0.58), trim, METAL)
+			add(side .. "Thigh", "CuisseLight", Vector3.new(0.5, 0.06, 0.08), CFrame.new(0, -0.28, -0.66), glow, glowMat)
+		end
 		for _, anchor in ipairs({ "LeftShin", "RightShin" }) do
 			add(anchor, "Greave", Vector3.new(1.14, 1.04, 1.14), CFrame.new(0, 0, 0), main)
 			add(anchor, "Knee", Vector3.new(0.8, 0.45, 0.32), CFrame.new(0, 0.5, -0.56), trim, METAL)
@@ -273,12 +296,17 @@ local function rigAnchor(character: Model, anchor: string): (BasePart?, CFrame)
 		end
 		return character:FindFirstChild("Torso"), CFrame.new()
 	end
-	local side = if anchor == "LeftShin" then "Left" else "Right"
-	local lower = character:FindFirstChild(side .. "LowerLeg")
-	if lower then
-		return lower, CFrame.new()
+	local side = if anchor:sub(1, 4) == "Left" then "Left" else "Right"
+	local part = anchor:sub(#side + 1)
+	-- R15 limb, else the R6 limb and its upper / lower half
+	local r15 = ({ Shin = "LowerLeg", Thigh = "UpperLeg", UpperArm = "UpperArm", Forearm = "LowerArm" })[part]
+	local limb = r15 and character:FindFirstChild(side .. r15)
+	if limb then
+		return limb, CFrame.new()
 	end
-	return character:FindFirstChild(side .. " Leg"), CFrame.new(0, -0.5, 0) -- R6: the shin is the lower half of the leg
+	local r6 = if part == "Shin" or part == "Thigh" then side .. " Leg" else side .. " Arm"
+	local half = if part == "Shin" or part == "Forearm" then -0.5 else 0.5
+	return character:FindFirstChild(r6), CFrame.new(0, half, 0)
 end
 
 -- Dresses a character: returns a Model of parts welded to its limbs.

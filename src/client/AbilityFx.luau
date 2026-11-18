@@ -58,36 +58,69 @@ end
 
 local handlers = {}
 
-function handlers.Ring(center: Vector3, radius: number, color: Color3)
-	local y = groundY(center) + 0.15
-	local ring = part({
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.2, 2, 2),
-		CFrame = CFrame.new(center.X, y, center.Z) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = color,
-		Transparency = 0.25,
-	})
-	tween(ring, 0.35, { Size = Vector3.new(0.2, radius * 2, radius * 2), Transparency = 1 })
-	Debris:AddItem(ring, 0.4)
+-- A burst of particles at a point (dust / sparks), removed after it.
+local function burst(position: Vector3, color: Color3, count: number, speed: number, size: number, lifetime: number, up: boolean?)
+	local attachment = Instance.new("Attachment")
+	attachment.WorldPosition = position
+	attachment.Parent = Workspace.Terrain
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Color = ColorSequence.new(color)
+	emitter.LightEmission = 0.4
+	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, size), NumberSequenceKeypoint.new(1, size * 1.8) })
+	emitter.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
+	emitter.Lifetime = NumberRange.new(lifetime * 0.6, lifetime)
+	emitter.Speed = NumberRange.new(speed * 0.6, speed)
+	emitter.SpreadAngle = if up then Vector2.new(25, 25) else Vector2.new(180, 8)
+	emitter.EmissionDirection = Enum.NormalId.Top
+	emitter.Drag = 3
+	emitter.Rate = 0
+	emitter.Parent = attachment
+	emitter:Emit(count)
+	Debris:AddItem(attachment, lifetime + 0.2)
 end
 
+-- Shockwave on the ground: a bright edge that runs out to the radius, a
+-- filled disc that fades, a dust ring and a short flash of light.
+function handlers.Ring(center: Vector3, radius: number, color: Color3)
+	local y = groundY(center) + 0.15
+	local flat = CFrame.new(center.X, y, center.Z) * CFrame.Angles(0, 0, math.rad(90))
+	local edge = part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.25, 2, 2), CFrame = flat, Color = color, Transparency = 0.05 })
+	local fill = part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.12, 2, 2), CFrame = flat * CFrame.new(0.02, 0, 0), Color = color, Transparency = 0.45, Material = Enum.Material.SmoothPlastic })
+	tween(edge, 0.3, { Size = Vector3.new(0.25, radius * 2, radius * 2), Transparency = 1 })
+	tween(fill, 0.45, { Size = Vector3.new(0.12, radius * 2, radius * 2), Transparency = 1 })
+	Debris:AddItem(edge, 0.35)
+	Debris:AddItem(fill, 0.5)
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = radius * 1.6
+	light.Brightness = 3
+	light.Parent = fill
+	tween(light, 0.4, { Brightness = 0 })
+	burst(Vector3.new(center.X, y + 0.5, center.Z), Color3.fromRGB(150, 145, 140), math.clamp(math.floor(radius * 2), 10, 36), radius * 2.2, 1.2, 0.7)
+	if radius >= 8 then
+		Style.PlaySound("Explosion", 1.1, 0.35)
+	end
+end
+
+-- Plasma bolt / energy line: a hot core inside a wide glow, an impact
+-- flash and sparks where it lands.
 function handlers.Beam(from: Vector3, to: Vector3, color: Color3, width: number?)
 	local length = (to - from).Magnitude
 	if length < 0.1 then
 		return
 	end
 	local w = width or 0.4
-	local bolt = part({
-		Size = Vector3.new(w, w, length),
-		CFrame = CFrame.lookAt((from + to) / 2, to),
-		Color = color,
-		Transparency = 0.1,
-	})
-	tween(bolt, 0.2, { Size = Vector3.new(w * 0.2, w * 0.2, length), Transparency = 1 })
-	Debris:AddItem(bolt, 0.25)
-	local flash = part({ Shape = Enum.PartType.Ball, Size = Vector3.new(w * 4, w * 4, w * 4), CFrame = CFrame.new(to), Color = color, Transparency = 0.3 })
-	tween(flash, 0.25, { Size = Vector3.new(w * 8, w * 8, w * 8), Transparency = 1 })
+	local cf = CFrame.lookAt((from + to) / 2, to)
+	local glow = part({ Size = Vector3.new(w * 2.2, w * 2.2, length), CFrame = cf, Color = color, Transparency = 0.55 })
+	local core = part({ Size = Vector3.new(w * 0.7, w * 0.7, length), CFrame = cf, Color = Color3.new(1, 1, 1), Transparency = 0.05 })
+	tween(glow, 0.22, { Size = Vector3.new(w * 0.3, w * 0.3, length), Transparency = 1 })
+	tween(core, 0.16, { Size = Vector3.new(w * 0.1, w * 0.1, length), Transparency = 1 })
+	Debris:AddItem(glow, 0.25)
+	Debris:AddItem(core, 0.2)
+	local flash = part({ Shape = Enum.PartType.Ball, Size = Vector3.new(w * 4, w * 4, w * 4), CFrame = CFrame.new(to), Color = color, Transparency = 0.2 })
+	tween(flash, 0.25, { Size = Vector3.new(w * 9, w * 9, w * 9), Transparency = 1 })
 	Debris:AddItem(flash, 0.3)
+	burst(to, color, math.clamp(math.floor(w * 25), 6, 24), 18, 0.25, 0.35)
 end
 
 function handlers.Area(center: Vector3, radius: number, seconds: number, color: Color3)
