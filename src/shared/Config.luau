@@ -37,6 +37,10 @@ Config.StartingData = {
 	Quests = { Day = 0, List = {} },
 	Weekly = { Week = 0, List = {} },
 	Stats = { Kills = 0, Bosses = 0, Runs = 0, Deaths = 0, PlaySeconds = 0, Pulls = 0 }, -- the Статистика window
+	Achievements = {}, -- [id] = true when reached (the reward is given at once)
+	Title = "", -- the achievement title shown under the name ("" = the level rank)
+	Codes = {}, -- [code] = true when redeemed
+	Gifts = { Day = 0, Claimed = {} }, -- playtime gifts of today
 	Level = 1,
 	Xp = 0,
 	SkillPoints = 0, -- old field (points are now Config.Skills.PointsAtLevel per class)
@@ -792,6 +796,46 @@ Config.Crystals = {
 	Boss = 2,
 	FirstClear = 15,
 	Texts = { Got = "+%d кристаллов", NotEnough = "Нужно %d кристаллов" },
+}
+
+-- Gifts for time in the game today (EngageService): at each Minute a
+-- gift becomes ready; the HUD shows the next one with a timer, a click
+-- claims it. The minutes count only while playing, reset every day.
+Config.Gifts = {
+	List = {
+		{ Minute = 10, Credits = 150 },
+		{ Minute = 20, Crystals = 5 },
+		{ Minute = 30, Credits = 400, Cores = 20 },
+		{ Minute = 60, Crystals = 15 },
+	},
+	Texts = { Ready = "Подарок готов!", Next = "Подарок через %s", Done = "Подарки на сегодня собраны", Got = "Подарок: %s" },
+}
+
+-- Promo codes (Settings window). Case does not matter, each works once
+-- per player; Ends = os.time() after which a code is closed (nil = never).
+Config.Codes = {
+	NANO = { Crystals = 25, Credits = 500 },
+	RELEASE = { Crystals = 50 },
+	GATES = { Cores = 50, Credits = 300 },
+	Texts = { Placeholder = "Введи код", Redeem = "Активировать", Ok = "Код принят: %s", Used = "Этот код уже активирован", Bad = "Нет такого кода" },
+}
+
+-- Achievements (EngageService): Kind counters from data.Stats / the save,
+-- Target to reach; the reward (Кристаллы and maybe a Title) is given at
+-- once with a System notice. The title can be worn (Status window).
+Config.Achievements = {
+	{ Id = "kill100", Kind = "Kills", Target = 100, Name = "Первая сотня", Text = "Убей 100 роботов", Crystals = 10 },
+	{ Id = "kill1000", Kind = "Kills", Target = 1000, Name = "Гроза машин", Text = "Убей 1000 роботов", Crystals = 30, Title = "Гроза машин" },
+	{ Id = "boss1", Kind = "Bosses", Target = 1, Name = "Первый босс", Text = "Победи босса", Crystals = 10 },
+	{ Id = "boss25", Kind = "Bosses", Target = 25, Name = "Охотник на боссов", Text = "Победи 25 боссов", Crystals = 30, Title = "Охотник на боссов" },
+	{ Id = "runs10", Kind = "Runs", Target = 10, Name = "Ходок", Text = "Войди во Врата 10 раз", Crystals = 10 },
+	{ Id = "level10", Kind = "Level", Target = 10, Name = "Оператор", Text = "Достигни 10 уровня", Crystals = 15 },
+	{ Id = "level25", Kind = "Level", Target = 25, Name = "Страж Цитадели", Text = "Достигни 25 уровня", Crystals = 40, Title = "Страж Цитадели" },
+	{ Id = "rankD", Kind = "RankD", Target = 1, Name = "Ранг D", Text = "Пройди любые Врата ранга D", Crystals = 20 },
+	{ Id = "gradeS", Kind = "GradeS", Target = 1, Name = "Безупречно", Text = "Получи оценку S", Crystals = 15, Title = "Безупречный" },
+	{ Id = "enhance10", Kind = "Enhance", Target = 10, Name = "Мастер заточки", Text = "Заточи предмет до +10", Crystals = 25, Title = "Кузнец" },
+	{ Id = "pull1", Kind = "Pulls", Target = 1, Name = "Первая капсула", Text = "Сделай крутку в Терминале снабжения", Crystals = 5 },
+	{ Id = "play5h", Kind = "PlayHours", Target = 5, Name = "Старожил", Text = "Проведи в игре 5 часов", Crystals = 30, Title = "Старожил" },
 }
 
 -- Pulls at the Терминал снабжения (GachaService, window Supply). A pull
@@ -1771,6 +1815,7 @@ Config.Remotes = {
 	Announce = "RemoteEvent", -- S->all (text, color) system chat line + toast
 	StoreNotify = "RemoteEvent", -- S->C (text) after a Robux purchase was granted
 	LevelUp = "RemoteEvent", -- S->C (level, skillPoints gained) big "Новый уровень!" banner
+	Engage = "RemoteFunction", -- ("Gift") | ("Code", text) | ("Achievements") | ("Title", id|"") -> ok, message|data
 	Gacha = "RemoteFunction", -- ("Info") | ("Pull", bannerId, 1|10) -> ok, results | message, info
 	Class = "RemoteFunction", -- ("Choose", classId) | ("Learn", nodeId) | ("Reset") | ("Equip", slot, nodeId|nil) -> ok, message
 	Ability = "RemoteEvent", -- C->S ("Use", slot, aim) | ("Dash", direction) | ("Block", on) | ("Charge"); S->C ("Dash", direction, distance, seconds); S->all ("Fx", kind, ...)

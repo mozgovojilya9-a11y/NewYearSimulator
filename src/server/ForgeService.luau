@@ -107,6 +107,7 @@ local function enhance(player, data, item)
 		item.E = (item.E or 0) + 1
 		item.F = nil
 		GameEvents.Fire(player, "Enhance", 1)
+		GameEvents.Fire(player, "EnhanceLevel", item.E)
 	else
 		item.F = (item.F or 0) + 1
 	end

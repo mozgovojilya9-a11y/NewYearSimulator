@@ -110,9 +110,16 @@ function SystemNotice.Show(title: string, lines: { string }?, kind: string?)
 	end)
 end
 
+-- Every server notice is an important moment: a sound and (gold / red)
+-- a short flash of the screen edge.
+local Popups = require(script.Parent.Popups)
 ReplicatedStorage:WaitForChild("System").OnClientEvent:Connect(function(title, lines, kind)
 	if type(title) == "string" then
 		SystemNotice.Show(title, if type(lines) == "table" then lines else nil, kind)
+		Style.PlaySound(if kind == "red" then "Barrier" else "Forged", if kind == "gold" then 1.25 else 1, 0.5)
+		if kind == "gold" or kind == "red" then
+			Popups.Flash(if kind == "red" then C.Red else C.Gold)
+		end
 	end
 end)
 

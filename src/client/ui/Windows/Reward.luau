@@ -37,8 +37,9 @@ tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 tabLayout.Parent = tabBar
 
 local pages = {}
+local refreshAchievements -- set below
 local function page(name, title, order, color)
-	local tab, setColor = Style.Button(tabBar, { Size = UDim2.fromOffset(150, 38), Color = color, Text = title, TextSize = 18, ZIndex = 34, LayoutOrder = order, Shadow = false })
+	local tab, setColor = Style.Button(tabBar, { Size = UDim2.fromOffset(140, 38), Color = color, Text = title, TextSize = 18, ZIndex = 34, LayoutOrder = order, Shadow = false })
 	local holder = Instance.new("Frame")
 	holder.Position = UDim2.fromOffset(0, 48)
 	holder.Size = UDim2.new(1, 0, 1, -48)
@@ -54,6 +55,9 @@ local function page(name, title, order, color)
 end
 
 function Reward.ShowTab(name)
+	if name == "Achievements" and refreshAchievements then
+		refreshAchievements()
+	end
 	for key, p in pairs(pages) do
 		p.holder.Visible = key == name
 		p.setColor(if key == name then p.color else Color3.fromRGB(150, 140, 170))
@@ -63,6 +67,7 @@ end
 local dailyPage = page("Daily", "Ежедневная", 1, Style.Colors.Gold)
 local questPage = page("Quests", "Задания", 2, Style.Colors.Green)
 local wheelPage = page("Wheel", "Колесо", 3, Style.Colors.Magenta)
+local achPage = page("Achievements", "Достижения", 4, Style.Colors.Gold)
 
 local function clock(seconds: number): string
 	seconds = math.max(0, math.floor(seconds))
@@ -245,6 +250,73 @@ local function renderStory()
 	end
 end
 player:GetAttributeChangedSignal("Tracker"):Connect(renderStory)
+
+---------------------------------------------------------------------
+-- Achievements (EngageService): reward in Кристаллы, some give a title
+---------------------------------------------------------------------
+
+local engage = ReplicatedStorage:WaitForChild("Engage")
+local achList = Instance.new("ScrollingFrame")
+achList.Size = UDim2.fromScale(1, 1)
+achList.BackgroundTransparency = 1
+achList.BorderSizePixel = 0
+achList.ScrollBarThickness = 5
+achList.ScrollBarImageColor3 = Style.Colors.Gold
+achList.CanvasSize = UDim2.new()
+achList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+achList.ZIndex = 33
+achList.Parent = achPage
+local achLayout = Instance.new("UIListLayout")
+achLayout.Padding = UDim.new(0, 6)
+achLayout.SortOrder = Enum.SortOrder.LayoutOrder
+achLayout.Parent = achList
+
+local function renderAchievements(list)
+	for _, child in ipairs(achList:GetChildren()) do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	for i, a in ipairs(list) do
+		local row = Instance.new("Frame")
+		row.LayoutOrder = if a.Done then 100 + i else i
+		row.Size = UDim2.new(1, -10, 0, 60)
+		row.BackgroundTransparency = 1
+		row.ZIndex = 33
+		row.Parent = achList
+		Style.Chamfer(row, { Fill = Style.Colors.PanelDark, Transparency = 0.05, Border = if a.Done then Style.Colors.GoldDim else Style.Colors.Line, Cut = 8, Thickness = 1.5 })
+		local icon = Style.Icons.Make(row, if a.Done then "check" else "trophy", 24, if a.Done then Style.Colors.Gold else Style.Colors.Muted, 34)
+		icon.AnchorPoint = Vector2.new(0, 0.5)
+		icon.Position = UDim2.new(0, 12, 0.5, 0)
+		Style.Label(row, a.Name, 15, if a.Done then Style.Colors.Gold else Style.Colors.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(46, 6), Size = UDim2.new(1, -220, 0, 20), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
+		Style.Label(row, a.Text .. ("  ·  %d / %d"):format(a.Progress, a.Target), 12, Style.Colors.Muted, { Position = UDim2.fromOffset(46, 30), Size = UDim2.new(1, -220, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
+		local reward = ("+%d крист."):format(a.Crystals or 0) .. (if a.Title then "  ·  титул" else "")
+		Style.Label(row, reward, 12, Config.Crystals.Color, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 6), Size = UDim2.fromOffset(160, 18), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 34 })
+		if a.Done and a.Title then
+			local wear = Style.Button(row, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -6), Size = UDim2.fromOffset(130, 24), Color = if player:GetAttribute("Title") == a.Title then Style.Colors.Gold else Style.Colors.Card, Text = if player:GetAttribute("Title") == a.Title then "Надет" else "Надеть титул", TextSize = 12, ZIndex = 35 })
+			wear.Activated:Connect(function()
+				task.spawn(function()
+					local same = player:GetAttribute("Title") == a.Title
+					local ok, message = engage:InvokeServer("Title", if same then "" else a.Id)
+					Popups.Toast(message or "", if ok then "gold" else "bad")
+					local ok2, fresh = engage:InvokeServer("Achievements")
+					if ok2 then
+						renderAchievements(fresh)
+					end
+				end)
+			end)
+		end
+	end
+end
+
+refreshAchievements = function()
+	task.spawn(function()
+		local ok, list = engage:InvokeServer("Achievements")
+		if ok and type(list) == "table" then
+			renderAchievements(list)
+		end
+	end)
+end
 
 ---------------------------------------------------------------------
 -- Wheel

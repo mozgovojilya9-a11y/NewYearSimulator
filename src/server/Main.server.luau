@@ -17,6 +17,7 @@ local Atmosphere = require(script.Parent.Atmosphere)
 local Bounds = require(script.Parent.Bounds)
 local ClassService = require(script.Parent.ClassService)
 local GachaService = require(script.Parent.GachaService)
+local EngageService = require(script.Parent.EngageService)
 local ClickService = require(script.Parent.ClickService)
 local DataService = require(script.Parent.DataService)
 local DevService = require(script.Parent.DevService)
@@ -95,7 +96,8 @@ start("ProgressionService", ProgressionService.Init)
 start("LootService", LootService.Init) -- after ProgressionService: both listen to kills
 start("ArtifactService", ArtifactService.Init) -- after LootService: chains the kill hook, feeds chest drops
 start("StatusService", StatusService.Init)
-start("QuestService", QuestService.Init) -- mentor story chain (listens to GameEvents)
+start("QuestService", QuestService.Init)
+start("EngageService", EngageService.Init) -- gifts, codes, achievements
 start("TrainingService", TrainingService.Init, hub)
 start("PartyService", PartyService.Init)
 start("GateService", GateService.Init, hub) -- after ProgressionService: chains OnRoomCleared

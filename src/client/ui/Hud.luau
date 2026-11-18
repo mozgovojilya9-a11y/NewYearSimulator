@@ -187,9 +187,11 @@ local function refreshProfile()
 	local rank = Config.RankFor(level)
 	Icons.Set(classIcon, if classDef then classDef.Icon else "user", C.Gold)
 	local hex = string.format("#%02X%02X%02X", C.Muted.R * 255, C.Muted.G * 255, C.Muted.B * 255)
-	classLabel.Text = (if classDef then Style.Upper(classDef.Name) else Style.Upper(T.NoClass)) .. ('  <font color="%s">%s</font>'):format(hex, rank.Name)
+	local title = player:GetAttribute("Title")
+	local shown = if type(title) == "string" and title ~= "" then title else rank.Name
+	classLabel.Text = (if classDef then Style.Upper(classDef.Name) else Style.Upper(T.NoClass)) .. ('  <font color="%s">%s</font>'):format(hex, shown)
 end
-for _, attribute in ipairs({ "Level", "Xp", "XpNext", "Class" }) do
+for _, attribute in ipairs({ "Level", "Xp", "XpNext", "Class", "Title" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshProfile)
 end
 refreshProfile()
@@ -718,6 +720,90 @@ local function refreshCrystals()
 end
 player:GetAttributeChangedSignal("Crystals"):Connect(refreshCrystals)
 refreshCrystals()
+
+-- Playtime gift (EngageService): above the wallet, the next gift and a
+-- timer; when ready it glows gold and a click claims it.
+local GF = Config.Gifts
+local gift = Instance.new("TextButton")
+gift.Name = "Gift"
+gift.AnchorPoint = Vector2.new(0, 1)
+gift.Position = UDim2.new(0, LEFT, 1, -62)
+gift.Size = UDim2.fromOffset(250, 36)
+gift.BackgroundTransparency = 1
+gift.Text = ""
+gift.ZIndex = 5
+gift.Parent = Style.Gui
+local giftShape = Style.Chamfer(gift, { Fill = C.PanelDark, Transparency = 0.12, Border = C.Line, Cut = 6, Thickness = 1.5 })
+local giftIcon = Icons.Make(gift, "chest", 20, C.Gold, 6)
+giftIcon.AnchorPoint = Vector2.new(0, 0.5)
+giftIcon.Position = UDim2.new(0, 12, 0.5, 0)
+local giftText = Style.Label(gift, "", 14, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(42, 0), Size = UDim2.new(1, -50, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6 })
+local giftPulse = Instance.new("UIScale")
+giftPulse.Parent = gift
+local giftReady = false
+local function rewardOf(def): string
+	local parts = {}
+	if def.Crystals then
+		table.insert(parts, def.Crystals .. " крист.")
+	end
+	if def.Credits then
+		table.insert(parts, Format.Number(def.Credits) .. " кр.")
+	end
+	if def.Cores then
+		table.insert(parts, def.Cores .. " ядер")
+	end
+	return table.concat(parts, " + ")
+end
+local giftPlayed, giftClock = 0, os.clock()
+local function refreshGift()
+	local index = player:GetAttribute("GiftNext") or 0
+	local def = GF.List[index]
+	gift.Visible = def ~= nil and player:GetAttribute("Zone") ~= "Dungeon"
+	if not def then
+		return
+	end
+	local left = (player:GetAttribute("GiftAt") or 0) - (giftPlayed + (os.clock() - giftClock))
+	giftReady = left <= 0
+	if giftReady then
+		giftText.Text = GF.Texts.Ready .. "  " .. rewardOf(def)
+		giftText.TextColor3 = C.Gold
+		giftShape.SetBorder(C.Gold)
+	else
+		local s = math.max(0, math.ceil(left))
+		giftText.Text = GF.Texts.Next:format(("%d:%02d"):format(s // 60, s % 60)) .. "  ·  " .. rewardOf(def)
+		giftText.TextColor3 = C.Text
+		giftShape.SetBorder(C.Line)
+	end
+end
+player:GetAttributeChangedSignal("GiftPlayed"):Connect(function()
+	giftPlayed = player:GetAttribute("GiftPlayed") or 0
+	giftClock = os.clock()
+	refreshGift()
+end)
+player:GetAttributeChangedSignal("GiftNext"):Connect(refreshGift)
+player:GetAttributeChangedSignal("Zone"):Connect(refreshGift)
+task.spawn(function()
+	while true do
+		task.wait(1)
+		refreshGift()
+		if giftReady and gift.Visible then
+			giftPulse.Scale = 1.06
+			Style.Tween(giftPulse, 0.5, { Scale = 1 })
+		end
+	end
+end)
+gift.Activated:Connect(function()
+	if not giftReady then
+		Popups.Toast(giftText.Text, "gold")
+		return
+	end
+	task.spawn(function()
+		local ok, message = ReplicatedStorage:WaitForChild("Engage"):InvokeServer("Gift")
+		if not ok then
+			Popups.Toast(message or "", "bad")
+		end
+	end)
+end)
 
 ---------------------------------------------------------------------
 -- Bottom right: ИГРАТЬ / В ХАБ
