@@ -65,6 +65,22 @@ function TravelService.Init(hubInfo)
 			end
 			return ok, message
 		end
+		-- the teleport window: a hall of the hub (only while in the hub)
+		if type(destination) == "string" and destination:sub(1, 5) == "Hall:" then
+			if DungeonRuns.HasRun(player) then
+				return false, "Сейчас нельзя"
+			end
+			local id = destination:sub(6)
+			for _, def in ipairs(Config.HubLayout.Teleports) do
+				if def.Id == id and player.Character then
+					local base = hub.SpawnCFrame.Position - Vector3.new(0, 4, 0)
+					local p = base + Vector3.new(def.At[1], 3, def.At[2])
+					local f = base + Vector3.new(def.Face[1], 3, def.Face[2])
+					player.Character:PivotTo(CFrame.lookAt(p, f))
+					return true
+				end
+			end
+		end
 		return false, "Неверный запрос"
 	end
 

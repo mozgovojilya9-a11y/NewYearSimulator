@@ -42,6 +42,7 @@ local Reward = require(script.Parent.Windows.Reward)
 local Settings = require(script.Parent.Windows.Settings)
 local Skills = require(script.Parent.Windows.Skills)
 local Store = require(script.Parent.Windows.Store)
+local Teleport = require(script.Parent.Windows.Teleport)
 
 local player = Players.LocalPlayer
 player:WaitForChild("leaderstats") -- data loaded
@@ -202,6 +203,7 @@ local actions = {
 	Shop = { Open = function()
 		Store.Open()
 	end, Windows = { Store.Window } },
+	Teleport = { Open = Teleport.Open, Windows = { Teleport.Window } },
 }
 
 local barButtons = {} -- [id] = api

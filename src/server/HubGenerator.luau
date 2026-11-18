@@ -296,11 +296,11 @@ end
 -- Hall sign hanging under the balcony edge in front of an arch.
 local function hangingSign(parent, cf: CFrame, title: string, sub: string?, accent: Color3)
 	local by, depth = L.Balcony.Height, L.Balcony.Depth
-	local lines = { { Text = title, Size = 64, Color = N.Gold } }
+	local lines = { { Text = title, Size = 92, Color = N.Gold } }
 	if sub then
-		table.insert(lines, { Text = sub, Size = 34, Color = accent })
+		table.insert(lines, { Text = sub, Size = 44, Color = accent })
 	end
-	local size = Vector2.new(15, if sub then 3.6 else 2.6)
+	local size = Vector2.new(24, if sub then 5 else 3.6)
 	local y = by - 2.4 - size.Y / 2
 	local pcf = cf * CFrame.new(0, y, -(depth - 0.6))
 	local m = signPlate(parent, pcf * CFrame.Angles(0, math.rad(180), 0), size, lines, true)
@@ -1304,6 +1304,9 @@ function HubGenerator.Build()
 	local gp = at(L.GateKeeper.Offset.X, 0, L.GateKeeper.Offset.Z)
 	local keeper = npc("GateKeeper", L.Models.GateKeeper, CFrame.lookAt(gp, gp + Vector3.new(0, 0, 10)))
 
+	-- way-finding: floor lines, sign posts, hall centerpieces, the supply terminal
+	local guide = require(script.Parent.HubGuide).Build(root, base)
+
 	local waypoints = {}
 	for name, offset in pairs(L.Waypoints) do
 		waypoints[name] = base + offset
@@ -1322,6 +1325,7 @@ function HubGenerator.Build()
 		Leaderboards = boards,
 		BoardPrompt = boardPrompt,
 		Npcs = { Mentor = mentor, GateKeeper = keeper },
+		Guide = guide,
 		Stations = stations,
 		Waypoints = waypoints,
 		SpawnCFrame = CFrame.lookAt(at(0, 4, 0), at(0, 4, -10)),

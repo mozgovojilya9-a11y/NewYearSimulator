@@ -1637,7 +1637,7 @@ Config.Assets = {
 	Expected = {
 		Weapons = { "Weapon_Sword_1", "Weapon_Sword_2", "Weapon_Spear_1", "Weapon_Spear_2", "Weapon_Blaster_1", "Weapon_Blaster_2", "Weapon_Blaster_3" },
 		Mobs = { "Boss_Juggernaut", "Boss_Foreman", "Boss_Cryo", "Boss_Molten", "Boss_HiveMother", "Mob_InfectedCrawler", "Mob_InfectedBrute", "Mob_ShieldBearer", "Mob_MedicDrone", "Mob_Sniper", "Mob_SpiderBot", "Mob_Mech", "Mob_RedAndroid", "Mob_Overseer", "Mob_Robot", "Mob_Android", "Mob_BlueBot", "Mob_Bot2" },
-		Props = { "Landmark_Assembly", "Landmark_Cryo", "Landmark_Smelter", "Landmark_Infected", "Landmark_Nexus", "Prop_Crate", "Prop_Door", "Prop_Lamp", "Prop_Pipes", "Prop_Hologram", "Prop_Barrel", "Prop_Misc_1", "Prop_Misc_2", "Prop_Misc_3", "Prop_Misc_4" },
+		Props = { "Center_Atrium", "Center_Spawn", "Center_Training", "Prop_SupplyMachine", "Landmark_Assembly", "Landmark_Cryo", "Landmark_Smelter", "Landmark_Infected", "Landmark_Nexus", "Prop_Crate", "Prop_Door", "Prop_Lamp", "Prop_Pipes", "Prop_Hologram", "Prop_Barrel", "Prop_Misc_1", "Prop_Misc_2", "Prop_Misc_3", "Prop_Misc_4" },
 		Trainers = { "Trainer_Dummy", "Trainer_Bag", "Trainer_Machine", "Trainer_Refiner", "Trainer_Weights" },
 	},
 	-- Weapon look by class (Config.Weapons[i].Class): the first entry whose
@@ -1938,6 +1938,45 @@ Config.HubLayout = {
 		{ Hall = "Academy", Corner = "NE", Kind = "Plant" },
 		{ Hall = "Academy", Wall = "S", At = 131, Kind = "Bench" },
 	},
+	-- Way-finding (HubGuide.luau). Paths = colored lines on the floor with
+	-- chevrons from the spawn arch to every hall (the hall's Accent color,
+	-- as on docs/design/hub_plan.png); points are { x, z } offsets from the
+	-- spawn. Posts = sign posts with arrow plates at the forks.
+	Signs = {
+		Width = 1.4,
+		ChevronEvery = 9,
+		Paths = {
+			{ To = "Gates", Points = { { 0, -16 }, { 0, -74 }, { -13, -82 }, { -13, -98 }, { 0, -106 }, { 0, -172 } } },
+			{ To = "Training", Points = { { -5, -16 }, { -5, -31 }, { -70, -31 }, { -70, -45 }, { -114, -45 } } },
+			{ To = "Academy", Points = { { 5, -16 }, { 5, -31 }, { 70, -31 }, { 70, -43 }, { 114, -43 } } },
+			{ To = "Forge", Points = { { 9, -16 }, { 9, -26 }, { 86, -26 }, { 86, -135 }, { 114, -135 } } },
+			{ To = "Supply", Points = { { -9, -16 }, { -9, -26 }, { -30, -26 }, { -30, -60 }, { -62, -60 } } },
+		},
+		Posts = {
+			{ At = { 13, -40 }, Arrows = { { Dir = "N", To = "Gates" }, { Dir = "W", To = "Training" }, { Dir = "E", To = "Academy" }, { Dir = "E", To = "Forge" } } },
+			{ At = { 93, -52 }, Arrows = { { Dir = "N", To = "Forge" }, { Dir = "S", To = "Academy" } } },
+			{ At = { -15, -40 }, Arrows = { { Dir = "N", To = "Supply" }, { Dir = "W", To = "Training" } } },
+		},
+		Names = { Gates = "ЗАЛ ВРАТ", Training = "ТРЕНИРОВКА", Academy = "АКАДЕМИЯ", Forge = "КУЗНИЦА", Supply = "СНАБЖЕНИЕ", Spawn = "СПАВН", Atrium = "АТРИУМ" },
+	},
+	-- Central object of a hall (GameAssets/Props model, AI-made; procedural
+	-- fallback) with its own light in the hall's Light color.
+	Centers = {
+		{ Hall = "Atrium", Model = "Center_Atrium", At = { 0, -90 }, Height = 11, Light = Color3.fromRGB(120, 230, 255) },
+		{ Hall = "Spawn", Model = "Center_Spawn", At = { 0, 0 }, Height = 1.2, Light = Color3.fromRGB(190, 160, 255), Flat = true },
+		{ Hall = "Training", Model = "Center_Training", At = { -140, -95 }, Height = 8, Light = Color3.fromRGB(255, 170, 90) },
+	},
+	-- Терминал снабжения (pulls, GachaService) in the atrium's west side.
+	Supply = { At = { -66, -60 }, Face = { 0, -60 }, Model = "Prop_SupplyMachine", Height = 9 },
+	-- Teleport window (HUD button): name, point { x, z } and the facing point.
+	Teleports = {
+		{ Id = "Spawn", Name = "Спавн", Icon = "play", At = { 0, 6 }, Face = { 0, -20 } },
+		{ Id = "Gates", Name = "Зал Врат", Icon = "gate", At = { 0, -175 }, Face = { 0, -200 } },
+		{ Id = "Training", Name = "Тренировочный зал", Icon = "sword", At = { -112, -60 }, Face = { -140, -90 } },
+		{ Id = "Forge", Name = "Кузница", Icon = "hammer", At = { 112, -132 }, Face = { 131, -132 } },
+		{ Id = "Academy", Name = "Академия классов", Icon = "academy", At = { 112, -45 }, Face = { 131, -45 } },
+		{ Id = "Supply", Name = "Терминал снабжения", Icon = "crystal", At = { -52, -60 }, Face = { -66, -60 } },
+	},
 	Leaderboards = { -- on the atrium north wall, either side of the Gate hall arch
 		{ Kind = "Level", Title = "Топ уровней", At = -42 },
 		{ Kind = "Room", Title = "Глубже всех в данже", At = -66 },
@@ -2009,7 +2048,7 @@ Config.HubLayout = {
 		Polygon = "МАНЕКЕНЫ",
 		PolygonSub = "Проверь урон и комбо",
 		Forge = "ФАБРИКАТОР",
-		ForgeSub = "Крафт оружия и брони",
+		ForgeSub = "Заточка и возвышение",
 		Training = "ТРЕНИРОВОЧНЫЙ ЗАЛ",
 		TrainingSub = "Станции: опыт за тренировку",
 		Academy = "АКАДЕМИЯ",
@@ -2239,8 +2278,9 @@ Config.Ui = {
 		{ Id = "Skills", Icon = "skills", Label = "Навыки", Key = Enum.KeyCode.K },
 		{ Id = "Quests", Icon = "quest", Label = "Задания", Key = Enum.KeyCode.J },
 		{ Id = "Shop", Icon = "gem", Label = "Магазин" },
+		{ Id = "Teleport", Icon = "map", Label = "Телепорт", Key = Enum.KeyCode.T },
 	},
-	BarButton = 50,
+	BarButton = 44,
 	-- Bottom center: HP and the ability slots (Q / E / R / dash).
 	AbilitySlots = {
 		{ Slot = "Q", Key = Enum.KeyCode.Q },
