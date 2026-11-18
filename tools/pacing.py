@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """
-Pacing simulator for the action-RPG progression.
+Pacing simulator for the action-RPG progression (gate runs).
 
 Reads the numbers straight from src/shared/Config.luau (no second copy of
 the balance) and plays a typical active player from zero, run after run:
 
-  - a run starts in room 1 and goes as deep as the player's damage allows
-    (Damage >= RecommendedDamage(room)); a mob takes
-    HP / (damage x crit average) hits at Pacing.HitsPerSecond, plus
-    Pacing.MoveSeconds of walking, rooms add Pacing.RoomSeconds;
-  - every kill gives XP (Config.Progression.Level) and credits, and may
-    drop an item: Config.Loot (drop chance, tables by gate rank and enemy
-    type, boss chest), item level by room, stats like Shared.Items;
+  - a run = the hardest open gate location (Config.Gates.Locations: rank
+    open by level and a cleared lower rank) whose last section the
+    player's damage handles (Pacing.EntryShare x RecommendedDamage);
+  - every section holds its group (Sections = { 5, 6, 4 }, elites by
+    Config.Sections.Elites); an enemy takes HP / (damage x crit average)
+    hits at Pacing.HitsPerSecond plus Pacing.EnemySeconds; a section adds
+    Pacing.SectionSeconds; the boss takes BossClicksToKill hits x
+    Pacing.BossOverhead;
+  - every kill gives XP and credits (x Config.Sections rewards), drops by
+    Config.Loot (tables by gate rank and enemy type), the boss chest gives
+    BossItems + the grade bonus (grade by ParSeconds);
   - a better item is worn, the rest is salvaged into cores; between runs
     (Pacing.RunOverhead) the weapon and the armor are enhanced while the
     credits and cores last (chance and pity above +9 as in the game);
@@ -23,8 +27,8 @@ are random: the run uses a fixed seed, so the table is repeatable.
 Usage:
   python3 tools/pacing.py            table + events (from Config)
   python3 tools/pacing.py --readme   also rewrites the table in README.md
-  python3 tools/pacing.py --tune     suggests XpBase and the room curve
-                                     that hit Config.Pacing.Targets
+  python3 tools/pacing.py --tune     suggests XpBase for Targets.Level at
+                                     Targets.LevelMinute
 """
 
 import math
@@ -156,42 +160,49 @@ class Game:
         self.forge = cfg["Forge"]
         self.credits = cfg["Credits"]
         self.attrs = cfg["Attributes"]
-        self.ranks = cfg["Gates"]["RankByRoom"]
         self.rarities = cfg["Rarities"]
         self.rarity_index = {r["Id"]: i + 1 for i, r in enumerate(self.rarities)}
-        self.mobs = cfg["Mobs"]
+        self.defs = cfg["Mobs"]["Defs"]
+        self.roles = cfg["Enemies"]["Roles"]
+        self.elite = cfg["Enemies"]["Elite"]
+        self.sec = cfg["Sections"]
+        self.gates = cfg["Gates"]
+        self.locations = [l for l in self.gates["Locations"] if l.get("Ready") is not False]
+        for l in self.locations:
+            l["BossTier"] = l["Tier"] + len(l["Sections"]) * l["TierStep"]
+        grades = cfg["Grades"]
+        self.grades = [grades[k] for k in sorted(k for k in grades if isinstance(k, int))]
 
-    # Config.RecommendedDamage
-    def recommended(self, room):
+    # Config.RecommendedDamage (by tier)
+    def recommended(self, tier):
         d = self.D
-        if room > d["LateFrom"]:
-            value = d["RecommendedBase"] * d["RecommendedGrowth"] ** (d["LateFrom"] - 1) * d["LateGrowth"] ** (room - d["LateFrom"])
-        elif room >= d["RampTo"]:
-            value = d["RecommendedBase"] * d["RecommendedGrowth"] ** (room - 1)
+        if tier > d["LateFrom"]:
+            value = d["RecommendedBase"] * d["RecommendedGrowth"] ** (d["LateFrom"] - 1) * d["LateGrowth"] ** (tier - d["LateFrom"])
+        elif tier >= d["RampTo"]:
+            value = d["RecommendedBase"] * d["RecommendedGrowth"] ** (tier - 1)
         else:
             target = d["RecommendedBase"] * d["RecommendedGrowth"] ** (d["RampTo"] - 1)
-            a = (room - 1) / (d["RampTo"] - 1)
+            a = (tier - 1) / (d["RampTo"] - 1)
             value = math.exp(math.log(d["RecommendedRoom1"]) * (1 - a) + math.log(target) * a)
         return max(1, math.floor(value))
 
-    def mob_health(self, room, boss):
-        return self.recommended(room) * (self.D["BossClicksToKill"] if boss else self.D["ClicksToKill"])
-
-    def is_boss(self, room):
-        return room % self.D["BossEvery"] == 0
-
-    def rank(self, room):
-        return self.ranks[max(1, min(len(self.ranks), room)) - 1]
+    def mob_health(self, tier, boss, role="Melee", elite=False):
+        if boss:
+            return self.recommended(tier) * self.D["BossClicksToKill"]
+        hp = self.recommended(tier) * self.D["ClicksToKill"] * self.roles[role]["Health"]
+        return hp * (self.elite["Health"] if elite else 1)
 
     def xp_to_next(self, level):
-        return math.floor(self.L["XpBase"] * max(1, level) ** self.L["XpExponent"])
+        l = self.L
+        late = l["LateGrowth"] ** (level - l["LateFrom"]) if level > l["LateFrom"] else 1
+        return math.floor(l["XpBase"] * max(1, level) ** l["XpExponent"] * late)
 
     def level_mult(self, level):
         return 1 + (max(1, level) - 1) * self.S["DamagePerLevel"]
 
-    def kill_credits(self, room, boss):
+    def kill_credits(self, tier, boss):
         c = self.credits
-        return max(1, math.floor(c["PerKill"] * c["Growth"] ** (max(1, room) - 1) * (c["BossMultiplier"] if boss else 1)))
+        return max(1, math.floor(c["PerKill"] * c["Growth"] ** (max(1, tier) - 1) * (c["BossMultiplier"] if boss else 1)))
 
     # Shared.Items
     def weapon_damage(self, item):
@@ -244,9 +255,9 @@ class Game:
                 return rid
         return pool[-1][0]
 
-    def generate(self, rng, room, rarity):
+    def generate(self, rng, tier, rarity):
         i = self.items
-        level = max(1, min(int(i["MaxLevel"]), int(room * i["LevelPerRoom"]) + rng.randint(-int(i["LevelSpread"]), int(i["LevelSpread"]))))
+        level = max(1, min(int(i["MaxLevel"]), int(tier * i["LevelPerRoom"]) + rng.randint(-int(i["LevelSpread"]), int(i["LevelSpread"]))))
         item = {"L": level, "R": rarity, "Q": round(i["Roll"][0] + (i["Roll"][1] - i["Roll"][0]) * rng.random(), 2), "E": 0}
         if rng.random() < i["WeaponShare"]:
             item["Slot"] = "Weapon"
@@ -256,6 +267,13 @@ class Game:
             item["Slot"] = rng.choice(["Helmet", "Chest", "Legs"])
             item["Usable"] = True
         return item
+
+    def grade(self, seconds, par):
+        for g in self.grades:
+            t = g.get("Time")
+            if t is None or seconds <= par * t:
+                return g
+        return self.grades[-1]
 
 
 # ---------------------------------------------------------------------------
@@ -271,17 +289,18 @@ class Player:
         self.t = 0.0
         self.level = 1
         self.xp = 0.0
-        self.record = 0
+        self.location = None
+        self.cleared = set()
+        self.runs = []  # (location id, seconds, level)
         # the starter weapon (Stick: damage 1)
         self.gear = {"Weapon": {"L": 1, "R": "Common", "Q": 0.55, "E": 0, "Slot": "Weapon", "Usable": True}, "Helmet": None, "Chest": None, "Legs": None}
         self.credits = 0
         self.cores = 0
         self.best_rarity = 1
         self.events = []
-        self.snaps = []  # (time, level, record, weapon text, gear score, damage)
+        self.snaps = []  # (time, level, location name, weapon text, gear score, damage)
 
     def strength(self):
-        # a typical build: StrShare of the stat points go into Сила
         a = self.g.attrs
         points = (self.level - 1) * a["PointsPerLevel"] * self.g.P.get("StrShare", 0.6)
         return 1 + points * 0.01
@@ -299,14 +318,15 @@ class Player:
         return "%s, ур. %d%s" % (names[w["R"]], w["L"], (" +%d" % w["E"]) if w["E"] else "")
 
     def snapshot(self):
-        self.snaps.append((self.t, self.level, self.record, self.weapon_text(), self.gear_score(), self.damage()))
+        name = self.location["Name"] if self.location else "—"
+        self.snaps.append((self.t, self.level, name, self.weapon_text(), self.gear_score(), self.damage()))
 
     def add_xp(self, amount):
         self.xp += amount
         while self.xp >= self.g.xp_to_next(self.level):
             self.xp -= self.g.xp_to_next(self.level)
             self.level += 1
-            if self.level % 10 == 0:
+            if self.level in (2, 3, 5) or self.level % 5 == 0:
                 self.events.append((self.t, "level", self.level))
 
     def power(self, item):
@@ -358,36 +378,71 @@ class Player:
             else:
                 item["F"] = item.get("F", 0) + 1
 
-    def kill(self, room):
+    def rank_open(self, rank):
+        info = self.g.gates["RankInfo"][rank]
+        if self.level < info["Level"]:
+            return False
+        need = info.get("Requires")
+        return not need or any(l["Rank"] == need and l["Id"] in self.cleared for l in self.g.locations)
+
+    def pick(self):
+        """The hardest open location whose last section the damage handles."""
         g = self.g
-        boss = g.is_boss(room)
+        best = g.locations[0]
+        for l in g.locations:
+            last = l["Tier"] + (len(l["Sections"]) - 1) * l["TierStep"]
+            if self.rank_open(l["Rank"]) and self.damage() >= g.P["EntryShare"] * g.recommended(last) and l["Tier"] >= best["Tier"]:
+                best = l
+        return best
+
+    def kill(self, loc, tier, role, elite):
+        g = self.g
         crit = g.S["CritChance"] * (g.S["CritDamage"] - 1)
-        hits = g.mob_health(room, boss) / (self.damage() * (1 + crit))
-        self.t += hits / g.P["HitsPerSecond"] + g.P["MoveSeconds"]
-        self.add_xp((g.L["XpPerBoss"] if boss else g.L["XpPerKill"]) * room)
-        self.credits += g.kill_credits(room, boss)
-        rank = g.rank(room)
-        if boss:
-            for n in range(int(g.loot["BossItems"])):
-                rarity = g.roll_rarity(self.rng, rank, "Boss", g.loot["BossMinRarity"][rank] if n == 0 else None)
-                self.take(g.generate(self.rng, room, rarity))
-        elif self.rng.random() < g.loot["DropChance"]["Normal"]:
-            self.take(g.generate(self.rng, room, g.roll_rarity(self.rng, rank, "Normal")))
+        hits = g.mob_health(tier, False, role, elite) / (self.damage() * (1 + crit))
+        self.t += hits / g.P["HitsPerSecond"] + g.P["EnemySeconds"]
+        weight = g.sec["Reward"] * (g.sec["EliteReward"] if elite else g.sec["SwarmReward"] if role == "Swarm" else 1)
+        self.add_xp(g.L["XpPerKill"] * tier * weight)
+        self.credits += g.kill_credits(tier, False) * weight
+        enemy = "Elite" if elite else "Normal"
+        if self.rng.random() < g.loot["DropChance"][enemy]:
+            self.take(g.generate(self.rng, tier, g.roll_rarity(self.rng, loc["Rank"], enemy)))
 
     def run(self):
         g = self.g
-        room = 1
-        mobs = (g.D["MobsMin"] + g.D["MobsMax"]) / 2
-        while room <= g.D["Rooms"] and self.damage() >= g.recommended(room):
-            count = 1 if g.is_boss(room) else round(mobs)
-            for _ in range(count):
-                self.kill(room)
-            self.t += g.P["RoomSeconds"]
-            if room > self.record:
-                self.record = room
-                if room % 5 == 0 or room == 1:
-                    self.events.append((self.t, "stage", room))
-            room += 1
+        loc = self.pick()
+        if loc is not self.location:
+            self.events.append((self.t, "location", loc["Name"]))
+        self.location = loc
+        start = self.t
+        elites = g.sec["Elites"]
+        for i, count in enumerate(loc["Sections"]):
+            tier = loc["Tier"] + i * loc["TierStep"]
+            self.t += g.P["SectionSeconds"]
+            n_elite = int(elites[min(i, len(elites) - 1)])
+            for k in range(int(count)):
+                mob = g.defs[self.rng.choice(loc["Mobs"])]
+                role = mob.get("Role", "Melee")
+                elite = k < n_elite
+                if elite and role in ("Swarm", "Healer"):
+                    role = "Melee"
+                if role == "Healer" and i == 0:
+                    role = "Melee"
+                self.kill(loc, tier, role, elite)
+        # the boss
+        tier = loc["BossTier"]
+        crit = g.S["CritChance"] * (g.S["CritDamage"] - 1)
+        hits = g.mob_health(tier, True) / (self.damage() * (1 + crit))
+        self.t += hits / g.P["HitsPerSecond"] * g.P["BossOverhead"] + 3
+        self.add_xp(g.L["XpPerBoss"] * tier)
+        self.credits += g.kill_credits(tier, True)
+        seconds = self.t - start
+        grade = g.grade(seconds, loc["ParSeconds"])
+        rank = loc["Rank"]
+        for n in range(int(g.loot["BossItems"] + grade["Items"])):
+            rarity = g.roll_rarity(self.rng, rank, "Boss", g.loot["BossMinRarity"][rank] if n == 0 else None)
+            self.take(g.generate(self.rng, tier, rarity))
+        self.runs.append((loc["Id"], seconds, self.level, grade["Id"]))
+        self.cleared.add(loc["Id"])
         self.t += g.P["RunOverhead"]
         self.forge()
         self.snapshot()
@@ -418,54 +473,25 @@ def state_at(p, minute):
 
 
 def tune(cfg):
+    """XpBase so the level at Targets.LevelMinute is Targets.Level. The
+    tier curve (Dungeon.Recommended*) is set by hand from the item level
+    math (drops are tier x LevelPerRoom, weapons x1.046 per item level);
+    the report shows when each location is first entered so it can be
+    checked against Targets.Tiers."""
     T = cfg["Pacing"]["Targets"]
-    D = cfg["Dungeon"]
-    stages = sorted((int(k), v) for k, v in T["Stages"].items())
-    for _ in range(12):
-        game = Game(cfg)
-        # 1) room curve through the damage the player has right before the
-        #    target minute of each stage (the "typical gear" of that moment)
-        p = simulate(game, stages[-1][1] + 5)
-        points = []
-        room1 = None
-        late = None
-        for stage, minute in stages:
-            dmg = state_at(p, minute)[5]
-            if stage < D["RampTo"]:
-                room1 = dmg
-            elif stage > D["LateFrom"]:
-                late = (stage, dmg)
-            else:
-                points.append((stage, math.log(dmg)))
-        n = len(points)
-        mx = sum(x for x, _ in points) / n
-        my = sum(y for _, y in points) / n
-        slope = sum((x - mx) * (y - my) for x, y in points) / sum((x - mx) ** 2 for x, _ in points)
-        intercept = my - slope * mx
-        D["RecommendedGrowth"] = round(math.exp(slope), 3)
-        D["RecommendedBase"] = round(math.exp(intercept + slope), 2)
-        if room1:
-            D["RecommendedRoom1"] = max(1, room1)
-        if late:
-            at_late = D["RecommendedBase"] * D["RecommendedGrowth"] ** (D["LateFrom"] - 1)
-            D["LateGrowth"] = round((late[1] / at_late) ** (1 / (late[0] - D["LateFrom"])), 3)
-        # 2) XpBase so the level at the target minute matches
-        lo, hi = 1.0, 2000.0
-        for _ in range(25):
-            mid = (lo + hi) / 2
-            cfg["Progression"]["Level"]["XpBase"] = mid
-            p = simulate(Game(cfg), T["LevelMinute"])
-            if state_at(p, T["LevelMinute"])[1] > T["Level"]:
-                lo = mid
-            else:
-                hi = mid
-        cfg["Progression"]["Level"]["XpBase"] = round(hi, 1)
+    lo, hi = 1.0, 3000.0
+    for _ in range(30):
+        mid = (lo + hi) / 2
+        cfg["Progression"]["Level"]["XpBase"] = mid
+        p = simulate(Game(cfg), T["LevelMinute"])
+        if state_at(p, T["LevelMinute"])[1] > T["Level"]:
+            lo = mid
+        else:
+            hi = mid
+    cfg["Progression"]["Level"]["XpBase"] = round(hi, 1)
     print("Suggested Config numbers:")
     print("  Progression.Level.XpBase =", cfg["Progression"]["Level"]["XpBase"])
-    print("  Dungeon.RecommendedRoom1 =", D["RecommendedRoom1"])
-    print("  Dungeon.RecommendedBase =", D["RecommendedBase"])
-    print("  Dungeon.RecommendedGrowth =", D["RecommendedGrowth"])
-    print("  Dungeon.LateGrowth =", D["LateGrowth"])
+    print("Targets (tier -> minute):", {int(k): v for k, v in T["Tiers"].items()})
     return cfg
 
 
@@ -487,18 +513,17 @@ def report(cfg):
     game = Game(cfg)
     minutes = [int(m) for m in cfg["Pacing"]["ReportMinutes"]]
     p = simulate(game, minutes[-1])
-    rows = ["| Минута | Уровень | Этап (рекорд) | Урон | Рек. урон следующего этапа | Gear Score | Оружие |", "|---:|---:|---:|---:|---:|---:|---|"]
+    rows = ["| Минута | Уровень | Врата (локация забега) | Урон | Gear Score | Оружие |", "|---:|---:|---|---:|---:|---|"]
     for m in minutes:
-        t, level, record, weapon, gs, dmg = state_at(p, m)
-        nxt = game.recommended(min(game.D["Rooms"], record + 1))
-        rows.append("| %d | %d | %d | %s | %s | %d | %s |" % (m, level, record, fmt(dmg), fmt(nxt), gs, weapon))
+        t, level, name, weapon, gs, dmg = state_at(p, m)
+        rows.append("| %d | %d | %s | %s | %d | %s |" % (m, level, name, fmt(dmg), gs, weapon))
     table = "\n".join(rows)
 
     names = {r["Id"]: r["Name"] for r in cfg["Rarities"]}
     ev = ["| Событие | Минута |", "|---|---:|"]
     for t, kind, value in p.events:
-        if kind == "stage":
-            ev.append("| Этап %d, ранг Врат %s (рек. урон %s) | %.1f |" % (value, game.rank(value), fmt(game.recommended(value)), t / 60))
+        if kind == "location":
+            ev.append("| Первый забег: %s | %.1f |" % (value, t / 60))
     for t, kind, value in p.events:
         if kind == "level":
             ev.append("| Уровень %d | %.1f |" % (value, t / 60))
@@ -507,6 +532,14 @@ def report(cfg):
             ev.append("| Первый предмет редкости «%s» | %.1f |" % (names[value], t / 60))
         elif kind == "enhance":
             ev.append("| Оружие заточено до +%d | %.1f |" % (value, t / 60))
+    # run length of each location (the first runs, the player at its level)
+    first = {}
+    for loc_id, seconds, level, grade in p.runs:
+        first.setdefault(loc_id, []).append(seconds)
+    for l in game.locations:
+        if l["Id"] in first:
+            runs = first[l["Id"]][:3]
+            ev.append("| Забег «%s» (первые %d) | %.1f мин |" % (l["Name"], len(runs), sum(runs) / len(runs) / 60))
     events = "\n".join(ev)
     return table, events
 
@@ -517,7 +550,8 @@ def write_readme(table, events):
     block = (
         start
         + "\n_Сгенерировано `python3 tools/pacing.py --readme` из `Config.luau`. "
-        "Модель: активная игра забегами от 1-й комнаты; предметы падают по таблицам рангов Врат, "
+        "Модель: активная игра забегами во Врата (самая сложная открытая локация, которую тянет урон): "
+        "участки с группами врагов и босс; предметы падают по таблицам рангов Врат, "
         "лучшее надевается, остальное разбирается на ядра, оружие и броня затачиваются между забегами; "
         "60% очков характеристик идут в Силу. Без пассов, бустов, заданий, навыков и артефактов._\n\n"
         + table + "\n\n" + events + "\n" + end

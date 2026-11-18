@@ -132,7 +132,7 @@ Config.World = {
 
 Config.Click = {
 	BaseDamage = 1, -- damage of one hit with a weapon of Damage 1
-	Cooldown = 0.1, -- min seconds between accepted clicks at AttackSpeed 1 (anti-macro)
+	Cooldown = 0.36, -- seconds between attacks at AttackSpeed 1 (one swing animation; spam does not cut it)
 	Range = 60, -- max studs between player and a clicked mob
 	MeleeRange = 16, -- a click with no target hits the nearest mob within this range
 }
@@ -313,18 +313,20 @@ Config.Dungeon = {
 	MobsMin = 3,
 	MobsMax = 5,
 
-	-- Difficulty curve: "recommended damage" of a room = the damage a
-	-- typical player has when they get there (tools/pacing.py). Mob HP =
-	-- RecommendedDamage(r) x ClicksToKill: at the recommended damage a mob
-	-- takes ~7-8 hits, a boss ~46 (crit 8% x2 included).
+	-- Difficulty curve by TIER (a gate location's Tier + its section;
+	-- the old name "room" stays in the code): "recommended damage" of a
+	-- tier = the damage a typical player has when they get there
+	-- (tools/pacing.py --tune). Mob HP = RecommendedDamage(tier) x
+	-- ClicksToKill x role: at the recommended damage a regular enemy dies
+	-- in 2-4 hits (the player must feel strong), a boss in ~40.
 	RecommendedRoom1 = 1, -- room 1: a Stick is enough
 	RampTo = 5, -- rooms 1..RampTo-1 ramp up to the curve below
-	RecommendedBase = 2.85,
-	RecommendedGrowth = 1.397,
+	RecommendedBase = 3.9,
+	RecommendedGrowth = 1.33,
 	LateFrom = 15, -- after this room the curve gets steeper
 	LateGrowth = 1.6,
-	ClicksToKill = 8,
-	BossClicksToKill = 50,
+	ClicksToKill = 3,
+	BossClicksToKill = 40,
 
 	-- Personal runs: every portal entry starts a new run from room 1 in
 	-- the player's own lane; only the current and next rooms exist.
@@ -1427,17 +1429,23 @@ end
 -- of a room = the real damage of a player who gets there on time;
 -- `--readme` writes the minute table into README.md.
 Config.Pacing = {
-	HitsPerSecond = 4, -- attack clicks per second while fighting
-	MoveSeconds = 2.5, -- walking to the next mob
-	RoomSeconds = 5, -- walking through a doorway / corridor
-	RunOverhead = 30, -- back to the hub, forge, portal between runs
+	-- the model of an active player (tools/pacing.py): runs of the
+	-- hardest open location they can handle, from the hub and back
+	HitsPerSecond = 2.4, -- real attacks per second (Click.Cooldown 0.36 + misses)
+	EnemySeconds = 3.5, -- per enemy: stepping in, dodging telegraphs, the next target
+	SectionSeconds = 20, -- per section: walking it and the corridor, picking loot
+	BossOverhead = 2, -- boss time x (phases, telegraphs, intro)
+	RunOverhead = 35, -- results, back to the hub, forge, the gate window
 	StrShare = 0.6, -- share of the stat points a typical player puts into Сила
+	EntryShare = 0.85, -- a location is taken when damage >= this x the recommended damage of its last section
 	Targets = {
-		Stages = { ["1"] = 1, ["5"] = 15, ["10"] = 60, ["15"] = 120, ["20"] = 420 },
-		Level = 30,
-		LevelMinute = 120,
+		-- tier -> minute the typical player first fights it (the curve of
+		-- RecommendedDamage is fitted through these)
+		Tiers = { ["1"] = 0, ["4"] = 25, ["7"] = 70, ["11"] = 150, ["15"] = 230 },
+		Level = 25,
+		LevelMinute = 240,
 	},
-	ReportMinutes = { 1, 3, 5, 10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240, 300, 360, 420 },
+	ReportMinutes = { 2, 5, 10, 15, 20, 30, 45, 60, 90, 120, 150, 180, 210, 240, 300, 360, 480 },
 }
 
 -- Engagement loop: things to do every few minutes.
@@ -1477,12 +1485,17 @@ Config.Progression = {
 	-- Player level. XP: kills, bosses, quests and a little for training.
 	-- Every level: +SkillPointsPerLevel skill point, damage and max HP grow
 	-- (Config.Stats), full heal.
-	--   XP to the next level = XpBase x level^XpExponent:
-	--   lvl 1 -> 54, 10 -> 1.7K, 30 -> 8.9K, 50 -> 19K
-	--   (tuned with tools/pacing.py: level ~30 after 2 hours)
+	--   XP to the next level = XpBase x level^XpExponent (x LateGrowth per
+	--   level above LateFrom); XpBase tuned with tools/pacing.py --tune:
+	--   level 25 after ~4 hours of active play, the first levels every few
+	--   minutes, slower after 25
 	Level = {
-		XpBase = 54,
+		XpBase = 186.6,
 		XpExponent = 1.5,
+		-- after LateFrom every level costs LateGrowth times more on top of
+		-- the curve: the fast climb ends around level 25 (~4 hours)
+		LateFrom = 25,
+		LateGrowth = 1.12,
 		XpPerKill = 10, -- x room index
 		XpPerBoss = 80, -- x room index
 		XpPerQuest = 40, -- x player level, when a quest reward is claimed
@@ -1500,7 +1513,8 @@ Config.Progression = {
 -- XP needed for the next level at `level` (formula above).
 function Config.XpToNext(level: number): number
 	local l = Config.Progression.Level
-	return math.floor(l.XpBase * math.max(1, level) ^ l.XpExponent)
+	local late = if level > l.LateFrom then l.LateGrowth ^ (level - l.LateFrom) else 1
+	return math.floor(l.XpBase * math.max(1, level) ^ l.XpExponent * late)
 end
 
 -- Equipment on the character (visual only). Grip = offset of the weapon
