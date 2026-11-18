@@ -381,27 +381,61 @@ local function refreshHint()
 end
 player:GetAttributeChangedSignal("ClickPower"):Connect(refreshHint)
 
+-- The objective line shows for a few seconds when the goal changes
+-- (entering the hub, a new quest) and fades out: the lasting goal lives
+-- in the quest tracker (Config.Hud.ObjectiveSeconds).
 local currentRoomAlive = nil
+local shownGoal = nil
+local hideToken = 0
 local function setObjective(text)
-	if objective.Text ~= text then
-		objective.Text = Style.Upper(text)
-		objectiveScale.Scale = 1.1
-		Style.Tween(objectiveScale, 0.25, { Scale = 1 })
+	if shownGoal == text then
+		return
 	end
+	shownGoal = text
+	objective.Text = Style.Upper(text)
+	objective.TextTransparency = 0
+	objective.Visible = true
+	objectiveScale.Scale = 1.15
+	Style.Tween(objectiveScale, 0.25, { Scale = 1 })
+	hideToken += 1
+	local token = hideToken
+	task.delay(Config.Hud.ObjectiveSeconds, function()
+		if token == hideToken then
+			Style.Tween(objective, 0.5, { TextTransparency = 1 })
+			task.delay(0.55, function()
+				if token == hideToken then
+					objective.Visible = false
+				end
+			end)
+		end
+	end)
 end
+objective.Visible = false
 
 local function refreshObjective()
 	local zone = player:GetAttribute("Zone")
-	objective.Visible = zone ~= "Dungeon" -- GateHud shows the waves there
-	local reached = player:GetAttribute("RoomReached") or 0
-	if zone ~= "Dungeon" then
-		setObjective(if reached >= Config.Dungeon.Rooms then Config.Hud.Objectives.Done else Config.Hud.Objectives.Hub)
-	elseif currentRoomAlive == 0 then
-		setObjective(Config.Hud.Objectives.Cleared)
-	else
-		setObjective(Config.Hud.Objectives.Fight)
+	if zone == "Dungeon" then
+		-- GateHud shows the sections there
+		hideToken += 1
+		objective.Visible = false
+		shownGoal = nil
+		return
 	end
+	setObjective(Config.Hud.Objectives.Hub)
 end
+
+-- A new quest in the tracker is a new goal: show its title for a moment.
+local lastQuest = nil
+player:GetAttributeChangedSignal("Tracker"):Connect(function()
+	local ok, q = pcall(HttpService.JSONDecode, HttpService, player:GetAttribute("Tracker") or "")
+	local title = ok and type(q) == "table" and q.Title or nil
+	if title and title ~= lastQuest and player:GetAttribute("Zone") ~= "Dungeon" then
+		if lastQuest ~= nil then
+			setObjective(Config.Hud.Objectives.Quest:format(title))
+		end
+	end
+	lastQuest = title
+end)
 
 -- Hud.SetCurrentRoom is called by Zone.luau with the room the player stands in.
 local currentRoom = nil

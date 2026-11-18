@@ -2194,8 +2194,10 @@ Config.MobLooks = {
 
 Config.Hud = {
 	TopLeftReserved = Vector2.new(320, 60), -- never put UI here (Roblox buttons)
+	ObjectiveSeconds = 3.5, -- the centre hint shows this long when the goal changes
 	Objectives = {
 		Hub = "Открой Врата!",
+		Quest = "Новая цель: %s",
 		Fight = "Уничтожь врагов!",
 		Cleared = "Иди дальше!",
 		Done = "Улучшай снаряжение и бери Врата выше",
