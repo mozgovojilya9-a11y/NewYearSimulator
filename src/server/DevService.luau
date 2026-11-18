@@ -108,6 +108,18 @@ function actions.Unlock(player)
 	return true, "Ранги E и D открыты"
 end
 
+-- Next class in turn, free (testing every class without paying).
+function actions.Class(player)
+	local data = DataService.Get(player)
+	local order = (Config.ClassById[data.Class or ""] or { Order = 0 }).Order
+	local class = Config.Classes[order % #Config.Classes + 1]
+	data.Class = class.Id
+	PlayerState.ClassRecord(data, class.Id)
+	PlayerState.Sync(player)
+	require(script.Parent.ItemService).FitWeapon(player)
+	return true, "Класс: " .. class.Name
+end
+
 function actions.Red()
 	require(script.Parent.GateService).OpenRed()
 	return true, "Красные Врата открыты"

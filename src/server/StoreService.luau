@@ -41,6 +41,11 @@ local function grant(player, product): string?
 	if product.Kind == "Credits" then
 		local amount = PlayerState.AddCredits(player, product.Amount)
 		return ("+%s нано-кредитов!"):format(Format.Number(amount))
+	elseif product.Kind == "Crystals" then
+		local amount = PlayerState.AddCrystals(player, product.Amount)
+		return Config.Crystals.Texts.Got:format(amount) .. "!"
+	elseif product.Kind == "ClassChange" then
+		return require(script.Parent.ClassService).GrantPaidChange(player)
 	elseif product.Kind == "Boost" then
 		PlayerState.AddBoost(player, product.Boost, product.Minutes)
 		return product.Name .. " активирован!"

@@ -18,6 +18,7 @@ Config.DataStoreName = "AuraClicker_v1"
 Config.StartingData = {
 	Credits = 0, -- "Нано-кредиты" (монеты): forge, resets, cosmetics
 	Cores = 0, -- "Нано-ядра": from salvaged items, spent in the forge
+	Crystals = 0, -- "Кристаллы": rare currency (bosses, first clears, Robux): class change, pulls
 	-- Gear: item instances (Shared.Items). [uid] = { U, B = base id, K = "W" | "A",
 	-- R = rarity, L = item level, Q = stat roll, E = enhance, P = bonus props,
 	-- Lk = locked, F = failed enhances in a row, C = "Any" (class-free), St = starter }
@@ -253,7 +254,8 @@ Config.GamePasses = {
 }
 
 -- Developer Products (bought again and again). Id = 0 -> "Скоро".
--- Kind: Credits (Amount of Нано-кредиты), Boost (Boost + Minutes),
+-- Kind: Credits (Amount of Нано-кредиты), Crystals (Amount), ClassChange
+-- (the class picked in the change dialog), Boost (Boost + Minutes),
 -- Chest (Rank, Rolls: gear rolled from the Boss table of that gate rank),
 -- Weapon / ArmorSet (exclusive gear, granted once), WheelSkip.
 Config.Products = {
@@ -261,6 +263,10 @@ Config.Products = {
 	{ Key = "CreditsMedium", Id = 0, Tab = "Packs", Icon = "credits", Name = "Пачка кредитов", Price = 79, Kind = "Credits", Amount = 1500 },
 	{ Key = "CreditsLarge", Id = 0, Tab = "Packs", Icon = "credits", Name = "Сейф кредитов", Price = 199, Kind = "Credits", Amount = 5000 },
 	{ Key = "WheelSkip", Id = 0, Tab = "Packs", Icon = "wheel", Name = "Крутить колесо сейчас", Price = 25, Kind = "WheelSkip" },
+	{ Key = "CrystalsSmall", Id = 0, Tab = "Packs", Icon = "crystal", Name = "Горсть кристаллов", Price = 49, Kind = "Crystals", Amount = 60 },
+	{ Key = "CrystalsLarge", Id = 0, Tab = "Packs", Icon = "crystal", Name = "Россыпь кристаллов", Price = 199, Kind = "Crystals", Amount = 300 },
+	-- not in the store: bought from the class change dialog (Academy)
+	{ Key = "ClassChange", Id = 0, Icon = "reset", Name = "Смена класса", Price = 99, Kind = "ClassChange" },
 
 	{ Key = "BoostXp15", Id = 0, Tab = "Boosts", Icon = "star", Name = "x2 Опыт · 15 мин", Price = 25, Kind = "Boost", Boost = "Xp", Minutes = 15 },
 	{ Key = "BoostXp60", Id = 0, Tab = "Boosts", Icon = "star", Name = "x2 Опыт · 60 мин", Price = 69, Kind = "Boost", Boost = "Xp", Minutes = 60 },
@@ -737,7 +743,9 @@ Config.Player = {
 -- WeaponModels[Class]); any owned weapon works with any class, its look
 -- and the attack style come from the class. Tags = role tags on the
 -- class card (Icon + Text), Difficulty 1..5, Key = 3 node ids shown as
--- the "key abilities" on the selection screen.
+-- the "key abilities" on the selection screen. Art = the card picture:
+-- the player's own character in the armor Set, frozen in a pose of the
+-- Clip (Config.Animations.Clips) at At seconds.
 Config.Classes = {
 	{
 		Id = "Blade", Name = "Клинок", Icon = "sword", Color = Color3.fromRGB(46, 200, 255),
@@ -746,6 +754,7 @@ Config.Classes = {
 		Tags = { { Icon = "shield", Text = "Танк" }, { Icon = "sword", Text = "Урон" }, { Icon = "bolt", Text = "Контроль" } },
 		Difficulty = 2,
 		Key = { "Blade_A3", "Blade_D1", "Blade_C1" },
+		Art = { Set = "Ice", Clip = "SwordSmash", At = 0.85 },
 	},
 	{
 		Id = "Pulse", Name = "Импульс", Icon = "spear", Color = Color3.fromRGB(255, 61, 184),
@@ -754,6 +763,7 @@ Config.Classes = {
 		Tags = { { Icon = "burst", Text = "Область" }, { Icon = "dash", Text = "Мобильность" }, { Icon = "flame", Text = "Бурст" } },
 		Difficulty = 3,
 		Key = { "Pulse_A3", "Pulse_A6", "Pulse_C3" },
+		Art = { Set = "Abyss", Clip = "SpearLunge", At = 0.3 },
 	},
 	{
 		Id = "Gunner", Name = "Стрелок", Icon = "blaster", Color = Color3.fromRGB(255, 201, 60),
@@ -762,9 +772,45 @@ Config.Classes = {
 		Tags = { { Icon = "target", Text = "Точность" }, { Icon = "dash", Text = "Дистанция" }, { Icon = "sword", Text = "Урон" } },
 		Difficulty = 3,
 		Key = { "Gunner_A1", "Gunner_A3", "Gunner_S3" },
+		Art = { Set = "Bone", Clip = "GunCharged", At = 0.9 },
 	},
 }
 Config.ClassById = {}
+
+-- Кристаллы: the rare currency. Every member gets Boss after a boss and
+-- FirstClear for the first clear of a location.
+Config.Crystals = {
+	Name = "Кристаллы",
+	Color = Color3.fromRGB(170, 110, 255),
+	Boss = 2,
+	FirstClear = 15,
+	Texts = { Got = "+%d кристаллов", NotEnough = "Нужно %d кристаллов" },
+}
+
+-- Class change in the Academy (the first pick is free): Нано-кредиты,
+-- Кристаллы or Robux (Config.Products "ClassChange"; Id 0 -> "Скоро").
+-- Only in the hub. Every class keeps its own skill tree progress.
+Config.ClassChange = {
+	Credits = function(level: number): number
+		return 400 + 80 * level
+	end,
+	Crystals = 40,
+	Product = "ClassChange",
+	Texts = {
+		Title = "СМЕНА КЛАССА",
+		Ask = "Сменить класс на «%s»?",
+		Note = "Прогресс дерева навыков каждого класса сохраняется. Оружие возьмёт вид нового класса.",
+		Credits = "%s кр.",
+		Crystals = "%d кристаллов",
+		Robux = "R$ %d",
+		Soon = "Скоро",
+		Cancel = "Отмена",
+		HubOnly = "Сменить класс можно только в хабе",
+		NoCredits = "Нужно %s нано-кредитов",
+		Waiting = "Ждём покупку…",
+		Free = "Первый выбор — бесплатно",
+	},
+}
 for order, class in ipairs(Config.Classes) do
 	class.Order = order
 	Config.ClassById[class.Id] = class

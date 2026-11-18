@@ -123,6 +123,9 @@ end)
 button("Красные Врата сейчас", Style.Colors.Red, function()
 	call("Red")
 end)
+button("Следующий класс (даром)", Style.Colors.Card, function()
+	call("Class")
+end)
 
 order += 1
 Style.Label(panel, "Случайный предмет:", 15, Style.Colors.Gold, { Size = UDim2.fromOffset(226, 20), LayoutOrder = order, ZIndex = 21 })

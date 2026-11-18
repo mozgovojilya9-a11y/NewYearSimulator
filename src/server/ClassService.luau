@@ -1,8 +1,13 @@
 --[[
 	ClassService.luau
 	Classes and skill trees (server-authoritative):
-	  ("Choose", classId)        pick / change the class (each class keeps
-	                             its own tree progress)
+	  ("Choose", classId, pay)   pick / change the class (each class keeps
+	                             its own tree progress). The first pick is
+	                             free; a change (only in the hub) costs
+	                             Config.ClassChange: pay = "Credits",
+	                             "Crystals" or "Robux" (a Developer Product;
+	                             the class is applied when the receipt comes,
+	                             StoreService -> GrantPaidChange)
 	  ("Learn", nodeId)          +1 rank: the class's node, unlock level
 	                             reached, the node above learned, a free point
 	  ("Reset")                  all points of the current class back; the
@@ -14,6 +19,8 @@
 	The Academy terminal in the hub opens the class screen on the client.
 ]]
 
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -72,11 +79,10 @@ function ClassService.CanLearn(data, record, node): (boolean, string?)
 	return true
 end
 
-local function choose(player, data, classId)
-	if not Config.ClassById[classId] then
-		return false, "Нет такого класса"
-	end
-	local first = (data.Class or "") == ""
+local CC = Config.ClassChange
+local pending = {} -- [player] = classId waiting for a Robux receipt
+
+local function apply(player, data, classId, first: boolean)
 	data.Class = classId
 	PlayerState.ClassRecord(data, classId)
 	PlayerState.Sync(player)
@@ -86,6 +92,61 @@ local function choose(player, data, classId)
 		ClassService.OnChosen(player, classId, first)
 	end
 	return true, ("Класс: %s"):format(Config.ClassById[classId].Name)
+end
+
+local function choose(player, data, classId, pay)
+	if not Config.ClassById[classId] then
+		return false, "Нет такого класса"
+	end
+	local first = (data.Class or "") == ""
+	if first then
+		return apply(player, data, classId, true)
+	end
+	if data.Class == classId then
+		return false, "Это твой текущий класс"
+	end
+	if player:GetAttribute("Zone") == "Dungeon" then
+		return false, CC.Texts.HubOnly
+	end
+	if pay == "Credits" then
+		local cost = CC.Credits(data.Level)
+		if not PlayerState.SpendCredits(player, cost) then
+			return false, CC.Texts.NoCredits:format(Format.Number(cost))
+		end
+	elseif pay == "Crystals" then
+		if not PlayerState.SpendCrystals(player, CC.Crystals) then
+			return false, Config.Crystals.Texts.NotEnough:format(CC.Crystals)
+		end
+	elseif pay == "Robux" then
+		local product = Config.ProductByKey[CC.Product]
+		if not product or product.Id <= 0 then
+			return false, CC.Texts.Soon
+		end
+		pending[player] = classId
+		MarketplaceService:PromptProductPurchase(player, product.Id)
+		return true, CC.Texts.Waiting, "Pending"
+	else
+		return false, "Выбери способ оплаты"
+	end
+	return apply(player, data, classId, false)
+end
+
+-- A class change bought for Robux: applies the class picked in the dialog
+-- (or, if the server lost it, gives its price in Кристаллы so the
+-- purchase is never wasted). Returns the message for the player.
+function ClassService.GrantPaidChange(player): string?
+	local data = DataService.Get(player)
+	if not data then
+		return nil
+	end
+	local classId = pending[player]
+	pending[player] = nil
+	if classId and Config.ClassById[classId] and data.Class ~= classId then
+		local _, message = apply(player, data, classId, false)
+		return message
+	end
+	PlayerState.AddCrystals(player, CC.Crystals)
+	return Config.Crystals.Texts.Got:format(CC.Crystals)
 end
 
 local function learn(player, data, nodeId)
@@ -168,7 +229,7 @@ function ClassService.Init(hub)
 		end
 		local data = DataService.Get(player)
 		if action == "Choose" then
-			return choose(player, data, a)
+			return choose(player, data, a, b)
 		elseif (data.Class or "") == "" then
 			return false, T.NeedClass
 		elseif action == "Learn" then
@@ -180,6 +241,10 @@ function ClassService.Init(hub)
 		end
 		return false, "Неверный запрос"
 	end
+
+	Players.PlayerRemoving:Connect(function(player)
+		pending[player] = nil
+	end)
 
 	-- Academy: the terminal opens the class screen (client Prompts).
 	local academy = hub and hub.Academy

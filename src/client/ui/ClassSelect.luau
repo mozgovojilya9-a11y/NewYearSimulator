@@ -2,21 +2,27 @@
 	ClassSelect.luau
 	"ВЫБОР КЛАССА" screen (owner mockup docs/design/ui_class_and_skilltree.png,
 	top half): three big class cards with the class art (a ViewportFrame
-	with the player's own character in their armor holding the class
-	weapon), role tags, and a details panel on the right (description,
-	key abilities, difficulty, "Выбрать класс").
+	with the player's own character in the class armor set holding the
+	class weapon, frozen in a fight pose: Config.Classes[i].Art), role
+	tags, and a details panel on the right (description, key abilities,
+	difficulty, "Выбрать класс"). Нано-кредиты and Кристаллы at the top.
 
 	Opens by itself for every player without a class (old saves too) and
-	cannot be closed until a class is picked; the Academy terminal opens
-	it again with a "Назад" button (ClassSelect.Open(true)).
+	cannot be closed until a class is picked (the first pick is free); the
+	Academy terminal opens it again with a "Назад" button
+	(ClassSelect.Open(true)). Changing the class asks first: a dialog with
+	the class preview and the price in credits, Кристаллы or Robux
+	(Config.ClassChange).
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local ArmorBuilder = require(ReplicatedStorage.Shared.ArmorBuilder)
 local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
 local Icons = require(script.Parent.Icons)
 local Popups = require(script.Parent.Popups)
@@ -43,7 +49,7 @@ screen.Active = true
 screen.Parent = Style.Gui
 local vignette = Instance.new("UIGradient")
 vignette.Rotation = 90
-vignette.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(0.5, 0.35), NumberSequenceKeypoint.new(1, 0.05) })
+vignette.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.02), NumberSequenceKeypoint.new(0.5, 0.12), NumberSequenceKeypoint.new(1, 0.02) })
 vignette.Parent = screen
 
 local W, H = 1180, 560
@@ -75,10 +81,17 @@ local creditsIcon = Icons.Make(creditsPlate, "credits", 20, C.Gold, Z + 2)
 creditsIcon.AnchorPoint = Vector2.new(0, 0.5)
 creditsIcon.Position = UDim2.new(0, 10, 0.5, 0)
 local creditsLabel = Style.Label(creditsPlate, "0", 16, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(38, 0), Size = UDim2.new(1, -46, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = Z + 2 })
+local crystalsPlate = Style.Panel(body, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -160, 0, 4), Size = UDim2.fromOffset(120, 36), ZIndex = Z + 1, Border = C.Line, Cut = 6 })
+local crystalsIcon = Icons.Make(crystalsPlate, "crystal", 20, Config.Crystals.Color, Z + 2)
+crystalsIcon.AnchorPoint = Vector2.new(0, 0.5)
+crystalsIcon.Position = UDim2.new(0, 10, 0.5, 0)
+local crystalsLabel = Style.Label(crystalsPlate, "0", 16, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(38, 0), Size = UDim2.new(1, -46, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = Z + 2 })
 local function refreshCredits()
 	creditsLabel.Text = Format.Number(player:GetAttribute("Credits") or 0)
+	crystalsLabel.Text = Format.Number(player:GetAttribute("Crystals") or 0)
 end
 player:GetAttributeChangedSignal("Credits"):Connect(refreshCredits)
+player:GetAttributeChangedSignal("Crystals"):Connect(refreshCredits)
 refreshCredits()
 
 ---------------------------------------------------------------------
@@ -96,34 +109,49 @@ local function characterModel(classId: string): Model?
 		return nil
 	end
 	for _, d in ipairs(clone:GetDescendants()) do
-		if d:IsA("LuaSourceContainer") or d:IsA("Sound") or d:IsA("BillboardGui") then
+		if d:IsA("LuaSourceContainer") or d:IsA("Sound") or d:IsA("BillboardGui") or d:IsA("ParticleEmitter") then
 			d:Destroy()
-		elseif d:IsA("BasePart") then
-			d.Anchored = true
 		end
 	end
-	for _, name in ipairs({ "EquippedWeapon", "EnergyShield" }) do
-		local old = clone:FindFirstChild(name)
-		if old then
-			old:Destroy()
+	-- the player's own gear off, the class look on
+	for _, child in ipairs(clone:GetChildren()) do
+		if child.Name == "EquippedWeapon" or child.Name == "EnergyShield" or child.Name:match("^Armor_") then
+			child:Destroy()
 		end
 	end
 	local humanoid = clone:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 	end
-	-- the class weapon in the right hand
+	local class = Config.ClassById[classId]
+	local art = class.Art or {}
+	for _, piece in ipairs(Config.Armor) do
+		if piece.Set == art.Set then
+			pcall(ArmorBuilder.Attach, clone, piece)
+		end
+	end
+	-- the class weapon welded to the right hand (so it follows the pose)
 	local weapon = Config.ItemById.Weapon[player:GetAttribute("EquippedWeapon") or ""] or Config.Weapons[1]
 	local look = table.clone(weapon)
 	look.Class = classId
-	look.Rarity = "Rare" -- rarity glows read as blobs in a viewport
+	look.Rarity = "Epic"
 	local ok, model = pcall(WeaponBuilder.Build, look)
 	local r15 = clone:FindFirstChild("RightHand")
 	local hand = r15 or clone:FindFirstChild("Right Arm")
 	if ok and model and hand and model.PrimaryPart then
-		WeaponBuilder.SetAnchored(model, true)
+		WeaponBuilder.SetAnchored(model, false)
 		local grip = if r15 then Config.Equipment.GripR15 else Config.Equipment.GripR6
 		model:PivotTo(hand.CFrame * grip)
+		for _, p in ipairs(model:GetDescendants()) do
+			if p:IsA("BasePart") then
+				p.Massless = true
+				p.CanCollide = false
+			end
+		end
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = hand
+		weld.Part1 = model.PrimaryPart
+		weld.Parent = model.PrimaryPart
 		model.Parent = clone
 	end
 	if classId == "Blade" then
@@ -136,12 +164,43 @@ local function characterModel(classId: string): Model?
 			plate.Color = S.Color
 			plate.Material = Enum.Material.Neon
 			plate.Transparency = 0.55
-			plate.Anchored = true
+			plate.Massless = true
+			plate.CanCollide = false
 			plate.CFrame = arm.CFrame * S.Offset
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = arm
+			weld.Part1 = plate
+			weld.Parent = plate
 			plate.Parent = clone
 		end
 	end
+	-- only the root is anchored: the joints can take the pose
+	for _, d in ipairs(clone:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = d.Name == "HumanoidRootPart"
+		end
+	end
 	return clone
+end
+
+-- Freezes the model in the class's fight pose (Config.Classes[i].Art).
+local function pose(model: Model, classId: string)
+	local art = Config.ClassById[classId].Art
+	local clip = art and Config.Animations.Clips[art.Clip]
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+	if not clip or (clip.Id or "") == "" or not animator or humanoid.RigType ~= Enum.HumanoidRigType.R15 then
+		return
+	end
+	local animation = Instance.new("Animation")
+	animation.AnimationId = clip.Id
+	local ok, track = pcall(animator.LoadAnimation, animator, animation)
+	if ok and track then
+		track.Priority = Enum.AnimationPriority.Action4
+		track:Play(0)
+		track.TimePosition = art.At or clip.Hit or 0
+		track:AdjustSpeed(0)
+	end
 end
 
 local function setArt(viewport: ViewportFrame, classId: string)
@@ -157,6 +216,7 @@ local function setArt(viewport: ViewportFrame, classId: string)
 	end
 	model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(180 + 20), 0))
 	model.Parent = world
+	pose(model, classId)
 	local cf, size = model:GetBoundingBox()
 	local camera = Instance.new("Camera")
 	camera.FieldOfView = 34
@@ -236,6 +296,9 @@ for i = 1, 5 do
 end
 local chooseButton = Style.Button(details, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -18), Size = UDim2.new(1, -36, 0, 52), Color = C.Gold, Text = "Выбрать класс", TextSize = 20, ZIndex = Z + 3 })
 
+local CC = Config.ClassChange
+local freeLine = Style.Label(details, CC.Texts.Free, 13, C.Green, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -76), Size = UDim2.new(1, -36, 0, 16), ZIndex = Z + 3 })
+
 local function showDetails(class)
 	selected = class
 	Icons.Set(dIcon, class.Icon, class.Color)
@@ -251,7 +314,9 @@ local function showDetails(class)
 	for i, bar in ipairs(diffBars) do
 		bar.BackgroundColor3 = if i <= class.Difficulty then C.Text else C.Line
 	end
-	chooseButton.Text = if current then "Текущий класс" else "Выбрать класс"
+	local hasClass = (player:GetAttribute("Class") or "") ~= ""
+	chooseButton.Text = if current then "Текущий класс" elseif hasClass then "Сменить класс" else "Выбрать класс"
+	freeLine.Visible = not hasClass
 	for id, card in pairs(cards) do
 		local on = id == class.Id
 		card.shape.SetBorder(if on then card.class.Color else C.Line)
@@ -327,15 +392,119 @@ for order, class in ipairs(Config.Classes) do
 	end)
 end
 
+---------------------------------------------------------------------
+-- Class change dialog (preview + price in credits / Кристаллы / Robux)
+---------------------------------------------------------------------
+
+
+local dim = Instance.new("TextButton")
+dim.Name = "ChangeDim"
+dim.Size = UDim2.fromScale(1, 1)
+dim.BackgroundColor3 = Color3.new(0, 0, 0)
+dim.BackgroundTransparency = 0.35
+dim.Text = ""
+dim.AutoButtonColor = false
+dim.ZIndex = Z + 10
+dim.Visible = false
+dim.Parent = screen
+local dialog = Style.Panel(dim, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(640, 380), ZIndex = Z + 11, Fill = C.Panel, Transparency = 0.02, Border = C.Gold, Cut = 14 })
+local dialogFit = Instance.new("UIScale")
+dialogFit.Parent = dialog
+Style.Label(dialog, CC.Texts.Title, 22, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 14), Size = UDim2.new(1, 0, 0, 26), ZIndex = Z + 12 })
+local preview = Instance.new("ViewportFrame")
+preview.Position = UDim2.fromOffset(18, 52)
+preview.Size = UDim2.fromOffset(220, 310)
+preview.BackgroundColor3 = Color3.fromRGB(10, 12, 16)
+preview.BackgroundTransparency = 0.2
+preview.Ambient = Color3.fromRGB(150, 150, 160)
+preview.LightColor = Color3.fromRGB(255, 240, 220)
+preview.LightDirection = Vector3.new(-0.4, -1, -0.6)
+preview.ZIndex = Z + 12
+preview.Parent = dialog
+local askLine = Style.Label(dialog, "", 20, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(256, 58), Size = UDim2.new(1, -274, 0, 50), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = Z + 12 })
+Style.Label(dialog, CC.Texts.Note, 13, C.Muted, { Position = UDim2.fromOffset(256, 112), Size = UDim2.new(1, -274, 0, 44), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = Z + 12 })
+local payButtons = {}
+local robuxColor = nil
+for i, kind in ipairs({ "Credits", "Crystals", "Robux" }) do
+	local button, setColor = Style.Button(dialog, {
+		Position = UDim2.fromOffset(256, 166 + (i - 1) * 50),
+		Size = UDim2.new(1, -274, 0, 42),
+		Color = if kind == "Robux" then C.Green else C.Card,
+		Icon = if kind == "Credits" then "credits" elseif kind == "Crystals" then "crystal" else "gem",
+		Text = "",
+		TextSize = 17,
+		ZIndex = Z + 12,
+	})
+	payButtons[kind] = button
+	if kind == "Robux" then
+		robuxColor = setColor
+	end
+end
+local cancel = Style.Button(dialog, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -18, 1, -14), Size = UDim2.fromOffset(150, 34), Color = C.CardDark, Text = CC.Texts.Cancel, TextSize = 15, ZIndex = Z + 12 })
+
+local changing = nil
+local function closeChange()
+	dim.Visible = false
+	changing = nil
+end
+cancel.Activated:Connect(closeChange)
+
+local function openChange(class)
+	changing = class
+	askLine.Text = CC.Texts.Ask:format(class.Name)
+	local level = player:GetAttribute("Level") or 1
+	payButtons.Credits.Text = CC.Texts.Credits:format(Format.Number(CC.Credits(level)))
+	payButtons.Crystals.Text = CC.Texts.Crystals:format(CC.Crystals)
+	local product = Config.ProductByKey[CC.Product]
+	local onSale = product ~= nil and product.Id > 0
+	payButtons.Robux.Text = if onSale then CC.Texts.Robux:format(product.Price) else CC.Texts.Robux:format(product and product.Price or 0) .. "  ·  " .. CC.Texts.Soon
+	if robuxColor then
+		robuxColor(if onSale then C.Green else C.CardDark)
+	end
+	setArt(preview, class.Id)
+	local camera = Workspace.CurrentCamera
+	dialogFit.Scale = math.min(1, (camera.ViewportSize.X - 24) / 640, (camera.ViewportSize.Y - 24) / 380)
+	dim.Visible = true
+end
+
 local busy = false
+for kind, button in pairs(payButtons) do
+	button.Activated:Connect(function()
+		if busy or not changing then
+			return
+		end
+		busy = true
+		local class = changing
+		local ok, message, state = classRemote:InvokeServer("Choose", class.Id, kind)
+		busy = false
+		if ok and state == "Pending" then
+			Popups.Toast(message or "", "gold")
+			closeChange()
+		elseif ok then
+			closeChange()
+			Popups.Toast(message or "", "gold")
+			Popups.Flash(class.Color)
+			Style.PlaySound("Forged", 1.1, 0.6)
+			ClassSelect.Close()
+		else
+			Popups.Toast(message or "", "bad")
+		end
+	end)
+end
+
 chooseButton.Activated:Connect(function()
 	if busy or not selected then
 		return
 	end
-	if player:GetAttribute("Class") == selected.Id then
+	local current = player:GetAttribute("Class") or ""
+	if current == selected.Id then
 		if canClose then
 			ClassSelect.Close()
 		end
+		return
+	end
+	if current ~= "" then
+		openChange(selected)
 		return
 	end
 	busy = true
@@ -364,6 +533,7 @@ end
 
 function ClassSelect.Close()
 	screen.Visible = false
+	closeChange()
 end
 
 function ClassSelect.IsOpen(): boolean

@@ -508,6 +508,11 @@ local function bossDefeated(run, position: Vector3)
 			data.Gates = if type(data.Gates) == "table" then data.Gates else { Cleared = {} }
 			data.Gates.Cleared = if type(data.Gates.Cleared) == "table" then data.Gates.Cleared else {}
 			local best = data.Gates.Cleared[run.location.Id]
+			-- Кристаллы: every boss, more for the first clear of a location
+			local crystals = Config.Crystals.Boss + (if best == nil then Config.Crystals.FirstClear else 0)
+			if PlayerState.AddCrystals(player, crystals) > 0 then
+				Remotes.Notify(player, Config.Crystals.Texts.Got:format(crystals), "gold")
+			end
 			local order = { S = 1, A = 2, B = 3, C = 4 }
 			if not best or order[grade.Id] < (order[best] or 9) then
 				data.Gates.Cleared[run.location.Id] = grade.Id

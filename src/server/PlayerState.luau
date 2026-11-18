@@ -91,6 +91,28 @@ function PlayerState.SpendCredits(player, cost: number): boolean
 	return true
 end
 
+-- Кристаллы (the rare currency): same rules as credits.
+function PlayerState.AddCrystals(player, amount: number): number
+	local data = DataService.Get(player)
+	amount = math.floor(amount)
+	if not data or amount <= 0 then
+		return 0
+	end
+	data.Crystals = (data.Crystals or 0) + amount
+	player:SetAttribute("Crystals", data.Crystals)
+	return amount
+end
+
+function PlayerState.SpendCrystals(player, cost: number): boolean
+	local data = DataService.Get(player)
+	if not data or (data.Crystals or 0) < cost then
+		return false
+	end
+	data.Crystals -= cost
+	player:SetAttribute("Crystals", data.Crystals)
+	return true
+end
+
 function PlayerState.GetRoomReached(player): number
 	local data = DataService.Get(player)
 	return if data then data.RoomReached else 0
@@ -276,6 +298,7 @@ function PlayerState.Sync(player)
 		return
 	end
 	player:SetAttribute("Credits", data.Credits or 0)
+	player:SetAttribute("Crystals", data.Crystals or 0)
 	player:SetAttribute("RoomReached", data.RoomReached)
 	player:SetAttribute("Level", data.Level)
 	player:SetAttribute("Xp", data.Xp)

@@ -108,6 +108,9 @@ for _, key in ipairs(passKeys) do
 end
 -- Products
 for order, product in ipairs(Config.Products) do
+	if not product.Tab then
+		continue -- bought elsewhere (class change dialog)
+	end
 	card(product.Tab, order, product.Icon or "gem", product.Name, describe(product), product.Price, product.Id, function()
 		MarketplaceService:PromptProductPurchase(player, product.Id)
 	end, nil)

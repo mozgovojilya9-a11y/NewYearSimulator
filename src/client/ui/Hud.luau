@@ -614,14 +614,14 @@ if player.Character then
 end
 
 ---------------------------------------------------------------------
--- Bottom left: credits
+-- Bottom left: credits and Кристаллы
 ---------------------------------------------------------------------
 
 local credits = Style.Panel(Style.Gui, {
 	Name = "Credits",
 	AnchorPoint = Vector2.new(0, 1),
 	Position = UDim2.new(0, LEFT, 1, -14),
-	Size = UDim2.fromOffset(180, 42),
+	Size = UDim2.fromOffset(250, 42),
 	ZIndex = 5,
 	Border = C.Line,
 	Cut = 8,
@@ -632,7 +632,7 @@ creditsIcon.Position = UDim2.new(0, 12, 0.5, 0)
 local creditsValue = Style.Label(credits, "0", 19, C.Text, {
 	Font = Style.FontTitle,
 	Position = UDim2.fromOffset(44, 0),
-	Size = UDim2.new(1, -54, 1, 0),
+	Size = UDim2.fromOffset(100, 42),
 	TextXAlignment = Enum.TextXAlignment.Left,
 	ZIndex = 6,
 })
@@ -650,6 +650,21 @@ local function refreshCredits()
 end
 player:GetAttributeChangedSignal("Credits"):Connect(refreshCredits)
 refreshCredits()
+local crystalsIcon = Icons.Make(credits, "crystal", 22, Config.Crystals.Color, 6)
+crystalsIcon.AnchorPoint = Vector2.new(0, 0.5)
+crystalsIcon.Position = UDim2.new(0, 152, 0.5, 0)
+local crystalsValue = Style.Label(credits, "0", 19, C.Text, {
+	Font = Style.FontTitle,
+	Position = UDim2.fromOffset(180, 0),
+	Size = UDim2.fromOffset(64, 42),
+	TextXAlignment = Enum.TextXAlignment.Left,
+	ZIndex = 6,
+})
+local function refreshCrystals()
+	crystalsValue.Text = Format.Number(player:GetAttribute("Crystals") or 0)
+end
+player:GetAttributeChangedSignal("Crystals"):Connect(refreshCrystals)
+refreshCrystals()
 
 ---------------------------------------------------------------------
 -- Bottom right: ИГРАТЬ / В ХАБ
