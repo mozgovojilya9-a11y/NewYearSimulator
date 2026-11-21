@@ -1,8 +1,9 @@
 --[[
 	ClassSelect.luau
 	"ВЫБОР КЛАССА" screen (owner mockup docs/design/ui_class_and_skilltree.png,
-	top half): three big class cards with unique procedural class fighters
-	in a ViewportFrame (the player's Roblox skin is never used), role
+	top half): three big class cards with the player's own avatar in the
+	class armor and weapon (ClassPreviewService rig, idle stance in a
+	WorldModel, slow turn), role
 	tags, and a details panel on the right (description, key abilities,
 	difficulty, "Выбрать класс"). Нано-кредиты and Кристаллы at the top.
 
@@ -21,6 +22,7 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local ArmorBuilder = require(ReplicatedStorage.Shared.ArmorBuilder)
 local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
 local Icons = require(script.Parent.Icons)
 local Popups = require(script.Parent.Popups)
@@ -93,167 +95,165 @@ player:GetAttributeChangedSignal("Crystals"):Connect(refreshCredits)
 refreshCredits()
 
 ---------------------------------------------------------------------
--- Class art: a unique class fighter, never the player's Roblox avatar/skin
+-- Class art: the player's own avatar (server ClassPreviewService builds
+-- it from the HumanoidDescription) in the class armor set with the class
+-- weapon, playing the class idle stance in a WorldModel, slowly turning.
 ---------------------------------------------------------------------
+
+local previews = ReplicatedStorage:WaitForChild("ClassPreviews", 30)
+
+local function avatarRig(): Model?
+	local source = previews and previews:WaitForChild(tostring(player.UserId), 10)
+	if not source then
+		return nil
+	end
+	source.Archivable = true
+	return source:Clone()
+end
 
 local function characterModel(classId: string): Model?
 	local class = Config.ClassById[classId]
-	if not class then
+	local model = class and avatarRig()
+	if not model then
 		return nil
 	end
-
-	local model = Instance.new("Model")
-	model.Name = classId .. "ClassFighter"
-
-	local root = Instance.new("Part")
-	root.Name = "HumanoidRootPart"
-	root.Size = Vector3.new(1, 1, 1)
-	root.Transparency = 1
-	root.Anchored = true
-	root.CanCollide = false
-	root.CanQuery = false
-	root.CanTouch = false
-	root.CFrame = CFrame.new(0, 3.2, 0)
-	root.Parent = model
-	model.PrimaryPart = root
-
-	local dark = Color3.fromRGB(18, 24, 38)
-	local accent = class.Color
-	local armor = if classId == "Blade" then Color3.fromRGB(70, 130, 165)
-		elseif classId == "Pulse" then Color3.fromRGB(110, 45, 125)
-		else Color3.fromRGB(145, 105, 36)
-
-	local function bodyPart(name, size, cframe, color, material)
-		local part = Instance.new("Part")
-		part.Name = name
-		part.Size = size
-		part.CFrame = cframe
-		part.Color = color
-		part.Material = material or Enum.Material.Metal
-		part.Anchored = false
-		part.CanCollide = false
-		part.CanQuery = false
-		part.CanTouch = false
-		part.Massless = true
-		part.TopSurface = Enum.SurfaceType.Smooth
-		part.BottomSurface = Enum.SurfaceType.Smooth
-		part.Parent = model
-		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = root
-		weld.Part1 = part
-		weld.Parent = part
-		return part
-	end
-
-	bodyPart("Torso", Vector3.new(2.3, 2.5, 1.15), CFrame.new(0, 3.8, 0), armor)
-	bodyPart("ChestCore", Vector3.new(0.55, 0.55, 0.12), CFrame.new(0, 4.05, -0.64), accent, Enum.Material.Neon)
-	bodyPart("Head", Vector3.new(1.35, 1.25, 1.25), CFrame.new(0, 5.75, 0), dark, Enum.Material.SmoothPlastic).Shape = Enum.PartType.Ball
-	bodyPart("Visor", Vector3.new(1.05, 0.18, 0.12), CFrame.new(0, 5.82, -0.66), accent, Enum.Material.Neon)
-
-	local leftShoulder = if classId == "Blade" then 1.55
-		elseif classId == "Gunner" then 1.7
-		else 1.35
-	bodyPart("LeftArm", Vector3.new(0.72, 2.2, 0.72), CFrame.new(-leftShoulder, 3.8, 0) * CFrame.Angles(0, 0, math.rad(-12)), armor)
-	bodyPart("RightArm", Vector3.new(0.72, 2.2, 0.72), CFrame.new(leftShoulder, 3.8, 0) * CFrame.Angles(0, 0, math.rad(12)), armor)
-	bodyPart("Pelvis", Vector3.new(1.75, 0.75, 1), CFrame.new(0, 2.25, 0), dark)
-	bodyPart("LeftLeg", Vector3.new(0.85, 2.15, 0.85), CFrame.new(-0.55, 1.15, 0) * CFrame.Angles(0, 0, math.rad(4)), dark)
-	bodyPart("RightLeg", Vector3.new(0.85, 2.15, 0.85), CFrame.new(0.55, 1.15, 0) * CFrame.Angles(0, 0, math.rad(-4)), dark)
-
-	if classId == "Blade" then
-		bodyPart("BladeShoulder", Vector3.new(1.05, 0.35, 1.05), CFrame.new(-1.55, 4.75, 0) * CFrame.Angles(0, 0, math.rad(-12)), accent)
-		bodyPart("Shield", Vector3.new(0.18, 1.65, 1.65), CFrame.new(-2.05, 3.55, -0.3), accent, Enum.Material.Glass).Shape = Enum.PartType.Cylinder
-	elseif classId == "Pulse" then
-		bodyPart("PulseBackWing", Vector3.new(0.15, 2.1, 1.45), CFrame.new(0, 4.25, 0.75) * CFrame.Angles(0, math.rad(35), 0), accent, Enum.Material.Neon)
-		bodyPart("PulseBackWing2", Vector3.new(0.15, 2.1, 1.45), CFrame.new(0, 4.25, 0.75) * CFrame.Angles(0, math.rad(-35), 0), accent, Enum.Material.Neon)
-	else
-		bodyPart("GunnerBackPack", Vector3.new(1.45, 1.65, 0.45), CFrame.new(0, 4, 0.75), dark)
-		bodyPart("GunnerCore", Vector3.new(0.9, 0.18, 0.18), CFrame.new(0, 4.15, 0.98), accent, Enum.Material.Neon)
-	end
-
-	local weaponId = if classId == "Blade" then "PhoenixBlade"
-		elseif classId == "Pulse" then "DuskScythe"
-		else "AbyssBlade"
-	local weapon = Config.ItemById.Weapon[weaponId]
-	if weapon then
-		local look = table.clone(weapon)
-		look.Rarity = "Epic"
-		local ok, weaponModel = pcall(WeaponBuilder.Build, look)
-		if ok and weaponModel and weaponModel.PrimaryPart then
-			WeaponBuilder.SetAnchored(weaponModel, false)
-			weaponModel:PivotTo(CFrame.new(leftShoulder, 3.05, -0.15) * CFrame.Angles(math.rad(75), 0, math.rad(-20)))
-			for _, part in ipairs(weaponModel:GetDescendants()) do
-				if part:IsA("BasePart") then
-					part.Massless = true
-					part.CanCollide = false
-				end
-			end
-			for _, part in ipairs(weaponModel:GetChildren()) do
-				if part:IsA("BasePart") then
-					local weld = Instance.new("WeldConstraint")
-					weld.Part0 = root
-					weld.Part1 = part
-					weld.Parent = part
-				end
-			end
-			weaponModel.Parent = model
+	model.Name = classId .. "Preview"
+	-- old accessories that hide armor stay; the class armor goes on top
+	local art = class.Art or {}
+	for _, piece in ipairs(Config.Armor) do
+		if piece.Set == art.Set then
+			pcall(ArmorBuilder.Attach, model, piece)
 		end
 	end
-
-	for _, part in ipairs(model:GetDescendants()) do
-		if part:IsA("BasePart") then
-			part.Anchored = part == root
+	-- the class weapon (GameAssets model when there is one) in the right hand
+	local weapon = Config.ItemById.Weapon[player:GetAttribute("EquippedWeapon") or ""] or Config.Weapons[1]
+	local look = table.clone(weapon)
+	look.Class = classId
+	look.Rarity = "Epic"
+	local ok, weaponModel = pcall(WeaponBuilder.Build, look)
+	local hand = model:FindFirstChild("RightHand")
+	if ok and weaponModel and hand and weaponModel.PrimaryPart then
+		WeaponBuilder.SetAnchored(weaponModel, false)
+		weaponModel:PivotTo(hand.CFrame * Config.Equipment.GripR15)
+		for _, part in ipairs(weaponModel:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.Massless = true
+				part.CanCollide = false
+			end
+		end
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = hand
+		weld.Part1 = weaponModel.PrimaryPart
+		weld.Parent = weaponModel.PrimaryPart
+		weaponModel.Parent = model
+	end
+	if classId == "Blade" then
+		local arm = model:FindFirstChild("LeftLowerArm")
+		if arm then
+			local S = Config.Equipment.Shield
+			local plate = Instance.new("Part")
+			plate.Name = "EnergyShield"
+			plate.Shape = Enum.PartType.Cylinder
+			plate.Size = Vector3.new(0.12, S.Size, S.Size)
+			plate.Color = S.Color
+			plate.Material = Enum.Material.Neon
+			plate.Transparency = 0.55
+			plate.Massless = true
+			plate.CanCollide = false
+			plate.CFrame = arm.CFrame * S.Offset
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = arm
+			weld.Part1 = plate
+			weld.Parent = plate
+			plate.Parent = model
+		end
+	end
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = d.Name == "HumanoidRootPart"
 		end
 	end
 	return model
 end
 
--- Freezes the model in the class's fight pose (Config.Classes[i].Art).
+-- The class idle stance, looped (Config.Animations.Acts[class].Idle).
 local function pose(model: Model, classId: string)
-	local art = Config.ClassById[classId].Art
-	local clip = art and Config.Animations.Clips[art.Clip]
+	local acts = Config.Animations.Acts[classId]
+	local clip = acts and Config.Animations.Clips[acts.Idle or ""]
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
-	if not clip or (clip.Id or "") == "" or not animator or humanoid.RigType ~= Enum.HumanoidRigType.R15 then
+	local animator = humanoid and (humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid))
+	if not clip or (clip.Id or "") == "" or not animator then
 		return
 	end
 	local animation = Instance.new("Animation")
 	animation.AnimationId = clip.Id
 	local ok, track = pcall(animator.LoadAnimation, animator, animation)
 	if ok and track then
-		track.Priority = Enum.AnimationPriority.Action4
-		track:Play(0)
-		track.TimePosition = art.At or clip.Hit or 0
-		track:AdjustSpeed(0)
+		track.Looped = true
+		track.Priority = Enum.AnimationPriority.Action
+		track:Play(0.2)
 	end
 end
 
+local artToken = {}
 local function setArt(viewport: ViewportFrame, classId: string)
 	viewport:ClearAllChildren()
+	artToken[viewport] = (artToken[viewport] or 0) + 1
+	local token = artToken[viewport]
 	local world = Instance.new("WorldModel")
 	world.Parent = viewport
-	local model = characterModel(classId)
-	if not model then
-		local icon = Icons.Make(viewport, Config.ClassById[classId].Icon, 110, Config.ClassById[classId].Color, viewport.ZIndex + 1)
-		icon.AnchorPoint = Vector2.new(0.5, 0.5)
-		icon.Position = UDim2.fromScale(0.5, 0.45)
-		return
+	-- soft studio light: warm key from the front-left, cool fill
+	viewport.Ambient = Color3.fromRGB(120, 125, 140)
+	viewport.LightColor = Color3.fromRGB(255, 236, 210)
+	viewport.LightDirection = Vector3.new(-0.5, -0.8, -0.7)
+	local waiting = Style.Label(viewport, "…", 30, C.Muted, { Size = UDim2.fromScale(1, 1), ZIndex = viewport.ZIndex + 1 })
+	-- a soft glow of the class color behind the figure
+	local glow = viewport.Parent:FindFirstChild("ArtGlow")
+	if not glow then
+		glow = Instance.new("Frame")
+		glow.Name = "ArtGlow"
+		glow.AnchorPoint = Vector2.new(0.5, 0.5)
+		glow.BorderSizePixel = 0
+		glow.ZIndex = viewport.ZIndex - 1
+		glow.Parent = viewport.Parent
+		Style.Corner(glow, UDim.new(0.5, 0))
+		local g = Instance.new("UIGradient")
+		g.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.72), NumberSequenceKeypoint.new(0.6, 0.94), NumberSequenceKeypoint.new(1, 1) })
+		g.Parent = glow
 	end
-	model:PivotTo(CFrame.new(0, 0, 0) * CFrame.Angles(0, math.rad(180 + 20), 0))
-	model.Parent = world
-	pose(model, classId)
-	local cf, size = model:GetBoundingBox()
-	local camera = Instance.new("Camera")
-	camera.FieldOfView = 34
-	local distance = size.Y * 1.55
-	camera.CFrame = CFrame.lookAt(cf.Position + Vector3.new(0, size.Y * 0.08, distance), cf.Position + Vector3.new(0, size.Y * 0.05, 0))
-	camera.Parent = viewport
-	viewport.CurrentCamera = camera
-	-- a gentle turn
+	glow.BackgroundColor3 = Config.ClassById[classId].Color
+	glow.Position = UDim2.new(0.5, 0, 0, viewport.Position.Y.Offset + viewport.Size.Y.Offset * 0.55) -- centre of the figure
+	glow.Size = UDim2.fromOffset(math.min(220, viewport.Size.Y.Offset), math.min(220, viewport.Size.Y.Offset))
 	task.spawn(function()
+		local model = characterModel(classId)
+		if artToken[viewport] ~= token then
+			return
+		end
+		waiting:Destroy()
+		if not model then
+			local icon = Icons.Make(viewport, Config.ClassById[classId].Icon, 110, Config.ClassById[classId].Color, viewport.ZIndex + 1)
+			icon.AnchorPoint = Vector2.new(0.5, 0.5)
+			icon.Position = UDim2.fromScale(0.5, 0.45)
+			return
+		end
+		local base = CFrame.new(0, 0, 0)
+		model:PivotTo(base * CFrame.Angles(0, math.rad(200), 0))
+		model.Parent = world
+		pose(model, classId)
+		local cf, size = model:GetBoundingBox()
+		local camera = Instance.new("Camera")
+		camera.FieldOfView = 30
+		-- the whole figure fits (big avatar heads / ears included)
+		local tall = math.max(size.Y, size.X * 1.2)
+		local distance = tall * 2.25
+		camera.CFrame = CFrame.lookAt(cf.Position + Vector3.new(0, tall * 0.04, distance), cf.Position + Vector3.new(0, -tall * 0.02, 0))
+		camera.Parent = viewport
+		viewport.CurrentCamera = camera
+		-- a slow turn back and forth
 		local start = os.clock()
-		while model.Parent and screen.Visible do
-			local a = math.sin((os.clock() - start) * 0.6) * math.rad(14)
-			model:PivotTo(CFrame.Angles(0, math.rad(200) + a, 0))
+		while model.Parent and artToken[viewport] == token do
+			local a = math.sin((os.clock() - start) * 0.45) * math.rad(28)
+			model:PivotTo(base * CFrame.Angles(0, math.rad(200) + a, 0))
 			RunService.RenderStepped:Wait()
 		end
 	end)
