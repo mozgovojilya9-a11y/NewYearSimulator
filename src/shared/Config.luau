@@ -12,7 +12,7 @@ local Config = {}
 
 -- v2 (2026-11-18): a clean start before the release: every save of the
 -- testing period (v1) stays in its own store and is not loaded.
-Config.DataStoreName = "AuraClicker_v2"
+Config.DataStoreName = "AuraClicker_v3" -- v3 (2026-11-21): owner's fresh playtest
 
 -- Default data for a brand-new player. DataService backfills any
 -- fields missing from an older save. IDs stored in saves (weapons,
@@ -1702,8 +1702,8 @@ Config.Animations = {
 
 -- Leaderboards (OrderedDataStore). Scores are written on every save.
 Config.Leaderboards = {
-	LevelStore = "AuraClicker_TopLevel_v2",
-	RoomStore = "AuraClicker_TopRoom_v2",
+	LevelStore = "AuraClicker_TopLevel_v3",
+	RoomStore = "AuraClicker_TopRoom_v3",
 	RefreshSeconds = 60,
 	Top = 10,
 }
