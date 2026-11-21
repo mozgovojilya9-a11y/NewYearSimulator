@@ -1593,13 +1593,16 @@ Config.Pacing = {
 	BossOverhead = 2, -- boss time x (phases, telegraphs, intro)
 	RunOverhead = 35, -- results, back to the hub, forge, the gate window
 	StrShare = 0.6, -- share of the stat points a typical player puts into Сила
-	EntryShare = 0.85, -- a location is taken when damage >= this x the recommended damage of its last section
+	EntryShare = 0.5, -- a location is taken at its recommended level when damage >= this x the recommended damage of its last section
 	Targets = {
 		-- tier -> minute the typical player first fights it (the curve of
 		-- RecommendedDamage is fitted through these)
 		Tiers = { ["1"] = 0, ["4"] = 25, ["7"] = 70, ["11"] = 150, ["15"] = 230 },
 		Level = 25,
 		LevelMinute = 240,
+		-- level -> minute of active play (21.11: a very fast start);
+		-- --tune fits XpBase and XpExponent through these
+		Levels = { ["5"] = 10, ["10"] = 30, ["25"] = 240 },
 	},
 	ReportMinutes = { 2, 5, 10, 15, 20, 30, 45, 60, 90, 120, 150, 180, 210, 240, 300, 360, 480 },
 }
@@ -1654,12 +1657,12 @@ Config.Progression = {
 	-- Every level: +SkillPointsPerLevel skill point, damage and max HP grow
 	-- (Config.Stats), full heal.
 	--   XP to the next level = XpBase x level^XpExponent (x LateGrowth per
-	--   level above LateFrom); XpBase tuned with tools/pacing.py --tune:
-	--   level 25 after ~4 hours of active play, the first levels every few
-	--   minutes, slower after 25
+	--   level above LateFrom); XpBase and XpExponent fitted with
+	--   tools/pacing.py --tune to Pacing.Targets.Levels (21.11): level 5
+	--   ~10 min, 10 ~30 min, 25 ~4 h of active play, slower after 25
 	Level = {
-		XpBase = 186.6,
-		XpExponent = 1.5,
+		XpBase = 44.3,
+		XpExponent = 2.025,
 		-- after LateFrom every level costs LateGrowth times more on top of
 		-- the curve: the fast climb ends around level 25 (~4 hours)
 		LateFrom = 25,

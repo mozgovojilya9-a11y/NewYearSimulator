@@ -169,7 +169,7 @@ class Game:
         self.gates = cfg["Gates"]
         self.locations = [l for l in self.gates["Locations"] if l.get("Ready") is not False]
         for l in self.locations:
-            l["BossTier"] = l["Tier"] + len(l["Sections"]) * l["TierStep"]
+            l["BossTier"] = l.get("BossTier") or (l["Tier"] + len(l["Sections"]) * l["TierStep"])
         grades = cfg["Grades"]
         self.grades = [grades[k] for k in sorted(k for k in grades if isinstance(k, int))]
 
@@ -298,7 +298,9 @@ class Player:
         self.cores = 0
         self.best_rarity = 1
         self.events = []
-        self.snaps = []  # (time, level, location name, weapon text, gear score, damage)
+        self.snaps = []  # (time, level, location name, weapon text, gear score, damage, kills, xp)
+        self.kills = 0
+        self.xp_total = 0.0
 
     def strength(self):
         a = self.g.attrs
@@ -319,13 +321,15 @@ class Player:
 
     def snapshot(self):
         name = self.location["Name"] if self.location else "—"
-        self.snaps.append((self.t, self.level, name, self.weapon_text(), self.gear_score(), self.damage()))
+        self.snaps.append((self.t, self.level, name, self.weapon_text(), self.gear_score(), self.damage(), self.kills, self.xp_total))
 
     def add_xp(self, amount):
         self.xp += amount
+        self.xp_total += amount
         while self.xp >= self.g.xp_to_next(self.level):
             self.xp -= self.g.xp_to_next(self.level)
             self.level += 1
+            self.events.append((self.t, "levelat", self.level))
             if self.level in (2, 3, 5) or self.level % 5 == 0:
                 self.events.append((self.t, "level", self.level))
 
@@ -391,7 +395,9 @@ class Player:
         best = g.locations[0]
         for l in g.locations:
             last = l["Tier"] + (len(l["Sections"]) - 1) * l["TierStep"]
-            if self.rank_open(l["Rank"]) and self.damage() >= g.P["EntryShare"] * g.recommended(last) and l["Tier"] >= best["Tier"]:
+            # a real player follows the recommended level shown on the card;
+            # the damage check keeps the model out of hopeless runs
+            if self.rank_open(l["Rank"]) and self.level >= l["Level"] and self.damage() >= g.P["EntryShare"] * g.recommended(last) and l["Tier"] >= best["Tier"]:
                 best = l
         return best
 
@@ -402,6 +408,7 @@ class Player:
         self.t += hits / g.P["HitsPerSecond"] + g.P["EnemySeconds"]
         weight = g.sec["Reward"] * (g.sec["EliteReward"] if elite else g.sec["SwarmReward"] if role == "Swarm" else 1)
         self.add_xp(g.L["XpPerKill"] * tier * weight)
+        self.kills += 1
         self.credits += g.kill_credits(tier, False) * weight
         enemy = "Elite" if elite else "Normal"
         if self.rng.random() < g.loot["DropChance"][enemy]:
@@ -414,7 +421,7 @@ class Player:
             self.events.append((self.t, "location", loc["Name"]))
         self.location = loc
         start = self.t
-        elites = g.sec["Elites"]
+        elites = loc.get("Elites") or g.sec["Elites"]
         for i, count in enumerate(loc["Sections"]):
             tier = loc["Tier"] + i * loc["TierStep"]
             self.t += g.P["SectionSeconds"]
@@ -472,26 +479,50 @@ def state_at(p, minute):
 # ---------------------------------------------------------------------------
 
 
+def level_minute(p, level):
+    for t, kind, value in p.events:
+        if kind == "levelat" and value == level:
+            return t / 60
+    return None
+
+
 def tune(cfg):
-    """XpBase so the level at Targets.LevelMinute is Targets.Level. The
-    tier curve (Dungeon.Recommended*) is set by hand from the item level
-    math (drops are tier x LevelPerRoom, weapons x1.046 per item level);
-    the report shows when each location is first entered so it can be
-    checked against Targets.Tiers."""
+    """XpBase and XpExponent so the levels of Targets.Levels come at
+    their minutes (log error, a grid then a finer grid). The tier curve
+    (Dungeon.Recommended*) is set by hand from the item level math."""
     T = cfg["Pacing"]["Targets"]
-    lo, hi = 1.0, 3000.0
-    for _ in range(30):
-        mid = (lo + hi) / 2
-        cfg["Progression"]["Level"]["XpBase"] = mid
-        p = simulate(Game(cfg), T["LevelMinute"])
-        if state_at(p, T["LevelMinute"])[1] > T["Level"]:
-            lo = mid
-        else:
-            hi = mid
-    cfg["Progression"]["Level"]["XpBase"] = round(hi, 1)
+    targets = sorted((int(k), v) for k, v in T["Levels"].items())
+    L = cfg["Progression"]["Level"]
+    horizon = max(m for _, m in targets) + 30
+
+    def error(base, exp):
+        L["XpBase"], L["XpExponent"] = base, exp
+        p = simulate(Game(cfg), horizon)
+        err = 0
+        for level, minute in targets:
+            got = level_minute(p, level) or horizon * 2
+            err += math.log(got / minute) ** 2
+        return err
+
+    best = None
+    for exp in [1.6 + 0.1 * i for i in range(12)]:
+        for base in [20 * 1.25 ** i for i in range(16)]:
+            e = error(base, exp)
+            if best is None or e < best[0]:
+                best = (e, base, exp)
+    _, base0, exp0 = best
+    for exp in [exp0 + 0.025 * i for i in range(-4, 5)]:
+        for base in [base0 * 1.05 ** i for i in range(-6, 7)]:
+            e = error(base, exp)
+            if e < best[0]:
+                best = (e, base, exp)
+    L["XpBase"], L["XpExponent"] = round(best[1], 1), round(best[2], 3)
     print("Suggested Config numbers:")
-    print("  Progression.Level.XpBase =", cfg["Progression"]["Level"]["XpBase"])
-    print("Targets (tier -> minute):", {int(k): v for k, v in T["Tiers"].items()})
+    print("  Progression.Level.XpBase =", L["XpBase"])
+    print("  Progression.Level.XpExponent =", L["XpExponent"])
+    p = simulate(Game(cfg), horizon)
+    for level, minute in targets:
+        print("  level %d: target %d min, model %.1f min" % (level, minute, level_minute(p, level) or -1))
     return cfg
 
 
@@ -513,10 +544,16 @@ def report(cfg):
     game = Game(cfg)
     minutes = [int(m) for m in cfg["Pacing"]["ReportMinutes"]]
     p = simulate(game, minutes[-1])
-    rows = ["| Минута | Уровень | Врата (локация забега) | Урон | Gear Score | Оружие |", "|---:|---:|---|---:|---:|---|"]
+    rows = ["| Минута | Уровень | Врата (локация забега) | Убийств/мин | Опыт/мин | Опыт до след. уровня | Урон | Оружие |", "|---:|---:|---|---:|---:|---:|---:|---|"]
+    prev = p.snaps[0]
     for m in minutes:
-        t, level, name, weapon, gs, dmg = state_at(p, m)
-        rows.append("| %d | %d | %s | %s | %d | %s |" % (m, level, name, fmt(dmg), gs, weapon))
+        snap = state_at(p, m)
+        t, level, name, weapon, gs, dmg, kills, xp = snap
+        dt = max(1e-6, (t - prev[0]) / 60)
+        kpm = (kills - prev[6]) / dt if t > prev[0] else 0
+        xpm = (xp - prev[7]) / dt if t > prev[0] else 0
+        rows.append("| %d | %d | %s | %.1f | %s | %s | %s | %s |" % (m, level, name, kpm, fmt(xpm), fmt(game.xp_to_next(level)), fmt(dmg), weapon))
+        prev = snap
     table = "\n".join(rows)
 
     names = {r["Id"]: r["Name"] for r in cfg["Rarities"]}
