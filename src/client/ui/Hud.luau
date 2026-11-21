@@ -912,27 +912,12 @@ UserInputService.InputBegan:Connect(function(input, processed)
 end)
 
 ---------------------------------------------------------------------
--- Level up: big banner, flash, sound
+-- Level up: the window "[СИСТЕМА] УРОВЕНЬ ПОВЫШЕН" (ui/LevelUp.luau);
+-- "Распределить" opens Статус
 ---------------------------------------------------------------------
 
-local levelUpRemote = ReplicatedStorage:WaitForChild("LevelUp")
-local LT = Config.Progression.Level.Texts
-levelUpRemote.OnClientEvent:Connect(function(level, points)
-	level = tonumber(level) or 1
-	task.wait(0.1) -- let the new MaxHealth attribute arrive
-	local rank = Config.RankFor(level)
-	local ST = Config.System.Texts
-	local gained = tonumber(points) or 1
-	local lines = {
-		ST.Level:format(level) .. "  •  " .. ST.SkillPoints:format(gained) .. "  •  " .. ST.StatPoints:format(gained * Config.Attributes.PointsPerLevel),
-		LT.Growth:format(Format.Number(player:GetAttribute("ClickPower") or 1), Format.Number(player:GetAttribute("MaxHealth") or Config.Player.Health)),
-	}
-	if rank.Level == level then
-		table.insert(lines, ST.Rank:format(rank.Name))
-	end
-	SystemNotice.Show(ST.LevelUp, lines, "gold")
-	Popups.Flash(C.Gold)
-	Style.PlaySound("Forged", 1.2, 0.7)
-end)
+require(script.Parent.LevelUp).OnSpend = function()
+	Status.Open()
+end
 
 return Hud

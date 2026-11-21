@@ -163,7 +163,12 @@ local function addXp(player, data, amount: number, raw: boolean?)
 				humanoid.Health = humanoid.MaxHealth -- a level up heals
 			end)
 		end
-		Remotes.Get("LevelUp"):FireClient(player, data.Level, gained * P.Level.SkillPointsPerLevel)
+		Remotes.Get("LevelUp"):FireClient(player, data.Level, gained * P.Level.SkillPointsPerLevel, data.Level - gained)
+		-- everyone sees the light on the character (client LevelUp.luau)
+		local character = player.Character
+		if character then
+			character:SetAttribute("LevelUpFx", (character:GetAttribute("LevelUpFx") or 0) + 1)
+		end
 		GameEvents.Fire(player, "Level", data.Level)
 	else
 		player:SetAttribute("Xp", data.Xp)

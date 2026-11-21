@@ -840,6 +840,35 @@ Config.AFK = {
 	},
 }
 
+-- The level-up moment (client LevelUp.luau): a pillar of light and a
+-- ring of particles on the character (everyone sees it), a flash, a short
+-- camera zoom, the sound Config.Assets.Sounds.LevelUp and the window
+-- "[СИСТЕМА] УРОВЕНЬ ПОВЫШЕН". Level-ups within Gather seconds are
+-- summed up in one window.
+Config.LevelUpFx = {
+	Gather = 1.2,
+	PillarSeconds = 1.6,
+	PillarColor = Color3.fromRGB(120, 235, 255),
+	RingColor = Color3.fromRGB(255, 214, 110),
+	ZoomFov = 8, -- degrees closer
+	ZoomSeconds = 0.6,
+	Texts = {
+		System = "[ СИСТЕМА ]",
+		Title = "УРОВЕНЬ ПОВЫШЕН",
+		Levels = "%d  →  %d",
+		Stats = "Очки характеристик: +%d",
+		Skills = "Очки навыков: +%d",
+		Opened = "ОТКРЫЛОСЬ",
+		Node = "Навык «%s» (ветка %s)",
+		Nodes = "Новых навыков в дереве: %d",
+		Gate = "Врата ранга %s",
+		Rank = "Звание: %s",
+		Stronger = "Урон %s  ·  Макс. HP %s",
+		Spend = "Распределить",
+		Later = "Позже",
+	},
+}
+
 -- Gifts for time in the game today (EngageService): at each Minute a
 -- gift becomes ready; the HUD shows the next one with a timer, a click
 -- claims it. The minutes count only while playing, reset every day.
@@ -1772,6 +1801,11 @@ end
 -- Shared.Assets and README). Missing model -> procedural fallback.
 Config.Assets = {
 	Animations = Config.Animations.Clips, -- (see Config.Animations)
+	-- sounds of key moments: put your uploaded ids here ("" = silent);
+	-- the defaults are built-in engine sounds
+	Sounds = {
+		LevelUp = "rbxasset://sounds/victory.wav",
+	},
 	-- Names the game looks for (AssetService reports the missing ones).
 	Expected = {
 		Weapons = { "Weapon_Sword_1", "Weapon_Sword_2", "Weapon_Spear_1", "Weapon_Spear_2", "Weapon_Blaster_1", "Weapon_Blaster_2", "Weapon_Blaster_3" },
@@ -1835,7 +1869,7 @@ Config.Remotes = {
 	Loot = "RemoteEvent", -- S->C ("Spawn", id, kind, payload, position, lifetime) kind = "Item" | "Chest" | "Artifact" | ("Picked", id, kind, payload) | ("Remove", id) | ("Clear"); C->S (id) pick up / open
 	Announce = "RemoteEvent", -- S->all (text, color) system chat line + toast
 	StoreNotify = "RemoteEvent", -- S->C (text) after a Robux purchase was granted
-	LevelUp = "RemoteEvent", -- S->C (level, skillPoints gained) big "Новый уровень!" banner
+	LevelUp = "RemoteEvent", -- S->C (level, skillPoints gained, previous level) the "[СИСТЕМА] УРОВЕНЬ ПОВЫШЕН" window
 	Afk = "RemoteFunction", -- ("Enter") | ("Leave") -> ok, message
 	AfkTick = "RemoteEvent", -- S->C (session { Seconds, Xp, Credits, Crystals, Items, Limited, ResetIn, LeftTicks })
 	Engage = "RemoteFunction", -- ("Gift") | ("Code", text) | ("Achievements") | ("Title", id|"") -> ok, message|data
