@@ -3,7 +3,7 @@
 	Tiny signal for gameplay facts quests listen to, so services don't
 	require each other in circles:
 	  GameEvents.Fire(player, kind, amount)
-	  kind: Kill, Boss, Loot, Craft, Train, Learn, Class, Room, Level
+	  kind: Kill, Boss, Loot, Afk, Learn, Class, Room, Level
 	  GameEvents.Connect(function(player, kind, amount) ... end)
 ]]
 

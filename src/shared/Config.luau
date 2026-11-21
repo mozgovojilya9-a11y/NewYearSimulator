@@ -43,6 +43,7 @@ Config.StartingData = {
 	Title = "", -- the achievement title shown under the name ("" = the level rank)
 	Codes = {}, -- [code] = true when redeemed
 	Gifts = { Day = 0, Claimed = {} }, -- playtime gifts of today
+	Afk = { HourStart = 0, Ticks = 0 }, -- AFK zone: rewarded ticks in the current hour (Config.AFK.HourLimit)
 	Level = 1,
 	Xp = 0,
 	SkillPoints = 0, -- old field (points are now Config.Skills.PointsAtLevel per class)
@@ -69,7 +70,8 @@ Config.StartingData = {
 --   6 = crafting and materials removed: owned catalog gear becomes item
 --       instances (kept as it was), materials become credits + Нано-ядра
 --       (Config.CraftMigration)
-Config.SchemaVersion = 6
+--   7 = training hall replaced by the AFK zone: data.Afk hour counter
+Config.SchemaVersion = 7
 
 -- Schema 5 -> 6: every material the player had turns into credits and
 -- Нано-ядра by its old rarity (old material id -> rarity is listed here:
@@ -798,6 +800,44 @@ Config.Crystals = {
 	Boss = 2,
 	FirstClear = 15,
 	Texts = { Got = "+%d кристаллов", NotEnough = "Нужно %d кристаллов" },
+}
+
+-- AFK zone (AfkService): a calm floating platform far above the city.
+-- While a player stands there, every Tick seconds the server gives:
+--   XP = XpShare of the XP to the next level (x level-up speed, so it
+--   stays a slow but steady share at every level), credits = CreditsTicks
+--   kills' worth of the record gate tier, Кристаллы with CrystalChance,
+--   an item with ItemChance (rarity by Items; no high rarities).
+-- HourLimit = rewarded ticks per hour (the hour starts at the first
+-- tick); after it only MinCredits per tick. AFK is much weaker than
+-- active play: ~1/6 of the XP of fighting at the same level.
+Config.AFK = {
+	Tick = 10, -- seconds
+	XpShare = 0.0035, -- of XpToNext(level) per tick (~2%/min)
+	CreditsTicks = 0.6, -- x KillCredits(record tier) per tick
+	CrystalChance = 0.02, -- per tick
+	ItemChance = 0.04, -- per tick
+	Items = { Common = 70, Uncommon = 25, Rare = 5 }, -- weights; nothing higher
+	HourLimit = 180, -- rewarded ticks per hour (30 minutes of full rewards)
+	MinCredits = 1, -- per tick after the limit
+	Origin = Vector3.new(0, 900, 6000), -- the platform, far from everything
+	Radius = 46,
+	Texts = {
+		Title = "АФК-ЗОНА",
+		Time = "Время",
+		Got = "Получено",
+		Xp = "Опыт",
+		Credits = "Кредиты",
+		Crystals = "Кристаллы",
+		Items = "Предметы",
+		Chances = "Шансы за %d с",
+		Limit = "Лимит наград на этот час исчерпан — только %d кр. за %d с. Новый час через %s",
+		LimitLeft = "Полные награды ещё %s в этом часе",
+		Leave = "Выйти",
+		Enter = "АФК",
+		Busy = "Сейчас нельзя",
+		Welcome = "АФК-зона: награды капают, пока ты здесь",
+	},
 }
 
 -- Gifts for time in the game today (EngageService): at each Minute a
@@ -1736,7 +1776,7 @@ Config.Assets = {
 	Expected = {
 		Weapons = { "Weapon_Sword_1", "Weapon_Sword_2", "Weapon_Spear_1", "Weapon_Spear_2", "Weapon_Blaster_1", "Weapon_Blaster_2", "Weapon_Blaster_3" },
 		Mobs = { "Boss_Juggernaut", "Boss_Foreman", "Boss_Cryo", "Boss_Molten", "Boss_HiveMother", "Mob_InfectedCrawler", "Mob_InfectedBrute", "Mob_ShieldBearer", "Mob_MedicDrone", "Mob_Sniper", "Mob_SpiderBot", "Mob_Mech", "Mob_RedAndroid", "Mob_Overseer", "Mob_Robot", "Mob_Android", "Mob_BlueBot", "Mob_Bot2" },
-		Props = { "Center_Atrium", "Center_Spawn", "Center_Training", "Prop_SupplyMachine", "Landmark_Assembly", "Landmark_Cryo", "Landmark_Smelter", "Landmark_Infected", "Landmark_Nexus", "Prop_Crate", "Prop_Door", "Prop_Lamp", "Prop_Pipes", "Prop_Hologram", "Prop_Barrel", "Prop_Misc_1", "Prop_Misc_2", "Prop_Misc_3", "Prop_Misc_4" },
+		Props = { "Center_Atrium", "Center_Spawn", "Prop_SupplyMachine", "Landmark_Assembly", "Landmark_Cryo", "Landmark_Smelter", "Landmark_Infected", "Landmark_Nexus", "Prop_Crate", "Prop_Door", "Prop_Lamp", "Prop_Pipes", "Prop_Hologram", "Prop_Barrel", "Prop_Misc_1", "Prop_Misc_2", "Prop_Misc_3", "Prop_Misc_4" },
 		Trainers = { "Trainer_Dummy", "Trainer_Bag", "Trainer_Machine", "Trainer_Refiner", "Trainer_Weights" },
 	},
 	-- Weapon look by class (Config.Weapons[i].Class): the first entry whose
@@ -1774,21 +1814,6 @@ Config.Assets = {
 	UiIcons = {},
 }
 
--- Polygon in the hub: test dummies (no rewards). Damage per hit, DPS and
--- the combo are shown to the player hitting them (client PolygonHud).
-Config.Polygon = {
-	DummyHeight = 6.5, -- studs (owner Trainer_Dummy / Trainer_Bag are scaled to it)
-	BigScale = 1.6, -- the "Big" dummy
-	Range = 18, -- max studs between the player and the dummy hit
-	ComboGap = 1.5, -- seconds between hits that keep the combo going
-	DpsWindow = 5, -- DPS = damage of the last N seconds / N
-	ResetSeconds = 4, -- the panel resets after this pause
-	Texts = {
-		Title = "ПОЛИГОН",
-		Line = "Удар %s   •   DPS %s   •   Комбо x%d",
-		Best = "Лучший удар %s   •   Всего %s",
-	},
-}
 
 -- All remotes live directly in ReplicatedStorage, created by the server.
 Config.Remotes = {
@@ -1811,12 +1836,13 @@ Config.Remotes = {
 	Announce = "RemoteEvent", -- S->all (text, color) system chat line + toast
 	StoreNotify = "RemoteEvent", -- S->C (text) after a Robux purchase was granted
 	LevelUp = "RemoteEvent", -- S->C (level, skillPoints gained) big "Новый уровень!" banner
+	Afk = "RemoteFunction", -- ("Enter") | ("Leave") -> ok, message
+	AfkTick = "RemoteEvent", -- S->C (session { Seconds, Xp, Credits, Crystals, Items, Limited, ResetIn, LeftTicks })
 	Engage = "RemoteFunction", -- ("Gift") | ("Code", text) | ("Achievements") | ("Title", id|"") -> ok, message|data
 	Gacha = "RemoteFunction", -- ("Info") | ("Pull", bannerId, 1|10) -> ok, results | message, info
 	Class = "RemoteFunction", -- ("Choose", classId) | ("Learn", nodeId) | ("Reset") | ("Equip", slot, nodeId|nil) -> ok, message
 	Ability = "RemoteEvent", -- C->S ("Use", slot, aim) | ("Dash", direction) | ("Block", on) | ("Charge"); S->C ("Dash", direction, distance, seconds); S->all ("Fx", kind, ...)
 	Quest = "RemoteFunction", -- ("Talk", npcId) -> dialog payload | ("Claim") -> ok, message
-	Training = "RemoteEvent", -- C->S ("Start", stationIndex) | ("Stop"); S->C ("Gain", xp)
 }
 
 ---------------------------------------------------------------------
@@ -1920,6 +1946,14 @@ Config.Lighting = {
 		Saturation = 0.04, Contrast = 0.06, Tint = Color3.fromRGB(255, 246, 234), Bloom = 0.04,
 		Atmosphere = { Density = 0.12, Offset = 0, Color = Color3.fromRGB(214, 204, 190), Decay = Color3.fromRGB(120, 110, 100), Glare = 0, Haze = 0.6 },
 	},
+	-- AFK zone: a calm evening above the city, warm low sun, soft haze
+	Afk = {
+		ClockTime = 17.6, Brightness = 2.2, ExposureCompensation = 0.15,
+		Ambient = Color3.fromRGB(104, 100, 108), OutdoorAmbient = Color3.fromRGB(120, 116, 124),
+		EnvironmentDiffuseScale = 0.5, EnvironmentSpecularScale = 0.8,
+		Saturation = 0.04, Contrast = 0.04, Tint = Color3.fromRGB(255, 244, 232), Bloom = 0.04,
+		Atmosphere = { Density = 0.28, Offset = 0.1, Color = Color3.fromRGB(206, 190, 184), Decay = Color3.fromRGB(104, 100, 126), Glare = 0.15, Haze = 1.2 },
+	},
 	Dungeon = {
 		ClockTime = 14.5, Brightness = 1.4, ExposureCompensation = 0.25,
 		Ambient = Color3.fromRGB(86, 82, 80), OutdoorAmbient = Color3.fromRGB(72, 72, 80),
@@ -1954,7 +1988,7 @@ Config.HubLayout = {
 		Spawn = { Rect = { -20, 20, 15, -15 }, Height = 20, Theme = "Spawn", Name = "СПАВН" },
 		Atrium = { Rect = { -100, 100, -15, -165 }, Height = 34, Theme = "Atrium", Name = "АТРИУМ" },
 		Gates = { Rect = { -60, 60, -165, -220 }, Height = 42, Theme = "Gates", Name = "ЗАЛ ВРАТ" },
-		Training = { Rect = { -180, -100, -30, -150 }, Height = 22, Theme = "Training", Name = "ТРЕНИРОВОЧНЫЙ ЗАЛ" },
+		Supply = { Rect = { -180, -100, -30, -150 }, Height = 22, Theme = "Supply", Name = "ЗАЛ СНАБЖЕНИЯ" },
 		Forge = { Rect = { 100, 162, -100, -165 }, Height = 24, Theme = "Forge", Name = "ФАБРИКАТОР" },
 		Academy = { Rect = { 100, 162, -15, -76 }, Height = 22, Theme = "Academy", Name = "АКАДЕМИЯ КЛАССОВ" },
 	},
@@ -1962,7 +1996,7 @@ Config.HubLayout = {
 	Doors = {
 		{ Side = "S", At = 0, Width = 20, Height = 14, To = "Spawn" },
 		{ Side = "N", At = 0, Width = 24, Height = 18, To = "Gates" },
-		{ Side = "W", At = -45, Width = 18, Height = 14, To = "Training" },
+		{ Side = "W", At = -45, Width = 18, Height = 14, To = "Supply" },
 		{ Side = "E", At = -43, Width = 18, Height = 14, To = "Academy" },
 		{ Side = "E", At = -135, Width = 18, Height = 14, To = "Forge" },
 	},
@@ -1977,7 +2011,7 @@ Config.HubLayout = {
 		Spawn = { Floor = Color3.fromRGB(70, 68, 84), Wall = Color3.fromRGB(122, 116, 140), Accent = Color3.fromRGB(170, 150, 255), Light = Color3.fromRGB(235, 228, 255) },
 		Atrium = { Floor = Color3.fromRGB(84, 82, 82), Wall = Color3.fromRGB(150, 143, 134), Accent = Color3.fromRGB(46, 230, 255), Light = Color3.fromRGB(255, 226, 190) },
 		Gates = { Floor = Color3.fromRGB(46, 70, 72), Wall = Color3.fromRGB(80, 118, 120), Accent = Color3.fromRGB(40, 230, 200), Light = Color3.fromRGB(200, 255, 245) },
-		Training = { Floor = Color3.fromRGB(88, 62, 46), Wall = Color3.fromRGB(150, 108, 76), Accent = Color3.fromRGB(255, 140, 50), Light = Color3.fromRGB(255, 210, 160) },
+		Supply = { Floor = Color3.fromRGB(58, 48, 82), Wall = Color3.fromRGB(118, 100, 150), Accent = Color3.fromRGB(170, 110, 255), Light = Color3.fromRGB(255, 210, 160) },
 		Forge = { Floor = Color3.fromRGB(64, 40, 40), Wall = Color3.fromRGB(112, 66, 62), Accent = Color3.fromRGB(255, 80, 60), Light = Color3.fromRGB(255, 180, 130) },
 		Academy = { Floor = Color3.fromRGB(86, 74, 42), Wall = Color3.fromRGB(160, 136, 84), Accent = Color3.fromRGB(255, 201, 60), Light = Color3.fromRGB(255, 232, 180) },
 	},
@@ -2022,9 +2056,12 @@ Config.HubLayout = {
 		{ Hall = "Gates", Corner = "NE", Kind = "Plant" },
 		{ Hall = "Gates", Corner = "SW", Kind = "Console" },
 		{ Hall = "Gates", Corner = "SE", Kind = "Console" },
-		{ Hall = "Training", Corner = "NW", Kind = "Plant" },
-		{ Hall = "Training", Corner = "SW", Kind = "Plant" },
-		{ Hall = "Training", Wall = "W", At = -90, Kind = "Rack" },
+		{ Hall = "Supply", Corner = "NW", Kind = "Plant" },
+		{ Hall = "Supply", Corner = "SW", Kind = "Plant" },
+		{ Hall = "Supply", Wall = "W", At = -70, Kind = "Bench" },
+		{ Hall = "Supply", Wall = "W", At = -110, Kind = "Bench" },
+		{ Hall = "Supply", Corner = "NE", Kind = "Plant" },
+		{ Hall = "Supply", Corner = "SE", Kind = "Plant" },
 		{ Hall = "Forge", Corner = "SW", Kind = "Cargo" },
 		{ Hall = "Forge", Corner = "NW", Kind = "Rack" },
 		{ Hall = "Forge", Corner = "SE", Kind = "Pipes" },
@@ -2042,35 +2079,34 @@ Config.HubLayout = {
 		ChevronEvery = 9,
 		Paths = {
 			{ To = "Gates", Points = { { 0, -16 }, { 0, -74 }, { -13, -82 }, { -13, -98 }, { 0, -106 }, { 0, -172 } } },
-			{ To = "Training", Points = { { -5, -16 }, { -5, -31 }, { -70, -31 }, { -70, -45 }, { -114, -45 } } },
+			{ To = "Supply", Points = { { -5, -16 }, { -5, -31 }, { -70, -31 }, { -70, -45 }, { -124, -45 }, { -124, -80 } } },
 			{ To = "Academy", Points = { { 5, -16 }, { 5, -31 }, { 70, -31 }, { 70, -43 }, { 114, -43 } } },
 			{ To = "Forge", Points = { { 9, -16 }, { 9, -26 }, { 86, -26 }, { 86, -135 }, { 114, -135 } } },
-			{ To = "Supply", Points = { { -9, -16 }, { -9, -26 }, { -30, -26 }, { -30, -60 }, { -62, -60 } } },
 		},
 		Posts = {
-			{ At = { 13, -40 }, Arrows = { { Dir = "N", To = "Gates" }, { Dir = "W", To = "Training" }, { Dir = "E", To = "Academy" }, { Dir = "E", To = "Forge" } } },
+			{ At = { 13, -40 }, Arrows = { { Dir = "N", To = "Gates" }, { Dir = "W", To = "Supply" }, { Dir = "E", To = "Academy" }, { Dir = "E", To = "Forge" } } },
 			{ At = { 93, -52 }, Arrows = { { Dir = "N", To = "Forge" }, { Dir = "S", To = "Academy" } } },
-			{ At = { -15, -40 }, Arrows = { { Dir = "N", To = "Supply" }, { Dir = "W", To = "Training" } } },
 		},
-		Names = { Gates = "ЗАЛ ВРАТ", Training = "ТРЕНИРОВКА", Academy = "АКАДЕМИЯ", Forge = "КУЗНИЦА", Supply = "СНАБЖЕНИЕ", Spawn = "СПАВН", Atrium = "АТРИУМ" },
+		Names = { Gates = "ЗАЛ ВРАТ", Academy = "АКАДЕМИЯ", Forge = "КУЗНИЦА", Supply = "СНАБЖЕНИЕ", Spawn = "СПАВН", Atrium = "АТРИУМ" },
 	},
 	-- Central object of a hall (GameAssets/Props model, AI-made; procedural
 	-- fallback) with its own light in the hall's Light color.
 	Centers = {
 		{ Hall = "Atrium", Model = "Center_Atrium", At = { 0, -90 }, Height = 11, Light = Color3.fromRGB(120, 230, 255) },
 		{ Hall = "Spawn", Model = "Center_Spawn", At = { 0, 0 }, Height = 1.2, Light = Color3.fromRGB(190, 160, 255), Flat = true },
-		{ Hall = "Training", Model = "Center_Training", At = { -140, -95 }, Height = 8, Light = Color3.fromRGB(255, 170, 90) },
 	},
 	-- Терминал снабжения (pulls, GachaService) in the atrium's west side.
-	Supply = { At = { -66, -60 }, Face = { 0, -60 }, Model = "Prop_SupplyMachine", Height = 9 },
+	-- the capsule machine in the middle of the Зал снабжения (west), the
+	-- AFK portal by its north wall
+	Supply = { At = { -140, -86 }, Face = { -100, -86 }, Model = "Prop_SupplyMachine", Height = 9 },
+	AfkPortal = { At = { -140, -140 }, Face = { -140, -100 } },
 	-- Teleport window (HUD button): name, point { x, z } and the facing point.
 	Teleports = {
 		{ Id = "Spawn", Name = "Спавн", Icon = "play", At = { 0, 6 }, Face = { 0, -20 } },
 		{ Id = "Gates", Name = "Зал Врат", Icon = "gate", At = { 0, -175 }, Face = { 0, -200 } },
-		{ Id = "Training", Name = "Тренировочный зал", Icon = "sword", At = { -112, -60 }, Face = { -140, -90 } },
 		{ Id = "Forge", Name = "Кузница", Icon = "hammer", At = { 112, -132 }, Face = { 131, -132 } },
 		{ Id = "Academy", Name = "Академия классов", Icon = "academy", At = { 112, -45 }, Face = { 131, -45 } },
-		{ Id = "Supply", Name = "Терминал снабжения", Icon = "crystal", At = { -57, -60 }, Face = { -66, -60 } },
+		{ Id = "Supply", Name = "Зал снабжения", Icon = "crystal", At = { -124, -86 }, Face = { -140, -86 } },
 	},
 	Leaderboards = { -- on the atrium north wall, either side of the Gate hall arch
 		{ Kind = "Level", Title = "Топ уровней", At = -42 },
@@ -2079,17 +2115,6 @@ Config.HubLayout = {
 	QuestBoard = { At = 42 }, -- 9: board + the Смотритель Врат NPC
 	Mentor = { Offset = Vector3.new(13, 0, -8), Face = Vector3.new(0, 0, 4) }, -- 3: next to the spawn, facing it
 	GateKeeper = { Offset = Vector3.new(54, 0, -150) },
-	-- Training hall stations (2 rows along the long walls) and the dummies.
-	TrainingRows = { X = { -168, -112 }, Z0 = -64, Step = 17 },
-	Polygon = {
-		Center = Vector3.new(-140, 0, -135),
-		Dummies = {
-			{ Offset = Vector3.new(-8, 0, 0), Kind = "Trainer_Dummy" },
-			{ Offset = Vector3.new(0, 0, 0), Kind = "Trainer_Dummy", Big = true },
-			{ Offset = Vector3.new(8, 0, 0), Kind = "Trainer_Bag" },
-		},
-		Facing = Vector3.new(0, 0, 1), -- dummies face south (into the hall)
-	},
 	-- First path of a new player (plan's yellow dashes): waypoints the floor
 	-- guide follows from the spawn into each hall (client QuestGuide).
 	Waypoints = {
@@ -2097,7 +2122,7 @@ Config.HubLayout = {
 		AtriumSouth = Vector3.new(0, 0, -30),
 		AtriumCenter = Vector3.new(0, 0, -90),
 		AtriumNorth = Vector3.new(0, 0, -150),
-		TrainingDoor = Vector3.new(-104, 0, -45),
+		SupplyDoor = Vector3.new(-104, 0, -45),
 		AcademyDoor = Vector3.new(104, 0, -43),
 		ForgeDoor = Vector3.new(104, 0, -135),
 		GatesDoor = Vector3.new(0, 0, -168),
@@ -2113,7 +2138,7 @@ Config.HubLayout = {
 		Routes = {
 			Mentor = { Vector3.new(0, 0, 0), Vector3.new(10, 0, -5) },
 			Academy = { Vector3.new(0, 0, 0), Vector3.new(0, 0, -30), Vector3.new(0, 0, -44), Vector3.new(104, 0, -44), Vector3.new(118, 0, -44) },
-			Training = { Vector3.new(0, 0, 0), Vector3.new(0, 0, -30), Vector3.new(0, 0, -44), Vector3.new(-104, 0, -44), Vector3.new(-120, 0, -44) },
+			Supply = { Vector3.new(0, 0, 0), Vector3.new(0, 0, -30), Vector3.new(0, 0, -44), Vector3.new(-104, 0, -44), Vector3.new(-124, 0, -86) },
 			Forge = { Vector3.new(0, 0, 0), Vector3.new(0, 0, -30), Vector3.new(0, 0, -44), Vector3.new(88, 0, -44), Vector3.new(88, 0, -135), Vector3.new(104, 0, -135), Vector3.new(116, 0, -135) },
 			Gates = { Vector3.new(0, 0, 0), Vector3.new(0, 0, -30), Vector3.new(0, 0, -150), Vector3.new(0, 0, -168), Vector3.new(0, 0, -200) },
 		},
@@ -2133,19 +2158,18 @@ Config.HubLayout = {
 		Mentor = "NPC_Mentor",
 		GateKeeper = "NPC_GateKeeper",
 		ForgeCore = "Prop_ForgeCore",
-		Stations = { Power = "Station_Power", Dummy = "Station_Dummy", Gravity = "Station_Gravity", Laser = "Station_Laser" },
 	},
 	Texts = {
 		Title = "НАНО-ЦИТАДЕЛЬ",
 		TitleSub = "Добро пожаловать",
 		Portal = "ВРАТА",
 		PortalSub = "Подземелье · Нано-фабрика",
-		Polygon = "МАНЕКЕНЫ",
-		PolygonSub = "Проверь урон и комбо",
 		Forge = "ФАБРИКАТОР",
 		ForgeSub = "Заточка и возвышение",
-		Training = "ТРЕНИРОВОЧНЫЙ ЗАЛ",
-		TrainingSub = "Станции: опыт за тренировку",
+		Supply = "ЗАЛ СНАБЖЕНИЯ",
+		SupplySub = "Крутки · портал в АФК-зону",
+		AfkPortal = "АФК-ЗОНА",
+		AfkPortalSub = "Награды, пока тебя нет",
 		Academy = "АКАДЕМИЯ",
 		AcademySub = "Классы: смена и обучение",
 		Gates = "ЗАЛ ВРАТ",
@@ -2164,30 +2188,10 @@ Config.HubLayout = {
 		Board = "Задания",
 		Train = "Тренировка",
 		Supply = "Крутки",
+		Afk = "АФК",
 	},
 }
 
--- Training hall stations: E to start, a panel with "Выйти", the station
--- animation; a little XP every Tick seconds (Xp x player level), stronger
--- stations open by level. XP from training is smaller than from fights.
-Config.Training = {
-	Tick = 3,
-	MaxDistance = 8, -- moving away ends the session
-	Stations = {
-		{ Id = "Power", Name = "Силовой стенд", Icon = "chevron", Level = 1, Xp = 2, Count = 2 },
-		{ Id = "Dummy", Name = "Робот-манекен", Icon = "sword", Level = 5, Xp = 3, Count = 2 },
-		{ Id = "Gravity", Name = "Гравиплатформа", Icon = "vortex", Level = 12, Xp = 4, Count = 2 },
-		{ Id = "Laser", Name = "Лазерный тир", Icon = "target", Level = 20, Xp = 5, Count = 2 },
-	},
-	Texts = {
-		Locked = "Откроется на %d уровне",
-		Panel = "Тренировка: %s",
-		Exit = "Выйти",
-		Gain = "+%d XP за тренировку",
-		Busy = "Станция занята",
-		Hint = "Опыт каждые %d с",
-	},
-}
 
 -- NPCs (name plate + "Поговорить"). The mentor runs the story chain
 -- (Config.Quests.Story), the gate keeper the daily quests.
@@ -2197,8 +2201,8 @@ Config.Npcs = {
 }
 
 -- The mentor's story chain: leads a new player through every system
--- (plan's first path: spawn -> mentor -> academy -> training -> forge ->
--- gates). Kind: Class (pick a class), Train (training sessions), Kill,
+-- (plan's first path: spawn -> mentor -> academy -> gates -> AFK zone ->
+-- forge). Kind: Class (pick a class), Afk (seconds in the AFK zone), Kill,
 -- Learn (skill ranks), Stat (stat points spent), Loot (items picked up),
 -- Enhance (successful enhances in the forge), Boss, Room (record room), Level. Target = waypoint / place the floor guide leads to.
 -- Rewards: XP x player level and credits, on talking to the mentor.
@@ -2206,10 +2210,10 @@ Config.Quests = {
 	Story = {
 		{ Id = "class", Title = "Выбери свой путь", Text = "Выбери класс в Академии классов.", Kind = "Class", Target = 1, Place = "Academy", Xp = 30, Credits = 40,
 			Talk = "Добро пожаловать в Нано-Цитадель! Первым делом выбери свой путь: Клинок, Импульс или Стрелок. Академия — на востоке атриума." },
-		{ Id = "train", Title = "Разминка", Text = "Потренируйся на станции в Тренировочном зале.", Kind = "Train", Target = 1, Place = "Training", Xp = 30, Credits = 40,
-			Talk = "Отлично! Теперь разомнись: в Тренировочном зале на западе станции дают опыт." },
-		{ Id = "kill", Title = "Первый бой", Text = "Победи 5 роботов в подземелье.", Kind = "Kill", Target = 5, Place = "Gates", Xp = 40, Credits = 60,
-			Talk = "Пора в бой. Врата на севере ведут в Нано-фабрику. Победи пятерых роботов." },
+		{ Id = "kill", Title = "Первый бой", Text = "Победи 5 роботов во Вратах.", Kind = "Kill", Target = 5, Place = "Gates", Xp = 40, Credits = 60,
+			Talk = "Отлично! Пора в бой. Зал Врат — на севере. Нажми «Играть» и победи пятерых роботов." },
+		{ Id = "afk", Title = "Передышка", Text = "Побудь 1 минуту в АФК-зоне (кнопка АФК).", Kind = "Afk", Target = 60, Place = "Supply", Xp = 30, Credits = 40,
+			Talk = "Хороший бой! Когда нужно отойти — жми «АФК»: на парящей платформе награды капают, пока тебя нет. Попробуй минутку." },
 		{ Id = "learn", Title = "Первое очко навыка", Text = "Изучи навык в дереве навыков [K].", Kind = "Learn", Target = 1, Xp = 40, Credits = 60,
 			Talk = "За уровни ты получаешь очки навыков. Открой дерево навыков [K] и изучи первый приём." },
 		{ Id = "stat", Title = "Статус", Text = "Распредели 3 очка характеристик в окне Статус [C].", Kind = "Stat", Target = 3, Xp = 40, Credits = 60,
@@ -2374,6 +2378,7 @@ Config.Ui = {
 		{ Id = "Quests", Icon = "quest", Label = "Задания", Key = Enum.KeyCode.J },
 		{ Id = "Shop", Icon = "gem", Label = "Магазин" },
 		{ Id = "Teleport", Icon = "map", Label = "Телепорт", Key = Enum.KeyCode.T },
+		{ Id = "Afk", Icon = "moon", Label = "АФК-зона", Key = Enum.KeyCode.Z },
 	},
 	BarButton = 44,
 	-- Bottom center: HP and the ability slots (Q / E / R / dash).

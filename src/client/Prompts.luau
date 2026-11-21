@@ -36,6 +36,12 @@ local ACTIONS = {
 	Wheel = function()
 		Reward.OpenWheel()
 	end,
+	OpenAfk = function()
+		require(script.Parent.Afk).Toggle()
+	end,
+	LeaveAfk = function()
+		require(script.Parent.Afk).Toggle()
+	end,
 	OpenSupply = function()
 		Supply.Open()
 	end,
@@ -55,9 +61,6 @@ local ACTIONS = {
 		if ok and type(payload) == "table" then
 			Dialog.Open(payload)
 		end
-	end,
-	Train = function(prompt)
-		ReplicatedStorage:WaitForChild("Training"):FireServer("Start", prompt:GetAttribute("Index"))
 	end,
 }
 

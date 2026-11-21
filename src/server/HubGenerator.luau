@@ -8,7 +8,7 @@
 	    a bridge across the middle, two stairs up to it, glass skylight
 	    on trusses, runners on the floor and the center ring
 	  4 Academy of classes (SE)   3 class pedestals, the class terminal
-	  5 Training hall (W)         2 rows of stations + test dummies
+	  5 Зал снабжения (W)         capsule machine (pulls), AFK portal
 	  6 Fabricator (NE)           the central forge, a conveyor
 	  7 Gate hall (N)             giant gates on the spawn axis
 	  8 Leaderboards, 9 Quest board + Смотритель Врат at the gate arch
@@ -992,92 +992,38 @@ local function buildGates()
 	return field
 end
 
--- Training hall: 2 rows of stations along the long walls + dummies.
-local stations = {}
-local function stationModel(parent, def, cf: CFrame, th)
-	local model = ownerProp(parent, L.Models.Stations[def.Id] or "", cf, 6.5, true)
-	if model then
-		return model
+-- Зал снабжения (west, where the training hall was): the capsule
+-- machine in the middle (HubGuide builds it), the AFK portal by the north
+-- wall, benches and plants along the walls, a soft violet light.
+local function buildSupplyHall()
+	sideHall("Supply", "E")
+	local th = theme("Supply")
+	local folder = NanoKit.Model(root, "SupplyHall")
+	-- a round carpet of light under the machine
+	local c = at(L.Supply.At[1], 0, L.Supply.At[2])
+	flatDisc(folder, "Carpet", 22, 0.08, c, th.Floor:Lerp(th.Accent, 0.18), M.Smooth)
+	flatDisc(folder, "CarpetRim", 22.6, 0.06, c, th.Accent, M.Neon).Transparency = 0.6
+	-- the AFK portal: an arch with a slow violet field (prompt "АФК")
+	local A = L.AfkPortal
+	local p = at(A.At[1], 0, A.At[2])
+	local cf = CFrame.lookAt(p, at(A.Face[1], 0, A.Face[2]))
+	local portal = NanoKit.Model(folder, "AfkPortal")
+	for _, sx in ipairs({ -1, 1 }) do
+		Panel(portal, "Post", Vector3.new(1.6, 11, 1.6), cf * CFrame.new(sx * 5, 5.5, 0), C.Steel, M.Metal)
+		NanoKit.Strip(portal, (cf * CFrame.new(sx * 5, 0.5, -0.85)).Position, (cf * CFrame.new(sx * 5, 10.5, -0.85)).Position, th.Accent, 0.16)
 	end
-	local m = NanoKit.Model(parent, "Station")
-	Panel(m, "Pad", Vector3.new(6, 0.5, 5), cf * CFrame.new(0, 0.25, 0), C.Beam, M.Plate)
-	NanoKit.Strip(m, (cf * CFrame.new(-3, 0.55, -2.5)).Position, (cf * CFrame.new(3, 0.55, -2.5)).Position, th.Accent, 0.12)
-	if def.Id == "Power" then
-		for _, sx in ipairs({ -1, 1 }) do
-			Panel(m, "Upright", Vector3.new(0.5, 6, 0.5), cf * CFrame.new(sx * 2.2, 3.3, 1.2), C.Steel, M.Metal)
-		end
-		Panel(m, "Bar", Vector3.new(5.4, 0.3, 0.3), cf * CFrame.new(0, 4.6, 1.2), C.Steel, M.Metal)
-		for _, sx in ipairs({ -1, 1 }) do
-			NanoKit.Cylinder(m, "Weight", 0.5, 1.8, cf * CFrame.new(sx * 2.7, 4.6, 1.2), th.Accent:Lerp(C.Beam, 0.6), M.Metal)
-		end
-		Panel(m, "Bench", Vector3.new(1.6, 0.4, 3.6), cf * CFrame.new(0, 1.4, 0.6), C.Dado, M.Plate)
-	elseif def.Id == "Dummy" then
-		NanoKit.Column(m, "Post", 3, 0.6, (cf * CFrame.new(0, 0.5, 0.8)).Position, C.Steel, M.Metal)
-		Panel(m, "Torso", Vector3.new(2.2, 2.6, 1.2), cf * CFrame.new(0, 4.6, 0.8), C.Steel, M.Plate)
-		Panel(m, "Head", Vector3.new(1.2, 1.2, 1.2), cf * CFrame.new(0, 6.5, 0.8), C.Steel, M.Metal)
-		Panel(m, "Visor", Vector3.new(0.9, 0.25, 0.1), cf * CFrame.new(0, 6.6, 0.18), th.Accent, M.Neon, { CanCollide = false })
-	elseif def.Id == "Gravity" then
-		NanoKit.Cylinder(m, "Platform", 0.5, 4.6, cf * CFrame.new(0, 0.8, 0) * CFrame.Angles(0, 0, math.rad(90)), C.Steel, M.Plate)
-		for i = 1, 2 do
-			local ring = NanoKit.Cylinder(m, "GravRing", 0.15, 5 + i, cf * CFrame.new(0, 2 + i * 1.6, 0) * CFrame.Angles(0, 0, math.rad(90)), th.Accent, M.Neon)
-			ring.CanCollide = false
-			ring.Transparency = 0.5
-			NanoKit.Tag(ring, "Bob", { Amplitude = 0.4, Period = 2 + i })
-		end
-		for _, sx in ipairs({ -1, 1 }) do
-			for _, sz in ipairs({ -1, 1 }) do
-				NanoKit.Column(m, "Pillar", 5.5, 0.5, (cf * CFrame.new(sx * 2.6, 0.5, sz * 2.1)).Position, C.Beam, M.Metal)
-			end
-		end
-	else -- laser range
-		Panel(m, "Counter", Vector3.new(5, 2.6, 1.2), cf * CFrame.new(0, 1.8, -1.6), C.Beam, M.Metal)
-		Panel(m, "Top", Vector3.new(5.4, 0.25, 1.6), cf * CFrame.new(0, 3.2, -1.6), C.Steel, M.Plate)
-		local target = Panel(m, "Target", Vector3.new(3, 3, 0.3), cf * CFrame.new(0, 4.5, 2.2), C.Screen, M.Glass)
-		for i, r in ipairs({ 2.6, 1.6, 0.6 }) do
-			local ring = NanoKit.Cylinder(m, "Ring", 0.08, r, target.CFrame * CFrame.new(0, 0, -0.18 - i * 0.01) * CFrame.Angles(0, math.rad(90), 0), if i % 2 == 1 then th.Accent else C.Steel, M.Neon)
-			ring.CanCollide = false
-		end
-	end
-	return m
-end
-
-local function buildTraining()
-	sideHall("Training", "E")
-	local th = theme("Training")
-	local R = L.TrainingRows
-	local folder = NanoKit.Model(root, "Training")
-	local index = 0
-	for row, x in ipairs(R.X) do
-		local z = R.Z0
-		for _, def in ipairs(Config.Training.Stations) do
-			for _ = 1, math.ceil(def.Count / #R.X) do
-				index += 1
-				local p = at(x, 0, z)
-				local cf = CFrame.lookAt(p, p + Vector3.new(if row == 1 then 1 else -1, 0, 0))
-				local model = stationModel(folder, def, cf, th)
-				model.Name = "Station_" .. def.Id .. "_" .. index
-				model:SetAttribute("Station", def.Id)
-				model:SetAttribute("Index", index)
-				local anchor = Panel(folder, "StationSpot_" .. index, Vector3.new(2, 1, 2), cf * CFrame.new(0, 1, -3.6), C.Steel, M.Smooth, { Transparency = 1, CanCollide = false })
-				local prompt = WorldKit.Prompt(anchor, L.Prompts.Train, def.Name, { Action = "Train", Station = def.Id, Index = index }, 9)
-				prompt.RequiresLineOfSight = false
-				local plate = Panel(folder, "LevelPlate", Vector3.new(4.4, 0.1, 1.4), cf * CFrame.new(0, 0.06, -5.6), T.PanelDark, M.Smooth, { CanCollide = false })
-				text(plate, Enum.NormalId.Top, { { Text = def.Name .. " · ур. " .. def.Level, Size = 30, Color = N.Gold } })
-				table.insert(stations, { Index = index, Model = model, Def = def, Prompt = prompt, Spot = anchor.CFrame, Face = cf })
-				z -= R.Step
-			end
-		end
-	end
-	-- test dummies (PolygonService places them) with a board
-	local poly = NanoKit.Model(root, "Polygon")
-	local center = at(L.Polygon.Center.X, 0, L.Polygon.Center.Z)
-	Panel(poly, "Mat", Vector3.new(30, 0.3, 12), CFrame.new(center + Vector3.new(0, 0.15, 0)), C.Dado, M.Plate)
-	for _, lx in ipairs({ -4, 4 }) do
-		Panel(poly, "Lane", Vector3.new(0.3, 0.1, 10), CFrame.new(center + Vector3.new(lx, 0.35, 0)), C.Paint, M.Smooth, { CanCollide = false })
-	end
-	local x0, x1, _, z1 = rect("Training")
-	signPlate(poly, CFrame.lookAt(at((x0 + x1) / 2, 11, z1 + 0.8), at((x0 + x1) / 2, 11, z1 + 5)), Vector2.new(14, 3.4), { { Text = Texts.Polygon, Size = 60, Color = th.Accent }, { Text = Texts.PolygonSub, Size = 26 } })
-	return poly, center + Vector3.new(0, 0.3, 0)
+	Panel(portal, "Lintel", Vector3.new(11.6, 1.4, 1.8), cf * CFrame.new(0, 11.4, 0), C.Steel, M.Metal)
+	local field = Panel(portal, "Field", Vector3.new(8.4, 10, 0.2), cf * CFrame.new(0, 5.5, 0), th.Accent, M.Neon, { Transparency = 0.72, CanCollide = false })
+	NanoKit.Tag(field, "Pulse", { Period = 3 })
+	local light = Instance.new("PointLight")
+	light.Color = th.Accent
+	light.Range = 18
+	light.Brightness = 1.4
+	light.Parent = field
+	signPlate(portal, cf * CFrame.new(0, 13.4, -0.4), Vector2.new(10, 2.6), { { Text = Texts.AfkPortal, Size = 60, Color = N.Gold }, { Text = Texts.AfkPortalSub, Size = 28, Color = th.Accent } })
+	local anchor = Panel(portal, "PromptAnchor", Vector3.new(1, 1, 1), cf * CFrame.new(0, 3, -3), th.Accent, M.Smooth, { Transparency = 1, CanCollide = false, CanQuery = false })
+	WorldKit.Prompt(anchor, L.Prompts.Afk, "", { Action = "OpenAfk" })
+	return folder
 end
 
 -- Fabricator: the central forge (Hearth / Anvil names are used by
@@ -1251,7 +1197,7 @@ end
 function HubGenerator.Build()
 	root = Instance.new("Folder")
 	root.Name = "Hub"
-	stations = {}
+
 	lampIndex = 0
 
 	local spawn = Workspace:FindFirstChildWhichIsA("SpawnLocation", true)
@@ -1274,7 +1220,7 @@ function HubGenerator.Build()
 	buildSpawn()
 	local portal = buildGates()
 	local redGate = buildRedGate()
-	local polygon, polygonCenter = buildTraining()
+	buildSupplyHall()
 	local forgePrompt, forge = buildForge()
 	local academy = buildAcademy()
 
@@ -1315,8 +1261,6 @@ function HubGenerator.Build()
 	root.Parent = Workspace
 	return {
 		Folder = root,
-		Polygon = polygon,
-		PolygonCenter = polygonCenter,
 		Portal = portal,
 		RedGate = redGate,
 		Forge = forge,
@@ -1326,7 +1270,6 @@ function HubGenerator.Build()
 		BoardPrompt = boardPrompt,
 		Npcs = { Mentor = mentor, GateKeeper = keeper },
 		Guide = guide,
-		Stations = stations,
 		Waypoints = waypoints,
 		SpawnCFrame = CFrame.lookAt(at(0, 4, 0), at(0, 4, -10)),
 		GroundY = base.Y,

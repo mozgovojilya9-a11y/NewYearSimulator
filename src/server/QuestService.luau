@@ -2,7 +2,7 @@
 	QuestService.luau
 	The mentor's story chain (Config.Quests.Story): one step at a time,
 	it leads a new player through every system. Progress comes from
-	GameEvents (Kill, Boss, Loot, Enhance, Train) or is read from the save
+	GameEvents (Kill, Boss, Loot, Enhance, Afk) or is read from the save
 	(Class, Learn = skill points spent, Stat = stat points spent, Level,
 	Room = record room).
 
@@ -12,7 +12,7 @@
 	Player attributes for the client:
 	  Tracker     JSON { Title, Text, Progress, Target, Ready } (HUD tracker)
 	  StoryMarker true = "!" over the mentor
-	  StoryPlace  where the floor guide leads: Academy / Training / Forge /
+	  StoryPlace  where the floor guide leads: Academy / Supply / Forge /
 	              Gates / Mentor ("" = nowhere)
 
 	Remote Quest (RemoteFunction):
@@ -36,7 +36,7 @@ local Remotes = require(script.Parent.Remotes)
 
 local Q = Config.Quests
 local STORY = Q.Story
-local COUNTED = { Kill = true, Boss = true, Loot = true, Enhance = true, Train = true }
+local COUNTED = { Kill = true, Boss = true, Loot = true, Enhance = true, Afk = true }
 
 local QuestService = {}
 

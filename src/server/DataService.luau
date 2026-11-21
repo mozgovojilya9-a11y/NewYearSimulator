@@ -230,6 +230,13 @@ DataService.Migrations = {
 		end
 		data.Materials = nil
 	end,
+	-- 6 -> 7: the training hall was replaced by the AFK zone: an AFK hour
+	-- counter (Config.AFK.HourLimit) and the story chain without the
+	-- training step (a player on it moves to the first fight).
+	[6] = function(data)
+		data.Afk = { HourStart = 0, Ticks = 0 }
+		data.Training = nil
+	end,
 }
 
 -- Adds an instance to data.Items with a fresh uid. Returns the uid.
@@ -394,6 +401,11 @@ function DataService.Sanitize(data)
 	number("Cores", 0)
 	number("Crystals", 0)
 	number("CrystalsPaid", 0)
+	if type(data.Afk) ~= "table" then
+		data.Afk = { HourStart = 0, Ticks = 0 }
+	end
+	data.Afk.HourStart = tonumber(data.Afk.HourStart) or 0
+	data.Afk.Ticks = tonumber(data.Afk.Ticks) or 0
 	if type(data.Gacha) ~= "table" then
 		data.Gacha = {}
 	end

@@ -25,7 +25,6 @@ local player = Players.LocalPlayer
 
 local Combat = {}
 
-Combat.OnDummyHit = nil -- set by PolygonHud: (model, damage, isCrit)
 
 local clickHit = ReplicatedStorage:WaitForChild("ClickHit")
 local lanesFolder = Workspace:WaitForChild("Dungeon"):WaitForChild("Lanes")
@@ -33,28 +32,6 @@ local lanesFolder = Workspace:WaitForChild("Dungeon"):WaitForChild("Lanes")
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Include
 rayParams.FilterDescendantsInstances = { lanesFolder }
-
--- Hub: only the Polygon dummies can be targeted.
-local hubParams = RaycastParams.new()
-hubParams.FilterType = Enum.RaycastFilterType.Include
-task.spawn(function()
-	local hub = Workspace:WaitForChild("Hub")
-	local polygon = hub:WaitForChild("Polygon", 30)
-	if polygon then
-		hubParams.FilterDescendantsInstances = { polygon }
-	end
-end)
-
-local function dummyFromPart(part)
-	local model = part and part:FindFirstAncestorOfClass("Model")
-	while model do
-		if model:GetAttribute("Dummy") then
-			return model
-		end
-		model = model:FindFirstAncestorOfClass("Model")
-	end
-	return nil
-end
 
 local lastSent = 0
 
@@ -114,9 +91,6 @@ local function click(ray: Ray, charged: boolean?)
 	if player:GetAttribute("Zone") == "Dungeon" then
 		local result = Workspace:Raycast(ray.Origin, ray.Direction * 500, rayParams)
 		target = result and mobFromPart(result.Instance)
-	elseif #hubParams.FilterDescendantsInstances > 0 then
-		local result = Workspace:Raycast(ray.Origin, ray.Direction * 300, hubParams)
-		target = result and dummyFromPart(result.Instance)
 	end
 	faceTarget(target)
 	Swing.Local(charged == true)
@@ -416,16 +390,6 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 		end
 	elseif kind == "Dodge" then
 		GateHud.Dodge()
-	elseif kind == "Dummy" then
-		local model, damage, isCrit = ...
-		if model and model.Parent then
-			Popups.World(topOf(model), (if isCrit then "КРИТ! " else "") .. Format.Number(damage), if isCrit then Style.Colors.Gold else Style.Colors.Text, if isCrit then 44 else 30, isCrit)
-			hitParticles(model:GetPivot().Position, if isCrit then Style.Colors.Gold else Style.Colors.Cyan, if isCrit then 14 else 6)
-			Style.PlaySound(Config.Sounds.Hit, if isCrit then 0.8 else 1 + (math.random() - 0.5) * 0.2, 0.35)
-		end
-		if Combat.OnDummyHit then
-			Combat.OnDummyHit(model, damage, isCrit)
-		end
 	elseif kind == "Credits" then
 		local amount, position = ...
 		local at = if typeof(position) == "Vector3" then position + Vector3.new(0, 3, 0) else headPosition()

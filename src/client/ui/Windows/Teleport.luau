@@ -23,10 +23,9 @@ local Teleport = {}
 local LINES = {
 	Spawn = "Начало пути и Наставник",
 	Gates = "Врата рангов E–S и Красные Врата",
-	Training = "Станции опыта и полигон",
 	Forge = "Заточка, возвышение, разбор",
 	Academy = "Выбор и смена класса",
-	Supply = "Крутки снаряжения за Кристаллы",
+	Supply = "Крутки за Кристаллы и портал в АФК-зону",
 }
 
 local list = Config.HubLayout.Teleports

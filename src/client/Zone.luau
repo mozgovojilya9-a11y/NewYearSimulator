@@ -73,7 +73,7 @@ local function onZone()
 	end
 	local first = lastZone == nil
 	lastZone = zone
-	applyLighting(if zone == "Dungeon" then "Dungeon" else "Hub")
+	applyLighting(if zone == "Dungeon" then "Dungeon" elseif zone == "Afk" then "Afk" else "Hub")
 	if not first then
 		Popups.Fade(Color3.new(0, 0, 0), 0.3)
 		Style.PlaySound(Config.Sounds.Portal, 1, 0.6)

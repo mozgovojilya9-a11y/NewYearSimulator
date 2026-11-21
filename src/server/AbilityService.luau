@@ -13,8 +13,7 @@
 	per rank, published as Ready_<slot> (server time) + CooldownMax_<slot>.
 	Dash (Shift): every class; Импульс's dash hits everyone on its path.
 	Incoming damage (MobAI): shield / block / thorns / cheat death.
-	Targets: the player's own run mobs in the dungeon, the Polygon dummies
-	in the hub. Visual effects: Ability:FireAllClients("Fx", ...) (client
+	Targets: the player's own run mobs in the dungeon. Visual effects: Ability:FireAllClients("Fx", ...) (client
 	AbilityFx).
 ]]
 
@@ -27,7 +26,6 @@ local DataService = require(script.Parent.DataService)
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local EquipmentService = require(script.Parent.EquipmentService)
 local PlayerState = require(script.Parent.PlayerState)
-local PolygonService = require(script.Parent.PolygonService)
 local RateLimit = require(script.Parent.RateLimit)
 local Remotes = require(script.Parent.Remotes)
 local StatService = require(script.Parent.StatService)
@@ -104,7 +102,7 @@ local function enemiesNear(player, position: Vector3, range: number)
 	if DungeonRuns.HasRun(player) then
 		return DungeonRuns.MobsNear(player, position, range)
 	end
-	return PolygonService.Near(position, range)
+	return {}
 end
 
 -- Enemies in front (angle from `direction` <= maxAngle degrees).
@@ -213,7 +211,7 @@ local function hit(player, model: Model, damage: number, isCrit: boolean?, heavy
 		end
 		return dealt
 	end
-	return PolygonService.Damage(player, model, damage, isCrit)
+	return 0
 end
 
 ---------------------------------------------------------------------
@@ -225,7 +223,7 @@ local function pickTarget(player, target, range: number)
 	if not root then
 		return nil
 	end
-	if typeof(target) == "Instance" and target:IsA("Model") and (DungeonRuns.IsMob(target) or PolygonService.IsDummy(target)) then
+	if typeof(target) == "Instance" and target:IsA("Model") and DungeonRuns.IsMob(target) then
 		local surface = (target:GetPivot().Position - root.Position).Magnitude - 2
 		if surface <= range then
 			return target

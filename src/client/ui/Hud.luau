@@ -223,6 +223,9 @@ local actions = {
 		Store.Open()
 	end, Windows = { Store.Window } },
 	Teleport = { Open = Teleport.Open, Windows = { Teleport.Window } },
+	Afk = { Open = function()
+		require(script.Parent.Parent.Afk).Toggle()
+	end, Windows = {} },
 }
 
 local barButtons = {} -- [id] = api
@@ -856,6 +859,7 @@ local function inDungeon(): boolean
 	return player:GetAttribute("Zone") == "Dungeon"
 end
 local function refreshPlay()
+	play.Visible = player:GetAttribute("Zone") ~= "Afk" -- the AFK panel has its own "Выйти"
 	local back = inDungeon()
 	playLabel.Text = if back then U.Play.Back else U.Play.Text
 	local dark = Color3.fromRGB(28, 22, 10)

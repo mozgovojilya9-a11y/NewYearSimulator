@@ -14,7 +14,6 @@
 	  ("Hit", mob, damage, isCrit)         -- DungeonRuns
 	  ("Kill", position, isBoss)           -- DungeonRuns
 	  ("Credits", amount, position)        -- ProgressionService
-	  ("Dummy", model, damage, isCrit)     -- PolygonService (hub dummies)
 	Numbers sent by the client are never used.
 ]]
 
@@ -40,7 +39,6 @@ local function click(player, target, charged)
 	end
 	-- the swing / shot animation is started inside (it knows the combo step)
 	-- Class attacks (combo / 360 / shots) on run mobs in the dungeon and
-	-- on the Polygon dummies in the hub (AbilityService picks the targets).
 	AbilityService.Basic(player, target, charged == true)
 end
 
