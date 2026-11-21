@@ -10,7 +10,9 @@
 
 local Config = {}
 
-Config.DataStoreName = "AuraClicker_v1"
+-- v2 (2026-11-18): a clean start before the release: every save of the
+-- testing period (v1) stays in its own store and is not loaded.
+Config.DataStoreName = "AuraClicker_v2"
 
 -- Default data for a brand-new player. DataService backfills any
 -- fields missing from an older save. IDs stored in saves (weapons,
@@ -302,7 +304,7 @@ for _, product in ipairs(Config.Products) do
 	end
 end
 Config.Store = {
-	PurchaseStore = "AuraClicker_Purchases_v1", -- PurchaseId -> granted (idempotent receipts)
+	PurchaseStore = "AuraClicker_Purchases_v2", -- PurchaseId -> granted (idempotent receipts)
 	DuplicateCreditsPerRobux = 20, -- an exclusive you already own turns into credits
 	-- Products without a Tab are not sold in the store (the gear chests are
 	-- paid random items: off until they follow the PolicyService rules).
@@ -351,9 +353,9 @@ Config.Dungeon = {
 		BossWalkSpeed = 7,
 		AttackCooldown = 1.6,
 		TelegraphSeconds = 0.5,
-		DamageBase = 8,
+		DamageBase = 5, -- tier 1: a level-1 player (100 HP) survives a group of 5-6
 		DamageGrowth = 1.12, -- r20 ~ 70 per hit (player HP 100)
-		BossDamageMultiplier = 2.5,
+		BossDamageMultiplier = 1.6, -- the first boss must be beatable by a fresh player who dodges the floor telegraphs
 		BossSlamEvery = 6,
 		BossSlamRadius = 16,
 		BossSlamWarning = 1, -- seconds the red circle shows before the hit
@@ -392,7 +394,7 @@ Config.Gates = {
 	-- Ready = false: a placeholder (shown as "Скоро"), add data to open it.
 	Locations = {
 		{ Id = "E_Assembly", Rank = "E", Biome = "Assembly", Name = "Сборочный цех", Text = "Конвейеры встали, роботы-сборщики вышли из-под контроля.",
-			Tier = 1, TierStep = 1, Sections = { 5, 6, 4 }, Level = 1, GearScore = 10, ParSeconds = 200, Seed = 11,
+			Tier = 1, TierStep = 1, Sections = { 5, 6, 4 }, Elites = { 0 }, BossTier = 2, Level = 1, GearScore = 10, ParSeconds = 200, Seed = 11,
 			Mobs = { "SpiderBot", "Assembler", "AsmGunner", "AsmShield" }, Boss = "ForemanMech", Icon = "gear" },
 		{ Id = "E_Cryo", Rank = "E", Biome = "Cryo", Name = "Криолаборатория", Text = "Ледяные камеры треснули. Внутри — то, что держали в холоде.",
 			Tier = 4, TierStep = 1, Sections = { 5, 6, 5 }, Level = 5, GearScore = 60, ParSeconds = 210, Seed = 23,
@@ -445,7 +447,7 @@ for order, location in ipairs(Config.Gates.Locations) do
 	for _, count in ipairs(location.Sections) do
 		location.Enemies += count
 	end
-	location.BossTier = location.Tier + #location.Sections * location.TierStep
+	location.BossTier = location.BossTier or (location.Tier + #location.Sections * location.TierStep) -- the very first boss is set lower
 	Config.LocationById[location.Id] = location
 end
 
@@ -475,8 +477,9 @@ Config.GateMap = {
 --   Extra players: + GroupCount enemies and x (1 + GroupHealth) health each.
 --   XP / credits of a kill x Reward, elites x EliteReward, swarm x SwarmReward.
 Config.Sections = {
-	Elites = { 0, 1, 1, 1 },
+	Elites = { 0, 0, 1, 1 },
 	Aggro = 30, -- studs
+	ClearHeal = 0.5, -- a cleared section heals every member by this share of max HP
 	Spread = 10, -- radius of a group
 	GroupCount = 0.35,
 	GroupHealth = 0.6,
@@ -742,7 +745,7 @@ Config.Enemies = {
 -- The player in combat. Health regenerates only when nothing hit the
 -- player for RegenDelay seconds (the default Roblox regen is disabled).
 Config.Player = {
-	Health = 100, -- base max health (+ level, + armor)
+	Health = 150, -- base max health (+ level, + armor)
 	RegenDelay = 4, -- seconds without being hit before regen starts (rate: Stats.Regen)
 }
 
@@ -755,8 +758,7 @@ Config.Player = {
 -- and the attack style come from the class. Tags = role tags on the
 -- class card (Icon + Text), Difficulty 1..5, Key = 3 node ids shown as
 -- the "key abilities" on the selection screen. Art = the card picture:
--- the player's own character in the armor Set, frozen in a pose of the
--- Clip (Config.Animations.Clips) at At seconds.
+-- a unique procedural class fighter, never the player's skin.
 Config.Classes = {
 	{
 		Id = "Blade", Name = "Клинок", Icon = "sword", Color = Color3.fromRGB(46, 200, 255),
@@ -1561,7 +1563,7 @@ Config.Progression = {
 		Pool = {
 			{ Id = "kill30", Kind = "Kill", Target = 30, Text = "Убей 30 роботов", Credits = 40, Crystals = 3 },
 			{ Id = "kill80", Kind = "Kill", Target = 80, Text = "Убей 80 роботов", Credits = 110, Crystals = 5 },
-			{ Id = "room5", Kind = "Room", Target = 4, Text = "Закрой Врата «Сборочный цех»", Credits = 60, Crystals = 3 },
+			{ Id = "room5", Kind = "Room", Target = 2, Text = "Закрой Врата «Сборочный цех»", Credits = 60, Crystals = 3 },
 			{ Id = "room10", Kind = "Room", Target = 10, Text = "Закрой Врата «Плавильный реактор»", Credits = 180, Crystals = 5 },
 			{ Id = "boss2", Kind = "Boss", Target = 2, Text = "Победи 2 боссов", Credits = 120, Crystals = 4 },
 			{ Id = "runs3", Kind = "Run", Target = 3, Text = "Войди во Врата 3 раза", Credits = 45, Crystals = 3 },
@@ -1700,8 +1702,8 @@ Config.Animations = {
 
 -- Leaderboards (OrderedDataStore). Scores are written on every save.
 Config.Leaderboards = {
-	LevelStore = "AuraClicker_TopLevel_v1",
-	RoomStore = "AuraClicker_TopRoom_v1",
+	LevelStore = "AuraClicker_TopLevel_v2",
+	RoomStore = "AuraClicker_TopRoom_v2",
 	RefreshSeconds = 60,
 	Top = 10,
 }
@@ -1786,12 +1788,6 @@ Config.Polygon = {
 		Line = "Удар %s   •   DPS %s   •   Комбо x%d",
 		Best = "Лучший удар %s   •   Всего %s",
 	},
-}
-
--- DEV panel (only in Studio, never in a published game).
-Config.Dev = {
-	Credits = 1000,
-	Cores = 50,
 }
 
 -- All remotes live directly in ReplicatedStorage, created by the server.

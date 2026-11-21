@@ -20,7 +20,6 @@ local GachaService = require(script.Parent.GachaService)
 local EngageService = require(script.Parent.EngageService)
 local ClickService = require(script.Parent.ClickService)
 local DataService = require(script.Parent.DataService)
-local DevService = require(script.Parent.DevService)
 local DungeonRuns = require(script.Parent.DungeonRuns)
 local GateService = require(script.Parent.GateService)
 local PartyService = require(script.Parent.PartyService)
@@ -101,7 +100,6 @@ start("EngageService", EngageService.Init) -- gifts, codes, achievements
 start("TrainingService", TrainingService.Init, hub)
 start("PartyService", PartyService.Init)
 start("GateService", GateService.Init, hub) -- after ProgressionService: chains OnRoomCleared
-start("DevService", DevService.Init) -- Studio only
 
 local started = {} -- players whose setup already ran (PlayerAdded + the startup loop can both fire)
 

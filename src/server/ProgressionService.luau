@@ -177,18 +177,6 @@ function ProgressionService.AddXp(player, amount: number)
 	end
 end
 
--- Exactly `count` level ups (DEV panel): the missing XP is added raw.
-function ProgressionService.GrantLevels(player, count: number)
-	local data = DataService.Get(player)
-	if not data then
-		return
-	end
-	local need = xpToNext(data.Level) - data.Xp
-	for i = 1, count - 1 do
-		need += xpToNext(data.Level + i)
-	end
-	addXp(player, data, need, true)
-end
 
 ---------------------------------------------------------------------
 -- Status / claims

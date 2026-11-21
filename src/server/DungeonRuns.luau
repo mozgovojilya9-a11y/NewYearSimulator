@@ -289,7 +289,8 @@ DungeonRuns.SpawnMob = spawnMob
 local function groupList(run, zoneIndex: number, count: number)
 	local countScale = teamScale(run)
 	count = math.floor(count * countScale + 0.5) + (if run.red then Config.RedGate.ExtraEnemies else 0)
-	local elites = W.Elites[math.min(zoneIndex, #W.Elites)] + (if #run.players > 2 then 1 else 0)
+	local table_ = run.location.Elites or W.Elites -- a location may set its own (the very first one has none)
+	local elites = table_[math.min(zoneIndex, #table_)] + (if #run.players > 2 then 1 else 0)
 	elites = math.min(elites, count - 1)
 	local pool = run.location.Mobs
 	local list = {}
@@ -482,6 +483,14 @@ local function zoneFlow(run, zone)
 	end
 	openBarrier(zone.Exit)
 	notifyAll(run, W.Texts.Cleared, "gold")
+	-- a breather: the team gets part of its health back
+	for _, player in ipairs(members(run)) do
+		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.Health > 0 then
+			humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + humanoid.MaxHealth * W.ClearHeal)
+			pcall(Effects.Burst, humanoid.Parent:GetPivot().Position, Color3.fromRGB(90, 230, 110), 14, 16, 1)
+		end
+	end
 	return true
 end
 

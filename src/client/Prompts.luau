@@ -6,7 +6,9 @@
 	(Action = OpenForge / OpenStore / Wheel).
 ]]
 
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -71,17 +73,26 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 		return
 	end
 	local size = IA.Size
-	local gui = Instance.new("BillboardGui")
+	-- a screen element that follows the object every frame: always on
+	-- top, never hidden inside a model, tappable on phones
+	local gui = Instance.new("Frame")
 	gui.Name = "PromptUI"
-	gui.Adornee = adornee
+	gui.AnchorPoint = Vector2.new(0.5, 0.5)
 	gui.Size = UDim2.fromOffset(120, size + 26)
-	-- loot drops carry their own name plate above: their circle sits lower
-	gui.StudsOffsetWorldSpace = Vector3.new(0, if prompt:GetAttribute("NoPlate") then -1.4 else math.min(adornee.Size.Y / 2 + 1.5, 6), 0)
-	gui.AlwaysOnTop = true
-	gui.MaxDistance = 40
-	gui.Active = true
-	gui.LightInfluence = 0
-	gui.Parent = playerGui
+	gui.BackgroundTransparency = 1
+	gui.ZIndex = 20
+	gui.Parent = Style.Gui
+	local lift = if prompt:GetAttribute("NoPlate") then -1.4 else math.min(adornee.Size.Y / 2 + 1.5, 6)
+	local camera = workspace.CurrentCamera
+	local follow = RunService.RenderStepped:Connect(function()
+		local point, onScreen = camera:WorldToViewportPoint(adornee.Position + Vector3.new(0, lift, 0))
+		gui.Visible = onScreen
+		if onScreen then
+			local inset = GuiService:GetGuiInset()
+			local k = math.max(0.01, Style.Scale.Scale)
+			gui.Position = UDim2.fromOffset((point.X - inset.X) / k, (point.Y - inset.Y) / k)
+		end
+	end)
 
 	local circle = Instance.new("TextButton")
 	circle.Name = "Circle"
@@ -147,6 +158,7 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	end)
 
 	prompt.PromptHidden:Wait()
+	follow:Disconnect()
 	beginConnection:Disconnect()
 	endConnection:Disconnect()
 	triggered:Disconnect()

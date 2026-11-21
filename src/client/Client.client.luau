@@ -65,4 +65,3 @@ load(modules, "HubLife")
 load(modules, "Training")
 load(modules, "QuestGuide")
 load(modules, "ItemFx")
-load(ui, "DevPanel") -- Studio only

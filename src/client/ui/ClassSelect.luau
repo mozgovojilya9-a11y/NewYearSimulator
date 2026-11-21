@@ -1,9 +1,8 @@
 --[[
 	ClassSelect.luau
 	"ВЫБОР КЛАССА" screen (owner mockup docs/design/ui_class_and_skilltree.png,
-	top half): three big class cards with the class art (a ViewportFrame
-	with the player's own character in the class armor set holding the
-	class weapon, frozen in a fight pose: Config.Classes[i].Art), role
+	top half): three big class cards with unique procedural class fighters
+	in a ViewportFrame (the player's Roblox skin is never used), role
 	tags, and a details panel on the right (description, key abilities,
 	difficulty, "Выбрать класс"). Нано-кредиты and Кристаллы at the top.
 
@@ -22,7 +21,6 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
-local ArmorBuilder = require(ReplicatedStorage.Shared.ArmorBuilder)
 local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
 local Icons = require(script.Parent.Icons)
 local Popups = require(script.Parent.Popups)
@@ -95,92 +93,118 @@ player:GetAttributeChangedSignal("Crystals"):Connect(refreshCredits)
 refreshCredits()
 
 ---------------------------------------------------------------------
--- Class art: the player's character in a ViewportFrame
+-- Class art: a unique class fighter, never the player's Roblox avatar/skin
 ---------------------------------------------------------------------
 
 local function characterModel(classId: string): Model?
-	local character = player.Character
-	if not character then
-		return nil
-	end
-	character.Archivable = true
-	local clone = character:Clone()
-	if not clone then
-		return nil
-	end
-	for _, d in ipairs(clone:GetDescendants()) do
-		if d:IsA("LuaSourceContainer") or d:IsA("Sound") or d:IsA("BillboardGui") or d:IsA("ParticleEmitter") then
-			d:Destroy()
-		end
-	end
-	-- the player's own gear off, the class look on
-	for _, child in ipairs(clone:GetChildren()) do
-		if child.Name == "EquippedWeapon" or child.Name == "EnergyShield" or child.Name:match("^Armor_") then
-			child:Destroy()
-		end
-	end
-	local humanoid = clone:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-	end
 	local class = Config.ClassById[classId]
-	local art = class.Art or {}
-	for _, piece in ipairs(Config.Armor) do
-		if piece.Set == art.Set then
-			pcall(ArmorBuilder.Attach, clone, piece)
-		end
+	if not class then
+		return nil
 	end
-	-- the class weapon welded to the right hand (so it follows the pose)
-	local weapon = Config.ItemById.Weapon[player:GetAttribute("EquippedWeapon") or ""] or Config.Weapons[1]
-	local look = table.clone(weapon)
-	look.Class = classId
-	look.Rarity = "Epic"
-	local ok, model = pcall(WeaponBuilder.Build, look)
-	local r15 = clone:FindFirstChild("RightHand")
-	local hand = r15 or clone:FindFirstChild("Right Arm")
-	if ok and model and hand and model.PrimaryPart then
-		WeaponBuilder.SetAnchored(model, false)
-		local grip = if r15 then Config.Equipment.GripR15 else Config.Equipment.GripR6
-		model:PivotTo(hand.CFrame * grip)
-		for _, p in ipairs(model:GetDescendants()) do
-			if p:IsA("BasePart") then
-				p.Massless = true
-				p.CanCollide = false
-			end
-		end
+
+	local model = Instance.new("Model")
+	model.Name = classId .. "ClassFighter"
+
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Size = Vector3.new(1, 1, 1)
+	root.Transparency = 1
+	root.Anchored = true
+	root.CanCollide = false
+	root.CanQuery = false
+	root.CanTouch = false
+	root.CFrame = CFrame.new(0, 3.2, 0)
+	root.Parent = model
+	model.PrimaryPart = root
+
+	local dark = Color3.fromRGB(18, 24, 38)
+	local accent = class.Color
+	local armor = if classId == "Blade" then Color3.fromRGB(70, 130, 165)
+		elseif classId == "Pulse" then Color3.fromRGB(110, 45, 125)
+		else Color3.fromRGB(145, 105, 36)
+
+	local function bodyPart(name, size, cframe, color, material)
+		local part = Instance.new("Part")
+		part.Name = name
+		part.Size = size
+		part.CFrame = cframe
+		part.Color = color
+		part.Material = material or Enum.Material.Metal
+		part.Anchored = false
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		part.Massless = true
+		part.TopSurface = Enum.SurfaceType.Smooth
+		part.BottomSurface = Enum.SurfaceType.Smooth
+		part.Parent = model
 		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = hand
-		weld.Part1 = model.PrimaryPart
-		weld.Parent = model.PrimaryPart
-		model.Parent = clone
+		weld.Part0 = root
+		weld.Part1 = part
+		weld.Parent = part
+		return part
 	end
+
+	bodyPart("Torso", Vector3.new(2.3, 2.5, 1.15), CFrame.new(0, 3.8, 0), armor)
+	bodyPart("ChestCore", Vector3.new(0.55, 0.55, 0.12), CFrame.new(0, 4.05, -0.64), accent, Enum.Material.Neon)
+	bodyPart("Head", Vector3.new(1.35, 1.25, 1.25), CFrame.new(0, 5.75, 0), dark, Enum.Material.SmoothPlastic).Shape = Enum.PartType.Ball
+	bodyPart("Visor", Vector3.new(1.05, 0.18, 0.12), CFrame.new(0, 5.82, -0.66), accent, Enum.Material.Neon)
+
+	local leftShoulder = if classId == "Blade" then 1.55
+		elseif classId == "Gunner" then 1.7
+		else 1.35
+	bodyPart("LeftArm", Vector3.new(0.72, 2.2, 0.72), CFrame.new(-leftShoulder, 3.8, 0) * CFrame.Angles(0, 0, math.rad(-12)), armor)
+	bodyPart("RightArm", Vector3.new(0.72, 2.2, 0.72), CFrame.new(leftShoulder, 3.8, 0) * CFrame.Angles(0, 0, math.rad(12)), armor)
+	bodyPart("Pelvis", Vector3.new(1.75, 0.75, 1), CFrame.new(0, 2.25, 0), dark)
+	bodyPart("LeftLeg", Vector3.new(0.85, 2.15, 0.85), CFrame.new(-0.55, 1.15, 0) * CFrame.Angles(0, 0, math.rad(4)), dark)
+	bodyPart("RightLeg", Vector3.new(0.85, 2.15, 0.85), CFrame.new(0.55, 1.15, 0) * CFrame.Angles(0, 0, math.rad(-4)), dark)
+
 	if classId == "Blade" then
-		local arm = clone:FindFirstChild("LeftLowerArm") or clone:FindFirstChild("Left Arm")
-		if arm then
-			local S = Config.Equipment.Shield
-			local plate = Instance.new("Part")
-			plate.Shape = Enum.PartType.Cylinder
-			plate.Size = Vector3.new(0.12, S.Size, S.Size)
-			plate.Color = S.Color
-			plate.Material = Enum.Material.Neon
-			plate.Transparency = 0.55
-			plate.Massless = true
-			plate.CanCollide = false
-			plate.CFrame = arm.CFrame * S.Offset
-			local weld = Instance.new("WeldConstraint")
-			weld.Part0 = arm
-			weld.Part1 = plate
-			weld.Parent = plate
-			plate.Parent = clone
+		bodyPart("BladeShoulder", Vector3.new(1.05, 0.35, 1.05), CFrame.new(-1.55, 4.75, 0) * CFrame.Angles(0, 0, math.rad(-12)), accent)
+		bodyPart("Shield", Vector3.new(0.18, 1.65, 1.65), CFrame.new(-2.05, 3.55, -0.3), accent, Enum.Material.Glass).Shape = Enum.PartType.Cylinder
+	elseif classId == "Pulse" then
+		bodyPart("PulseBackWing", Vector3.new(0.15, 2.1, 1.45), CFrame.new(0, 4.25, 0.75) * CFrame.Angles(0, math.rad(35), 0), accent, Enum.Material.Neon)
+		bodyPart("PulseBackWing2", Vector3.new(0.15, 2.1, 1.45), CFrame.new(0, 4.25, 0.75) * CFrame.Angles(0, math.rad(-35), 0), accent, Enum.Material.Neon)
+	else
+		bodyPart("GunnerBackPack", Vector3.new(1.45, 1.65, 0.45), CFrame.new(0, 4, 0.75), dark)
+		bodyPart("GunnerCore", Vector3.new(0.9, 0.18, 0.18), CFrame.new(0, 4.15, 0.98), accent, Enum.Material.Neon)
+	end
+
+	local weaponId = if classId == "Blade" then "PhoenixBlade"
+		elseif classId == "Pulse" then "DuskScythe"
+		else "AbyssBlade"
+	local weapon = Config.ItemById.Weapon[weaponId]
+	if weapon then
+		local look = table.clone(weapon)
+		look.Rarity = "Epic"
+		local ok, weaponModel = pcall(WeaponBuilder.Build, look)
+		if ok and weaponModel and weaponModel.PrimaryPart then
+			WeaponBuilder.SetAnchored(weaponModel, false)
+			weaponModel:PivotTo(CFrame.new(leftShoulder, 3.05, -0.15) * CFrame.Angles(math.rad(75), 0, math.rad(-20)))
+			for _, part in ipairs(weaponModel:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.Massless = true
+					part.CanCollide = false
+				end
+			end
+			for _, part in ipairs(weaponModel:GetChildren()) do
+				if part:IsA("BasePart") then
+					local weld = Instance.new("WeldConstraint")
+					weld.Part0 = root
+					weld.Part1 = part
+					weld.Parent = part
+				end
+			end
+			weaponModel.Parent = model
 		end
 	end
-	-- only the root is anchored: the joints can take the pose
-	for _, d in ipairs(clone:GetDescendants()) do
-		if d:IsA("BasePart") then
-			d.Anchored = d.Name == "HumanoidRootPart"
+
+	for _, part in ipairs(model:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.Anchored = part == root
 		end
 	end
-	return clone
+	return model
 end
 
 -- Freezes the model in the class's fight pose (Config.Classes[i].Art).
@@ -554,14 +578,4 @@ local function check()
 end
 player:GetAttributeChangedSignal("Class"):Connect(check)
 task.delay(1, check)
-player.CharacterAdded:Connect(function()
-	task.delay(1, function()
-		if screen.Visible then
-			for id, card in pairs(cards) do
-				setArt(card.viewport, id)
-			end
-		end
-	end)
-end)
-
 return ClassSelect
