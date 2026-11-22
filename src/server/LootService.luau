@@ -32,6 +32,7 @@ local GameEvents = require(script.Parent.GameEvents)
 local ItemService = require(script.Parent.ItemService)
 local PlayerState = require(script.Parent.PlayerState)
 local StatService = require(script.Parent.StatService)
+local StreakService = require(script.Parent.StreakService)
 local RateLimit = require(script.Parent.RateLimit)
 local Remotes = require(script.Parent.Remotes)
 
@@ -136,7 +137,7 @@ function LootService.OnKill(player, room: number, isBoss: boolean, position: Vec
 	local ground = Vector3.new(position.X, DungeonRuns.GroundY(), position.Z)
 	-- spread a little so drops of a group don't sit in one spot
 	ground += Vector3.new(rng:NextNumber(-1.5, 1.5), 0, rng:NextNumber(-1.5, 1.5))
-	local chance = (LOOT.DropChance[enemy] or LOOT.DropChance.Normal) + (StatService.Get(player).DropChance or 0)
+	local chance = ((LOOT.DropChance[enemy] or LOOT.DropChance.Normal) + (StatService.Get(player).DropChance or 0)) * StreakService.Mult(player, "Loot")
 	if rng:NextNumber() < chance then
 		LootService.DropItem(player, room, enemy, ground, nil, info.Rank)
 	end
@@ -240,13 +241,33 @@ function LootService.Init()
 
 	-- Chain onto the kill hook (ProgressionService listens to it too).
 	local previous = DungeonRuns.OnKill
-	DungeonRuns.OnKill = function(player, room, isBoss, position, kind)
+	DungeonRuns.OnKill = function(player, room, isBoss, position, kind, info)
 		if previous then
-			previous(player, room, isBoss, position, kind)
+			previous(player, room, isBoss, position, kind, info) -- keep `info` (enemy kind, rank, weight)
 		end
-		LootService.OnKill(player, room, isBoss, position, kind)
+		LootService.OnKill(player, room, isBoss, position, kind, info)
 	end
 	DungeonRuns.OnRunClosed = LootService.Clear
+	-- Охотничий азарт milestones: extra items (and a chest at the top one)
+	StreakService.OnMilestone = function(player, milestone, room, position, rank)
+		if not position or not PlayerState.IsReady(player) then
+			return
+		end
+		local ground = Vector3.new(position.X, DungeonRuns.GroundY(), position.Z)
+		for i = 1, milestone.Items or 0 do
+			local angle = i * math.pi * 2 / math.max(1, milestone.Items)
+			LootService.DropItem(player, room, "Elite", ground + Vector3.new(math.cos(angle) * 3, 0, math.sin(angle) * 3), nil, rank)
+		end
+		if milestone.Chest then
+			LootService.DropChest(player, room, ground + Vector3.new(0, 0, 4), "Elite", { Rank = rank })
+		end
+		if milestone.Credits then
+			local credits = PlayerState.AddCredits(player, Config.KillCredits(room, false) * milestone.Credits * StatService.Get(player).CreditsMult)
+			if credits and credits > 0 then
+				Remotes.Get("ClickHit"):FireClient(player, "Credits", credits, position)
+			end
+		end
+	end
 	-- boss down: a chest for every member, more items for a better grade
 	DungeonRuns.OnBossDefeated = function(run, position, grade)
 		for i, player in ipairs(DungeonRuns.Members(run)) do

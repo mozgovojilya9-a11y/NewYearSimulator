@@ -209,6 +209,79 @@ local function bossIntro(info)
 end
 
 ---------------------------------------------------------------------
+-- Охотничий азарт (kill streak, server StreakService)
+---------------------------------------------------------------------
+
+local ST = Config.Streak
+local streakPanel = Style.Panel(Style.Gui, {
+	Name = "StreakPanel",
+	AnchorPoint = Vector2.new(1, 0.5),
+	Position = UDim2.new(1, -16, 0.4, 0),
+	Size = UDim2.fromOffset(230, 74),
+	Fill = C.PanelDark,
+	Border = ST.Color,
+	Cut = 8,
+	ZIndex = 6,
+	Visible = false,
+})
+local streakTitle = Style.Label(streakPanel, "", 26, ST.Color, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 6), Size = UDim2.new(1, 0, 0, 30), ZIndex = 7 })
+local streakBonus = Style.Label(streakPanel, "", 13, C.Text, { Position = UDim2.fromOffset(0, 36), Size = UDim2.new(1, 0, 0, 16), ZIndex = 7 })
+local streakBack = Instance.new("Frame")
+streakBack.AnchorPoint = Vector2.new(0.5, 0)
+streakBack.Position = UDim2.new(0.5, 0, 0, 58)
+streakBack.Size = UDim2.new(1, -30, 0, 5)
+streakBack.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
+streakBack.BorderSizePixel = 0
+streakBack.ZIndex = 7
+streakBack.Parent = streakPanel
+local streakFill = Instance.new("Frame")
+streakFill.Size = UDim2.fromScale(1, 1)
+streakFill.BackgroundColor3 = ST.Color
+streakFill.BorderSizePixel = 0
+streakFill.ZIndex = 8
+streakFill.Parent = streakBack
+local streakScale = Instance.new("UIScale")
+streakScale.Parent = streakTitle
+local streakTween
+
+function GateHud.Streak(count: number, window: number, xpPct: number, lootPct: number, milestone: string?)
+	if count < 2 then
+		return
+	end
+	streakPanel.Visible = true
+	streakTitle.Text = ST.Texts.Title .. "  ×" .. tostring(count)
+	streakBonus.Text = ST.Texts.Bonus:format(xpPct, lootPct)
+	streakScale.Scale = if milestone then 1.5 else 1.15
+	Style.Tween(streakScale, 0.2, { Scale = 1 })
+	if streakTween then
+		streakTween:Cancel()
+	end
+	streakFill.Size = UDim2.fromScale(1, 1)
+	streakTween = TweenService:Create(streakFill, TweenInfo.new(window, Enum.EasingStyle.Linear), { Size = UDim2.fromScale(0, 1) })
+	streakTween:Play()
+	if milestone then
+		Popups.Banner(ST.Texts.Title, milestone, {}, ST.Color)
+		Popups.Shake(0.5, 0.3)
+	end
+end
+
+player:GetAttributeChangedSignal("Zone"):Connect(function()
+	if player:GetAttribute("Zone") ~= "Dungeon" then
+		streakPanel.Visible = false
+	end
+end)
+
+function GateHud.StreakEnd(count: number)
+	streakTitle.Text = ST.Texts.Lost
+	streakBonus.Text = "×" .. tostring(count)
+	task.delay(1.5, function()
+		if streakTitle.Text == ST.Texts.Lost then
+			streakPanel.Visible = false
+		end
+	end)
+end
+
+---------------------------------------------------------------------
 -- Combo, dodge, shield
 ---------------------------------------------------------------------
 

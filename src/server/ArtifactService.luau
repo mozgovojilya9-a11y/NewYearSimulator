@@ -239,9 +239,9 @@ function ArtifactService.Init()
 
 	-- Explosion / heal on kill
 	local previous = DungeonRuns.OnKill
-	DungeonRuns.OnKill = function(player, room, isBoss, position, kind)
+	DungeonRuns.OnKill = function(player, room, isBoss, position, kind, info)
 		if previous then
-			previous(player, room, isBoss, position, kind)
+			previous(player, room, isBoss, position, kind, info) -- keep `info` (enemy kind, rank, weight)
 		end
 		local boom, boomValue = effect(player, "Explode")
 		if boom then

@@ -26,6 +26,7 @@ local DungeonRuns = require(script.Parent.DungeonRuns)
 local PlayerState = require(script.Parent.PlayerState)
 local RateLimit = require(script.Parent.RateLimit)
 local StatService = require(script.Parent.StatService)
+local StreakService = require(script.Parent.StreakService)
 local Remotes = require(script.Parent.Remotes)
 
 local ProgressionService = {}
@@ -431,7 +432,8 @@ function ProgressionService.OnKill(player, room: number, isBoss: boolean, positi
 		return
 	end
 	local weight = if isBoss then 1 else (info and info.Weight or 1)
-	local credits = earnCredits(player, Config.KillCredits(room, isBoss) * weight)
+	StreakService.Kill(player, info and info.Enemy, room, position, info and info.Rank) -- Охотничий азарт
+	local credits = earnCredits(player, Config.KillCredits(room, isBoss) * weight * StreakService.Mult(player, "Credits"))
 	if credits > 0 then
 		Remotes.Get("ClickHit"):FireClient(player, "Credits", credits, position)
 	end
@@ -443,7 +445,7 @@ function ProgressionService.OnKill(player, room: number, isBoss: boolean, positi
 		questProgress(player, "Boss", 1)
 		GameEvents.Fire(player, "Boss", 1)
 	end
-	addXp(player, data, (if isBoss then P.Level.XpPerBoss else P.Level.XpPerKill) * room * weight)
+	addXp(player, data, (if isBoss then P.Level.XpPerBoss else P.Level.XpPerKill) * room * weight * StreakService.Mult(player, "Xp"))
 end
 
 function ProgressionService.OnRoomCleared(player, room: number)

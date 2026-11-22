@@ -390,6 +390,10 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 		end
 	elseif kind == "Dodge" then
 		GateHud.Dodge()
+	elseif kind == "Streak" then
+		GateHud.Streak(...)
+	elseif kind == "StreakEnd" then
+		GateHud.StreakEnd(...)
 	elseif kind == "Credits" then
 		local amount, position = ...
 		local at = if typeof(position) == "Vector3" then position + Vector3.new(0, 3, 0) else headPosition()

@@ -184,17 +184,18 @@ local function openPortal(run, position: Vector3, color: Color3)
 	end)
 end
 
-local function decorateElite(model)
+local function decorateElite(model, color: Color3?)
+	color = color or E.Elite.Aura
 	local aura = Instance.new("Highlight")
 	aura.Name = "EliteAura"
 	aura.FillTransparency = 0.85
-	aura.FillColor = E.Elite.Aura
-	aura.OutlineColor = E.Elite.Aura
+	aura.FillColor = color
+	aura.OutlineColor = color
 	aura.OutlineTransparency = 0.1
 	aura.DepthMode = Enum.HighlightDepthMode.Occluded
 	aura.Parent = model
 	local emitter = Instance.new("ParticleEmitter")
-	emitter.Color = ColorSequence.new(E.Elite.Aura, Color3.new(1, 1, 1))
+	emitter.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
 	emitter.LightEmission = 0.6
 	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
 	emitter.Lifetime = NumberRange.new(0.8, 1.4)
@@ -251,11 +252,28 @@ local function spawnMob(run, defId: string, position: Vector3, opts)
 		health *= Config.RedGate.Health
 		damage *= Config.RedGate.Damage
 	end
+	-- elite affixes (Config.Enemies.Affixes): rolled once, named, glowing
+	local affixes = {}
+	if elite and not isBoss then
+		local pool = table.clone(E.Affixes.List)
+		for _ = 1, math.min(E.Affixes.Count[run.location.Rank] or 1, #pool) do
+			table.insert(affixes, table.remove(pool, run.rng:NextInteger(1, #pool)))
+		end
+	end
 	health = math.max(1, math.floor(health))
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	humanoid.MaxHealth = health
 	humanoid.Health = health
-	local name = (if elite then E.Elite.Prefix else "") .. def.Name
+	local name = (if elite and #affixes == 0 then E.Elite.Prefix else "") .. def.Name
+	if #affixes > 0 then
+		local ids, names = {}, {}
+		for _, affix in ipairs(affixes) do
+			table.insert(ids, affix.Id)
+			table.insert(names, affix.Name)
+		end
+		name = table.concat(names, " ") .. " " .. def.Name
+		model:SetAttribute("Affixes", table.concat(ids, ","))
+	end
 	model:SetAttribute("Room", tier) -- clients find mobs by this attribute
 	model:SetAttribute("Boss", isBoss)
 	model:SetAttribute("Elite", elite)
@@ -267,7 +285,7 @@ local function spawnMob(run, defId: string, position: Vector3, opts)
 	WorldKit.HealthGui(model.PrimaryPart, if isBoss or elite then name else nil, height - (model.PrimaryPart.Position.Y - position.Y) + 1.5)
 	WorldKit.UpdateHealth(model.PrimaryPart, health, health)
 	if elite then
-		decorateElite(model)
+		decorateElite(model, affixes[1] and affixes[1].Color)
 	end
 	if def.Role == "Shield" then
 		addShield(model)
@@ -596,7 +614,8 @@ end
 -- Kills and damage
 ---------------------------------------------------------------------
 
-local function kill(model, killer)
+-- quiet = the mob destroyed itself (a bomber): no rewards
+local function kill(model, killer, quiet: boolean?)
 	local info = mobInfo[model]
 	mobInfo[model] = nil
 	local run = info.run
@@ -634,13 +653,18 @@ local function kill(model, killer)
 	local enemy = if run.red and not isBoss then "Red" elseif isBoss then "Boss" elseif elite then "Elite" else "Normal"
 	local role = model:GetAttribute("Role")
 	local weight = W.Reward * (if elite then W.EliteReward elseif role == "Swarm" then W.SwarmReward else 1)
+	local affixes = model:GetAttribute("Affixes")
+	if affixes then
+		local _, count = affixes:gsub(",", ",")
+		weight *= 1 + (count + 1) * E.Affixes.Loot -- every affix: more loot
+	end
 	local lootInfo = { Rank = run.location.Rank, Enemy = enemy, Elite = elite, Red = run.red, Weight = weight }
 	if killer and run.stats[killer] then
 		run.stats[killer].kills += 1
 	end
 	for _, player in ipairs(members(run)) do
 		Remotes.Get("ClickHit"):FireClient(player, "Kill", position, isBoss)
-		if DungeonRuns.OnKill then
+		if DungeonRuns.OnKill and not quiet then
 			DungeonRuns.OnKill(player, tier, isBoss, position, kind, lootInfo)
 		end
 	end
@@ -654,6 +678,17 @@ local function kill(model, killer)
 		if info.zone == run.zoneIndex then
 			pushState(run)
 		end
+	end
+end
+
+-- A mob that removes itself (bomber blast): dies without rewards.
+function DungeonRuns.Kill(model)
+	if mobInfo[model] then
+		local humanoid = model:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			humanoid.Health = 0
+		end
+		kill(model, nil, true)
 	end
 end
 
@@ -745,6 +780,18 @@ function DungeonRuns.Damage(player, model, damage: number, isCrit: boolean?, fla
 	local isBlocked = blocked(model, player)
 	if isBlocked then
 		damage *= 1 - E.Roles.Shield.Block
+	end
+	local affixes = model:GetAttribute("Affixes")
+	if affixes and affixes:find("Shielded", 1, true) and (model:GetAttribute("BubbleUntil") or 0) > Workspace:GetServerTimeNow() then
+		damage *= Config.AffixById.Shielded.Take -- the bubble eats most of it
+		isBlocked = true
+	end
+	if affixes and affixes:find("Thorns", 1, true) then
+		-- spikes: part of the hit comes back (never lethal, capped per hit)
+		local ph = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+		if ph and ph.Health > 1 then
+			ph.Health = math.max(1, ph.Health - math.min(damage * Config.AffixById.Thorns.Reflect, ph.MaxHealth * 0.06))
+		end
 	end
 	damage = math.max(1, math.floor(damage))
 	if not model:GetAttribute("Awake") then

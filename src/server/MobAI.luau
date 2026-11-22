@@ -9,7 +9,11 @@
 	          (DungeonRuns), bashes up close
 	  Healer  stays away from the players and heals the most hurt ally
 	          (green beam), never attacks
-	Elites (bigger, aura) also do a shockwave: a circle around them.
+	  Bomber  runs at the player, flashes and blows itself up
+	  Blinker blinks behind a far player, then strikes
+	Elites (bigger, aura) also do a shockwave: a circle around them, and
+	carry affixes (Config.Enemies.Affixes): Explosive, Vampire, Shielded,
+	Swift, Summoner, Thorns (Thorns / Shielded live in DungeonRuns.Damage).
 	Bosses: phase 2 (rage) at Config.Enemies.Boss.Phases of health (banner
 	"ФАЗА 2", red glow, faster), special attacks every few seconds - Slam
 	(circle around), Charge (rectangle, then a dash along it), Cone (fan in
@@ -44,6 +48,7 @@ local MobAI = {}
 
 local E = Config.Enemies
 local BOSS = E.Boss
+local AFFIX = Config.AffixById
 local P = Config.Player
 local TICK = 0.2
 local RED = E.TelegraphColor
@@ -64,6 +69,14 @@ function MobAI.DamagePlayer(player, amount: number, attacker: Model?)
 		taken = AbilityService.Incoming(player, taken, attacker) -- dodge, shield, block, thorns, cheat death
 		if taken > 0 then
 			humanoid:TakeDamage(math.max(1, taken))
+			-- Vampire elites drink what they deal
+			local affixes = attacker and attacker.Parent and attacker:GetAttribute("Affixes")
+			local mobHumanoid = affixes and affixes:find("Vampire", 1, true) and attacker:FindFirstChildOfClass("Humanoid")
+			if mobHumanoid and mobHumanoid.Health > 0 then
+				mobHumanoid.Health = math.min(mobHumanoid.MaxHealth, mobHumanoid.Health + taken * AFFIX.Vampire.Heal)
+				require(script.Parent.WorldKit).UpdateHealth(attacker.PrimaryPart, mobHumanoid.Health, mobHumanoid.MaxHealth)
+				AbilityService.Fx("Heal", attacker)
+			end
 			DungeonRuns.NoteDamageTaken(player, taken)
 			-- the "hit taken" flinch (not too often, never over an attack)
 			local t = os.clock()
@@ -277,6 +290,111 @@ local function shockwave(state, model, radius: number, seconds: number, mult: nu
 		end
 	end
 	state.busy = false
+end
+
+---------------------------------------------------------------------
+-- New roles and elite affixes
+---------------------------------------------------------------------
+
+local function hasAffix(model, id: string): boolean
+	local affixes = model:GetAttribute("Affixes")
+	return affixes ~= nil and affixes:find(id, 1, true) ~= nil
+end
+
+-- A blast on the floor: red circle for `delay`, then damage inside.
+local function blast(run, center: Vector3, radius: number, delay: number, damage: number, attacker)
+	Telegraph.Circle(run.fxFolder, center, radius, delay, RED)
+	task.delay(delay, function()
+		AbilityService.Fx("Ring", center, radius, Config.Theme.Orange)
+		for _, player in ipairs(DungeonRuns.Members(run)) do
+			local root = rootOf(player)
+			if root and Telegraph.InCircle(root.Position, center, radius) then
+				damagePlayer(player, damage, if attacker and attacker.Parent then attacker else nil)
+			end
+		end
+	end)
+end
+
+-- Bomber: stop, glow, blow up (it dies without loot).
+local function selfDestruct(state, model, role)
+	state.busy = true
+	stop(state)
+	local center = Vector3.new(state.root.Position.X, groundOf(state), state.root.Position.Z)
+	model:SetAttribute("Telegraph", true)
+	blast(state.run, center, role.Radius, role.Telegraph, model:GetAttribute("Damage") or 1, nil)
+	task.wait(role.Telegraph)
+	if mobs[model] and model.Parent then
+		DungeonRuns.Kill(model)
+	end
+end
+
+-- Blinker: a flash where it stands, a short wind-up, then it appears
+-- behind the target, facing it.
+local function blink(state, model, targetRoot)
+	state.busy = true
+	stop(state)
+	local color = model:GetAttribute("Color") or Config.Theme.Magenta
+	local from = state.root.Position
+	AbilityService.Fx("Ring", Vector3.new(from.X, groundOf(state), from.Z), 4, color)
+	model:SetAttribute("Telegraph", true)
+	task.wait(0.35)
+	model:SetAttribute("Telegraph", false)
+	if mobs[model] and model.Parent and targetRoot.Parent then
+		local behind = targetRoot.CFrame * CFrame.new(0, 0, 4)
+		local spot = Vector3.new(behind.X, from.Y, behind.Z)
+		model:PivotTo(CFrame.lookAt(spot, Vector3.new(targetRoot.Position.X, spot.Y, targetRoot.Position.Z)))
+		AbilityService.Fx("Ring", Vector3.new(spot.X, groundOf(state), spot.Z), 4, color)
+		state.lastAttack = os.clock() - state.role.Cooldown + 0.2 -- strikes almost at once
+	end
+	state.lastBlink = os.clock()
+	state.busy = false
+end
+
+-- Elite affix timers: the Shielded bubble and Summoner adds.
+local function eliteAffixes(state, model, clock: number)
+	if hasAffix(model, "Shielded") and clock >= (state.nextBubble or 0) then
+		local a = AFFIX.Shielded
+		state.nextBubble = clock + a.Every
+		model:SetAttribute("BubbleUntil", now() + a.Seconds)
+		AbilityService.Fx("Shield", model, a.Seconds, a.Color)
+	end
+	if hasAffix(model, "Summoner") and clock >= (state.nextSummon or (clock + 3)) then
+		local a = AFFIX.Summoner
+		state.nextSummon = clock + a.Every
+		state.adds = state.adds or {}
+		local alive = {}
+		for _, add in ipairs(state.adds) do
+			if add.Parent and not add:GetAttribute("Dying") then
+				table.insert(alive, add)
+			end
+		end
+		state.adds = alive
+		if #alive >= a.Count * 2 then
+			return
+		end
+		local pool = {}
+		for _, id in ipairs(state.run.location.Mobs) do
+			local def = Config.Mobs.Defs[id]
+			if def and (def.Role == "Swarm" or def.Role == "Bomber") then
+				table.insert(pool, id)
+			end
+		end
+		if #pool == 0 then
+			pool = { state.run.location.Mobs[1] }
+		end
+		AbilityService.Fx("Ring", Vector3.new(state.root.Position.X, groundOf(state), state.root.Position.Z), 6, a.Color)
+		for i = 1, a.Count do
+			local angle = math.rad(i * 360 / a.Count)
+			local at = state.root.Position + Vector3.new(math.cos(angle) * 4, 0, math.sin(angle) * 4)
+			local add = DungeonRuns.SpawnMob(state.run, pool[state.run.rng:NextInteger(1, #pool)], Vector3.new(at.X, groundOf(state), at.Z), {
+				Tier = model:GetAttribute("Room"),
+				Zone = "Adds", -- not counted in the section
+			})
+			if add then
+				table.insert(state.adds, add)
+			end
+		end
+	end
 end
 
 ---------------------------------------------------------------------
@@ -638,6 +756,9 @@ local function tick()
 			continue
 		end
 
+		if state.elite then
+			eliteAffixes(state, model, clock)
+		end
 		if state.elite and clock - state.lastShock >= E.Elite.Shockwave.Every and distance <= E.Elite.Shockwave.Radius then
 			state.lastShock = clock
 			local s = E.Elite.Shockwave
@@ -646,6 +767,19 @@ local function tick()
 		end
 
 		local kind = model:GetAttribute("Role")
+		local cooldown = (role.Cooldown or 2) * state.cooldownMult
+		if kind == "Bomber" then
+			if distance <= role.Range then
+				task.spawn(selfDestruct, state, model, role)
+			else
+				state.humanoid:MoveTo(targetRoot.Position)
+			end
+			continue
+		end
+		if kind == "Blinker" and distance > role.BlinkFrom and clock - (state.lastBlink or 0) >= role.Blink then
+			task.spawn(blink, state, model, targetRoot)
+			continue
+		end
 		if kind == "Healer" then
 			-- keep away from the players, heal now and then
 			if distance < role.Keep then
@@ -668,7 +802,7 @@ local function tick()
 				state.humanoid:MoveTo(state.root.Position + (if away.Magnitude > 0.1 then away.Unit else Vector3.new(1, 0, 0)) * 8)
 			else
 				stop(state)
-				if clock - state.lastAttack >= role.Cooldown then
+				if clock - state.lastAttack >= cooldown then
 					task.spawn(shoot, state, model, role)
 				end
 			end
@@ -676,7 +810,7 @@ local function tick()
 			if distance <= role.Range then
 				stop(state)
 				face(state, targetRoot.Position)
-				if clock - state.lastAttack >= role.Cooldown then
+				if clock - state.lastAttack >= cooldown then
 					task.spawn(melee, state, model, role)
 				end
 			else
@@ -711,6 +845,11 @@ function MobAI.Register(run, model)
 	local roleName = model:GetAttribute("Role") or "Melee"
 	local role = E.Roles[roleName] or E.Roles.Melee
 	local speed = if isBoss then Config.Dungeon.Mob.BossWalkSpeed + 3 else role.Speed
+	local cooldownMult = 1
+	if hasAffix(model, "Swift") then
+		speed *= AFFIX.Swift.Speed
+		cooldownMult = AFFIX.Swift.Cooldown
+	end
 	humanoid.WalkSpeed = speed
 	mobs[model] = {
 		run = run,
@@ -727,6 +866,7 @@ function MobAI.Register(run, model)
 		lastSpecial = os.clock(),
 		lastShock = os.clock() - math.random() * 3,
 		busy = false,
+		cooldownMult = cooldownMult,
 	}
 	if isBoss then
 		model:SetAttribute("Phase", 1)
@@ -734,7 +874,14 @@ function MobAI.Register(run, model)
 end
 
 function MobAI.Unregister(model)
+	local state = mobs[model]
 	mobs[model] = nil
+	-- Explosive elites: a last blast where they fell
+	if state and hasAffix(model, "Explosive") and state.humanoid.Health <= 0 then
+		local a = AFFIX.Explosive
+		local p = state.root.Position
+		blast(state.run, Vector3.new(p.X, groundOf(state), p.Z), a.Radius, a.Delay, (model:GetAttribute("Damage") or 1) * a.Mult, nil)
+	end
 end
 
 function MobAI.Init()

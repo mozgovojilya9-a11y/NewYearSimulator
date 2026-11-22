@@ -40,6 +40,7 @@ local ForgeService = require(script.Parent.ForgeService)
 local StatService = require(script.Parent.StatService)
 local StatusService = require(script.Parent.StatusService)
 local StoreService = require(script.Parent.StoreService)
+local StreakService = require(script.Parent.StreakService)
 local TravelService = require(script.Parent.TravelService)
 
 -- Workspace is not managed by Rojo, so leftovers of older versions of
@@ -91,6 +92,7 @@ start("ForgeService", ForgeService.Init, hub)
 start("StoreService", StoreService.Init)
 start("TravelService", TravelService.Init, hub)
 start("EquipmentService", EquipmentService.Init)
+start("StreakService", StreakService.Init) -- Охотничий азарт (kill streak)
 start("ProgressionService", ProgressionService.Init)
 start("LootService", LootService.Init) -- after ProgressionService: both listen to kills
 start("ArtifactService", ArtifactService.Init) -- after LootService: chains the kill hook, feeds chest drops

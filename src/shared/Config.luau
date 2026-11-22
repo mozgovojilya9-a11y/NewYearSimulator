@@ -400,27 +400,33 @@ Config.Gates = {
 			Mobs = { "SpiderBot", "Assembler", "AsmGunner", "AsmShield" }, Boss = "ForemanMech", Icon = "gear" },
 		{ Id = "E_Cryo", Rank = "E", Biome = "Cryo", Name = "Криолаборатория", Text = "Ледяные камеры треснули. Внутри — то, что держали в холоде.",
 			Tier = 4, TierStep = 1, Sections = { 5, 6, 5 }, Level = 5, GearScore = 60, ParSeconds = 210, Seed = 23,
-			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic" }, Boss = "CryoOverseer", Icon = "vortex" },
+			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic", "CryoBomber" }, Boss = "CryoOverseer", Icon = "vortex" },
 		{ Id = "D_Smelter", Rank = "D", Biome = "Smelter", Name = "Плавильный реактор", Text = "Каналы расплава, жар и тяжёлые мехи плавильни.",
 			Tier = 7, TierStep = 1, Sections = { 6, 6, 5 }, Level = 9, GearScore = 140, ParSeconds = 230, Seed = 37,
-			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic" }, Boss = "MoltenColossus", Icon = "flame" },
+			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic", "SlagBomber" }, Boss = "MoltenColossus", Icon = "flame" },
 		{ Id = "D_Infected", Rank = "D", Biome = "Infected", Name = "Заражённый сектор", Text = "Нано-биомасса пожирает металл. Роботы стали её носителями.",
 			Tier = 9, TierStep = 1, Sections = { 5, 6, 6, 5 }, Level = 12, GearScore = 190, ParSeconds = 270, Seed = 41,
-			Mobs = { "InfectedCrawler", "InfectedBrute", "InfectedSpitter", "InfectedMedic" }, Boss = "HiveMother", Icon = "skull" },
+			Mobs = { "InfectedCrawler", "InfectedBrute", "InfectedSpitter", "InfectedMedic", "SporeBomber", "InfectedStalker" }, Boss = "HiveMother", Icon = "skull" },
 		{ Id = "D_Nexus", Rank = "D", Biome = "Nexus", Name = "Ядро Нексуса", Text = "Сердце ИИ. Его стражи не знают пощады.",
 			Tier = 11, TierStep = 1, Sections = { 6, 6, 7, 5 }, Level = 15, GearScore = 250, ParSeconds = 280, Seed = 53,
 			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
-		-- placeholders: data is enough to open them later
-		{ Id = "C_Foundry", Rank = "C", Biome = "Smelter", Name = "Глубинная литейная", Ready = false, Tier = 14, TierStep = 1, Sections = { 6, 7, 7, 6 }, Level = 18, GearScore = 330, ParSeconds = 300, Seed = 61,
-			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic" }, Boss = "MoltenColossus", Icon = "flame" },
-		{ Id = "C_Hive", Rank = "C", Biome = "Infected", Name = "Улей биомассы", Ready = false, Tier = 15, TierStep = 1, Sections = { 6, 7, 7, 6 }, Level = 20, GearScore = 360, ParSeconds = 300, Seed = 67,
-			Mobs = { "InfectedCrawler", "InfectedBrute", "InfectedSpitter", "InfectedMedic" }, Boss = "HiveMother", Icon = "skull" },
-		{ Id = "B_Core", Rank = "B", Biome = "Nexus", Name = "Ядро-2", Ready = false, Tier = 17, TierStep = 1, Sections = { 7, 7, 8, 6 }, Level = 26, GearScore = 440, ParSeconds = 320, Seed = 71,
-			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
-		{ Id = "A_Citadel", Rank = "A", Biome = "Cryo", Name = "Ледяная цитадель", Ready = false, Tier = 19, TierStep = 1, Sections = { 7, 8, 8, 7 }, Level = 34, GearScore = 520, ParSeconds = 340, Seed = 79,
-			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic" }, Boss = "CryoOverseer", Icon = "vortex" },
-		{ Id = "S_Throne", Rank = "S", Biome = "Nexus", Name = "Трон Нексуса", Ready = false, Tier = 21, TierStep = 1, Sections = { 8, 8, 8, 7 }, Level = 42, GearScore = 600, ParSeconds = 360, Seed = 83,
-			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
+		-- higher ranks: mixed pools from several biomes, more elites with
+		-- more affixes (Config.Enemies.Affixes.Count)
+		{ Id = "C_Foundry", Rank = "C", Biome = "Smelter", Name = "Глубинная литейная", Text = "Ниже реактора. Расплав, подрывники и щиты в три ряда.",
+			Tier = 14, TierStep = 1, Sections = { 6, 7, 7, 6 }, Elites = { 1, 2, 2, 2 }, Level = 18, GearScore = 330, ParSeconds = 300, Seed = 61,
+			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic", "SlagBomber", "NexusSentinel" }, Boss = "MoltenColossus", Icon = "flame" },
+		{ Id = "C_Hive", Rank = "C", Biome = "Infected", Name = "Улей биомассы", Text = "Биомасса проросла сквозь этажи. Охотники нападают со спины.",
+			Tier = 15, TierStep = 1, Sections = { 6, 7, 7, 6 }, Elites = { 1, 2, 2, 2 }, Level = 20, GearScore = 360, ParSeconds = 300, Seed = 67,
+			Mobs = { "InfectedCrawler", "InfectedBrute", "InfectedSpitter", "InfectedMedic", "SporeBomber", "InfectedStalker" }, Boss = "HiveMother", Icon = "skull" },
+		{ Id = "B_Core", Rank = "B", Biome = "Nexus", Name = "Ядро-2", Text = "Резервное ядро ИИ. Фазовые стражи и всё, что они собрали.",
+			Tier = 17, TierStep = 1, Sections = { 7, 7, 8, 6 }, Elites = { 2, 2, 3, 2 }, Level = 26, GearScore = 440, ParSeconds = 320, Seed = 71,
+			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic", "CryoPhantom", "SlagBomber" }, Boss = "Juggernaut", Icon = "eye" },
+		{ Id = "A_Citadel", Rank = "A", Biome = "Cryo", Name = "Ледяная цитадель", Text = "Замёрзшая крепость. Фантомы, турели и бомбы во льду.",
+			Tier = 19, TierStep = 1, Sections = { 7, 8, 8, 7 }, Elites = { 2, 3, 3, 3 }, Level = 34, GearScore = 520, ParSeconds = 340, Seed = 79,
+			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic", "CryoBomber", "CryoPhantom", "NexusShield" }, Boss = "CryoOverseer", Icon = "vortex" },
+		{ Id = "S_Throne", Rank = "S", Biome = "Nexus", Name = "Трон Нексуса", Text = "Последний рубеж. Здесь собраны худшие машины всех цехов.",
+			Tier = 21, TierStep = 1, Sections = { 8, 8, 8, 7 }, Elites = { 3, 3, 3, 3 }, Level = 42, GearScore = 600, ParSeconds = 360, Seed = 83,
+			Mobs = { "PhaseAndroid", "NexusSentinel", "InfectedBrute", "SmeltGunner", "NexusShield", "SlagBomber", "InfectedStalker", "CryoPhantom" }, Boss = "Juggernaut", Icon = "eye" },
 	},
 	Texts = {
 		Title = "ВРАТА",
@@ -624,12 +630,18 @@ Config.Mobs = {
 		InfectedMedic = { Name = "Спороносец", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "FlyingEye", Float = true },
 		HiveMother = { Name = "Матка улья", Boss = true, Asset = "Boss_HiveMother", AltAsset = "Mob_Overseer", Height = 6.4, Glow = Color3.fromRGB(120, 255, 90), Builder = "AbyssLord", Title = "Источник заражения" },
 		-- 5. Ядро Нексуса
-		PhaseAndroid = { Name = "Фазовый андроид", Role = "Swarm", Rig = "Rig_Assembler", Asset = "Mob_RedAndroid", Height = 4.2, Tint = Color3.fromRGB(170, 80, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost" },
+		PhaseAndroid = { Name = "Фазовый андроид", Role = "Blinker", Rig = "Rig_Assembler", Asset = "Mob_RedAndroid", Height = 4.2, Tint = Color3.fromRGB(170, 80, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost" },
 		NexusSentinel = { Name = "Страж Нексуса", Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(120, 60, 200), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
 		NexusDrone = { Name = "Дрон Нексуса", Role = "Ranged", Asset = "Mob_Robot", Height = 5.2, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.45, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye" },
 		NexusShield = { Name = "Бастион Нексуса", Role = "Shield", Rig = "Rig_Heavy", Asset = "Mob_ShieldBearer", Height = 6.2, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.35, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
 		NexusMedic = { Name = "Корректор", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(170, 90, 255), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye", Float = true },
 		Juggernaut = { Name = "Джаггернаут", Boss = true, Rig = "Rig_Heavy", Asset = "Boss_Juggernaut", Height = 6.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord", Title = "Воля Нексуса" },
+		-- Bombers and blinkers (spiders / androids with new behaviour)
+		CryoBomber = { Name = "Крио-подрывник", Role = "Bomber", Asset = "Mob_SpiderBot", Height = 2.6, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider" },
+		SlagBomber = { Name = "Шлак-подрывник", Role = "Bomber", Asset = "Mob_SpiderBot", Height = 2.6, Tint = Color3.fromRGB(255, 110, 40), TintAmount = 0.55, Glow = Color3.fromRGB(255, 140, 40), Builder = "GoblinSmith" },
+		SporeBomber = { Name = "Споровая бомба", Role = "Bomber", Asset = "Mob_InfectedCrawler", AltAsset = "Mob_SpiderBot", Height = 2.6, Glow = Color3.fromRGB(120, 255, 90), Builder = "IceSpider" },
+		CryoPhantom = { Name = "Крио-фантом", Role = "Blinker", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 5.4, Tint = Color3.fromRGB(150, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost" },
+		InfectedStalker = { Name = "Заражённый охотник", Role = "Blinker", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 5.6, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "AuraGhost" },
 	},
 }
 for id, def in pairs(Config.Mobs.Defs) do
@@ -723,8 +735,12 @@ Config.Enemies = {
 		Ranged = { Health = 0.75, Damage = 0.9, Speed = 10, Range = 40, Keep = 22, Cooldown = 2.8, Telegraph = 0.8, Width = 2.6 },
 		Shield = { Health = 1.7, Damage = 1.1, Speed = 8, Range = 5, Cooldown = 2.2, Telegraph = 0.7, Front = 70, Block = 0.8 },
 		Healer = { Health = 0.7, Damage = 0, Speed = 11, Keep = 26, Every = 4, Heal = 0.18, Range = 30 },
+		-- runs at the player, stops, flashes and blows itself up (Radius)
+		Bomber = { Health = 0.4, Damage = 2.2, Speed = 19, Range = 6, Radius = 9, Telegraph = 0.9, Cooldown = 99 },
+		-- blinks behind the player (Blink seconds apart), then strikes
+		Blinker = { Health = 0.8, Damage = 1.1, Speed = 13, Range = 4.5, Cooldown = 1.5, Telegraph = 0.45, Blink = 5, BlinkFrom = 9 },
 	},
-	RoleNames = { Melee = "ближний бой", Swarm = "рой", Ranged = "стрелок", Shield = "щитоносец", Healer = "лекарь" },
+	RoleNames = { Melee = "ближний бой", Swarm = "рой", Ranged = "стрелок", Shield = "щитоносец", Healer = "лекарь", Bomber = "подрывник", Blinker = "телепортер" },
 	DeathSeconds = 1.4, -- a rigged mob stays this long after death (animation + dissolve)
 	-- Animations of rigged mobs (client MobFx): clip ids from the Studio
 	-- animation generator; From..To = the part played, Hit = the strike
@@ -746,6 +762,27 @@ Config.Enemies = {
 	-- HelmetScale of the head, with a thin visor light (Glow of the mob,
 	-- else Visor). def.Helmet = false keeps the rig's own head.
 	Rig = { Helmet = "Part_RobotHead", HelmetScale = 1.25, Visor = Color3.fromRGB(255, 150, 40) },
+	-- Elite affixes (Diablo-style): every elite rolls Count[rank] different
+	-- ones; each adds danger and Loot share of extra drop weight. Shown in
+	-- the elite's name and as a colored glow.
+	--   Explosive  on death: a red circle, then a blast (Radius, Delay, Mult x damage)
+	--   Vampire    heals Heal x the damage it deals
+	--   Shielded   every Every s: a bubble for Seconds, damage taken x Take
+	--   Swift      walk speed x Speed, attack cooldown x Cooldown
+	--   Summoner   every Every s: Count swarm adds of its location
+	--   Thorns     Reflect x the damage taken goes back to the attacker (not lethal)
+	Affixes = {
+		Count = { E = 1, D = 1, C = 2, B = 2, A = 3, S = 3 },
+		Loot = 0.35,
+		List = {
+			{ Id = "Explosive", Name = "Взрывной", Color = Color3.fromRGB(255, 120, 40), Radius = 10, Delay = 1.1, Mult = 2 },
+			{ Id = "Vampire", Name = "Вампир", Color = Color3.fromRGB(220, 40, 70), Heal = 0.6 },
+			{ Id = "Shielded", Name = "Защищённый", Color = Color3.fromRGB(80, 170, 255), Every = 9, Seconds = 3, Take = 0.15 },
+			{ Id = "Swift", Name = "Стремительный", Color = Color3.fromRGB(255, 230, 90), Speed = 1.45, Cooldown = 0.65 },
+			{ Id = "Summoner", Name = "Призыватель", Color = Color3.fromRGB(190, 90, 255), Every = 10, Count = 2 },
+			{ Id = "Thorns", Name = "Шипастый", Color = Color3.fromRGB(150, 255, 120), Reflect = 0.12 },
+		},
+	},
 	Elite = {
 		Scale = 1.35,
 		Health = 4,
@@ -787,6 +824,30 @@ Config.Enemies = {
 	Projectile = { Speed = 65, Size = 0.9 },
 	TelegraphColor = Color3.fromRGB(255, 70, 60),
 	HealColor = Color3.fromRGB(90, 230, 110),
+}
+Config.AffixById = {}
+for _, affix in ipairs(Config.Enemies.Affixes.List) do
+	Config.AffixById[affix.Id] = affix
+end
+
+-- Охотничий азарт (kill streak, server StreakService, HUD GateHud):
+-- every kill within Window seconds of the last one adds a stack (up to
+-- Max). Each stack: +Xp / +Loot (drop chance) / +Credits share. Reaching
+-- a Milestone pays a bonus: Credits x the kill credits of the tier, Items
+-- = extra item drops of the location's table, Chest = an elite chest.
+-- Elites count Elite stacks. The streak ends when the window runs out.
+Config.Streak = {
+	Window = 6,
+	Max = 60,
+	Elite = 3,
+	Per = { Xp = 0.015, Loot = 0.01, Credits = 0.01 },
+	Milestones = {
+		{ At = 10, Credits = 6, Items = 1, Text = "Серия ×10" },
+		{ At = 25, Credits = 15, Items = 2, Text = "Серия ×25" },
+		{ At = 45, Credits = 30, Items = 2, Chest = true, Text = "Серия ×45 — сундук!" },
+	},
+	Texts = { Title = "АЗАРТ", Bonus = "+%d%% опыта  ·  +%d%% добычи", Lost = "Серия прервана" },
+	Color = Color3.fromRGB(255, 140, 40),
 }
 
 -- The player in combat. Health regenerates only when nothing hit the
