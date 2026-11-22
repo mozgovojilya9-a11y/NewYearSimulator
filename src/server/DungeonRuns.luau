@@ -45,6 +45,7 @@ local PlayerState = require(script.Parent.PlayerState)
 local StatService = require(script.Parent.StatService)
 local Remotes = require(script.Parent.Remotes)
 local WorldKit = require(script.Parent.WorldKit)
+local StreakService = require(script.Parent.StreakService)
 
 local DungeonRuns = {}
 
@@ -137,11 +138,94 @@ local function waveState(run)
 		Total = if zone then zone.Total else run.total,
 		Phase = run.phase,
 		Red = run.red,
+		Contract = DungeonRuns.ContractState and DungeonRuns.ContractState(run),
 	}
 end
 
 local function pushState(run)
 	send(run, "Wave", waveState(run))
+end
+
+---------------------------------------------------------------------
+-- Контракты (Config.Contracts): one side goal per run
+---------------------------------------------------------------------
+
+local CT = Config.Contracts
+
+local function plannedElites(run): number
+	local table_ = run.location.Elites or W.Elites
+	local total = 0
+	for i = 1, #run.zones do
+		total += table_[math.min(i, #table_)] + (if #run.players > 2 then 1 else 0)
+	end
+	return total
+end
+
+local function rollContract(run)
+	local rank = run.location.Rank
+	local options = {}
+	for _, c in ipairs(CT.List) do
+		if c.Id ~= "Elites" or plannedElites(run) > 0 then
+			table.insert(options, c)
+		end
+	end
+	local c = options[run.rng:NextInteger(1, #options)]
+	local contract = { Id = c.Id, Progress = 0, Goal = 1 }
+	if c.Id == "Elites" then
+		contract.Goal = math.min(c.Goal[rank] or 2, plannedElites(run))
+	elseif c.Id == "Streak" then
+		contract.Goal = c.Goal[rank] or 15
+	elseif c.Id == "Time" then
+		contract.Goal = math.floor((run.location.ParSeconds or 240) * c.Share)
+	end
+	run.contract = contract
+end
+
+-- The line for the HUD: text, state.
+local function contractState(run)
+	local k = run.contract
+	if not k then
+		return nil
+	end
+	local def
+	for _, c in ipairs(CT.List) do
+		if c.Id == k.Id then
+			def = c
+		end
+	end
+	local text
+	if k.Id == "Time" then
+		text = def.Text:format(k.Goal // 60, k.Goal % 60)
+	elseif k.Id == "NoDeath" then
+		text = def.Text
+	else
+		text = def.Text:format(math.min(k.Progress, k.Goal), k.Goal)
+	end
+	return { Text = text, Done = k.Done == true, Failed = k.Failed == true, Deadline = if k.Id == "Time" then run.started + k.Goal - os.clock() else nil }
+end
+
+DungeonRuns.ContractState = contractState
+
+local function contractDone(run)
+	local k = run.contract
+	if k and not k.Done and not k.Failed then
+		k.Done = true
+		for _, player in ipairs(members(run)) do
+			Remotes.Notify(player, CT.Texts.Done, "good")
+		end
+		pushState(run)
+	end
+end
+
+local function contractFailed(run)
+	local k = run.contract
+	if k and not k.Done and not k.Failed then
+		k.Failed = true
+		for _, player in ipairs(members(run)) do
+			Remotes.Notify(player, CT.Texts.Failed, "bad")
+		end
+		pushState(run)
+	end
 end
 
 -- Portal glow, then the enemy appears.
@@ -558,6 +642,15 @@ end
 local function bossDefeated(run, position: Vector3)
 	run.finished = true
 	local grade, elapsed = gradeFor(run)
+	local k = run.contract
+	if k and not k.Done and not k.Failed then
+		if (k.Id == "Time" and elapsed <= k.Goal) or (k.Id == "NoDeath" and run.deaths == 0) then
+			contractDone(run)
+		else
+			contractFailed(run)
+		end
+	end
+	run.contractItems = if k and k.Done then CT.Reward.Items else 0
 	run.grade = grade
 	run.phase = "Done"
 	pushState(run)
@@ -570,6 +663,10 @@ local function bossDefeated(run, position: Vector3)
 			local best = data.Gates.Cleared[run.location.Id]
 			-- Кристаллы: every boss, more for the first clear of a location
 			local crystals = Config.Crystals.Boss + (if best == nil then Config.Crystals.FirstClear else 0)
+			if run.contractItems > 0 then
+				crystals += CT.Reward.Crystals
+				Remotes.Notify(player, CT.Texts.Reward:format(CT.Reward.Crystals, CT.Reward.Items), "gold")
+			end
 			if PlayerState.AddCrystals(player, crystals) > 0 then
 				Remotes.Notify(player, Config.Crystals.Texts.Got:format(crystals), "gold")
 			end
@@ -666,6 +763,27 @@ local function kill(model, killer, quiet: boolean?)
 		Remotes.Get("ClickHit"):FireClient(player, "Kill", position, isBoss)
 		if DungeonRuns.OnKill and not quiet then
 			DungeonRuns.OnKill(player, tier, isBoss, position, kind, lootInfo)
+		end
+	end
+	local k = run.contract
+	if k and not quiet and not k.Done and not k.Failed then
+		if k.Id == "Elites" and elite then
+			k.Progress += 1
+			if k.Progress >= k.Goal then
+				contractDone(run)
+			else
+				pushState(run)
+			end
+		elseif k.Id == "Streak" and killer then
+			local streak = StreakService.Count(killer)
+			if streak > k.Progress then
+				k.Progress = streak
+				if k.Progress >= k.Goal then
+					contractDone(run)
+				else
+					pushState(run)
+				end
+			end
 		end
 	end
 	if isBoss then
@@ -955,6 +1073,7 @@ function DungeonRuns.Start(location, players, opts)
 	fxFolder.Parent = run.map.Folder
 	run.fxFolder = fxFolder
 	run.started = os.clock()
+	rollContract(run)
 
 	for i, player in ipairs(players) do
 		runOf[player] = run
@@ -976,6 +1095,9 @@ function DungeonRuns.Start(location, players, opts)
 						return -- the boss is down: a late death changes nothing
 					end
 					run.deaths += 1
+					if run.contract and run.contract.Id == "NoDeath" then
+						contractFailed(run)
+					end
 					local d = DataService.Get(player)
 					if d then
 						d.Stats = if type(d.Stats) == "table" then d.Stats else {}

@@ -274,7 +274,7 @@ function LootService.Init()
 			local offset = Vector3.new((i - 1) * 6 - (#run.players - 1) * 3, 0, 4)
 			LootService.DropChest(player, run.location.BossTier, position + offset, if run.red then "Red" else "Boss", {
 				Rank = run.location.Rank,
-				Extra = grade.Items,
+				Extra = grade.Items + (run.contractItems or 0), -- + the contract bonus
 				MinStep = grade.MinStep,
 				Red = run.red,
 			})

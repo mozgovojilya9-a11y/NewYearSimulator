@@ -67,6 +67,22 @@ barFill.Parent = barBack
 local waveScale = Instance.new("UIScale")
 waveScale.Parent = waveLine
 
+-- the run contract (Config.Contracts) under the run panel
+local CTR = Config.Contracts
+local contractPanel, contractShape = Style.Panel(Style.Gui, {
+	Name = "ContractPanel",
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, TOP + 84),
+	Size = UDim2.fromOffset(380, 30),
+	Fill = C.PanelDark,
+	Border = CTR.Colors.Active,
+	Cut = 6,
+	ZIndex = 6,
+	Visible = false,
+})
+local contractLine = Style.Label(contractPanel, "", 14, C.Text, { Size = UDim2.fromScale(1, 1), ZIndex = 7, RichText = true })
+local contractDeadline = nil -- os.clock() when a Time contract runs out
+
 local state = nil
 local lastWave = nil
 
@@ -74,6 +90,7 @@ local function render()
 	local s = state
 	panel.Visible = s ~= nil and player:GetAttribute("Zone") == "Dungeon"
 	if not panel.Visible then
+		contractPanel.Visible = false
 		return
 	end
 	shape.SetBorder(if s.Red then Config.RedGate.Color else C.GoldDim)
@@ -98,6 +115,15 @@ local function render()
 		waveLine.TextColor3 = if alive == 0 then C.Green else C.Text
 		Style.Tween(barFill, 0.2, { Size = UDim2.fromScale(1 - alive / total, 1) })
 	end
+	local k = s.Contract
+	contractPanel.Visible = k ~= nil and s.Phase ~= "Done" or (k ~= nil and k.Done)
+	if k then
+		local color = if k.Done then CTR.Colors.Done elseif k.Failed then CTR.Colors.Failed else CTR.Colors.Active
+		contractShape.SetBorder(color)
+		contractLine.TextColor3 = color
+		contractLine.Text = CTR.Texts.Title .. "  ·  " .. k.Text .. (if k.Done then "  ·  ВЫПОЛНЕН" elseif k.Failed then "  ·  ПРОВАЛЕН" else "")
+		contractDeadline = if k.Deadline and not k.Done and not k.Failed then os.clock() + k.Deadline else nil
+	end
 	local key = tostring(s.Zone) .. ":" .. tostring(s.Phase)
 	if key ~= lastWave then
 		lastWave = key
@@ -111,6 +137,19 @@ player:GetAttributeChangedSignal("Zone"):Connect(function()
 		state = nil
 	end
 	render()
+end)
+
+task.spawn(function()
+	while true do
+		task.wait(0.5)
+		if contractDeadline and contractPanel.Visible and state and state.Contract then
+			local left = math.max(0, math.ceil(contractDeadline - os.clock()))
+			contractLine.Text = CTR.Texts.Title .. "  ·  " .. state.Contract.Text .. ("  (%d:%02d)"):format(left // 60, left % 60)
+			if left <= 0 then
+				contractLine.TextColor3 = CTR.Colors.Failed
+			end
+		end
+	end
 end)
 
 ---------------------------------------------------------------------

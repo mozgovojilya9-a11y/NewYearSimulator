@@ -850,6 +850,30 @@ Config.Streak = {
 	Color = Color3.fromRGB(255, 140, 40),
 }
 
+-- Контракты забега: every gate run rolls one side goal (DungeonRuns),
+-- shown under the run panel. Done by the boss kill = Reward for every
+-- member: Crystals + Items more in the boss chest.
+--   Elites   kill Goal[rank] elites (only where the location has elites)
+--   Time     beat the boss within Share x ParSeconds of the location
+--   NoDeath  nobody dies
+--   Streak   reach an Охотничий азарт streak of Goal[rank]
+Config.Contracts = {
+	Reward = { Crystals = 3, Items = 1 },
+	List = {
+		{ Id = "Elites", Text = "Убей элит: %d / %d", Goal = { E = 1, D = 2, C = 4, B = 5, A = 6, S = 7 } },
+		{ Id = "Time", Text = "Закрой Врата за %d:%02d", Share = 1.15 },
+		{ Id = "NoDeath", Text = "Пройди без смертей" },
+		{ Id = "Streak", Text = "Серия азарта: ×%d / ×%d", Goal = { E = 12, D = 18, C = 24, B = 28, A = 32, S = 36 } },
+	},
+	Texts = {
+		Title = "КОНТРАКТ",
+		Done = "Контракт выполнен! Награда — после босса",
+		Failed = "Контракт провален",
+		Reward = "Контракт: +%d Кристаллов и +%d предмет в сундуке",
+	},
+	Colors = { Active = Color3.fromRGB(46, 230, 255), Done = Color3.fromRGB(90, 230, 110), Failed = Color3.fromRGB(255, 70, 60) },
+}
+
 -- The player in combat. Health regenerates only when nothing hit the
 -- player for RegenDelay seconds (the default Roblox regen is disabled).
 Config.Player = {
