@@ -818,6 +818,13 @@ Config.Enemies = {
 		DeathSlowmo = 1.8, -- seconds the camera holds on the dying boss
 		Texts = { Phase = "ФАЗА %d", Rage = "ЯРОСТЬ", Intro = "%s", Summon = "%s зовёт подкрепление!" },
 	},
+	-- Melee strikes: a lunge of Distance studs in Seconds, the player is
+	-- knocked back (studs/s; elites and bosses harder). Within Surround.From
+	-- studs melee mobs spread around the player instead of queueing.
+	-- Ranged mobs side-step Strafe.Distance every Strafe.Every seconds.
+	Lunge = { Distance = 4, Seconds = 0.12, Knock = 38, KnockElite = 60 },
+	Surround = { From = 14 },
+	Strafe = { Every = 1.6, Distance = 7 },
 	-- Ranged shots are visible projectiles (client AbilityFx "Bolt"): they
 	-- fly at Speed studs/s, a wall stops them, and a mob without a clear
 	-- line to its target walks closer instead of shooting.
@@ -981,7 +988,8 @@ Config.AFK = {
 -- "[СИСТЕМА] УРОВЕНЬ ПОВЫШЕН". Level-ups within Gather seconds are
 -- summed up in one window.
 Config.LevelUpFx = {
-	Gather = 1.2,
+	Gather = 0.4,
+	BannerSeconds = 1.8, -- the level banner fades after this
 	PillarSeconds = 1.6,
 	PillarColor = Color3.fromRGB(120, 235, 255),
 	RingColor = Color3.fromRGB(255, 214, 110),
@@ -989,10 +997,10 @@ Config.LevelUpFx = {
 	ZoomSeconds = 0.6,
 	Texts = {
 		System = "[ СИСТЕМА ]",
-		Title = "УРОВЕНЬ ПОВЫШЕН",
+		Title = "УРОВЕНЬ",
 		Levels = "%d  →  %d",
 		Stats = "Очки характеристик: +%d",
-		Skills = "Очки навыков: +%d",
+		Skills = "+%d очко навыков",
 		Opened = "ОТКРЫЛОСЬ",
 		Node = "Навык «%s» (ветка %s)",
 		Nodes = "Новых навыков в дереве: %d",
@@ -1111,6 +1119,32 @@ end
 
 -- Basic attacks, block, dash (numbers of the class mechanics).
 Config.Combat = {
+	-- The glowing slash of melee hits (client Swing.slashArc): an arc
+	-- from From to To degrees (0 = straight ahead, + = to the right),
+	-- Radius studs, Thick = blade height, Tilt = roll of the arc,
+	-- Stab = a straight thrust instead. Sweep / Fade in seconds.
+	Slash = {
+		Sweep = 0.07,
+		Fade = 0.22,
+		Shapes = {
+			Default = {
+				Combo1 = { From = -70, To = 70, Radius = 5.5, Thick = 0.6, Tilt = 18 },
+				Combo2 = { From = 70, To = -70, Radius = 5.5, Thick = 0.6, Tilt = -20 },
+				Combo3 = { From = -110, To = 110, Radius = 7.5, Thick = 1.1, Tilt = 0, Count = 20 },
+				Strike = { From = -90, To = 90, Radius = 7, Thick = 1, Tilt = 70 },
+				Stun = { From = -60, To = 60, Radius = 6, Thick = 0.8, Tilt = 60 },
+				Wave = { From = -50, To = 50, Radius = 10, Thick = 1.2, Tilt = 0 },
+				Spin = { From = -180, To = 180, Radius = 8, Thick = 1, Tilt = 0, Count = 28 },
+				Quake = { From = -180, To = 180, Radius = 9, Thick = 0.8, Height = -2.4, Count = 28 },
+				Trap = { From = -180, To = 180, Radius = 6, Thick = 0.6, Height = -2.4, Count = 20 },
+			},
+			Pulse = {
+				Combo1 = { Stab = true, Radius = 7 },
+				Combo2 = { From = -100, To = 100, Radius = 7, Thick = 0.7, Tilt = 8 },
+				Combo3 = { From = -180, To = 180, Radius = 8.5, Thick = 1, Tilt = 0, Count = 30 },
+			},
+		},
+	},
 	Blade = { Range = 10, Combo = { 1, 1, 1.6 }, ComboWindow = 1.4, ThirdArc = 7 }, -- 3rd hit also hits mobs within ThirdArc of the target
 	Pulse = { Range = 12, Combo = { 1, 1.1, 1.3 }, ComboWindow = 1.4, ThirdRadius = 11 }, -- 3rd hit: everyone around
 	Gunner = { Range = 70, VolleyEvery = 3, VolleyTargets = 3, VolleyMult = 0.8, ChargeSeconds = 0.9, ChargeMult = 3 },
@@ -1661,8 +1695,8 @@ Config.System = {
 	Tag = "[ СИСТЕМА ]",
 	Width = 440,
 	Top = 236, -- px from the top (under the wave panel and the boss bar)
-	Seconds = 4,
-	Max = 3,
+	Seconds = 2.5,
+	Max = 2,
 	Fill = Color3.fromRGB(8, 26, 38),
 	Transparency = 0.22,
 	ItemFrom = "Epic", -- picked items of this rarity and above get a notice
@@ -1686,6 +1720,15 @@ Config.System = {
 -- back for ResetCost + ResetPerLevel x level credits.
 Config.Attributes = {
 	PointsPerLevel = 3,
+	-- 22.11: points are spent automatically by class (no "+" buttons, no
+	-- nagging): Auto[class][attribute] = share of the level's points.
+	-- Points the player had spent by hand before stay where they are.
+	Auto = {
+		Blade = { Str = 0.4, Vit = 0.4, Agi = 0.2 },
+		Pulse = { Str = 0.35, Agi = 0.45, Vit = 0.2 },
+		Gunner = { Str = 0.3, Agi = 0.3, Per = 0.4 },
+		Default = { Str = 0.4, Agi = 0.2, Vit = 0.3, Per = 0.1 },
+	},
 	ResetCost = 50,
 	ResetPerLevel = 10,
 	List = {
@@ -2515,7 +2558,7 @@ Config.MobLooks = {
 
 Config.Hud = {
 	TopLeftReserved = Vector2.new(320, 60), -- never put UI here (Roblox buttons)
-	ObjectiveSeconds = 3.5, -- the centre hint shows this long when the goal changes
+	ObjectiveSeconds = 0, -- the centre hint shows this long when the goal changes (0 = off: less text)
 	Objectives = {
 		Hub = "Открой Врата!",
 		Quest = "Новая цель: %s",

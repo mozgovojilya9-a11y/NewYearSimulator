@@ -335,7 +335,7 @@ function PlayerState.Sync(player)
 	for _, value in pairs(data.Attributes) do
 		spentStats += value
 	end
-	player:SetAttribute("StatPoints", math.max(0, Config.StatPointsAtLevel(data.Level) - spentStats))
+	player:SetAttribute("StatPoints", 0) -- spent automatically by class (StatusService)
 
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then

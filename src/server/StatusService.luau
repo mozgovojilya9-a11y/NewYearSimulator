@@ -71,8 +71,11 @@ end
 function StatusService.Init()
 	table.insert(StatService.Sources, function(_player, data)
 		local bonus = {}
+		-- free points work automatically, split by the class (Config.Attributes.Auto)
+		local free = math.max(0, Config.StatPointsAtLevel(data.Level or 1) - spent(data))
+		local shares = A.Auto[data.Class or ""] or A.Auto.Default
 		for _, def in ipairs(A.List) do
-			local points = data.Attributes[def.Id] or 0
+			local points = (data.Attributes[def.Id] or 0) + free * (shares[def.Id] or 0)
 			if points > 0 then
 				for stat, per in pairs(def.PerPoint) do
 					bonus[stat] = (bonus[stat] or 0) + per * points

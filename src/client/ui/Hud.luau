@@ -334,13 +334,13 @@ local function refreshTracker()
 	if type(q) == "table" and q.Title then
 		local ST = Config.System.Texts
 		if lastQuest ~= nil and q.Title ~= lastQuest then
-			SystemNotice.Show(ST.NewQuest, { q.Title, q.Text or "" })
+			SystemNotice.Show(ST.NewQuest, { q.Title })
 		elseif lastQuest == q.Title and q.Ready and not lastReady then
-			SystemNotice.Show(ST.QuestDone, { q.Title, ST.QuestBack }, "gold")
+			SystemNotice.Show(ST.QuestDone, { q.Title }, "gold")
 		end
 		lastQuest, lastReady = q.Title, q.Ready == true
 		qTitle.Text = q.Title
-		qText.Text = q.Text or ""
+		qText.Text = "" -- 22.11: title + progress only
 		local target = math.max(1, tonumber(q.Target) or 1)
 		local progress = math.clamp(tonumber(q.Progress) or 0, 0, target)
 		qFill.Size = UDim2.fromScale(progress / target, 1)
@@ -412,8 +412,8 @@ local currentRoomAlive = nil
 local shownGoal = nil
 local hideToken = 0
 local function setObjective(text)
-	if shownGoal == text then
-		return
+	if Config.Hud.ObjectiveSeconds <= 0 or shownGoal == text then
+		return -- 22.11: off - less text on screen, the tracker holds the goal
 	end
 	shownGoal = text
 	objective.Text = Style.Upper(text)

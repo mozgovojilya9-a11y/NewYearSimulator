@@ -152,15 +152,50 @@ end
 -- Basic attacks
 ---------------------------------------------------------------------
 
+-- the strike: a short lunge at the target (Config.Enemies.Lunge)
+local function lunge(state, targetRoot)
+	local L = E.Lunge
+	local from = state.root.Position
+	local to = Vector3.new(targetRoot.Position.X, from.Y, targetRoot.Position.Z)
+	local gap = (to - from).Magnitude - state.reach - 1.5
+	if gap <= 0.2 then
+		return
+	end
+	local step = (to - from).Unit * math.min(L.Distance, gap)
+	local look = CFrame.lookAt(from, to).Rotation
+	local start = os.clock()
+	while os.clock() - start < L.Seconds and state.root.Parent do
+		local t = (os.clock() - start) / L.Seconds
+		state.root.CFrame = CFrame.new(from + step * (1 - (1 - t) ^ 2)) * look
+		task.wait()
+	end
+end
+
+local function knock(player, fromPosition: Vector3, strength: number)
+	local root = rootOf(player)
+	if root then
+		local away = root.Position - fromPosition
+		away = Vector3.new(away.X, 0, away.Z)
+		if away.Magnitude > 0.1 then
+			Remotes.Get("ClickHit"):FireClient(player, "Knock", away.Unit * strength)
+		end
+	end
+end
+
 local function melee(state, model, role)
 	state.busy = true
 	model:SetAttribute("Telegraph", true)
 	task.wait(role.Telegraph)
 	model:SetAttribute("Telegraph", false)
 	if mobs[model] and model.Parent then
+		local _, targetRoot = target(state)
+		if targetRoot then
+			lunge(state, targetRoot)
+		end
 		local player, _, distance = target(state)
 		if player and distance <= role.Range + 2.5 then
 			damagePlayer(player, model:GetAttribute("Damage") or 1, model)
+			knock(player, state.root.Position, if state.elite or state.isBoss then E.Lunge.KnockElite else E.Lunge.Knock)
 		end
 	end
 	state.lastAttack = os.clock()
@@ -801,9 +836,17 @@ local function tick()
 				away = Vector3.new(away.X, 0, away.Z)
 				state.humanoid:MoveTo(state.root.Position + (if away.Magnitude > 0.1 then away.Unit else Vector3.new(1, 0, 0)) * 8)
 			else
-				stop(state)
 				if clock - state.lastAttack >= cooldown then
+					stop(state)
 					task.spawn(shoot, state, model, role)
+				elseif clock >= (state.nextStrafe or 0) then
+					-- side-step between shots
+					state.nextStrafe = clock + E.Strafe.Every
+					local to = targetRoot.Position - state.root.Position
+					local side = Vector3.new(-to.Z, 0, to.X)
+					if side.Magnitude > 0.1 then
+						state.humanoid:MoveTo(state.root.Position + side.Unit * E.Strafe.Distance * (if math.random() < 0.5 then -1 else 1))
+					end
 				end
 			end
 		else
@@ -813,8 +856,13 @@ local function tick()
 				if clock - state.lastAttack >= cooldown then
 					task.spawn(melee, state, model, role)
 				end
-			else
+			elseif distance > E.Surround.From then
 				state.humanoid:MoveTo(targetRoot.Position)
+			else
+				-- close in from its own side: the group surrounds the player
+				local a = state.slot
+				local ring = math.max(2, role.Range * 0.6)
+				state.humanoid:MoveTo(targetRoot.Position + Vector3.new(math.cos(a) * ring, 0, math.sin(a) * ring))
 			end
 		end
 	end
@@ -867,6 +915,7 @@ function MobAI.Register(run, model)
 		lastShock = os.clock() - math.random() * 3,
 		busy = false,
 		cooldownMult = cooldownMult,
+		slot = math.random() * math.pi * 2, -- its side when surrounding the player
 	}
 	if isBoss then
 		model:SetAttribute("Phase", 1)

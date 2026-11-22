@@ -6,10 +6,9 @@
 	  * for the local player (LevelUp remote: level, skill points gained,
 	    previous level): a flash, a short camera zoom, the sound
 	    Config.Assets.Sounds.LevelUp and the window
-	    "[СИСТЕМА] УРОВЕНЬ ПОВЫШЕН" in the Solo Leveling style: old → new
-	    level, stat and skill points, what opened (skill tree nodes of the
-	    class, gate ranks, a new title), "Распределить" (opens Статус) and
-	    "Позже". Several level-ups in a row become one window.
+	    a short banner "УРОВЕНЬ / 8 / +1 очко навыков" that fades by
+	    itself (no window, no buttons; stats are spent automatically).
+	    Several level-ups in a row become one banner.
 ]]
 
 local Players = game:GetService("Players")
@@ -117,107 +116,58 @@ end
 Players.PlayerAdded:Connect(watchPlayer)
 
 ---------------------------------------------------------------------
--- The window
+-- The banner (22.11: no window, no buttons - it never stops the game)
 ---------------------------------------------------------------------
 
-local dim = Instance.new("TextButton")
-dim.Name = "LevelUpWindow"
-dim.Size = UDim2.fromScale(1, 1)
-dim.BackgroundColor3 = Color3.new(0, 0, 0)
-dim.BackgroundTransparency = 0.45
-dim.Text = ""
-dim.AutoButtonColor = false
-dim.ZIndex = 90
-dim.Visible = false
-dim.Parent = Style.Gui
+local banner = Instance.new("Frame")
+banner.Name = "LevelUpWindow"
+banner.AnchorPoint = Vector2.new(0.5, 0.5)
+banner.Position = UDim2.fromScale(0.5, 0.3)
+banner.Size = UDim2.fromOffset(420, 120)
+banner.BackgroundTransparency = 1
+banner.ZIndex = 90
+banner.Visible = false
+banner.Parent = Style.Gui
+local small = Style.Label(banner, T.Title, 18, Config.Theme.Cyan, { Font = Style.FontTitle, Size = UDim2.new(1, 0, 0, 22), ZIndex = 91 })
+local big = Style.Label(banner, "", 64, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 70), ZIndex = 91 })
+local extra = Style.Label(banner, "", 15, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 92), Size = UDim2.new(1, 0, 0, 20), ZIndex = 91 })
+local bigScale = Instance.new("UIScale")
+bigScale.Parent = big
+local shownAt = 0
 
-local panel = Style.Panel(dim, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(520, 420), Fill = Color3.fromRGB(8, 12, 20), Transparency = 0.06, Border = Config.Theme.Cyan, Cut = 14, ZIndex = 91 })
-local fit = Instance.new("UIScale")
-fit.Parent = panel
--- thin cyan lines top and bottom
-Style.Rule(panel, { Position = UDim2.fromOffset(24, 54), Size = UDim2.new(1, -48, 0, 1), Color = Config.Theme.Cyan, ZIndex = 92 })
-local bottomRule = Style.Rule(panel, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 24, 1, -84), Size = UDim2.new(1, -48, 0, 1), Color = Config.Theme.Cyan, ZIndex = 92 })
-local _ = bottomRule
-Style.Label(panel, T.System, 14, Config.Theme.Cyan, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 14), Size = UDim2.new(1, 0, 0, 16), ZIndex = 92 })
-local title = Style.Label(panel, T.Title, 30, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 30), ZIndex = 92 })
-local levels = Style.Label(panel, "", 46, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 64), Size = UDim2.new(1, 0, 0, 52), ZIndex = 92 })
-local levelScale = Instance.new("UIScale")
-levelScale.Parent = levels
-local stats = Style.Label(panel, "", 17, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 122), Size = UDim2.new(1, 0, 0, 22), ZIndex = 92 })
-local skills = Style.Label(panel, "", 17, Config.Theme.Cyan, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 146), Size = UDim2.new(1, 0, 0, 22), ZIndex = 92 })
-local stronger = Style.Label(panel, "", 13, C.Muted, { Position = UDim2.fromOffset(0, 172), Size = UDim2.new(1, 0, 0, 18), ZIndex = 92 })
-Style.Label(panel, T.Opened, 13, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(32, 200), Size = UDim2.new(1, -64, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 92 })
-local opened = Style.Label(panel, "", 14, C.Text, { Position = UDim2.fromOffset(32, 220), Size = UDim2.new(1, -64, 0, 104), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 92 })
-local spend = Style.Button(panel, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 24, 1, -20), Size = UDim2.new(0.5, -30, 0, 50), Color = C.Gold, Text = T.Spend, TextSize = 18, ZIndex = 93 })
-local later = Style.Button(panel, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -24, 1, -20), Size = UDim2.new(0.5, -30, 0, 50), Color = C.CardDark, Text = T.Later, TextSize = 18, ZIndex = 93 })
-
-local function close()
-	dim.Visible = false
-end
-later.Activated:Connect(close)
-spend.Activated:Connect(function()
-	close()
-	if LevelUp.OnSpend then
-		LevelUp.OnSpend()
-	end
-end)
-
--- What opened between two levels (old, new].
-local function openedBetween(from: number, to: number): { string }
-	local list = {}
-	local class = player:GetAttribute("Class") or ""
-	local nodes = {}
-	for _, node in pairs(Config.SkillById) do
-		if node.Class == class and node.Level and node.Level > from and node.Level <= to then
-			table.insert(nodes, node)
+local function show(_from: number, to: number, skillPoints: number)
+	small.Text = T.Title
+	big.Text = tostring(to)
+	extra.Text = if skillPoints > 0 then T.Skills:format(skillPoints) else ""
+	for _, label in ipairs({ small, big, extra }) do
+		label.TextTransparency = 0
+		local stroke = label:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Transparency = 0
 		end
 	end
-	table.sort(nodes, function(a, b)
-		return a.Level < b.Level
+	banner.Visible = true
+	bigScale.Scale = 1.8
+	Style.Tween(bigScale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
+	local stamp = os.clock()
+	shownAt = stamp
+	task.delay(FX.BannerSeconds or 1.8, function()
+		if shownAt ~= stamp then
+			return
+		end
+		for _, label in ipairs({ small, big, extra }) do
+			Style.Tween(label, 0.4, { TextTransparency = 1 })
+			local stroke = label:FindFirstChildOfClass("UIStroke")
+			if stroke then
+				Style.Tween(stroke, 0.4, { Transparency = 1 })
+			end
+		end
+		task.delay(0.45, function()
+			if shownAt == stamp then
+				banner.Visible = false
+			end
+		end)
 	end)
-	local branchNames = {}
-	for _, b in ipairs(Config.Skills.Branches) do
-		branchNames[b.Id] = b.Name
-	end
-	if #nodes <= 3 then
-		for _, node in ipairs(nodes) do
-			table.insert(list, T.Node:format(node.Name, branchNames[node.Branch] or ""))
-		end
-	else
-		table.insert(list, T.Nodes:format(#nodes))
-	end
-	for _, rank in ipairs(Config.Gates.Ranks) do
-		local info = Config.Gates.RankInfo[rank]
-		if info and info.Level > from and info.Level <= to then
-			table.insert(list, T.Gate:format(rank))
-		end
-	end
-	for _, r in ipairs(Config.Ranks) do
-		if r.Level > from and r.Level <= to then
-			table.insert(list, T.Rank:format(r.Name))
-		end
-	end
-	return list
-end
-
-local function show(from: number, to: number, skillPoints: number)
-	levels.Text = T.Levels:format(from, to)
-	stats.Text = T.Stats:format((to - from) * Config.Attributes.PointsPerLevel)
-	skills.Text = T.Skills:format(skillPoints)
-	stronger.Text = T.Stronger:format(Format.Number(player:GetAttribute("ClickPower") or 1), Format.Number(player:GetAttribute("MaxHealth") or Config.Player.Health))
-	local list = openedBetween(from, to)
-	opened.Text = if #list > 0 then "•  " .. table.concat(list, "\n•  ") else "—"
-	-- the panel is as tall as its lines
-	panel.Size = UDim2.fromOffset(520, 236 + math.max(1, #list) * 20 + 100)
-	local camera = Workspace.CurrentCamera
-	fit.Scale = math.min(1, (camera.ViewportSize.X - 24) / 520, (camera.ViewportSize.Y - 24) / 420)
-	dim.Visible = true
-	panel.Position = UDim2.new(0.5, 0, 0.5, 30)
-	Style.Tween(panel, 0.3, { Position = UDim2.fromScale(0.5, 0.5) }, Enum.EasingStyle.Back)
-	levelScale.Scale = 1.6
-	Style.Tween(levelScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
-	title.TextTransparency = 1
-	Style.Tween(title, 0.4, { TextTransparency = 0 })
 end
 
 -- the camera leans in and back

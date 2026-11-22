@@ -53,6 +53,80 @@ local function clipFor(character, act: string)
 	return clip, name
 end
 
+-- The slash itself (22.11): a glowing crescent in the class color drawn
+-- at the strike moment - an arc of short neon blades that sweeps in, then
+-- widens and fades. Combo3 / Spin = a wide (Pulse: full circle) slash,
+-- a spear thrust = a straight stab. Config.Combat.Slash.
+local SL = CB.Slash
+local slashFolder = Instance.new("Folder")
+slashFolder.Name = "SlashFx"
+slashFolder.Parent = workspace
+
+local function slashArc(character, act: string)
+	if Style.HideEffects or not SL then
+		return
+	end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+	local class = ownerClass(character)
+	local def = Config.ClassById[class]
+	local color = def and def.Color or Config.Theme.Cyan
+	local shape = (SL.Shapes[class] and SL.Shapes[class][act]) or SL.Shapes.Default[act] or SL.Shapes.Default.Combo1
+	local base = root.CFrame * CFrame.new(0, shape.Height or 0.3, 0) * CFrame.Angles(0, 0, math.rad(shape.Tilt or 0))
+	local blades = {}
+	if shape.Stab then
+		-- a straight stab forward
+		local length = shape.Radius
+		local core = Instance.new("Part")
+		core.Anchored, core.CanCollide, core.CanQuery, core.CanTouch, core.CastShadow = true, false, false, false, false
+		core.Material = Enum.Material.Neon
+		core.Color = color
+		core.Size = Vector3.new(0.35, 0.35, length)
+		core.CFrame = base * CFrame.new(0, 0, -length / 2 - 1)
+		core.Transparency = 0.1
+		core.Parent = slashFolder
+		table.insert(blades, core)
+	else
+		local count = shape.Count or 14
+		local from, to = math.rad(shape.From), math.rad(shape.To)
+		local radius = shape.Radius
+		local step = (to - from) / count
+		for i = 0, count - 1 do
+			local a = from + step * (i + 0.5)
+			local t = i / math.max(1, count - 1)
+			local blade = Instance.new("Part")
+			blade.Anchored, blade.CanCollide, blade.CanQuery, blade.CanTouch, blade.CastShadow = true, false, false, false, false
+			blade.Material = Enum.Material.Neon
+			blade.Color = color:Lerp(Color3.new(1, 1, 1), 0.35 * (1 - math.abs(t - 0.5) * 2))
+			-- thicker in the middle of the arc, thin at the ends (a crescent)
+			local thick = (shape.Thick or 0.5) * (0.35 + 0.65 * math.sin(t * math.pi))
+			blade.Size = Vector3.new(0.12, thick, radius * math.abs(step) * 1.4)
+			blade.CFrame = base * CFrame.Angles(0, -a, 0) * CFrame.new(0, 0, -radius) * CFrame.Angles(0, math.rad(90), 0)
+			blade.Transparency = 1
+			blade.Parent = slashFolder
+			blades[i + 1] = blade
+			-- sweep in, blade after blade
+			task.delay(SL.Sweep * t, function()
+				if blade.Parent then
+					blade.Transparency = 0.05
+				end
+			end)
+		end
+	end
+	task.delay(SL.Sweep, function()
+		for _, blade in ipairs(blades) do
+			Style.Tween(blade, SL.Fade, { Transparency = 1, Size = blade.Size * Vector3.new(1, 0.3, 1.3) })
+		end
+		task.delay(SL.Fade + 0.05, function()
+			for _, blade in ipairs(blades) do
+				blade:Destroy()
+			end
+		end)
+	end)
+end
+
 local function setTrail(character, enabled: boolean)
 	local weapon = character:FindFirstChild("EquippedWeapon")
 	local handle = weapon and weapon:FindFirstChild("Handle")
@@ -248,6 +322,9 @@ local function play(character, act: string)
 		return
 	end
 	if MELEE[act] then
+		-- the crescent appears at the clip's strike moment
+		local strikeAt = if clip and clip.Hit then (clip.Hit - clip.From) / math.max(0.05, (clip.To - clip.From) / math.max(0.05, clip.Seconds)) else S.WindSeconds
+		task.delay(strikeAt * 0.85, slashArc, character, act)
 		setTrail(character, true)
 		task.delay(math.max(S.TrailSeconds, seconds), function()
 			if character.Parent then

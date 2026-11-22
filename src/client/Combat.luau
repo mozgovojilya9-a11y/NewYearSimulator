@@ -390,6 +390,14 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 		end
 	elseif kind == "Dodge" then
 		GateHud.Dodge()
+	elseif kind == "Knock" then
+		-- a mob's strike throws us back a little
+		local push = ...
+		local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if root and typeof(push) == "Vector3" then
+			root.AssemblyLinearVelocity = push + Vector3.new(0, push.Magnitude * 0.3, 0)
+			Popups.Shake(0.35, 0.18)
+		end
 	elseif kind == "Streak" then
 		GateHud.Streak(...)
 	elseif kind == "StreakEnd" then
