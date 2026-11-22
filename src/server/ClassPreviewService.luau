@@ -1,23 +1,24 @@
 --[[
 	ClassPreviewService.luau
-	The class screen shows the player's OWN avatar in the class armor with
-	the class weapon. Players:CreateHumanoidModelFromDescription works only
-	on the server, so the server builds an R15 rig from the player's
-	HumanoidDescription (Players:GetHumanoidDescriptionFromUserId) and puts
-	it into ReplicatedStorage.ClassPreviews.<UserId>; the client clones it
-	into a ViewportFrame + WorldModel and dresses / animates it there.
-	If the avatar can't be loaded, a plain rigged R15 mannequin (default
-	HumanoidDescription) is used instead.
+	The class screen shows three unique class characters (not the player's
+	avatar): rigged R15 models in ServerStorage/GameAssets/Avatars named
+	Config.Classes[i].Avatar (made with the Studio avatar generator). The
+	server copies them, cleaned (no scripts, only the root anchored, an
+	Animator added), into ReplicatedStorage.ClassPreviews.<ClassId>; the
+	client clones them into a ViewportFrame + WorldModel and animates them.
+	A missing model is replaced by a plain rigged R15 mannequin in the class
+	colors (never blocks).
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local ClassPreviewService = {}
 
-local folder
-
-local function strip(model: Model)
+local function clean(model: Model)
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("LuaSourceContainer") or d:IsA("Sound") then
 			d:Destroy()
@@ -38,53 +39,43 @@ local function strip(model: Model)
 	end
 end
 
-local function build(player)
-	local description
-	local ok = pcall(function()
-		description = Players:GetHumanoidDescriptionFromUserId(math.max(1, player.UserId))
+-- A plain R15 mannequin painted in the class colors.
+local function mannequin(class): Model?
+	local description = Instance.new("HumanoidDescription")
+	local main = class.Color:Lerp(Color3.fromRGB(40, 42, 50), 0.55)
+	description.HeadColor = Color3.fromRGB(70, 72, 80)
+	description.TorsoColor = main
+	description.LeftArmColor = main
+	description.RightArmColor = main
+	description.LeftLegColor = Color3.fromRGB(46, 48, 56)
+	description.RightLegColor = Color3.fromRGB(46, 48, 56)
+	local ok, model = pcall(function()
+		return Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
 	end)
-	if not ok or not description then
-		description = Instance.new("HumanoidDescription") -- a plain mannequin
-	end
-	local model
-	ok = pcall(function()
-		model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
-	end)
-	if not ok or not model then
-		ok = pcall(function()
-			model = Players:CreateHumanoidModelFromDescription(Instance.new("HumanoidDescription"), Enum.HumanoidRigType.R15)
-		end)
-	end
-	if not model or not player.Parent then
-		return
-	end
-	strip(model)
-	model.Name = tostring(player.UserId)
-	model.Archivable = true
-	model:PivotTo(CFrame.new(0, -500, 0))
-	local old = folder:FindFirstChild(model.Name)
-	if old then
-		old:Destroy()
-	end
-	model.Parent = folder
+	return if ok then model else nil
 end
 
 function ClassPreviewService.Init()
-	folder = Instance.new("Folder")
+	local folder = Instance.new("Folder")
 	folder.Name = "ClassPreviews"
-	folder.Parent = ReplicatedStorage
-	Players.PlayerAdded:Connect(function(player)
-		task.spawn(build, player)
-	end)
-	for _, player in ipairs(Players:GetPlayers()) do
-		task.spawn(build, player)
-	end
-	Players.PlayerRemoving:Connect(function(player)
-		local model = folder:FindFirstChild(tostring(player.UserId))
-		if model then
-			model:Destroy()
+	local source = ServerStorage:FindFirstChild("GameAssets") and ServerStorage.GameAssets:FindFirstChild("Avatars")
+	for _, class in ipairs(Config.Classes) do
+		local model
+		local own = source and source:FindFirstChild(class.Avatar or "")
+		if own and own:IsA("Model") and own:FindFirstChildOfClass("Humanoid") then
+			own.Archivable = true
+			model = own:Clone()
+		else
+			model = mannequin(class)
 		end
-	end)
+		if model then
+			clean(model)
+			model.Name = class.Id
+			model:PivotTo(CFrame.new(0, -500, 0))
+			model.Parent = folder
+		end
+	end
+	folder.Parent = ReplicatedStorage
 end
 
 return ClassPreviewService

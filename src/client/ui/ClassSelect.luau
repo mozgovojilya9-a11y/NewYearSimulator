@@ -1,9 +1,9 @@
 --[[
 	ClassSelect.luau
 	"ВЫБОР КЛАССА" screen (owner mockup docs/design/ui_class_and_skilltree.png,
-	top half): three big class cards with the player's own avatar in the
-	class armor and weapon (ClassPreviewService rig, idle stance in a
-	WorldModel, slow turn), role
+	top half): three big class cards with the unique class characters
+	(GameAssets/Avatars via ClassPreviewService, class weapon, idle stance
+	in a WorldModel, slow turn), role
 	tags, and a details panel on the right (description, key abilities,
 	difficulty, "Выбрать класс"). Нано-кредиты and Кристаллы at the top.
 
@@ -22,7 +22,6 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
-local ArmorBuilder = require(ReplicatedStorage.Shared.ArmorBuilder)
 local WeaponBuilder = require(ReplicatedStorage.Shared.WeaponBuilder)
 local Icons = require(script.Parent.Icons)
 local Popups = require(script.Parent.Popups)
@@ -95,36 +94,22 @@ player:GetAttributeChangedSignal("Crystals"):Connect(refreshCredits)
 refreshCredits()
 
 ---------------------------------------------------------------------
--- Class art: the player's own avatar (server ClassPreviewService builds
--- it from the HumanoidDescription) in the class armor set with the class
--- weapon, playing the class idle stance in a WorldModel, slowly turning.
+-- Class art: the unique class character (server ClassPreviewService,
+-- GameAssets/Avatars) with the class weapon, playing the class idle
+-- stance in a WorldModel, slowly turning.
 ---------------------------------------------------------------------
 
 local previews = ReplicatedStorage:WaitForChild("ClassPreviews", 30)
 
-local function avatarRig(): Model?
-	local source = previews and previews:WaitForChild(tostring(player.UserId), 10)
+local function characterModel(classId: string): Model?
+	local class = Config.ClassById[classId]
+	local source = class and previews and previews:WaitForChild(classId, 10)
 	if not source then
 		return nil
 	end
 	source.Archivable = true
-	return source:Clone()
-end
-
-local function characterModel(classId: string): Model?
-	local class = Config.ClassById[classId]
-	local model = class and avatarRig()
-	if not model then
-		return nil
-	end
+	local model = source:Clone()
 	model.Name = classId .. "Preview"
-	-- old accessories that hide armor stay; the class armor goes on top
-	local art = class.Art or {}
-	for _, piece in ipairs(Config.Armor) do
-		if piece.Set == art.Set then
-			pcall(ArmorBuilder.Attach, model, piece)
-		end
-	end
 	-- the class weapon (GameAssets model when there is one) in the right hand
 	local weapon = Config.ItemById.Weapon[player:GetAttribute("EquippedWeapon") or ""] or Config.Weapons[1]
 	local look = table.clone(weapon)
@@ -146,27 +131,6 @@ local function characterModel(classId: string): Model?
 		weld.Part1 = weaponModel.PrimaryPart
 		weld.Parent = weaponModel.PrimaryPart
 		weaponModel.Parent = model
-	end
-	if classId == "Blade" then
-		local arm = model:FindFirstChild("LeftLowerArm")
-		if arm then
-			local S = Config.Equipment.Shield
-			local plate = Instance.new("Part")
-			plate.Name = "EnergyShield"
-			plate.Shape = Enum.PartType.Cylinder
-			plate.Size = Vector3.new(0.12, S.Size, S.Size)
-			plate.Color = S.Color
-			plate.Material = Enum.Material.Neon
-			plate.Transparency = 0.55
-			plate.Massless = true
-			plate.CanCollide = false
-			plate.CFrame = arm.CFrame * S.Offset
-			local weld = Instance.new("WeldConstraint")
-			weld.Part0 = arm
-			weld.Part1 = plate
-			weld.Parent = plate
-			plate.Parent = model
-		end
 	end
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") then

@@ -759,8 +759,10 @@ Config.Player = {
 -- WeaponModels[Class]); any owned weapon works with any class, its look
 -- and the attack style come from the class. Tags = role tags on the
 -- class card (Icon + Text), Difficulty 1..5, Key = 3 node ids shown as
--- the "key abilities" on the selection screen. Art = the card picture:
--- a unique procedural class fighter, never the player's skin.
+-- the "key abilities" on the selection screen. Avatar = the unique class
+-- character on the card (rigged R15 model in GameAssets/Avatars, made with
+-- the Studio avatar generator); it holds the class weapon and plays the
+-- class idle stance. Never the player's own avatar.
 Config.Classes = {
 	{
 		Id = "Blade", Name = "Клинок", Icon = "sword", Color = Color3.fromRGB(46, 200, 255),
@@ -769,6 +771,7 @@ Config.Classes = {
 		Tags = { { Icon = "shield", Text = "Танк" }, { Icon = "sword", Text = "Урон" }, { Icon = "bolt", Text = "Контроль" } },
 		Difficulty = 2,
 		Key = { "Blade_A3", "Blade_D1", "Blade_C1" },
+		Avatar = "Class_Blade",
 		Art = { Set = "Ice", Clip = "SwordSmash", At = 0.85 },
 	},
 	{
@@ -778,6 +781,7 @@ Config.Classes = {
 		Tags = { { Icon = "burst", Text = "Область" }, { Icon = "dash", Text = "Мобильность" }, { Icon = "flame", Text = "Бурст" } },
 		Difficulty = 3,
 		Key = { "Pulse_A3", "Pulse_A6", "Pulse_C3" },
+		Avatar = "Class_Pulse",
 		Art = { Set = "Abyss", Clip = "SpearLunge", At = 0.3 },
 	},
 	{
@@ -787,6 +791,7 @@ Config.Classes = {
 		Tags = { { Icon = "target", Text = "Точность" }, { Icon = "dash", Text = "Дистанция" }, { Icon = "sword", Text = "Урон" } },
 		Difficulty = 3,
 		Key = { "Gunner_A1", "Gunner_A3", "Gunner_S3" },
+		Avatar = "Class_Gunner",
 		Art = { Set = "Bone", Clip = "GunCharged", At = 0.9 },
 	},
 }
@@ -1814,6 +1819,7 @@ Config.Assets = {
 		Weapons = { "Weapon_Sword_1", "Weapon_Sword_2", "Weapon_Spear_1", "Weapon_Spear_2", "Weapon_Blaster_1", "Weapon_Blaster_2", "Weapon_Blaster_3" },
 		Mobs = { "Boss_Juggernaut", "Boss_Foreman", "Boss_Cryo", "Boss_Molten", "Boss_HiveMother", "Mob_InfectedCrawler", "Mob_InfectedBrute", "Mob_ShieldBearer", "Mob_MedicDrone", "Mob_Sniper", "Mob_SpiderBot", "Mob_Mech", "Mob_RedAndroid", "Mob_Overseer", "Mob_Robot", "Mob_Android", "Mob_BlueBot", "Mob_Bot2" },
 		Props = { "Center_Atrium", "Center_Spawn", "Prop_SupplyMachine", "Landmark_Assembly", "Landmark_Cryo", "Landmark_Smelter", "Landmark_Infected", "Landmark_Nexus", "Prop_Crate", "Prop_Door", "Prop_Lamp", "Prop_Pipes", "Prop_Hologram", "Prop_Barrel", "Prop_Misc_1", "Prop_Misc_2", "Prop_Misc_3", "Prop_Misc_4" },
+		Avatars = { "Class_Blade", "Class_Pulse", "Class_Gunner" },
 		Trainers = { "Trainer_Dummy", "Trainer_Bag", "Trainer_Machine", "Trainer_Refiner", "Trainer_Weights" },
 	},
 	-- Weapon look by class (Config.Weapons[i].Class): the first entry whose
