@@ -474,6 +474,8 @@ Config.GateMap = {
 	Pylons = 4, -- lamp pylons per zone
 	Ceiling = true, -- closed halls: a roof with girders and light slits
 	FloorTile = 18, -- studs per tile of the AI floor material
+	-- section layouts (GateMap), shuffled per location (seeded)
+	Layouts = { "Pillars", "Cross", "Core", "Split", "Yard", "Lanes" },
 	Texts = { Zone = "ЗОНА %d", Boss = "АРЕНА" },
 }
 

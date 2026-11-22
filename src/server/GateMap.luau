@@ -5,11 +5,10 @@
 
 	  [start] Section 1 -> corridor -> Section 2 -> ... -> corridor -> Boss arena
 
-	A section ("zone" in code) is a square hall with a roof: floor with the biome's AI
-	material (FloorVariant), walls with pilasters and a thin accent line,
-	cover blocks in a ring (the middle stays free to fight), the biome's
-	AI landmark model (or the procedural machine) in a corner, the biome
-	decor along a wall and lamp pylons. Post = where the section's enemy
+	A section ("zone" in code) is a square hall with a roof and its own
+	layout (Config.GateMap.Layouts, shuffled per location): pillars, a
+	cross, a core machine, a split wall, a junk yard or cover lanes; worn
+	floor plates, the biome decor along a wall, hanging lamps. Post = where the section's enemy
 	group stands (in front of the exit). Zones snake left / right (seeded per location, so a location
 	always looks the same). The exit of a zone is an energy barrier that
 	the run opens as soon as the section's group is dead; the boss arena is an octagon
@@ -212,7 +211,7 @@ local function floorPart(parent, center: Vector3, sizeX: number, sizeZ: number, 
 		end
 		part.Material = variant.BaseMaterial
 		part.MaterialVariant = variant.Name
-		part.Color = biome.Floor:Lerp(Color3.new(1, 1, 1), 0.45)
+		part.Color = biome.Floor:Lerp(Color3.new(1, 1, 1), 0.12) -- dark: the texture stays calm
 	end
 	return part
 end
@@ -244,7 +243,6 @@ local function wall(parent, biome, a: Vector3, b: Vector3, inward: Vector3, heig
 			Panel(parent, "Wall", Vector3.new(w, height, t), cf * CFrame.new(0, height / 2, t / 2), biome.StoneA, biome.WallMaterial or M.Concrete)
 			Panel(parent, "Base", Vector3.new(w, 1.6, 0.6), cf * CFrame.new(0, 0.8, -0.3), biome.Metal, M.Metal)
 			Panel(parent, "Top", Vector3.new(w + 0.2, 1, t + 1.2), cf * CFrame.new(0, height + 0.5, t / 2), biome.Metal, M.Metal)
-			NanoKit.Strip(parent, (cf * CFrame.new(-w / 2, 2.4, -0.62)).Position, (cf * CFrame.new(w / 2, 2.4, -0.62)).Position, biome.Accent, 0.14)
 			-- pilasters every 14 studs
 			local count = math.floor(w / 14)
 			for i = 1, count do
@@ -283,6 +281,15 @@ local function doorFrame(parent, biome, cf: CFrame, width: number, height: numbe
 	end
 end
 
+-- A steel drum in the biome's metal (the owner's white barrel shouted).
+local function drum(parent, biome, cf: CFrame)
+	local p = cf.Position
+	NanoKit.Column(parent, "Drum", 3, 2.2, p, biome.Metal:Lerp(biome.Accent, 0.18), M.Metal)
+	for _, y in ipairs({ 0.5, 2.4 }) do
+		NanoKit.Column(parent, "DrumBand", 0.25, 2.35, p + Vector3.new(0, y, 0), biome.Metal:Lerp(Color3.new(0, 0, 0), 0.4), M.Metal)
+	end
+end
+
 -- Cover block (waist high, you can hide behind it from shots).
 local function cover(parent, biome, cf: CFrame, rng: Random)
 	local m = NanoKit.Model(parent, "Cover")
@@ -290,14 +297,13 @@ local function cover(parent, biome, cf: CFrame, rng: Random)
 	Panel(m, "Block", Vector3.new(w, 4.4, 2.4), cf * CFrame.new(0, 2.2, 0), biome.StoneB, biome.PanelMaterial or M.Metal)
 	Panel(m, "Cap", Vector3.new(w + 0.4, 0.5, 2.8), cf * CFrame.new(0, 4.6, 0), biome.Metal, M.Plate)
 	NanoKit.Strip(m, (cf * CFrame.new(-w / 2, 3.4, -1.25)).Position, (cf * CFrame.new(w / 2, 3.4, -1.25)).Position, biome.Accent, 0.12)
-	NanoKit.Strip(m, (cf * CFrame.new(-w / 2, 3.4, 1.25)).Position, (cf * CFrame.new(w / 2, 3.4, 1.25)).Position, biome.Accent, 0.12)
 	-- a biome detail on top / beside
 	local theme = biome.Theme
 	if theme == "Cryo" then
 		local tank = NanoKit.Column(m, "Tank", 5, 2.2, (cf * CFrame.new(w / 2 + 1.6, 0, 0)).Position, biome.Glow, M.Smooth)
 		tank.Transparency = 0.55
 	elseif theme == "Smelter" then
-		NanoKit.Barrel(m, cf * CFrame.new(w / 2 + 1.8, 0, 0.4))
+		drum(m, biome, cf * CFrame.new(w / 2 + 1.8, 0, 0.4))
 	elseif theme == "Infected" then
 		local sac = Panel(m, "Growth", Vector3.new(3, 2.2, 3), cf * CFrame.new(-w / 4, 4.9, 0), biome.Glow, M.Smooth, { Shape = Enum.PartType.Ball, Transparency = 0.25, CanCollide = false })
 		NanoKit.Tag(sac, "Pulse", { Period = 2.2 })
@@ -379,18 +385,204 @@ end
 -- Zones
 ---------------------------------------------------------------------
 
+-- A big solid structure (no neon): foot, body, cap.
+local function mass(parent, biome, cf: CFrame, size: Vector3, color: Color3?)
+	local m = NanoKit.Model(parent, "Mass")
+	Panel(m, "Foot", Vector3.new(size.X + 0.8, 1.2, size.Z + 0.8), cf * CFrame.new(0, 0.6, 0), biome.Metal, M.Metal)
+	Panel(m, "Body", size, cf * CFrame.new(0, size.Y / 2, 0), color or biome.StoneB, biome.WallMaterial or M.Concrete)
+	Panel(m, "Cap", Vector3.new(size.X + 0.6, 0.8, size.Z + 0.6), cf * CFrame.new(0, size.Y + 0.4, 0), biome.Metal, M.Metal)
+	-- panel seams so big blocks don't read as one flat box
+	local seams = math.floor(size.X / 6)
+	for i = 1, seams do
+		local x = -size.X / 2 + i * size.X / (seams + 1)
+		for _, z in ipairs({ -size.Z / 2 - 0.05, size.Z / 2 + 0.05 }) do
+			Panel(m, "Seam", Vector3.new(0.3, size.Y - 1.6, 0.2), cf * CFrame.new(x, size.Y / 2, z), biome.Metal, M.Metal, { CanCollide = false })
+		end
+	end
+	return m
+end
+
+-- A round support pillar up to the roof, with a lamp ring at head height.
+local function pillar(parent, biome, p: Vector3, height: number, lit: boolean)
+	NanoKit.Column(parent, "PillarFoot", 1.4, 6, p, biome.Metal, M.Metal)
+	NanoKit.Column(parent, "Pillar", height, 4, p, biome.StoneA, biome.WallMaterial or M.Concrete)
+	NanoKit.Column(parent, "PillarBand", 0.8, 4.6, p + Vector3.new(0, height * 0.62, 0), biome.Metal, M.Metal)
+	if lit then
+		local lamp = NanoKit.Column(parent, "PillarLamp", 0.3, 4.8, p + Vector3.new(0, height * 0.62 - 0.4, 0), biome.Light, M.Neon)
+		lamp.CanCollide = false
+		WorldKit.Light(lamp, biome.Light, 26, 0.9)
+	end
+end
+
+-- A pile of junk: crates, barrels, owner props.
+local function clutter(parent, biome, rng: Random, p: Vector3)
+	local m = NanoKit.Model(parent, "Clutter")
+	local cf = CFrame.new(p) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+	local kind = rng:NextInteger(1, 4)
+	if kind == 1 then
+		NanoKit.Crate(m, cf, Vector3.new(3.4, 3.4, 3.4))
+		NanoKit.Crate(m, cf * CFrame.new(3.6, 0, 0.4) * CFrame.Angles(0, 0.3, 0), Vector3.new(2.8, 2.8, 2.8))
+		drum(m, biome, cf * CFrame.new(-3, 0, 1.2))
+	elseif kind == 2 then
+		NanoKit.Crate(m, cf, Vector3.new(4, 4, 4))
+		NanoKit.Crate(m, cf * CFrame.new(0, 4, 0) * CFrame.Angles(0, 0.4, 0), Vector3.new(3, 3, 3))
+		drum(m, biome, cf * CFrame.new(3.4, 0, 1))
+	elseif kind == 3 then
+		NanoKit.Prop(m, "Prop_Pipes", cf, 6, function(pp, c)
+			return drum(pp, biome, c)
+		end)
+		drum(m, biome, cf * CFrame.new(-3, 0, 0))
+		drum(m, biome, cf * CFrame.new(-3.2, 0, 2.4))
+	else
+		-- a fallen girder over two broken blocks
+		Panel(m, "Debris", Vector3.new(3, 2, 3), cf * CFrame.new(-3, 1, 0), biome.StoneB, M.Concrete)
+		Panel(m, "Debris", Vector3.new(2.4, 1.6, 2.6), cf * CFrame.new(3, 0.8, 0.6), biome.StoneB, M.Concrete)
+		Panel(m, "FallenGirder", Vector3.new(10, 1, 1.4), cf * CFrame.new(0, 2.2, 0) * CFrame.Angles(0, 0, math.rad(8)), biome.Metal, M.Metal)
+	end
+	return m
+end
+
+-- A hanging lamp (cable + shade + warm downlight).
+local function hangingLamp(parent, biome, p: Vector3, height: number)
+	Panel(parent, "LampCable", Vector3.new(0.15, 5, 0.15), CFrame.new(p + Vector3.new(0, height - 2.5, 0)), Color3.fromRGB(20, 20, 24), M.Metal, { CanCollide = false })
+	local shade = NanoKit.Cylinder(parent, "LampShade", 1, 3.6, CFrame.new(p + Vector3.new(0, height - 5.5, 0)) * CFrame.Angles(0, 0, math.rad(90)), biome.Metal, M.Metal)
+	shade.CanCollide = false
+	local bulb = NanoKit.Cylinder(parent, "LampBulb", 0.1, 3, CFrame.new(p + Vector3.new(0, height - 6.05, 0)) * CFrame.Angles(0, 0, math.rad(90)), biome.Light, M.Neon)
+	bulb.CanCollide = false
+	local light = Instance.new("SpotLight")
+	light.Face = Enum.NormalId.Bottom
+	light.Color = biome.Light
+	light.Range = height + 4
+	light.Angle = 100
+	light.Brightness = 2.2
+	light.Shadows = true
+	light.Parent = shade
+end
+
+-- Zone layouts: every section has its own shape (Config.GateMap.Layouts).
+--   Pillars  a hall of thick round pillars
+--   Cross    solid blocks fill the corners: a cross-shaped room
+--   Core     a big machine block in the middle, the fight goes around it
+--   Split    a low wall across the room with two gaps
+--   Yard     a cluttered storage yard: junk piles everywhere
+--   Lanes    long cover walls in two rows (shooting lanes)
+-- free(p, r) tells if a spot keeps the door lanes and the post clear.
+local LAYOUTS = {}
+
+function LAYOUTS.Pillars(m, biome, rng, center, half, H, free, add)
+	for _, x in ipairs({ -0.5, 0, 0.5 }) do
+		for _, z in ipairs({ -0.45, 0.05, 0.5 }) do
+			local p = center + Vector3.new(x * half * 1.2, 0, z * half * 1.2)
+			if free(p, 6) then
+				pillar(m, biome, p, H, (x + z) ~= 0)
+				add(p)
+			end
+		end
+	end
+end
+
+function LAYOUTS.Cross(m, biome, rng, center, half, H, free, add)
+	local s = half * 0.62
+	for _, c in ipairs({ { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } }) do
+		local p = center + Vector3.new(c[1] * (half - s / 2), 0, c[2] * (half - s / 2))
+		if free(p, s * 0.5) then
+			mass(m, biome, CFrame.new(p), Vector3.new(s, H * 0.55, s))
+			add(p)
+			add(p + Vector3.new(-c[1] * s * 0.3, 0, -c[2] * s * 0.3))
+		end
+	end
+	for _ = 1, 3 do
+		local p = center + Vector3.new(rng:NextNumber(-half * 0.3, half * 0.3), 0, rng:NextNumber(-half * 0.1, half * 0.4))
+		if free(p, 6) then
+			clutter(m, biome, rng, p)
+			add(p)
+		end
+	end
+end
+
+function LAYOUTS.Core(m, biome, rng, center, half, H, free, add)
+	local size = half * 0.5
+	local p = center + Vector3.new(0, 0, half * 0.12)
+	mass(m, biome, CFrame.new(p), Vector3.new(size, 7, size), biome.Metal)
+	landmark(m, biome, CFrame.new(p + Vector3.new(0, 7.8, 0)), 14)
+	add(p)
+	for _, c in ipairs({ { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } }) do
+		add(p + Vector3.new(c[1] * size * 0.35, 0, c[2] * size * 0.35))
+	end
+	-- cables from the core up into the roof
+	for _, k in ipairs({ -1, 1 }) do
+		NanoKit.Cable(m, p + Vector3.new(k * size * 0.4, 8, 0), center + Vector3.new(k * half * 0.9, H - 2, 0), 4, Color3.fromRGB(26, 26, 30))
+	end
+end
+
+function LAYOUTS.Split(m, biome, rng, center, half, H, free, add)
+	local z = center.Z + half * 0.05
+	local gapA = rng:NextNumber(-half * 0.6, -half * 0.2)
+	local gapB = rng:NextNumber(half * 0.2, half * 0.6)
+	local cuts = { -half, gapA - 6, gapA + 6, gapB - 6, gapB + 6, half }
+	for i = 1, #cuts - 1, 2 do
+		local x1, x2 = cuts[i], cuts[i + 1]
+		local w = x2 - x1
+		if w > 2 then
+			local p = Vector3.new(center.X + (x1 + x2) / 2, center.Y, z)
+			mass(m, biome, CFrame.new(p), Vector3.new(w, 5, 3))
+			for x = x1 + 4, x2 - 4, 8 do
+				add(Vector3.new(center.X + x, center.Y, z))
+			end
+		end
+	end
+	for _ = 1, 3 do
+		local p = center + Vector3.new(rng:NextNumber(-half * 0.7, half * 0.7), 0, rng:NextNumber(half * 0.2, half * 0.6))
+		if free(p, 6) then
+			clutter(m, biome, rng, p)
+			add(p)
+		end
+	end
+end
+
+function LAYOUTS.Yard(m, biome, rng, center, half, H, free, add)
+	for _ = 1, 11 do
+		local p = center + Vector3.new(rng:NextNumber(-half * 0.8, half * 0.8), 0, rng:NextNumber(-half * 0.8, half * 0.8))
+		if free(p, 7) then
+			clutter(m, biome, rng, p)
+			add(p)
+		end
+	end
+end
+
+function LAYOUTS.Lanes(m, biome, rng, center, half, H, free, add)
+	for _, x in ipairs({ -0.45, 0.45 }) do
+		for _, z in ipairs({ -0.35, 0.3 }) do
+			local p = center + Vector3.new(x * half, 0, z * half)
+			if free(p, 6) then
+				cover(m, biome, CFrame.lookAt(p, p + Vector3.new(1, 0, 0)), rng)
+				add(p)
+			end
+		end
+	end
+	for _ = 1, 2 do
+		local p = center + Vector3.new(rng:NextNumber(-half * 0.15, half * 0.15), 0, rng:NextNumber(-half * 0.1, half * 0.4))
+		if free(p, 6) then
+			cover(m, biome, CFrame.new(p), rng)
+			add(p)
+		end
+	end
+end
+
 -- A square zone. exitX / entryX = door offsets along X (nil = no door).
-local function buildZone(folder, biome, rng: Random, index: number, center: Vector3, size: number, entryX: number?, exitX: number?)
+local function buildZone(folder, biome, rng: Random, index: number, center: Vector3, size: number, entryX: number?, exitX: number?, layout: string)
 	local m = NanoKit.Model(folder, ("Zone%d"):format(index))
+	m:SetAttribute("Layout", layout)
 	local half = size / 2
 	local H = G.WallHeight
 	local C = G.Corridor
 	floorPart(m, center, size, size, biome, "Floor")
-	-- floor markings: a ring in the middle and two lanes between the doors
-	local ring = NanoKit.Cylinder(m, "Ring", 0.08, 26, CFrame.new(center + Vector3.new(0, 0.04, 0)) * CFrame.Angles(0, 0, math.rad(90)), biome.Accent:Lerp(biome.Floor, 0.55), M.Smooth)
-	ring.CanCollide = false
-	local inner = NanoKit.Cylinder(m, "RingInner", 0.09, 25, CFrame.new(center + Vector3.new(0, 0.045, 0)) * CFrame.Angles(0, 0, math.rad(90)), biome.FloorB, biome.FloorMaterial or M.Plate)
-	inner.CanCollide = false
+	-- a few darker floor plates (wear), never the same pattern twice
+	for _ = 1, rng:NextInteger(3, 6) do
+		local w, d = rng:NextNumber(8, 18), rng:NextNumber(6, 14)
+		local p = center + Vector3.new(rng:NextNumber(-half + w / 2, half - w / 2), 0.03, rng:NextNumber(-half + d / 2, half - d / 2))
+		Panel(m, "FloorPlate", Vector3.new(w, 0.12, d), CFrame.new(p), biome.Metal:Lerp(biome.Floor, 0.4), M.Plate, { CanCollide = false })
+	end
 	-- walls with door gaps (south = entry, north = exit)
 	local sw, se, nw, ne = center + Vector3.new(-half, 0, half), center + Vector3.new(half, 0, half), center + Vector3.new(-half, 0, -half), center + Vector3.new(half, 0, -half)
 	wall(m, biome, sw, se, Vector3.new(0, 0, -1), H, if entryX then { { center = entryX + half, width = C.Width } } else nil)
@@ -400,50 +592,41 @@ local function buildZone(folder, biome, rng: Random, index: number, center: Vect
 	local exitBarrier
 	if exitX then
 		local cf = CFrame.lookAt(center + Vector3.new(exitX, 0, -half), center + Vector3.new(exitX, 0, -half - 1))
-		doorFrame(m, biome, cf, C.Width, C.Height, G.Texts.Zone:format(index + 1))
+		doorFrame(m, biome, cf, C.Width, C.Height, nil)
 		exitBarrier = barrier(m, cf, C.Width, C.Height, biome.Accent)
 	end
-	-- lamp pylons near the corners
-	local inset = half - 7
-	for _, c in ipairs({ { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } }) do
-		pylon(m, biome, center + Vector3.new(c[1] * inset, 0, c[2] * inset))
-	end
 	task.wait()
-	-- landmark in a corner (seeded), decor along the opposite side wall
-	local corner = rng:NextInteger(1, 4)
-	local signs = ({ { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } })[corner]
-	local lmPos = center + Vector3.new(signs[1] * (half - 13), 0, signs[2] * (half - 15))
-	landmark(m, biome, CFrame.lookAt(lmPos, Vector3.new(center.X, lmPos.Y, center.Z)), 16)
-	local side = -signs[1]
-	local decorX = center.X + side * (half - 4)
-	biomeDecor(m, biome, Vector3.new(decorX, center.Y, center.Z + half - 16), Vector3.new(decorX, center.Y, center.Z - half + 16), side)
-	-- covers in a ring between the middle and the walls
-	local covers = {}
-	for i = 1, G.Covers do
-		local a = (i - 1) / G.Covers * math.pi * 2 + rng:NextNumber(-0.25, 0.25)
-		local r = rng:NextNumber(half * 0.42, half * 0.62)
-		local p = center + Vector3.new(math.cos(a) * r, 0, math.sin(a) * r)
-		-- keep the door lanes free
-		local free = true
-		for _, dx in ipairs({ entryX, exitX }) do
-			if dx and math.abs(p.X - (center.X + dx)) < C.Width and math.abs(math.abs(p.Z - center.Z) - half) < 22 then
-				free = false
+	-- where the section's group stands: the far half, in front of the exit
+	local post = center + Vector3.new((exitX or 0) * 0.5, 0, -half * 0.42)
+	local blocks = {}
+	local function add(p: Vector3)
+		table.insert(blocks, p)
+	end
+	-- keep both door lanes and the post free
+	local function free(p: Vector3, r: number): boolean
+		for _, d in ipairs({ { entryX, half }, { exitX, -half } }) do
+			if d[1] and math.abs(p.X - (center.X + d[1])) < C.Width / 2 + r + 2 and math.abs(p.Z - (center.Z + d[2])) < 20 + r then
+				return false
 			end
 		end
-		if (p - lmPos).Magnitude < 16 then
-			free = false
-		end
-		if free then
-			table.insert(covers, cover(m, biome, CFrame.lookAt(p, Vector3.new(center.X, p.Y, center.Z)), rng))
+		return Vector3.new(p.X - post.X, 0, p.Z - post.Z).Magnitude > 9 + r
+	end
+	LAYOUTS[layout](m, biome, rng, center, half, H, free, add)
+	task.wait()
+	-- the biome's look: its machine set along one side wall
+	if layout ~= "Cross" then
+		local side = if rng:NextNumber() < 0.5 then -1 else 1
+		local decorX = center.X + side * (half - 4)
+		biomeDecor(m, biome, Vector3.new(decorX, center.Y, center.Z + half - 18), Vector3.new(decorX, center.Y, center.Z - half + 18), side)
+	end
+	-- light: hanging lamps on a loose grid (pillars carry their own)
+	if layout ~= "Pillars" then
+		for _, x in ipairs({ -0.4, 0.4 }) do
+			for _, z in ipairs({ -0.4, 0.4 }) do
+				hangingLamp(m, biome, center + Vector3.new(x * half + rng:NextNumber(-4, 4), 0, z * half + rng:NextNumber(-4, 4)), H)
+			end
 		end
 	end
-	-- where the section's group stands: the far half, in front of the exit
-	local post = center + Vector3.new((exitX or 0) * 0.5, 0, -half * 0.3)
-	local blocks = {}
-	for _, c in ipairs(covers) do
-		table.insert(blocks, c:GetPivot().Position)
-	end
-	table.insert(blocks, lmPos)
 	roof(m, biome, center, size, size, H)
 	m.Parent = folder
 	return {
@@ -508,7 +691,7 @@ local function buildArena(folder, biome, center: Vector3, size: number, entryX: 
 	end
 	-- corner fill under the cut walls (so the floor reads as an octagon)
 	local entry = CFrame.lookAt(center + Vector3.new(entryX, 0, half), center + Vector3.new(entryX, 0, half - 1))
-	doorFrame(m, biome, entry, C.Width, C.Height, G.Texts.Boss)
+	doorFrame(m, biome, entry, C.Width, C.Height, nil)
 	local gate = barrier(m, entry, C.Width, C.Height, Config.DungeonLayout.BossBarrierColor)
 	gate.CanCollide = false
 	gate.Transparency = 1
@@ -565,9 +748,15 @@ function GateMap.Build(location, slot: number)
 	-- bedrock under the whole run
 	local zones = {}
 	local entryX = 0
+	local order = table.clone(G.Layouts)
+	for i = #order, 2, -1 do -- shuffle (seeded): a location keeps its look
+		local j = rng:NextInteger(1, i)
+		order[i], order[j] = order[j], order[i]
+	end
 	for index = 1, #location.Sections do
 		local exitX = rng:NextInteger(-math.floor(size * 0.28), math.floor(size * 0.28))
-		local zone = buildZone(folder, biome, rng, index, center, size, entryX, exitX)
+		local layout = order[(index - 1) % #order + 1]
+		local zone = buildZone(folder, biome, rng, index, center, size, entryX, exitX, layout)
 		table.insert(zones, zone)
 		-- the next room's door sits right in front of this exit
 		local doorOut = center + Vector3.new(exitX, 0, -size / 2)
