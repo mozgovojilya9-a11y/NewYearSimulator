@@ -460,15 +460,48 @@ local function bossFight(run)
 	run.phase = "Boss"
 	run.alive, run.total = 1, 1
 	pushState(run)
-	send(run, "Boss", { Name = def.Name, Title = def.Title or "", Seconds = E.Boss.IntroSeconds, Position = arena.Spawn.Position })
-	openPortal(run, arena.Spawn.Position, Config.DungeonLayout.BossBarrierColor)
-	task.wait(E.Boss.IntroSeconds)
-	if not runs[run] then
-		return
-	end
+	-- the entrance: the boss waits high above its spot ("Intro": MobAI and
+	-- the HP bar ignore it), falls at DropAt with a hit and dust, roars,
+	-- and fights when the cutscene ends.
+	local intro = E.Boss.Intro
 	run.facing = arena.Center + Vector3.new(0, 0, arena.Size)
 	local boss = spawnMob(run, run.location.Boss, arena.Spawn.Position, { Boss = true, Tier = run.location.BossTier, Zone = "Boss" })
 	run.boss = boss
+	boss:SetAttribute("Intro", true)
+	local root = boss.PrimaryPart
+	local ground = boss:GetPivot()
+	root.Anchored = true
+	boss:PivotTo(ground + Vector3.new(0, intro.DropHeight, 0))
+	send(run, "Boss", {
+		Name = def.Name,
+		Title = def.Title or "",
+		Seconds = E.Boss.IntroSeconds,
+		Position = arena.Spawn.Position,
+		Center = arena.Center,
+		Size = arena.Size,
+		DropAt = intro.DropAt + intro.DropSeconds,
+		Height = boss:GetAttribute("Height") or 18,
+	})
+	openPortal(run, arena.Spawn.Position, Config.DungeonLayout.BossBarrierColor)
+	task.wait(intro.DropAt)
+	local start = os.clock()
+	while boss.Parent do
+		local t = math.min(1, (os.clock() - start) / intro.DropSeconds)
+		boss:PivotTo(ground + Vector3.new(0, intro.DropHeight * (1 - t * t), 0))
+		if t >= 1 then
+			break
+		end
+		task.wait()
+	end
+	if boss.Parent then
+		root.Anchored = false
+		local spot = Vector3.new(ground.Position.X, run.groundY or ground.Position.Y, ground.Position.Z)
+		require(script.Parent.AbilityService).Fx("Impact", spot, 18, boss:GetAttribute("Color") or Config.DungeonLayout.BossBarrierColor)
+	end
+	task.wait(math.max(0, E.Boss.IntroSeconds - intro.DropAt - intro.DropSeconds))
+	if boss.Parent then
+		boss:SetAttribute("Intro", nil)
+	end
 end
 
 -- A section is done the moment its group is dead: the exit opens.
@@ -592,7 +625,8 @@ local function kill(model, killer)
 			p.CanCollide = false
 		end
 	end
-	task.delay(0.15, function()
+	-- a rigged mob plays its death and falls apart on the clients first
+	task.delay(if isBoss then E.Boss.DeathSlowmo elseif model:GetAttribute("Rigged") then Config.Enemies.DeathSeconds else 0.15, function()
 		model:Destroy()
 	end)
 	Effects.Burst(position, color, if isBoss then 90 elseif elite then 45 else 25, if isBoss then 35 else 22, if isBoss then 2 else 1)
@@ -704,8 +738,8 @@ function DungeonRuns.Damage(player, model, damage: number, isCrit: boolean?, fla
 		return 0
 	end
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 then
-		return 0
+	if not humanoid or humanoid.Health <= 0 or model:GetAttribute("Intro") then
+		return 0 -- the boss entrance is untouchable
 	end
 	local run = info.run
 	local isBlocked = blocked(model, player)

@@ -26,6 +26,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Assets = {}
+local stripRig -- defined below
 
 -- Classes that may stay in a model (IsA checks, so subclasses count:
 -- BasePart covers Part / MeshPart / UnionOperation / WedgePart ...).
@@ -35,6 +36,9 @@ local KEEP = {
 	"WeldConstraint", "Bone", "Light", "ParticleEmitter",
 	"Beam", "Trail", "Highlight", "BodyColors", "Shirt", "Pants",
 	"Accessory", "WrapLayer", "WrapTarget",
+	-- rigged characters (mobs from the avatar generator / auto_setup_avatar)
+	"Humanoid", "Animator", "HumanoidDescription", "Constraint",
+	"FaceControls", "WrapDeformer",
 }
 
 local function allowed(instance: Instance): boolean
@@ -182,6 +186,15 @@ local function setAll(model: Instance, props: { [string]: any })
 	end
 end
 
+-- Props and weapons are not characters: their Humanoids go away.
+stripRig = function(model: Instance)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("Humanoid") or d:IsA("Animator") or d:IsA("HumanoidDescription") then
+			d:Destroy()
+		end
+	end
+end
+
 -- Makes `model` hold together when unanchored: every part welded to `root`.
 local function weldTo(model: Instance, root: BasePart)
 	for _, p in ipairs(parts(model)) do
@@ -212,6 +225,7 @@ function Assets.Prop(name: string, height: number?): Model?
 	if not model then
 		return nil
 	end
+	stripRig(model) -- decor never walks
 	setAll(model, { Anchored = true, CanTouch = false })
 	if height then
 		local _, size = model:GetBoundingBox()
@@ -276,6 +290,7 @@ function Assets.Weapon(name: string, fit): Model?
 	if not model then
 		return nil
 	end
+	stripRig(model)
 	fit = fit or {}
 	if fit.Gun then
 		return gunHold(model, fit)

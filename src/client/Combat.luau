@@ -403,8 +403,7 @@ clickHit.OnClientEvent:Connect(function(kind, ...)
 		Style.PlaySound(Config.Sounds.MobDeath, 0.9 + math.random() * 0.25, 0.5)
 		if isBoss then
 			Popups.Shake(Config.Hud.ShakeBoss.Amplitude, Config.Hud.ShakeBoss.Seconds)
-			Popups.Toast("Босс побеждён!", "gold")
-			Style.PlaySound(Config.Sounds.BossDeath, 1, 0.8)
+			Popups.Toast("Босс побеждён!", "gold") -- the big boom: MobFx boss death
 		end
 	end
 end)

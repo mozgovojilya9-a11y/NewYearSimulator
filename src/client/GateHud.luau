@@ -131,7 +131,7 @@ for i, anchor in ipairs({ 0, 1 }) do
 	bar.Parent = Style.Gui
 	bars[i] = bar
 end
-local introName = Style.Label(Style.Gui, "", 46, C.Gold, { Font = Style.FontTitle, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.72), Size = UDim2.new(1, 0, 0, 52), ZIndex = 81, Visible = false })
+local introName = Style.Label(Style.Gui, "", 56, C.Gold, { Font = Style.FontTitle, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.72), Size = UDim2.new(1, 0, 0, 52), ZIndex = 81, Visible = false })
 local introTitle = Style.Label(Style.Gui, "", 18, Config.DungeonLayout.BossBarrierColor, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.79), Size = UDim2.new(1, 0, 0, 22), ZIndex = 81, Visible = false })
 
 local function bossIntro(info)
@@ -142,25 +142,59 @@ local function bossIntro(info)
 	end
 	introName.Text = Style.Upper(info.Name or "")
 	introTitle.Text = info.Title or ""
-	introName.Visible, introTitle.Visible = true, true
-	introName.TextTransparency, introTitle.TextTransparency = 1, 1
-	Style.Tween(introName, 0.5, { TextTransparency = 0 })
-	Style.Tween(introTitle, 0.7, { TextTransparency = 0 })
+	introName.Visible, introTitle.Visible = false, false
 	Style.PlaySound(Config.Sounds.Portal, 0.6, 0.9)
+	local dropAt = info.DropAt or seconds * 0.5
 	local oldType = camera.CameraType
 	local target = typeof(info.Position) == "Vector3" and info.Position
 	if target then
+		-- circle the arena while the boss falls, then hold on it from the front
 		camera.CameraType = Enum.CameraType.Scriptable
 		local from = camera.CFrame
-		local goal = CFrame.lookAt(target + Vector3.new(0, 10, 34), target + Vector3.new(0, 4, 0))
-		TweenService:Create(camera, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = goal }):Play()
-		task.delay(seconds - 0.2, function()
-			camera.CFrame = from
-			camera.CameraType = oldType
+		local center = if typeof(info.Center) == "Vector3" then info.Center else target
+		local radius = math.max(30, (info.Size or 60) * 0.42)
+		local height = info.Height or 18
+		local orbit = math.rad(Config.Enemies.Boss.Intro.Orbit)
+		local toTarget = Vector3.new(target.X - center.X, 0, target.Z - center.Z)
+		local endAngle = if toTarget.Magnitude > 0.1 then math.atan2(toTarget.Z, toTarget.X) + math.pi else 0
+		local startAngle = endAngle - orbit
+		local focus = target + Vector3.new(0, height * 0.45, 0)
+		local start = os.clock()
+		local connection
+		connection = RunService.RenderStepped:Connect(function()
+			local t = os.clock() - start
+			if t >= seconds - 0.2 then
+				connection:Disconnect()
+				camera.CFrame = from
+				camera.CameraType = oldType
+				return
+			end
+			if t < dropAt then
+				local k = t / dropAt
+				k = 1 - (1 - k) * (1 - k)
+				local a = startAngle + orbit * k
+				local eye = center + Vector3.new(math.cos(a) * radius, height * 0.8 + 6, math.sin(a) * radius)
+				camera.CFrame = CFrame.lookAt(eye, center:Lerp(focus, k))
+			else
+				-- after the landing: slowly push in on the boss
+				local k = math.min(1, (t - dropAt) / math.max(0.1, seconds - dropAt))
+				local dir = Vector3.new(math.cos(endAngle), 0, math.sin(endAngle))
+				local eye = target + dir * (radius * (0.75 - 0.15 * k)) + Vector3.new(0, height * 0.55, 0)
+				camera.CFrame = CFrame.lookAt(eye, focus)
+			end
 		end)
 	end
-	task.delay(seconds * 0.7, function()
-		Popups.Shake(0.9, 0.5)
+	task.delay(dropAt, function()
+		-- the landing: shake, then the big name and title
+		Popups.Shake(1.1, 0.6)
+		introName.Visible, introTitle.Visible = true, true
+		introName.TextTransparency, introTitle.TextTransparency = 1, 1
+		local nameScale = introName:FindFirstChildOfClass("UIScale") or Instance.new("UIScale")
+		nameScale.Scale = 1.5
+		nameScale.Parent = introName
+		Style.Tween(nameScale, 0.35, { Scale = 1 })
+		Style.Tween(introName, 0.3, { TextTransparency = 0 })
+		Style.Tween(introTitle, 0.6, { TextTransparency = 0 })
 	end)
 	task.delay(seconds, function()
 		for _, bar in ipairs(bars) do
@@ -299,7 +333,8 @@ stateRemote.OnClientEvent:Connect(function(kind, payload)
 	elseif kind == "Boss" and type(payload) == "table" then
 		bossIntro(payload)
 	elseif kind == "Phase" then
-		Popups.Banner("БОСС", Config.Enemies.Boss.Texts.Phase:format(tonumber(payload) or 2), {}, Config.DungeonLayout.BossBarrierColor)
+		local BT = Config.Enemies.Boss.Texts
+		Popups.Banner("БОСС", BT.Phase:format(tonumber(payload) or 2) .. "  ·  " .. BT.Rage, {}, Config.Enemies.Boss.Rage.Color)
 		Popups.Shake(0.7, 0.4)
 	end
 end)

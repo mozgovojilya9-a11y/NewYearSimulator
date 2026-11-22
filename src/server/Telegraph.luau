@@ -7,7 +7,7 @@
 	      cframe = start point on the floor, looking along the attack
 	  Telegraph.Line(parent, from, to, width, seconds, color)  (a shot)
 	Each returns the parts; they remove themselves after `seconds` (+ a
-	short flash). Helpers InCircle / InRect test a position.
+	short flash). Helpers InCircle / InRect / InCone test a position.
 ]]
 
 local TweenService = game:GetService("TweenService")
@@ -81,6 +81,75 @@ function Telegraph.Line(parent, from: Vector3, to: Vector3, width: number, secon
 	local parts = { line, strip }
 	flashAndRemove(parts, seconds)
 	return parts
+end
+
+-- A flat triangle a-b-c from two WedgeParts (thickness `t`).
+local function triangle(parent, a: Vector3, b: Vector3, c: Vector3, t: number, props)
+	local ab, ac, bc = b - a, c - a, c - b
+	local abd, acd, bcd = ab:Dot(ab), ac:Dot(ac), bc:Dot(bc)
+	if abd > acd and abd > bcd then
+		c, a = a, c
+	elseif acd > bcd and acd > abd then
+		a, b = b, a
+	end
+	ab, ac, bc = b - a, c - a, c - b
+	local right = ac:Cross(ab).Unit
+	local up = bc:Cross(right).Unit
+	local back = bc.Unit
+	local height = math.abs(ab:Dot(up))
+	local out = {}
+	for i, data in ipairs({ { (a + b) / 2, right, math.abs(ab:Dot(back)) }, { (a + c) / 2, -right, math.abs(ac:Dot(back)) } }) do
+		local w = Instance.new("WedgePart")
+		w.Anchored, w.CanCollide, w.CanQuery, w.CanTouch, w.CastShadow = true, false, false, false, false
+		w.Material = Enum.Material.Neon
+		for k, v in pairs(props) do
+			w[k] = v
+		end
+		w.Size = Vector3.new(t, height, data[3])
+		w.CFrame = CFrame.fromMatrix(data[1], data[2], up, if i == 1 then back else -back)
+		w.Parent = parent
+		out[i] = w
+	end
+	return out
+end
+
+-- A cone (fan) on the floor: from cf's position along its look, `radius`
+-- long, `angle` degrees wide. The fill brightens until the hit.
+function Telegraph.Cone(parent, cf: CFrame, radius: number, angle: number, seconds: number, color: Color3)
+	local origin = cf.Position + Vector3.new(0, 0.1, 0)
+	local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z).Unit
+	local steps = math.max(3, math.ceil(angle / 12))
+	local parts = {}
+	local function edgePoint(i, r)
+		local a = math.rad(-angle / 2 + angle * i / steps)
+		local dir = CFrame.Angles(0, a, 0):VectorToWorldSpace(look)
+		return origin + dir * r
+	end
+	for i = 0, steps - 1 do
+		for _, w in ipairs(triangle(parent, origin, edgePoint(i, radius), edgePoint(i + 1, radius), 0.06, { Name = "WarnCone", Color = color, Transparency = 0.75 })) do
+			table.insert(parts, w)
+			TweenService:Create(w, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { Transparency = 0.35 }):Play()
+		end
+	end
+	-- the outer arc edge
+	for i = 0, steps - 1 do
+		local p1, p2 = edgePoint(i, radius), edgePoint(i + 1, radius)
+		table.insert(parts, part(parent, { Name = "WarnEdge", Size = Vector3.new(0.25, 0.08, (p2 - p1).Magnitude), CFrame = CFrame.lookAt((p1 + p2) / 2, p2) + Vector3.new(0, 0.02, 0), Color = color, Transparency = 0.2 }))
+	end
+	flashAndRemove(parts, seconds)
+	return parts
+end
+
+function Telegraph.InCone(position: Vector3, cf: CFrame, radius: number, angle: number): boolean
+	local offset = Vector3.new(position.X - cf.Position.X, 0, position.Z - cf.Position.Z)
+	if offset.Magnitude > radius + 1 then
+		return false
+	end
+	if offset.Magnitude < 2 then
+		return true
+	end
+	local look = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z).Unit
+	return math.deg(math.acos(math.clamp(offset.Unit:Dot(look), -1, 1))) <= angle / 2 + 4
 end
 
 function Telegraph.InCircle(position: Vector3, center: Vector3, radius: number): boolean

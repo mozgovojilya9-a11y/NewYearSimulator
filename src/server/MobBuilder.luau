@@ -16,11 +16,15 @@
 
 	Part names never match Roblox limb names (Head, Torso...), so the
 	Humanoid does not fight over their collisions.
+
+	Preferred: def.Rig = a real rigged R15 character in GameAssets/Mobs
+	(fromRig), animated with AnimationTracks by the clients.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Assets = require(ReplicatedStorage.Shared.Assets)
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local MobBuilder = {}
 
@@ -793,10 +797,151 @@ local function fromAsset(def, scale: number, origin: CFrame): Model?
 	return model
 end
 
+-- A real rigged character (R15 Humanoid + Animator) from GameAssets/Mobs
+-- (def.Rig: Studio avatar generator / auto_setup_avatar / owner model):
+-- scaled to Height, walking with its own Humanoid; clients play the mob
+-- animations on its Animator (MobFx, attribute "Rigged").
+-- The avatar generator always gives a human face: the head is hidden and
+-- a steel robot helmet (GameAssets/Mobs/<Config.Enemies.Rig.Helmet>) with
+-- a thin visor light in the mob's Glow color is welded on instead.
+-- def.Helmet = false keeps the rig's own head (already a robot head).
+local function robotHead(model: Model, def)
+	local R_ = Config.Enemies.Rig
+	local name = if def.Helmet == nil then R_.Helmet else def.Helmet
+	local head = model:FindFirstChild("Head")
+	if not name or not head or not head:IsA("BasePart") or model:FindFirstChild("Helmet") then
+		return
+	end
+	local source = Assets.Get("Mobs", name)
+	local mesh = source and (if source:IsA("BasePart") then source else source:FindFirstChildWhichIsA("BasePart", true))
+	if not mesh then
+		if source then
+			source:Destroy()
+		end
+		return
+	end
+	mesh.Parent = nil
+	if source ~= mesh then
+		source:Destroy()
+	end
+	head.Transparency = 1
+	for _, d in ipairs(head:GetChildren()) do
+		if d:IsA("Decal") or d:IsA("FaceControls") or d:IsA("SurfaceAppearance") then
+			d:Destroy()
+		end
+	end
+	for _, a in ipairs(model:GetChildren()) do
+		if a:IsA("Accessory") then
+			a:Destroy() -- hair, hats
+		end
+	end
+	local s = head.Size
+	mesh.Name = "Helmet"
+	mesh.Size = mesh.Size * (math.max(s.X / mesh.Size.X, s.Y / mesh.Size.Y) * R_.HelmetScale)
+	mesh.CFrame = head.CFrame * CFrame.new(0, s.Y * 0.08, 0)
+	mesh.Anchored = false
+	mesh.Parent = model
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = head
+	weld.Part1 = mesh
+	weld.Parent = mesh
+	local visor = Instance.new("Part")
+	visor.Name = "Visor"
+	visor.Material = NEON
+	visor.Color = def.Glow or R_.Visor
+	visor.Size = V(mesh.Size.X * 0.5, mesh.Size.Y * 0.028, 0.04)
+	visor.CFrame = mesh.CFrame * CFrame.new(0, mesh.Size.Y * 0.04, -mesh.Size.Z * 0.44)
+	visor.Parent = model
+	local weld2 = Instance.new("WeldConstraint")
+	weld2.Part0 = mesh
+	weld2.Part1 = visor
+	weld2.Parent = visor
+end
+
+-- Biome tint on textured (SurfaceAppearance) parts: Tint x TintAmount.
+local function tintRig(model: Model, def)
+	if not def.Tint then
+		return
+	end
+	local color = WHITE:Lerp(def.Tint, def.TintAmount or 0.3)
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("SurfaceAppearance") then
+			pcall(function()
+				d.Color = color
+			end)
+		end
+	end
+end
+
+local function fromRig(def, scale: number, origin: CFrame): Model?
+	if not def.Rig then
+		return nil
+	end
+	local model = Assets.Get("Mobs", def.Rig)
+	local humanoid = model and model:FindFirstChildOfClass("Humanoid")
+	local root = model and model:FindFirstChild("HumanoidRootPart")
+	if not model or not humanoid or not root then
+		if model then
+			model:Destroy()
+		end
+		return nil
+	end
+	robotHead(model, def)
+	tintRig(model, def)
+	-- a gun / blade in the right hand (scaled with the body below)
+	local hand = def.Weapon and model:FindFirstChild("RightHand")
+	local weapon = hand and Assets.Weapon(def.Weapon, Config.Assets.WeaponFit[def.Weapon])
+	if weapon then
+		weapon.Name = "MobWeapon"
+		weapon:PivotTo(hand.CFrame * CFrame.new(0, -hand.Size.Y * 0.3, 0) * CFrame.Angles(-math.pi / 2, 0, 0))
+		weapon.Parent = model
+		local grip = Instance.new("WeldConstraint")
+		grip.Part0 = hand
+		grip.Part1 = weapon.PrimaryPart
+		grip.Parent = weapon.PrimaryPart
+	end
+	local height = (def.Height or 6) * scale
+	local _, size = model:GetBoundingBox()
+	if size.Y > 0.1 then
+		model:ScaleTo(model:GetScale() * height / size.Y)
+	end
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = false
+			d.CanTouch = false
+			d.CanQuery = true
+			d.CanCollide = d == root
+			d.Massless = d ~= root
+		end
+	end
+	root.Transparency = 1
+	model.PrimaryPart = root
+	model.Name = def.Name
+	humanoid.WalkSpeed = 0
+	humanoid.JumpPower = 0
+	humanoid.AutoRotate = true
+	humanoid.RequiresNeck = false
+	humanoid.BreakJointsOnDeath = false
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+	if not humanoid:FindFirstChildOfClass("Animator") then
+		Instance.new("Animator").Parent = humanoid
+	end
+	-- stand on the ground, facing along `origin`
+	model:PivotTo(CFrame.new(origin.Position) * origin.Rotation * CFrame.new(0, 0, 0))
+	Assets.PlaceOnGround(model, origin)
+	model:SetAttribute("Height", height)
+	model:SetAttribute("Color", def.Glow or def.Tint or rgb(255, 61, 184))
+	model:SetAttribute("Float", false)
+	model:SetAttribute("Rigged", true)
+	model:SetAttribute("Asset", def.Rig)
+	return model
+end
+
 -- def: Config.Mobs.Defs entry. cframe: ground level, -Z = facing.
 -- Returns the Model (PrimaryPart = HumanoidRootPart).
 function MobBuilder.Build(def, scale: number, cframe: CFrame): Model
-	local model = fromAsset(def, scale, cframe)
+	local model = fromRig(def, scale, cframe) or fromAsset(def, scale, cframe)
 	if not model then
 		local build = builders[def.Builder or def.Id] or builders.ZombieMiner
 		model = build(def.Name, scale * (def.Scale or 1), cframe)

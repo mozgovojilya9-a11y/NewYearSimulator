@@ -153,6 +153,178 @@ end
 -- Tracking
 ---------------------------------------------------------------------
 
+---------------------------------------------------------------------
+-- Rigged mobs (real R15 characters): AnimationTracks, cached per mob
+---------------------------------------------------------------------
+
+local CLIPS = Config.Enemies.Clips
+
+local function loadTrack(state, name: string)
+	local clip = CLIPS[name]
+	if not clip or (clip.Id or "") == "" or not state.animator then
+		return nil
+	end
+	local cached = state.tracks[name]
+	if cached ~= nil then
+		return cached or nil
+	end
+	local animation = Instance.new("Animation")
+	animation.AnimationId = clip.Id
+	local ok, track = pcall(state.animator.LoadAnimation, state.animator, animation)
+	if not ok or not track then
+		state.tracks[name] = false
+		return nil
+	end
+	track.Looped = clip.Loop == true
+	track.Priority = if name == "Idle" or name == "Walk" then Enum.AnimationPriority.Movement else Enum.AnimationPriority.Action
+	state.tracks[name] = track
+	return track
+end
+
+-- plays the working part of a clip in `seconds` (or at its own speed)
+local function playClip(state, name: string, seconds: number?)
+	local track = loadTrack(state, name)
+	if not track then
+		return nil
+	end
+	local clip = CLIPS[name]
+	local from, to = clip.From or 0, clip.To or track.Length
+	local speed = if seconds then (to - from) / math.max(0.05, seconds) else 1
+	track:Play(0.08, 1, speed)
+	track.TimePosition = from
+	return track
+end
+
+-- the parts fade out into particles of the mob color
+local function dissolve(model)
+	local color = model:GetAttribute("Color") or Style.Colors.Magenta
+	for _, p in ipairs(model:GetDescendants()) do
+		if p:IsA("BasePart") and p.Transparency < 1 then
+			local attachment = Instance.new("Attachment")
+			attachment.Parent = p
+			local emitter = Instance.new("ParticleEmitter")
+			emitter.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
+			emitter.LightEmission = 0.7
+			emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
+			emitter.Lifetime = NumberRange.new(0.5, 1)
+			emitter.Speed = NumberRange.new(2, 6)
+			emitter.SpreadAngle = Vector2.new(180, 180)
+			emitter.Acceleration = Vector3.new(0, 6, 0)
+			emitter.Rate = 0
+			emitter.Parent = attachment
+			emitter:Emit(math.clamp(math.floor(p.Size.Magnitude * 3), 4, 18))
+			local start = os.clock()
+			local connection
+			connection = RunService.RenderStepped:Connect(function()
+				local t = (os.clock() - start) / 0.45
+				if t >= 1 or not p.Parent then
+					connection:Disconnect()
+					if p.Parent then
+						p.LocalTransparencyModifier = 1
+					end
+					return
+				end
+				p.LocalTransparencyModifier = t
+			end)
+		end
+	end
+end
+
+---------------------------------------------------------------------
+-- Boss: rage glow (phase 2) and the slow-motion death
+---------------------------------------------------------------------
+
+local BOSS = Config.Enemies.Boss
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+
+local function rage(model, root)
+	if model:FindFirstChild("RageGlow") then
+		return
+	end
+	local color = BOSS.Rage.Color
+	local glow = Instance.new("Highlight")
+	glow.Name = "RageGlow"
+	glow.FillColor = color
+	glow.FillTransparency = 0.75
+	glow.OutlineColor = color
+	glow.OutlineTransparency = 0.1
+	glow.DepthMode = Enum.HighlightDepthMode.Occluded
+	glow.Parent = model
+	if Style.HideEffects then
+		return
+	end
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "RageAura"
+	attachment.Parent = root
+	local embers = Instance.new("ParticleEmitter")
+	embers.Color = ColorSequence.new(color, Color3.fromRGB(255, 200, 120))
+	embers.LightEmission = 0.8
+	local h = model:GetAttribute("Height") or 18
+	embers.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, h * 0.03), NumberSequenceKeypoint.new(1, 0) })
+	embers.Lifetime = NumberRange.new(0.6, 1.2)
+	embers.Speed = NumberRange.new(2, 5)
+	embers.SpreadAngle = Vector2.new(180, 180)
+	embers.Acceleration = Vector3.new(0, h * 0.4, 0)
+	embers.Rate = 40
+	embers.Shape = Enum.ParticleEmitterShape.Box
+	embers.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
+	embers.Parent = attachment
+	-- the roar moment: a red pulse of the whole body
+	glow.FillTransparency = 0.1
+	TweenService:Create(glow, TweenInfo.new(0.8), { FillTransparency = 0.75 }):Play()
+end
+
+-- The camera holds on the falling boss, the world drains of color, the
+-- death clip plays slowly, then one big burst of light and particles.
+local function bossDeath(model, state)
+	local seconds = BOSS.DeathSlowmo
+	for _, track in pairs(state.tracks or {}) do
+		if track and track.IsPlaying then
+			track:AdjustSpeed(0.25)
+		end
+	end
+	local camera = Workspace.CurrentCamera
+	local center = model:GetPivot().Position
+	local h = model:GetAttribute("Height") or 18
+	local character = player.Character
+	local myRoot = character and character:FindFirstChild("HumanoidRootPart")
+	if camera and myRoot and (myRoot.Position - center).Magnitude < 120 then
+		local oldType = camera.CameraType
+		local from = camera.CFrame
+		local side = Vector3.new(from.Position.X - center.X, 0, from.Position.Z - center.Z)
+		side = if side.Magnitude > 0.1 then side.Unit else Vector3.new(0, 0, 1)
+		local eye = center + side * h * 1.6 + Vector3.new(0, h * 0.45, 0)
+		camera.CameraType = Enum.CameraType.Scriptable
+		TweenService:Create(camera, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = CFrame.lookAt(eye, center + Vector3.new(0, h * 0.3, 0)) }):Play()
+		task.delay(0.5, function()
+			TweenService:Create(camera, TweenInfo.new(seconds - 0.6, Enum.EasingStyle.Linear), { CFrame = CFrame.lookAt(eye - side * h * 0.35, center + Vector3.new(0, h * 0.3, 0)) }):Play()
+		end)
+		task.delay(seconds, function()
+			camera.CFrame = from
+			camera.CameraType = oldType
+		end)
+	end
+	local grade = Instance.new("ColorCorrectionEffect")
+	grade.Name = "BossDeathGrade"
+	grade.Parent = Lighting
+	TweenService:Create(grade, TweenInfo.new(0.4), { Saturation = -0.7, Contrast = 0.15 }):Play()
+	task.delay(seconds * 0.65, function()
+		-- the final burst
+		grade.TintColor = Color3.fromRGB(255, 245, 230)
+		grade.Brightness = 0.35
+		TweenService:Create(grade, TweenInfo.new(0.6), { Saturation = 0, Contrast = 0, Brightness = 0 }):Play()
+		Style.PlaySound(Config.Sounds.BossDeath, 0.8, 0.9)
+		if model.Parent then
+			shards(model, model:GetPivot().Position)
+			dissolve(model)
+		end
+		task.delay(0.7, function()
+			grade:Destroy()
+		end)
+	end)
+end
+
 local function watch(model: Model)
 	if mobs[model] then
 		return
@@ -173,12 +345,75 @@ local function watch(model: Model)
 		hop = model:GetAttribute("Hop") == true,
 	}
 	state.solid = #state.joints <= 1 -- one-piece model: only the Core moves
+	-- a real rig: AnimationTracks instead of joint math
+	if model:GetAttribute("Rigged") then
+		local humanoid = model:FindFirstChildOfClass("Humanoid")
+		state.rig = true
+		state.animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+		state.tracks = {}
+		state.joints = {}
+		local idle = loadTrack(state, "Idle")
+		if idle then
+			idle:Play(0.3)
+		end
+		local walk = loadTrack(state, "Walk")
+		if walk then
+			walk:Play(0, 0.001, 1)
+		end
+	end
 	mobs[model] = state
 
-	local highlight
+	local highlight, warning
 	model:GetAttributeChangedSignal("Telegraph"):Connect(function()
 		if model:GetAttribute("Telegraph") then
 			state.windingUp = true
+			if state.rig then
+				-- wind up to the strike pose and hold there
+				local name = if model:GetAttribute("Role") == "Ranged" and CLIPS.Shoot and CLIPS.Shoot.Id ~= "" then "Shoot" else "Attack"
+				local clip = CLIPS[name]
+				local share = (clip.To - clip.From) / math.max(0.05, clip.Hit - clip.From)
+				local track = playClip(state, name, Config.Enemies.WindUp * share)
+				if track then
+					state.attackTrack = track
+					task.delay(math.max(0, (clip.Hit - clip.From) / track.Speed - 0.02), function()
+						if state.windingUp and track.IsPlaying then
+							track:AdjustSpeed(0)
+						end
+					end)
+				end
+			end
+			if not warning and not Style.HideEffects then
+				-- the red warning sign over the head: a dark diamond with a red "!"
+				warning = Instance.new("BillboardGui")
+				warning.Name = "Warning"
+				warning.Size = UDim2.fromOffset(38, 38)
+				warning.StudsOffsetWorldSpace = Vector3.new(0, (model:GetAttribute("Height") or 6) * 0.6 + 2.2, 0)
+				warning.AlwaysOnTop = true
+				warning.LightInfluence = 0
+				warning.Adornee = root
+				local diamond = Instance.new("Frame")
+				diamond.AnchorPoint = Vector2.new(0.5, 0.5)
+				diamond.Position = UDim2.fromScale(0.5, 0.5)
+				diamond.Size = UDim2.fromScale(0.7, 0.7)
+				diamond.Rotation = 45
+				diamond.BackgroundColor3 = Color3.fromRGB(24, 18, 22)
+				diamond.BackgroundTransparency = 0.1
+				local stroke = Instance.new("UIStroke")
+				stroke.Color = Style.Colors.Red
+				stroke.Thickness = 2.5
+				stroke.Parent = diamond
+				diamond.Parent = warning
+				local mark = Style.Label(warning, "!", 26, Style.Colors.Red, { Font = Style.FontTitle, Size = UDim2.fromScale(1, 1) })
+				local scale = Instance.new("UIScale")
+				scale.Scale = 0.4
+				scale.Parent = diamond
+				local markScale = Instance.new("UIScale")
+				markScale.Scale = 0.4
+				markScale.Parent = mark
+				warning.Parent = root
+				Style.Tween(scale, 0.15, { Scale = 1 })
+				Style.Tween(markScale, 0.15, { Scale = 1 })
+			end
 			if not highlight then
 				highlight = Instance.new("Highlight")
 				highlight.FillColor = Style.Colors.Red
@@ -191,14 +426,24 @@ local function watch(model: Model)
 		else
 			state.windingUp = false
 			state.strike = 1
+			if state.attackTrack and state.attackTrack.IsPlaying then
+				state.attackTrack:AdjustSpeed(2.2) -- the strike itself is fast
+			end
 			if highlight then
 				highlight:Destroy()
 				highlight = nil
+			end
+			if warning then
+				warning:Destroy()
+				warning = nil
 			end
 		end
 	end)
 	model:GetAttributeChangedSignal("Hits"):Connect(function()
 		state.recoil = 1
+		if state.rig and not state.windingUp then
+			playClip(state, "Hurt", 0.3)
+		end
 	end)
 	-- the group noticed the player: a short "!" over the head
 	model:GetAttributeChangedSignal("Awake"):Connect(function()
@@ -224,10 +469,41 @@ local function watch(model: Model)
 			end)
 		end
 	end)
+	model:GetAttributeChangedSignal("Rage"):Connect(function()
+		if model:GetAttribute("Rage") then
+			rage(model, root)
+		end
+	end)
+	if model:GetAttribute("Rage") then
+		rage(model, root)
+	end
 	model:GetAttributeChangedSignal("Dying"):Connect(function()
 		if model:GetAttribute("Dying") then
 			mobs[model] = nil
-			burst(model)
+			if model:GetAttribute("Boss") then
+				if state.rig then
+					playClip(state, "Death", BOSS.DeathSlowmo * 0.6)
+				end
+				bossDeath(model, state)
+				return
+			end
+			if state.rig then
+				-- fall, then fall apart into particles
+				for _, track in pairs(state.tracks) do
+					if track and track ~= state.tracks.Death then
+						track:Stop(0.1)
+					end
+				end
+				playClip(state, "Death", 0.7)
+				shards(model, model:GetPivot().Position)
+				task.delay(if CLIPS.Death.Id ~= "" then 0.7 else 0.1, function()
+					if model.Parent then
+						dissolve(model)
+					end
+				end)
+			else
+				burst(model)
+			end
 		end
 	end)
 	model.AncestryChanged:Connect(function()
@@ -268,6 +544,14 @@ RunService.Stepped:Connect(function(_, dt)
 		local velocity = s.root.AssemblyLinearVelocity
 		local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
 		s.walk += (math.clamp(speed / 8, 0, 1) - s.walk) * math.min(1, dt * 8)
+		if s.rig then
+			local walk = s.tracks.Walk
+			if walk then
+				walk:AdjustWeight(math.max(0.001, s.walk), 0.1)
+				walk:AdjustSpeed(math.clamp(speed / 10, 0.6, 1.6))
+			end
+			continue
+		end
 		s.windup += ((if s.windingUp then 1 else 0) - s.windup) * math.min(1, dt * 10)
 		s.strike = math.max(0, s.strike - dt * 5)
 		s.recoil = math.max(0, s.recoil - dt * 7)
@@ -417,7 +701,7 @@ task.spawn(function()
 		local boss, best = nil, 90
 		if root and player:GetAttribute("Zone") == "Dungeon" then
 			for model in pairs(mobs) do
-				if model:GetAttribute("Boss") and model.Parent then
+				if model:GetAttribute("Boss") and model.Parent and not model:GetAttribute("Intro") then
 					local distance = (model:GetPivot().Position - root.Position).Magnitude
 					if distance < best then
 						boss, best = model, distance

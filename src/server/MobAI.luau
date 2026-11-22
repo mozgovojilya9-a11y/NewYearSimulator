@@ -10,11 +10,14 @@
 	  Healer  stays away from the players and heals the most hurt ally
 	          (green beam), never attacks
 	Elites (bigger, aura) also do a shockwave: a circle around them.
-	Bosses: phases at Config.Enemies.Boss.Phases of health (banner
-	"ФАЗА 2"), special attacks every few seconds - Slam (circle around),
-	Charge (rectangle, then a dash along it), Barrage (circles under the
-	players), Summon (adds from the arena portals, from phase 2); later
-	phases attack faster. Between specials the boss chases and hits.
+	Bosses: phase 2 (rage) at Config.Enemies.Boss.Phases of health (banner
+	"ФАЗА 2", red glow, faster), special attacks every few seconds - Slam
+	(circle around), Charge (rectangle, then a dash along it), Cone (fan in
+	front), Wave (an energy ring runs out along the floor: jump over it),
+	Barrage (circles under the players); from phase 2 also Volley (a fan
+	of projectiles) and Summon (adds from the arena portals). Between
+	specials the boss chases and hits. While "Intro" is set (the entrance
+	cutscene) the boss does nothing.
 
 	Section groups stand still on their post until a member comes within
 	Config.Sections.Aggro studs or one of them is hit ("Awake"); then the
@@ -151,6 +154,56 @@ local function melee(state, model, role)
 	state.busy = false
 end
 
+-- World geometry only: mobs, players and effects never block a shot.
+local function worldRay(state, from: Vector3, to: Vector3): RaycastResult?
+	local ignore = { state.run.fxFolder }
+	for _, other in ipairs(DungeonRuns.LiveMobs(state.run)) do
+		table.insert(ignore, other)
+	end
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player.Character then
+			table.insert(ignore, player.Character)
+		end
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = ignore
+	params.RespectCanCollide = true
+	return Workspace:Raycast(from, to - from, params)
+end
+
+-- Is there a clear line from the mob's gun to the target's chest?
+local function canSee(state, root: BasePart): boolean
+	local from = state.root.Position + Vector3.new(0, 1.5, 0)
+	return worldRay(state, from, root.Position) == nil
+end
+
+-- A projectile flying from -> to: damage on arrival for whoever is still
+-- in its path (`width`) by then. Walls stop it (to is clipped).
+local function fireBolt(state, model, from: Vector3, to: Vector3, width: number, mult: number)
+	local hit = worldRay(state, from, to)
+	if hit then
+		to = hit.Position
+	end
+	local P_ = E.Projectile
+	local color = model:GetAttribute("Color") or RED
+	AbilityService.Fx("Bolt", from, to, color, P_.Speed, P_.Size)
+	local damage = (model:GetAttribute("Damage") or 1) * mult
+	for _, player in ipairs(membersIn(state, function(p)
+		return Telegraph.ToSegment(p, from, to) <= width / 2 + 1
+	end)) do
+		local root = rootOf(player)
+		local along = if root then (root.Position - from).Magnitude else 0
+		task.delay(along / P_.Speed, function()
+			-- still in the path when it arrives?
+			local r = rootOf(player)
+			if r and Telegraph.ToSegment(r.Position, from, to) <= width / 2 + 1.5 then
+				damagePlayer(player, damage, model)
+			end
+		end)
+	end
+end
+
 local function shoot(state, model, role)
 	state.busy = true
 	local _, root = target(state)
@@ -164,17 +217,16 @@ local function shoot(state, model, role)
 	local direction = Vector3.new(root.Position.X - from.X, 0, root.Position.Z - from.Z)
 	local to = from + (if direction.Magnitude > 0.1 then direction.Unit else state.root.CFrame.LookVector) * role.Range
 	to = Vector3.new(to.X, root.Position.Y, to.Z)
+	local wall = worldRay(state, from, to)
+	if wall then
+		to = wall.Position -- the line on the floor ends at the wall too
+	end
 	model:SetAttribute("Telegraph", true)
 	Telegraph.Line(state.run.fxFolder, from, to, role.Width, role.Telegraph, RED)
 	task.wait(role.Telegraph)
 	model:SetAttribute("Telegraph", false)
 	if mobs[model] and model.Parent then
-		AbilityService.Fx("Beam", from, to, model:GetAttribute("Color") or RED, 0.5)
-		for _, player in ipairs(membersIn(state, function(p)
-			return Telegraph.ToSegment(p, from, to) <= role.Width / 2 + 1
-		end)) do
-			damagePlayer(player, model:GetAttribute("Damage") or 1, model)
-		end
+		fireBolt(state, model, from, to, role.Width, 1)
 	end
 	state.lastAttack = os.clock()
 	state.busy = false
@@ -334,6 +386,127 @@ local function summon(state, model)
 	state.busy = false
 end
 
+local function cone(state, model)
+	state.busy = true
+	local _, root = target(state)
+	if not root then
+		state.busy = false
+		return
+	end
+	stop(state)
+	face(state, root.Position)
+	local c = BOSS.Cone
+	local start = Vector3.new(state.root.Position.X, groundOf(state), state.root.Position.Z)
+	local look = Vector3.new(root.Position.X - start.X, 0, root.Position.Z - start.Z)
+	look = if look.Magnitude > 0.1 then look.Unit else Vector3.new(0, 0, 1)
+	local cf = CFrame.lookAt(start, start + look)
+	model:SetAttribute("Telegraph", true)
+	Telegraph.Cone(state.run.fxFolder, cf, c.Radius, c.Angle, c.Telegraph, RED)
+	task.wait(c.Telegraph)
+	model:SetAttribute("Telegraph", false)
+	if mobs[model] and model.Parent then
+		local color = model:GetAttribute("Color") or RED
+		for i = -2, 2 do
+			local dir = CFrame.Angles(0, math.rad(c.Angle / 4 * i), 0):VectorToWorldSpace(look)
+			AbilityService.Fx("Beam", start + Vector3.new(0, 1.5, 0), start + Vector3.new(0, 1, 0) + dir * c.Radius, color, 0.8)
+		end
+		for _, player in ipairs(membersIn(state, function(p)
+			return Telegraph.InCone(p, cf, c.Radius, c.Angle)
+		end)) do
+			damagePlayer(player, (model:GetAttribute("Damage") or 1) * c.Mult, model)
+		end
+	end
+	state.busy = false
+end
+
+-- Energy rings run out along the floor from the boss; a player on the
+-- ground inside the ring's band is hit (a jump clears it).
+local function wave(state, model)
+	state.busy = true
+	stop(state)
+	local w = BOSS.Wave
+	local center = Vector3.new(state.root.Position.X, groundOf(state), state.root.Position.Z)
+	model:SetAttribute("Telegraph", true)
+	Telegraph.Circle(state.run.fxFolder, center, 6, w.Telegraph, RED)
+	task.wait(w.Telegraph)
+	model:SetAttribute("Telegraph", false)
+	if not (mobs[model] and model.Parent) then
+		state.busy = false
+		return
+	end
+	local rings = w.Rings + (state.phase - 1) * w.PerPhase
+	local color = if model:GetAttribute("Rage") then BOSS.Rage.Color else (model:GetAttribute("Color") or RED)
+	local damage = (model:GetAttribute("Damage") or 1) * w.Mult
+	for ring = 1, rings do
+		AbilityService.Fx("Wave", center, w.Radius, w.Speed, color)
+		task.spawn(function()
+			local hit = {}
+			local start = os.clock()
+			while true do
+				local radius = (os.clock() - start) * w.Speed
+				if radius > w.Radius then
+					break
+				end
+				for _, player in ipairs(DungeonRuns.Members(state.run)) do
+					local root = rootOf(player)
+					local humanoid = root and player.Character:FindFirstChildOfClass("Humanoid")
+					if root and not hit[player] and humanoid.FloorMaterial ~= Enum.Material.Air then
+						local d = Vector3.new(root.Position.X - center.X, 0, root.Position.Z - center.Z).Magnitude
+						if math.abs(d - radius) <= w.Band then
+							hit[player] = true
+							damagePlayer(player, damage, model)
+						end
+					end
+				end
+				task.wait(0.05)
+			end
+		end)
+		if ring < rings then
+			task.wait(w.Gap)
+		end
+	end
+	task.wait(0.3)
+	state.busy = false
+end
+
+-- A fan of projectiles at the target.
+local function volley(state, model)
+	state.busy = true
+	local _, root = target(state)
+	if not root then
+		state.busy = false
+		return
+	end
+	stop(state)
+	face(state, root.Position)
+	local v = BOSS.Volley
+	local from = state.root.Position + Vector3.new(0, 2, 0)
+	local look = Vector3.new(root.Position.X - from.X, 0, root.Position.Z - from.Z)
+	look = if look.Magnitude > 0.1 then look.Unit else state.root.CFrame.LookVector
+	local lines = {}
+	for i = 1, v.Count do
+		local a = -v.Spread / 2 + v.Spread * (i - 1) / math.max(1, v.Count - 1)
+		local dir = CFrame.Angles(0, math.rad(a), 0):VectorToWorldSpace(look)
+		local to = from + dir * v.Range
+		to = Vector3.new(to.X, root.Position.Y, to.Z)
+		local wall = worldRay(state, from, to)
+		if wall then
+			to = wall.Position
+		end
+		table.insert(lines, to)
+		Telegraph.Line(state.run.fxFolder, from, to, v.Width, v.Telegraph, RED)
+	end
+	model:SetAttribute("Telegraph", true)
+	task.wait(v.Telegraph)
+	model:SetAttribute("Telegraph", false)
+	if mobs[model] and model.Parent then
+		for _, to in ipairs(lines) do
+			fireBolt(state, model, from, to, v.Width, v.Mult)
+		end
+	end
+	state.busy = false
+end
+
 local function bossPhase(state, model)
 	local humanoid = state.humanoid
 	local share = humanoid.Health / math.max(1, humanoid.MaxHealth)
@@ -346,6 +519,10 @@ local function bossPhase(state, model)
 	if phase > state.phase then
 		state.phase = phase
 		model:SetAttribute("Phase", phase)
+		if phase >= 2 and not model:GetAttribute("Rage") then
+			model:SetAttribute("Rage", true) -- clients: red glow (MobFx)
+			state.speed *= BOSS.Rage.Speed
+		end
 		for _, player in ipairs(DungeonRuns.Members(state.run)) do
 			Remotes.Get("GateState"):FireClient(player, "Phase", phase)
 		end
@@ -357,7 +534,10 @@ local function bossPhase(state, model)
 end
 
 local function bossSpecial(state, model)
-	local options = { slam = true, charge = true, barrage = true }
+	local options = { slam = true, charge = true, barrage = true, cone = true, wave = true }
+	if state.phase >= BOSS.Volley.FromPhase then
+		options.volley = true
+	end
 	if state.phase >= BOSS.Summon.FromPhase and not state.summoned then
 		state.summoned = true
 		return summon(state, model)
@@ -375,11 +555,14 @@ local function bossSpecial(state, model)
 		shockwave(state, model, s.Radius + (state.phase - 1) * 2, s.Telegraph, s.Mult)
 	elseif pick == "charge" then
 		charge(state, model)
+	elseif pick == "cone" then
+		cone(state, model)
+	elseif pick == "wave" then
+		wave(state, model)
+	elseif pick == "volley" then
+		volley(state, model)
 	else
 		barrage(state, model)
-	end
-	if state.phase >= 3 then
-		state.summoned = false -- phase 3 summons again now and then
 	end
 end
 
@@ -404,8 +587,8 @@ local function tick()
 			mobs[model] = nil
 			continue
 		end
-		if state.busy then
-			continue
+		if state.busy or model:GetAttribute("Intro") then
+			continue -- attacking, or the boss entrance is still playing
 		end
 		local player, targetRoot, distance = target(state)
 		if not player then
@@ -476,7 +659,8 @@ local function tick()
 				task.spawn(heal, state, model, role)
 			end
 		elseif kind == "Ranged" then
-			if distance > role.Range - 4 then
+			if distance > role.Range - 4 or not canSee(state, targetRoot) then
+				-- too far, or a wall in the way: come closer
 				state.humanoid:MoveTo(targetRoot.Position)
 			elseif distance < role.Keep * 0.6 then
 				local away = state.root.Position - targetRoot.Position
