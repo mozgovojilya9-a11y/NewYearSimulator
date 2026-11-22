@@ -599,6 +599,14 @@ local function bossFight(run)
 		root.Anchored = false
 		local spot = Vector3.new(ground.Position.X, run.groundY or ground.Position.Y, ground.Position.Z)
 		require(script.Parent.AbilityService).Fx("Impact", spot, 18, boss:GetAttribute("Color") or Config.DungeonLayout.BossBarrierColor)
+		-- the landing throws everyone near back
+		for _, player in ipairs(members(run)) do
+			local r = rootOf(player)
+			local away = r and Vector3.new(r.Position.X - spot.X, 0, r.Position.Z - spot.Z)
+			if away and away.Magnitude < intro.KnockRadius and away.Magnitude > 0.1 then
+				Remotes.Get("ClickHit"):FireClient(player, "Knock", away.Unit * intro.Knock)
+			end
+		end
 	end
 	task.wait(math.max(0, E.Boss.IntroSeconds - intro.DropAt - intro.DropSeconds))
 	if boss.Parent then

@@ -814,8 +814,8 @@ Config.Enemies = {
 		-- the entrance: the camera circles the arena (Orbit degrees), the
 		-- boss falls from DropHeight at DropAt for DropSeconds, a hit with
 		-- dust and a roar, then the name and title.
-		IntroSeconds = 4,
-		Intro = { DropAt = 1.4, DropSeconds = 0.5, DropHeight = 50, Orbit = 110 },
+		IntroSeconds = 2.6,
+		Intro = { DropAt = 0.7, DropSeconds = 0.35, DropHeight = 60, Orbit = 70, Knock = 75, KnockRadius = 34 },
 		DeathSlowmo = 1.8, -- seconds the camera holds on the dying boss
 		Texts = { Phase = "ФАЗА %d", Rage = "ЯРОСТЬ", Intro = "%s", Summon = "%s зовёт подкрепление!" },
 	},
@@ -1231,7 +1231,7 @@ Config.Skills = {
 		{ Row = 3, Col = 1, Needs = 5 },
 		{ Row = 4, Col = 0, NeedsAny = { 6, 7 } },
 	},
-	Levels = { 1, 3, 5, 8, 10, 15, 20, 30 }, -- unlock level by position
+	Levels = { 1, 2, 4, 6, 8, 11, 14, 20 }, -- unlock level by position (22.11: sooner, choices come early)
 	Branches = {
 		{ Id = "A", Name = "Атака", Icon = "sword" },
 		{ Id = "D", Name = "Защита", Icon = "shield" },
