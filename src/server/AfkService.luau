@@ -108,10 +108,12 @@ local function build()
 	for i = 1, 6 do
 		local a = (i + 0.5) / 6 * math.pi * 2
 		local p = o + Vector3.new(math.cos(a) * 16, 0, math.sin(a) * 16)
-		NanoKit.Column(folder, "Planter", 1.6, 4.6, p, Color3.fromRGB(80, 78, 86), M.Concrete)
-		NanoKit.Column(folder, "Trunk", 5, 0.7, p + Vector3.new(0, 1.6, 0), Color3.fromRGB(90, 66, 50), Enum.Material.Wood)
-		local crown = Panel(folder, "Crown", Vector3.new(5, 4.2, 5), CFrame.new(p + Vector3.new(0, 8, 0)), Color3.fromRGB(110, 150, 120), Enum.Material.Grass, { Shape = Enum.PartType.Ball, CanCollide = false })
-		NanoKit.Tag(crown, "Bob", { Amplitude = 0.15, Period = 5 + i * 0.3 })
+		-- sakura in a metal planter (sheet 07), the old ball tree as a fallback
+		NanoKit.Prop(folder, "Prop_Sakura", CFrame.new(p) * CFrame.Angles(0, i, 0), 10, function(pp, c)
+			NanoKit.Column(pp, "Planter", 1.6, 4.6, c.Position, Color3.fromRGB(80, 78, 86), M.Concrete)
+			NanoKit.Column(pp, "Trunk", 5, 0.7, c.Position + Vector3.new(0, 1.6, 0), Color3.fromRGB(90, 66, 50), Enum.Material.Wood)
+			return Panel(pp, "Crown", Vector3.new(5, 4.2, 5), CFrame.new(c.Position + Vector3.new(0, 8, 0)), Color3.fromRGB(240, 170, 200), Enum.Material.Grass, { Shape = Enum.PartType.Ball, CanCollide = false })
+		end)
 	end
 	-- the centre: a slow hologram crystal over a fountain basin
 	NanoKit.Cylinder(folder, "Basin", 1.2, 10, CFrame.new(o + Vector3.new(0, 0.6, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(110, 108, 120), M.Concrete)
@@ -157,8 +159,7 @@ local function build()
 		local p = o + off
 		NanoKit.Cylinder(folder, "Island", 3, 26, CFrame.new(p) * CFrame.Angles(0, 0, math.rad(90)), stone, M.Concrete).CanCollide = false
 		NanoKit.Cylinder(folder, "IslandRock", 10, 16, CFrame.new(p + Vector3.new(0, -6, 0)) * CFrame.Angles(0, 0, math.rad(90)), stone:Lerp(Color3.new(0, 0, 0), 0.35), M.Concrete).CanCollide = false
-		local tree = Panel(folder, "IslandTree", Vector3.new(7, 6, 7), CFrame.new(p + Vector3.new(0, 6, 0)), Color3.fromRGB(110, 150, 120), Enum.Material.Grass, { Shape = Enum.PartType.Ball, CanCollide = false })
-		local _ = tree
+		NanoKit.Prop(folder, "Prop_Sakura", CFrame.new(p + Vector3.new(0, 1.5, 0)), 12, nil)
 	end
 	folder.Parent = workspace
 	return folder

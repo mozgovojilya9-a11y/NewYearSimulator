@@ -2,10 +2,8 @@
 	HubGuide.luau
 	Way-finding and the "life" of the hub (Config.HubLayout.Signs /
 	Centers / Supply), built by HubGenerator after the halls:
-	  * colored lines on the floor from the spawn arch to every hall, in
-	    the hall's Accent color (docs/design/hub_plan.png), with chevrons
-	    pointing the way;
-	  * sign posts with arrow plates at the forks (hall names);
+	  * the atrium garden: trees, grass beds, benches (22.11: the colored
+	    floor lines and sign posts are gone - less noise, less text);
 	  * the central object of a hall (an AI model from GameAssets/Props,
 	    procedural fallback) with its own colored light;
 	  * the Терминал снабжения corner in the atrium (pulls: GachaService).
@@ -90,6 +88,9 @@ end
 -- The central object of a hall with its own light.
 local function center(parent, base: Vector3, def)
 	local p = Vector3.new(base.X + def.At[1], base.Y, base.Z + def.At[2])
+	if def.Hologram then
+		return require(script.Parent.HubIsland).Hologram(parent, p) -- the atrium's hologram cube
+	end
 	local cf = CFrame.new(p)
 	local prop = NanoKit.Prop(parent, def.Model, cf, def.Height, nil)
 	if not prop then
@@ -155,14 +156,38 @@ local function supply(parent, base: Vector3)
 	return m, prompt
 end
 
+-- The atrium garden (22.11, instead of the colored floor lines and the
+-- sign posts): trees in planters (GameAssets/Props/Prop_Tree, else the
+-- glass plant capsule), grass beds with a stone rim, benches facing the
+-- middle (Config.HubLayout.Garden).
+local function garden(parent, base: Vector3)
+	local GD = L.Garden
+	local m = NanoKit.Model(parent, "Garden")
+	for i, t in ipairs(GD.Trees) do
+		local p = base + Vector3.new(t[1], 0, t[2])
+		NanoKit.Prop(m, GD.Models[(i - 1) % #GD.Models + 1], CFrame.new(p) * CFrame.Angles(0, math.rad((t[1] * 7 + t[2] * 3) % 360), 0), GD.TreeHeight, function(pp, cf)
+			return NanoKit.PlantCapsule(pp, cf.Position, 1.6)
+		end)
+	end
+	for _, b in ipairs(GD.Beds) do
+		local p = base + Vector3.new(b[1], 0, b[2])
+		local size = Vector3.new(b[3], 0.6, b[4])
+		Panel(m, "BedRim", size + Vector3.new(1.2, 0, 1.2), CFrame.new(p + Vector3.new(0, 0.3, 0)), Color3.fromRGB(96, 94, 92), M.Concrete)
+		Panel(m, "Grass", size + Vector3.new(0, 0.1, 0), CFrame.new(p + Vector3.new(0, 0.36, 0)), Color3.fromRGB(74, 120, 62), Enum.Material.Grass)
+		for k = -1, 1, 2 do
+			NanoKit.PlantCapsule(m, p + Vector3.new(k * b[3] * 0.3, 0.6, 0), 0.8)
+		end
+	end
+	for _, b in ipairs(GD.Benches) do
+		local p = base + Vector3.new(b[1], 0, b[2])
+		NanoKit.Bench(m, CFrame.lookAt(p, base + Vector3.new(b[3], 0, b[4])))
+	end
+	return m
+end
+
 function HubGuide.Build(root, base: Vector3)
 	local folder = NanoKit.Model(root, "Guide")
-	for _, def in ipairs(G.Paths) do
-		path(folder, base, def.Points, colorOf(def.To))
-	end
-	for _, def in ipairs(G.Posts) do
-		post(folder, base, def)
-	end
+	garden(folder, base)
 	for _, def in ipairs(L.Centers) do
 		center(folder, base, def)
 	end

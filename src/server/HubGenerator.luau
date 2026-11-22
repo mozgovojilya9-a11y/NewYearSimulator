@@ -978,17 +978,46 @@ local function buildGates()
 	end
 	Panel(m, "TunnelTop", Vector3.new(P.Width + 2, 1, 9), cf * CFrame.new(0, P.Height + 1, WT + 3.5), C.Tunnel, M.Smooth)
 	Panel(m, "TunnelFloor", Vector3.new(P.Width + 2, 1, 9), cf * CFrame.new(0, -0.5, WT + 3.5), C.Tunnel, M.Smooth)
-	local field = Panel(m, "PortalField", Vector3.new(P.Width, P.Height, 0.6), cf * CFrame.new(0, P.Height / 2, -fd + 1.8), th.Accent, Enum.Material.ForceField, { CanCollide = false, Transparency = 0.3, CastShadow = false })
+	local field = Panel(m, "PortalField", Vector3.new(P.Width, P.Height, 0.6), cf * CFrame.new(0, P.Height / 2, -fd + 1.8), Config.HubIsland.PortalColors[1], Enum.Material.ForceField, { CanCollide = false, Transparency = 0.3, CastShadow = false })
 	field:SetAttribute("Portal", true)
 	for i = 1, P.Curtains do
 		local x = -half + P.Width * (i - 0.5) / P.Curtains
-		local color = if i % 2 == 0 then N.Magenta else th.Accent
+		local color = if i % 2 == 0 then Config.HubIsland.PortalColors[1] else Config.HubIsland.PortalColors[2]
 		local curtain = Panel(m, "Curtain", Vector3.new(P.Width / P.Curtains + 0.6, P.Height - 0.4, 0.1), cf * CFrame.new(x, P.Height / 2, -fd + 2.3 + (i % 2) * 0.25), color, M.Neon, { CanCollide = false, CanTouch = false, CanQuery = false, Transparency = P.CurtainTransparency, CastShadow = false })
 		NanoKit.Tag(curtain, "Pulse", { Period = 2.2 + i * 0.35 })
 	end
-	WorldKit.Light(field, th.Accent, 30, 1.4)
-	local sh = P.SignHeight
-	signPlate(m, cf * CFrame.new(0, P.Height + 6.2 + sh / 2, -fd - 0.1), Vector2.new(lw + 6, sh), { { Text = Texts.Portal, Size = 96, Color = N.Gold }, { Text = Texts.PortalSub, Size = 36, Color = th.Accent } })
+	WorldKit.Light(field, Config.HubIsland.PortalColors[1], 30, 1.6)
+	-- the round portal ring around the opening (sheet 01): a steel band
+	-- with a warm inner line, segment by segment
+	local R = Config.HubIsland.GateRing
+	local ringCenter = cf * CFrame.new(0, P.Height / 2 + 1, -fd - 0.6)
+	local radius = math.max(P.Width, P.Height) / 2 + R.Gap
+	for i = 0, R.Segments - 1 do
+		local a = (i + 0.5) / R.Segments * math.pi * 2
+		local seg = radius * math.pi * 2 / R.Segments + 0.3
+		local pcf = ringCenter * CFrame.Angles(0, 0, a) * CFrame.new(radius, 0, 0)
+		Panel(m, "Ring", Vector3.new(R.Thick, seg, R.Depth), pcf, C.Beam, M.Metal)
+		Panel(m, "RingLine", Vector3.new(0.35, seg, 0.3), pcf * CFrame.new(-R.Thick / 2 - 0.05, 0, -R.Depth / 2 - 0.1), Config.HubIsland.Warm, M.Neon, { CanCollide = false })
+		if i % 4 == 0 then
+			Panel(m, "RingNode", Vector3.new(R.Thick + 1.4, 2.2, R.Depth + 0.8), pcf, C.Steel, M.Metal)
+		end
+	end
+	-- the rank letters E D C B A S over the ring, in hexagon badges
+	local ranks = Config.Gates.Ranks
+	local spacing = R.BadgeSize + 1.2
+	for i, rank in ipairs(ranks) do
+		local x = -(i - (#ranks + 1) / 2) * spacing -- E on the left as seen from the atrium
+		local y = radius + R.BadgeSize * 0.9 - math.abs(x) * 0.18
+		local bcf = ringCenter * CFrame.new(x, y, -0.4)
+		local color = R.RankColors[rank] or N.Gold
+		local hex = NanoKit.Cylinder(m, "Badge", 0.6, R.BadgeSize + 0.4, bcf * CFrame.Angles(0, math.rad(90), 0), C.Beam, M.Metal)
+		local _ = hex
+		local face = Panel(m, "BadgeFace", Vector3.new(R.BadgeSize * 0.8, R.BadgeSize * 0.8, 0.2), bcf * CFrame.new(0, 0, -0.4) * CFrame.Angles(0, 0, math.rad(45)), Color3.fromRGB(24, 24, 30), M.Smooth)
+		Panel(m, "BadgeRim", Vector3.new(R.BadgeSize * 0.86, R.BadgeSize * 0.86, 0.12), bcf * CFrame.new(0, 0, -0.32) * CFrame.Angles(0, 0, math.rad(45)), color, M.Neon, { CanCollide = false })
+		local label = Panel(m, "BadgeLetter", Vector3.new(R.BadgeSize * 0.7, R.BadgeSize * 0.7, 0.1), bcf * CFrame.new(0, 0, -0.56), color, M.Smooth, { Transparency = 1, CanCollide = false })
+		WorldKit.SurfaceText(label, Enum.NormalId.Front, { { Text = rank, Size = 120, Color = color } }, 60)
+		local _f = face
+	end
 	return field
 end
 
@@ -1252,6 +1281,18 @@ function HubGenerator.Build()
 
 	-- way-finding: floor lines, sign posts, hall centerpieces, the supply terminal
 	local guide = require(script.Parent.HubGuide).Build(root, base)
+
+	-- the floating island under the hub, scenery, banners (sheet 01)
+	require(script.Parent.HubIsland).Build(root, base)
+	-- an open atrium: sky and clouds instead of the glass roof
+	if Config.HubIsland.OpenAtrium then
+		for _, name in ipairs({ "AtriumCeiling", "Ceiling_Spawn" }) do
+			local roof = root:FindFirstChild(name)
+			if roof then
+				roof:Destroy() -- the spawn pad and the atrium are open to the sky (sheet 01)
+			end
+		end
+	end
 
 	local waypoints = {}
 	for name, offset in pairs(L.Waypoints) do

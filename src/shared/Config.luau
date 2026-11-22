@@ -383,10 +383,10 @@ Config.Gates = {
 	RankInfo = {
 		E = { Name = "Ранг E", Level = 1, Text = "Первые разломы: роботы цеха и лаборатории" },
 		D = { Name = "Ранг D", Level = 8, Requires = "E", Text = "Опасные сектора: плавильня, заражение, Нексус" },
-		C = { Name = "Ранг C", Level = 18, Requires = "D", Text = "Скоро" },
-		B = { Name = "Ранг B", Level = 26, Requires = "C", Text = "Скоро" },
-		A = { Name = "Ранг A", Level = 34, Requires = "B", Text = "Скоро" },
-		S = { Name = "Ранг S", Level = 42, Requires = "A", Text = "Скоро" },
+		C = { Name = "Ранг C", Level = 18, Requires = "D", Text = "Литейная и улей: щиты, подрывники, охотники" },
+		B = { Name = "Ранг B", Level = 26, Requires = "C", Text = "Резервное ядро ИИ" },
+		A = { Name = "Ранг A", Level = 34, Requires = "B", Text = "Ледяная цитадель" },
+		S = { Name = "Ранг S", Level = 42, Requires = "A", Text = "Трон Нексуса" },
 	},
 	-- Locations: a path of Sections (each: how many enemies already stand
 	-- there as one group) + a boss arena. No waves: kill the group, the
@@ -996,7 +996,7 @@ Config.AFK = {
 	Items = { Common = 70, Uncommon = 25, Rare = 5 }, -- weights; nothing higher
 	HourLimit = 180, -- rewarded ticks per hour (30 minutes of full rewards)
 	MinCredits = 1, -- per tick after the limit
-	Origin = Vector3.new(0, 900, 6000), -- the platform, far from everything
+	Origin = Vector3.new(-330, 0, 150), -- the small island next to the hub (sheet 01), linked by a light bridge
 	Radius = 46,
 	Texts = {
 		Title = "АФК-ЗОНА",
@@ -2187,15 +2187,15 @@ Config.Lighting = {
 	BloomSize = 18,
 	BloomThreshold = 1.4, -- only the very brightest pixels may glow
 	ShadowSoftness = 0.3,
-	Clouds = { Cover = 0.45, Density = 0.55, Color = Color3.fromRGB(245, 248, 255) },
+	Clouds = { Cover = 0.62, Density = 0.6, Color = Color3.fromRGB(240, 232, 244) },
 	-- Hub = the Atrium interior: the sun only through the skylight, warm
 	-- lamps do the rest; ambient a little warm, almost no haze indoors.
 	Hub = {
-		ClockTime = 13.5, Brightness = 2.6, ExposureCompensation = 0.1,
-		Ambient = Color3.fromRGB(104, 96, 88), OutdoorAmbient = Color3.fromRGB(118, 110, 102),
+		ClockTime = 16.6, Brightness = 3, ExposureCompensation = 0.35, -- golden hour (sheet 01)
+		Ambient = Color3.fromRGB(132, 118, 108), OutdoorAmbient = Color3.fromRGB(150, 136, 128),
 		EnvironmentDiffuseScale = 0.35, EnvironmentSpecularScale = 0.8,
 		Saturation = 0.04, Contrast = 0.06, Tint = Color3.fromRGB(255, 246, 234), Bloom = 0.04,
-		Atmosphere = { Density = 0.12, Offset = 0, Color = Color3.fromRGB(214, 204, 190), Decay = Color3.fromRGB(120, 110, 100), Glare = 0, Haze = 0.6 },
+		Atmosphere = { Density = 0.3, Offset = 0.05, Color = Color3.fromRGB(232, 198, 192), Decay = Color3.fromRGB(110, 98, 140), Glare = 0.3, Haze = 1.4 }, -- dusk haze
 	},
 	-- AFK zone: a calm evening above the city, warm low sun, soft haze
 	Afk = {
@@ -2231,6 +2231,63 @@ Config.Lighting = {
 --
 -- Every hall has its own colors (Theme), central object and decor groups
 -- along the walls and in the corners; the middle and the paths stay free.
+-- The hub as a floating island (HubIsland, concept sheet 01): the rim
+-- slab and the rock under the halls, warm light strips and lamps on the
+-- edge, glowing crystals, distant islands { offset, radius, towers },
+-- banners with the crest { x, z, look x, look z }, the atrium's hologram
+-- cube. OpenAtrium = no roof over the atrium (sky and clouds).
+Config.HubIsland = {
+	Seed = 7,
+	Footprint = { -186, 168, 22, -226 }, -- x0, x1, z0, z1 of the halls (from the spawn)
+	Margin = 14,
+	SlabDepth = 10,
+	RockDepth = 150,
+	RockLayers = 8,
+	Crystals = 10,
+	LampEvery = 24,
+	OpenAtrium = true,
+	RimColor = Color3.fromRGB(70, 70, 76),
+	DeckColor = Color3.fromRGB(150, 142, 132),
+	TerraceStep = 30, -- grid of the terrace decor between the halls
+	CloudSea = { { -260, 0.35 }, { -235, 0.6 }, { -215, 0.8 } }, -- y, transparency
+	CloudColor = Color3.fromRGB(236, 214, 222),
+	RockColor = Color3.fromRGB(88, 80, 78),
+	TowerColor = Color3.fromRGB(150, 150, 160),
+	Warm = Color3.fromRGB(255, 196, 110),
+	Gold = Color3.fromRGB(226, 182, 92),
+	CrystalColor = Color3.fromRGB(120, 210, 255),
+	FarIslands = {
+		{ Vector3.new(-650, 60, -350), 40, 3 },
+		{ Vector3.new(700, 120, -520), 55, 4 },
+		{ Vector3.new(-520, 170, 420), 34, 2 },
+		{ Vector3.new(580, 30, 380), 45, 3 },
+		{ Vector3.new(60, 230, -950), 70, 5 },
+		{ Vector3.new(-950, 100, -120), 50, 3 },
+	},
+	Banner = { Height = 16, Width = 4, Length = 8, Cloth = Color3.fromRGB(34, 38, 70) },
+	Banners = {
+		{ -12, -22, 0, -90 }, { 12, -22, 0, -90 },
+		{ -44, -60, 0, -90 }, { 44, -60, 0, -90 },
+		{ -44, -122, 0, -90 }, { 44, -122, 0, -90 },
+		{ -14, -158, 0, -90 }, { 14, -158, 0, -90 },
+	},
+	Hologram = { Size = 7, Height = 11, Base = 10, Color = Color3.fromRGB(120, 230, 255) },
+	Facade = { Step = 16, Width = 2.6, Out = 1.6 }, -- hall facades outside
+	-- the light bridge from the hub island to the AFK island (decor: you
+	-- get there with the АФК button / portal)
+	AfkBridge = { From = Vector3.new(-200, -0.6, 30), Width = 6, Color = Color3.fromRGB(120, 220, 255) },
+	PortalColors = { Color3.fromRGB(150, 90, 255), Color3.fromRGB(96, 70, 220) }, -- the gate's violet field (sheet 01)
+	-- the Gate hall portal ring and the rank badges over it
+	GateRing = {
+		Gap = 3, Segments = 40, Thick = 2.6, Depth = 3,
+		BadgeSize = 4,
+		RankColors = {
+			E = Color3.fromRGB(190, 190, 200), D = Color3.fromRGB(90, 220, 110), C = Color3.fromRGB(70, 150, 255),
+			B = Color3.fromRGB(170, 90, 255), A = Color3.fromRGB(255, 150, 50), S = Color3.fromRGB(255, 201, 60),
+		},
+	},
+}
+
 Config.HubLayout = {
 	Name = "Нано-Цитадель",
 	WallThickness = 2,
@@ -2258,13 +2315,23 @@ Config.HubLayout = {
 	StairWidth = 8,
 	Skylight = { Rect = { -60, 60, -40, -140 }, Mullion = 5, Truss = 12 },
 	-- Hall colors. Accent = thin light strips and signs, Light = lamps.
+	-- 22.11: one calm palette (warm concrete, graphite floors, warm white
+	-- light); halls differ by a muted tint and their central object.
 	Themes = {
-		Spawn = { Floor = Color3.fromRGB(70, 68, 84), Wall = Color3.fromRGB(122, 116, 140), Accent = Color3.fromRGB(170, 150, 255), Light = Color3.fromRGB(235, 228, 255) },
-		Atrium = { Floor = Color3.fromRGB(84, 82, 82), Wall = Color3.fromRGB(150, 143, 134), Accent = Color3.fromRGB(46, 230, 255), Light = Color3.fromRGB(255, 226, 190) },
-		Gates = { Floor = Color3.fromRGB(46, 70, 72), Wall = Color3.fromRGB(80, 118, 120), Accent = Color3.fromRGB(40, 230, 200), Light = Color3.fromRGB(200, 255, 245) },
-		Supply = { Floor = Color3.fromRGB(58, 48, 82), Wall = Color3.fromRGB(118, 100, 150), Accent = Color3.fromRGB(170, 110, 255), Light = Color3.fromRGB(255, 210, 160) },
-		Forge = { Floor = Color3.fromRGB(64, 40, 40), Wall = Color3.fromRGB(112, 66, 62), Accent = Color3.fromRGB(255, 80, 60), Light = Color3.fromRGB(255, 180, 130) },
-		Academy = { Floor = Color3.fromRGB(86, 74, 42), Wall = Color3.fromRGB(160, 136, 84), Accent = Color3.fromRGB(255, 201, 60), Light = Color3.fromRGB(255, 232, 180) },
+		Spawn = { Floor = Color3.fromRGB(128, 122, 116), Wall = Color3.fromRGB(150, 146, 140), Accent = Color3.fromRGB(214, 178, 104), Light = Color3.fromRGB(255, 236, 212) },
+		Atrium = { Floor = Color3.fromRGB(138, 132, 126), Wall = Color3.fromRGB(168, 160, 150), Accent = Color3.fromRGB(206, 180, 128), Light = Color3.fromRGB(255, 234, 204) },
+		Gates = { Floor = Color3.fromRGB(112, 114, 120), Wall = Color3.fromRGB(116, 122, 128), Accent = Color3.fromRGB(122, 196, 206), Light = Color3.fromRGB(226, 240, 246) },
+		Supply = { Floor = Color3.fromRGB(54, 52, 60), Wall = Color3.fromRGB(132, 126, 134), Accent = Color3.fromRGB(168, 150, 206), Light = Color3.fromRGB(255, 228, 196) },
+		Forge = { Floor = Color3.fromRGB(56, 46, 44), Wall = Color3.fromRGB(128, 104, 94), Accent = Color3.fromRGB(226, 128, 76), Light = Color3.fromRGB(255, 204, 156) },
+		Academy = { Floor = Color3.fromRGB(64, 60, 52), Wall = Color3.fromRGB(170, 154, 124), Accent = Color3.fromRGB(220, 182, 96), Light = Color3.fromRGB(255, 236, 198) },
+	},
+	-- the atrium garden (HubGuide): { x, z } offsets from the spawn base
+	Garden = {
+		TreeHeight = 11,
+		Models = { "Prop_Sakura", "Prop_Sakura", "Prop_Tree" }, -- GameAssets/Props, by turns
+		Trees = { { -20, -72 }, { 20, -72 }, { -20, -108 }, { 20, -108 }, { -58, -70 }, { 58, -70 }, { -58, -118 }, { 58, -118 }, { -40, -140 }, { 40, -140 } },
+		Beds = { { -42, -92, 14, 6 }, { 42, -92, 14, 6 } }, -- x, z, width, depth
+		Benches = { { -30, -84, 0, -90 }, { 30, -84, 0, -90 }, { -30, -98, 0, -90 }, { 30, -98, 0, -90 } }, -- x, z, look at x, z
 	},
 	-- AI-generated MaterialVariants (MaterialService, made in Studio);
 	-- missing names simply fall back to the base material.
@@ -2343,8 +2410,8 @@ Config.HubLayout = {
 	-- Central object of a hall (GameAssets/Props model, AI-made; procedural
 	-- fallback) with its own light in the hall's Light color.
 	Centers = {
-		{ Hall = "Atrium", Model = "Center_Atrium", At = { 0, -90 }, Height = 11, Light = Color3.fromRGB(120, 230, 255) },
-		{ Hall = "Spawn", Model = "Center_Spawn", At = { 0, 0 }, Height = 1.2, Light = Color3.fromRGB(190, 160, 255), Flat = true },
+		{ Hall = "Atrium", Hologram = true, At = { 0, -90 }, Height = 11, Light = Color3.fromRGB(255, 226, 180) },
+		{ Hall = "Spawn", Model = "Center_Spawn", At = { 0, 0 }, Height = 1.2, Light = Color3.fromRGB(255, 226, 180), Flat = true },
 	},
 	-- Терминал снабжения (pulls, GachaService) in the atrium's west side.
 	-- the capsule machine in the middle of the Зал снабжения (west), the
@@ -2385,7 +2452,7 @@ Config.HubLayout = {
 		Step = 4, -- studs between chevrons
 		Max = 36, -- chevrons drawn at most
 		Speed = 3, -- studs per second they crawl forward
-		Color = Color3.fromRGB(255, 201, 60),
+		Color = Color3.fromRGB(110, 220, 255), -- cyan like the path on sheet 01
 		Routes = {
 			Mentor = { Vector3.new(0, 0, 0), Vector3.new(10, 0, -5) },
 			Academy = { Vector3.new(0, 0, 0), Vector3.new(0, 0, -30), Vector3.new(0, 0, -44), Vector3.new(104, 0, -44), Vector3.new(118, 0, -44) },
