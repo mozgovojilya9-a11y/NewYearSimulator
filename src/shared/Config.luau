@@ -311,6 +311,7 @@ Config.Store = {
 	-- Products without a Tab are not sold in the store (the gear chests are
 	-- paid random items: off until they follow the PolicyService rules).
 	Tabs = {
+		{ Id = "Market", Text = "Рынок", Line = "Товары за кредиты. Меняются каждые 10 минут." },
 		{ Id = "Crystals", Text = "Кристаллы", Line = "Кристаллы — крутки в Терминале снабжения и смена класса. Кредиты — Кузница и сбросы." },
 		{ Id = "Passes", Text = "Пассы", Line = "Навсегда: покупаются один раз и работают всегда." },
 		{ Id = "Boosts", Text = "Бусты", Line = "На время: x2 к опыту, урону или удаче. Время складывается." },
@@ -879,6 +880,37 @@ Config.Contracts = {
 		Reward = "Контракт: +%d Кристаллов и +%d предмет в сундуке",
 	},
 	Colors = { Active = Color3.fromRGB(46, 230, 255), Done = Color3.fromRGB(90, 230, 110), Failed = Color3.fromRGB(255, 70, 60) },
+}
+
+-- Чёрный рынок (MarketService, the first tab of the store): a personal
+-- set of offers for credits that changes every RefreshSeconds (the same
+-- for the whole window, each offer bought once). Price = Price x the
+-- credits of a kill in the player's record tier, so it keeps up with the
+-- player. Item offers are gear of the player's level; their rarity is
+-- capped by the best rarity the player's gate rank can drop.
+-- Chance = the offer appears with this chance (else the slot is empty).
+Config.Market = {
+	RefreshSeconds = 600,
+	Slots = {
+		{ Kind = "Item", Rarity = "Uncommon", Price = 40 },
+		{ Kind = "Item", Rarity = "Rare", Price = 110 },
+		{ Kind = "Item", Rarity = "Epic", Price = 320, Chance = 0.5 },
+		{ Kind = "Cores", Amount = 30, Price = 35 },
+		{ Kind = "Boost", Boost = "Xp", Minutes = 15, Price = 120 },
+		{ Kind = "Crystals", Amount = 3, Price = 400 },
+	},
+	Texts = {
+		Tab = "Рынок",
+		Line = "Товары меняются каждые 10 минут",
+		Refresh = "Новые товары через %d:%02d",
+		Bought = "Куплено",
+		NoCredits = "Не хватает кредитов",
+		Full = "Инвентарь полон",
+		Done = "Куплено: %s",
+		Cores = "Нано-ядра ×%d",
+		Boost = "x2 опыт · %d мин",
+		Crystals = "Кристаллы ×%d",
+	},
 }
 
 -- The player in combat. Health regenerates only when nothing hit the
@@ -2033,6 +2065,7 @@ Config.Assets = {
 
 -- All remotes live directly in ReplicatedStorage, created by the server.
 Config.Remotes = {
+	Market = "RemoteFunction", -- ("List") -> ok, { Offers, EndsIn } | ("Buy", slot) -> ok, message
 	ClickHit = "RemoteEvent", -- C->S (mob or nil) on every attack click; S->C ("Hit"|"Kill"|"Credits", ...)
 	Items = "RemoteFunction", -- ("Equip", uid) | ("Unequip", slot) | ("Lock", uid) | ("Salvage", { uid, ... }) | ("SalvageRarity", rarityId) -> ok, message
 	Forge = "RemoteFunction", -- ("Enhance", uid) | ("Ascend", uid) | ("Reforge", uid, propIndex) -> ok, message, extra

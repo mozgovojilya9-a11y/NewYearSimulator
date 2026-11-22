@@ -1,7 +1,7 @@
 --[[
 	Store.luau
-	"Магазин" (Robux). Tabs (Config.Store.Tabs): Кристаллы / Пассы / Бусты /
-	Смена класса, each with a line on what the section is for. Every card
+	"Магазин". Tabs (Config.Store.Tabs): Рынок (Чёрный рынок for credits,
+	MarketService) / Кристаллы / Пассы / Бусты / Смена класса (Robux). Every card
 	shows icon, name, what it gives and the price. Items whose
 	id in Config is still 0 show a grey "Скоро" button. Buying opens the
 	Roblox purchase prompt; the server grants it (passes: Passes.luau,
@@ -135,6 +135,93 @@ for order, product in ipairs(Config.Products) do
 	end, nil)
 end
 
+---------------------------------------------------------------------
+-- Чёрный рынок (MarketService): offers for credits, new every 10 min
+---------------------------------------------------------------------
+
+local MT = Config.Market.Texts
+local marketRemote = ReplicatedStorage:WaitForChild("Market")
+local marketHolder = Instance.new("Frame")
+marketHolder.Position = UDim2.fromOffset(0, 70)
+marketHolder.Size = UDim2.new(1, 0, 1, -70)
+marketHolder.BackgroundTransparency = 1
+marketHolder.ZIndex = 32
+marketHolder.Visible = false
+marketHolder.Parent = content
+local marketGrid = Window.Grid(marketHolder, UDim2.fromOffset(222, 178))
+local marketCards = {}
+local marketEnds = 0
+local loadMarket
+
+local KIND_ICON = { Cores = "gear", Boost = "bolt", Crystals = "crystal" }
+
+local function marketCard(o)
+	local rarity = o.Rarity and Config.Rarity[o.Rarity]
+	local color = if rarity then rarity.Color else Style.Colors.Cyan
+	local c = Style.Card(marketGrid, color)
+	c.LayoutOrder = o.Slot
+	local icon = if o.Kind == "Item" then (if o.ItemSlot == "Weapon" then "sword" else "shield") else (KIND_ICON[o.Kind] or "gem")
+	local glyph = Style.Icons.Make(c, icon, 34, color, 35)
+	glyph.AnchorPoint = Vector2.new(0.5, 0)
+	glyph.Position = UDim2.new(0.5, 0, 0, 10)
+	Style.Label(c, o.Name or "", 16, color, { Font = Style.FontTitle, Position = UDim2.fromOffset(6, 50), Size = UDim2.new(1, -12, 0, 20), TextScaled = true, ZIndex = 35 })
+	local sub = if rarity then rarity.Name .. "  ·  ур. " .. tostring(o.Level or 1) else ""
+	Style.Label(c, sub, 13, Style.Colors.Muted, { Position = UDim2.fromOffset(6, 74), Size = UDim2.new(1, -12, 0, 18), ZIndex = 35 })
+	local button, setColor = Style.Button(c, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -8), Size = UDim2.new(1, -20, 0, 40), Color = Style.Colors.Green, Text = "", TextSize = 18, ZIndex = 36, Shadow = false, Icon = if o.Bought then nil else "credits" })
+	if o.Bought then
+		button.Text = MT.Bought
+		setColor(GREY)
+	else
+		button.Text = Format.Number(o.Price)
+		setColor(if (player:GetAttribute("Credits") or 0) >= o.Price then Style.Colors.Green else GREY)
+	end
+	button.Activated:Connect(function()
+		if o.Bought then
+			return
+		end
+		task.spawn(function()
+			local ok, message = marketRemote:InvokeServer("Buy", o.Slot)
+			Popups.Toast(tostring(message or ""), if ok then "gold" else "bad")
+			if ok then
+				Style.PlaySound(Config.Sounds.Buy, 1.1, 0.6)
+				loadMarket()
+			end
+		end)
+	end)
+	table.insert(marketCards, c)
+end
+
+function loadMarket()
+	task.spawn(function()
+		local ok, info = marketRemote:InvokeServer("List")
+		if not ok or type(info) ~= "table" then
+			return
+		end
+		for _, c in ipairs(marketCards) do
+			c:Destroy()
+		end
+		marketCards = {}
+		marketEnds = os.clock() + (info.EndsIn or 0)
+		for _, o in ipairs(info.Offers or {}) do
+			marketCard(o)
+		end
+	end)
+end
+
+task.spawn(function()
+	while true do
+		task.wait(1)
+		if window.IsOpen() and tabs.Current == "Market" then
+			local left = math.max(0, math.ceil(marketEnds - os.clock()))
+			tabLine.Text = MT.Refresh:format(left // 60, left % 60)
+			if left <= 0 and marketEnds > 0 then
+				marketEnds = 0
+				loadMarket()
+			end
+		end
+	end
+end)
+
 local function refresh()
 	for _, c in ipairs(cards) do
 		c.refresh()
@@ -144,9 +231,15 @@ local function refresh()
 			tabLine.Text = t.Line or ""
 		end
 	end
+	local market = tabs.Current == "Market"
+	marketHolder.Visible = market
+	holder.Visible = not market
+	if market and window.IsOpen() then
+		loadMarket()
+	end
 end
 tabs.Changed = refresh
-selectTab("Crystals")
+selectTab("Market")
 PlayerData.Changed({ "Passes" }, function()
 	if window.IsOpen() then
 		refresh()
@@ -167,7 +260,7 @@ end)
 
 Store.Window = window
 function Store.Open(tab: string?)
-	selectTab(tab or "Crystals")
+	selectTab(tab or "Market")
 	window.Open()
 end
 return Store
