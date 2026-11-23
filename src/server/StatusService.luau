@@ -91,6 +91,31 @@ function StatusService.Init()
 			return add(player, data, id, count)
 		elseif action == "Reset" then
 			return reset(player, data)
+		elseif action == "Ascend" then
+			-- spend Возвышение points into a line (Config.Ascension)
+			local line
+			for _, l in ipairs(Config.Ascension.Lines) do
+				if l.Id == id then
+					line = l
+				end
+			end
+			local A = data.Ascension
+			if not line or type(A) ~= "table" then
+				return false, "Неверный запрос"
+			end
+			A.Spent = if type(A.Spent) == "table" then A.Spent else {}
+			local spentA = 0
+			for _, v in pairs(A.Spent) do
+				spentA += v
+			end
+			local free = (A.Points or 0) - spentA
+			local n = math.min(math.max(1, math.floor(tonumber(count) or 1)), free)
+			if n <= 0 then
+				return false, Config.Ascension.Texts.NoPoints
+			end
+			A.Spent[line.Id] = (A.Spent[line.Id] or 0) + n
+			PlayerState.Sync(player)
+			return true, ""
 		end
 		return false, "Неверный запрос"
 	end

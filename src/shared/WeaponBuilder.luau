@@ -599,18 +599,20 @@ function WeaponBuilder.ApplyRarity(model: Model, weapon, handle: BasePart, glowP
 		end
 		return
 	end
-	-- Rare+: glowing inserts (owner models without neon get a strip)
-	if #neonParts == 0 then
-		local length = math.max(1, top - handle.Position.Y - 1.6)
+	-- Rare+: clear glowing strips along the weapon on both faces (sheet 05),
+	-- Epic+: a soft glowing shell around them
+	local length = math.max(1, top - handle.Position.Y - 1.6)
+	local function strip(name, size, offset, transparency)
 		local insert = Instance.new("Part")
-		insert.Name = "Insert"
-		insert.Size = Vector3.new(0.08, length, 0.08)
-		insert.CFrame = handle.CFrame * CFrame.new(0, 1.2 + length / 2, -0.12)
-		insert.Color = weapon.Color
+		insert.Name = name
+		insert.Size = size
+		insert.CFrame = handle.CFrame * offset
 		insert.Material = NEON
+		insert.Transparency = transparency
 		insert.CanCollide = false
 		insert.CanQuery = false
 		insert.CanTouch = false
+		insert.CastShadow = false
 		insert.Massless = true
 		insert.Parent = model
 		local weld = Instance.new("WeldConstraint")
@@ -618,21 +620,31 @@ function WeaponBuilder.ApplyRarity(model: Model, weapon, handle: BasePart, glowP
 		weld.Part1 = insert
 		weld.Parent = insert
 		table.insert(neonParts, insert)
+		return insert
 	end
+	for _, z in ipairs({ -0.14, 0.14 }) do
+		strip("Insert", Vector3.new(0.12, length, 0.06), CFrame.new(0, 1.2 + length / 2, z), 0)
+	end
+	if rank >= R.Epic.Index then
+		strip("GlowShell", Vector3.new(0.6, length + 0.4, 0.5), CFrame.new(0, 1.2 + length / 2, 0), 0.75)
+	end
+	-- sheet 05: the glow is the RARITY's color (Rare blue, Epic violet,
+	-- Legendary gold ...), not the weapon's own color
+	local glow = rarity.Color
 	for _, p in ipairs(neonParts) do
-		p.Color = weapon.Color
+		p.Color = glow
 	end
 	local source = glowPart or neonParts[1] or handle
 	if rank >= R.Epic.Index then
 		local light = Instance.new("PointLight")
 		light.Name = "RarityLight"
-		light.Color = weapon.Color
+		light.Color = glow
 		light.Range = if rank >= R.Legendary.Index then 10 else 6
 		light.Brightness = if rank >= R.Legendary.Index then 1.3 else 0.8
 		light.Shadows = false
 		light.Parent = source
 		if trail then
-			trail.Color = ColorSequence.new(rarity.Color:Lerp(WHITE, 0.3), weapon.Color)
+			trail.Color = ColorSequence.new(glow:Lerp(WHITE, 0.3), glow)
 			trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
 			trail.LightEmission = 1
 			trail.Lifetime = 0.26
@@ -640,9 +652,33 @@ function WeaponBuilder.ApplyRarity(model: Model, weapon, handle: BasePart, glowP
 		end
 	end
 	if rank >= R.Legendary.Index then
+		-- gold-plated metal and floating shards along the blade (sheet 05)
+		for _, p in ipairs(model:GetDescendants()) do
+			if p:IsA("BasePart") and p.Material ~= NEON and p.Transparency < 1 then
+				p.Color = p.Color:Lerp(Color3.fromRGB(226, 182, 92), 0.55)
+			end
+		end
+		local length = math.max(1, top - handle.Position.Y)
+		for k, side in ipairs({ -1, 1, -1 }) do
+			local shard = Instance.new("Part")
+			shard.Name = "FloatingShard"
+			shard.Size = Vector3.new(0.12, 0.6, 0.3)
+			shard.CFrame = handle.CFrame * CFrame.new(side * 0.55, length * (0.35 + k * 0.18), 0) * CFrame.Angles(0, 0, math.rad(side * 25))
+			shard.Color = glow
+			shard.Material = NEON
+			shard.CanCollide = false
+			shard.CanQuery = false
+			shard.CanTouch = false
+			shard.Massless = true
+			shard.Parent = model
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = handle
+			weld.Part1 = shard
+			weld.Parent = shard
+		end
 		local emitter = Instance.new("ParticleEmitter")
 		emitter.Name = "Aura"
-		emitter.Color = ColorSequence.new(weapon.Color, WHITE)
+		emitter.Color = ColorSequence.new(glow, WHITE)
 		emitter.LightEmission = 0.7
 		emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0) })
 		emitter.Transparency = NumberSequence.new(0.2, 1)
@@ -652,10 +688,11 @@ function WeaponBuilder.ApplyRarity(model: Model, weapon, handle: BasePart, glowP
 		emitter.Rate = if rank >= R.Mythic.Index then 20 else 10
 		emitter.Parent = source
 	end
-	if rank >= R.Mythic.Index then
-		-- the client (ItemFx) adds rotating rings + lightning / rainbow
-		model:SetAttribute("Fx", rarity.Id)
-		model:SetAttribute("FxColor", weapon.Color)
+	if rank >= R.Mythic.Index or (weapon.Enhance or 0) >= 15 then
+		-- the client (ItemFx) adds rotating energy rings + lightning / rainbow
+		-- (Mythic+, and every weapon at +15 - sheet 05)
+		model:SetAttribute("Fx", if rank >= R.Mythic.Index then rarity.Id else "Mythic")
+		model:SetAttribute("FxColor", glow)
 		model:SetAttribute("FxLength", top - handle.Position.Y)
 		CollectionService:AddTag(model, "ItemFx")
 	end

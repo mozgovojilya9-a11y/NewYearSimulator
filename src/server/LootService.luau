@@ -85,8 +85,11 @@ function LootService.RollRarity(player, rank: string, enemy: string, minRarity: 
 	return allowed[#allowed].Id
 end
 
-local function itemLevel(room: number): number
-	return math.clamp(room * Config.Items.LevelPerRoom + rng:NextInteger(-Config.Items.LevelSpread, Config.Items.LevelSpread), 1, Config.Items.MaxLevel)
+-- 23.11: a drop has the PLAYER's level (-2..+1), so gear grows with you
+local function itemLevel(room: number, player): number
+	local data = player and require(script.Parent.DataService).Get(player)
+	local level = if data then data.Level else room * Config.Items.LevelPerRoom
+	return math.clamp(level + rng:NextInteger(-2, 1), 1, Config.Items.MaxLevel)
 end
 
 local function spawnDrop(player, kind: string, payload, position: Vector3, extra)
@@ -114,7 +117,7 @@ end
 function LootService.DropItem(player, room: number, enemy: string, position: Vector3, minRarity: string?, rank: string?)
 	rank = rank or Config.RankForRoom(room)
 	local rarityId = LootService.RollRarity(player, rank, enemy, minRarity)
-	local instance = ItemService.Generate(player, itemLevel(room), rarityId)
+	local instance = ItemService.Generate(player, itemLevel(room, player), rarityId)
 	return spawnDrop(player, "Item", instance, position)
 end
 
@@ -248,6 +251,10 @@ function LootService.Init()
 		LootService.OnKill(player, room, isBoss, position, kind, info)
 	end
 	DungeonRuns.OnRunClosed = LootService.Clear
+	-- the supply cache of a cleared section: one item of the player's level
+	DungeonRuns.OnCacheItem = function(player, room, position, rank)
+		LootService.DropItem(player, room, "Elite", position, nil, rank)
+	end
 	-- Охотничий азарт milestones: extra items (and a chest at the top one)
 	StreakService.OnMilestone = function(player, milestone, room, position, rank)
 		if not position or not PlayerState.IsReady(player) then

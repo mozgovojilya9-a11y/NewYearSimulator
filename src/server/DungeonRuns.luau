@@ -326,8 +326,11 @@ local function spawnMob(run, defId: string, position: Vector3, opts)
 	local model = MobBuilder.Build(def, scale, CFrame.lookAt(position, Vector3.new(facing.X, position.Y, facing.Z)))
 	local _, healthScale = teamScale(run)
 	local tier = opts.Tier or run.location.Tier
-	local health = Config.MobHealth(tier, isBoss) * (if isBoss then 1 else role.Health) * healthScale
-	local damage = Config.MobDamage(tier, isBoss) * (if isBoss then 1 else role.Damage)
+	-- the enemy's LEVEL: the location's level, + per section, + for the boss
+	local D = Config.Difficulty
+	local mobLevel = run.location.Level + math.max(0, tier - run.location.Tier) * D.LevelPerSection + (if isBoss then D.BossLevels else 0)
+	local health = Config.MobHealthAt(mobLevel, isBoss) * (if isBoss then 1 else role.Health) * healthScale
+	local damage = Config.MobDamageAt(mobLevel, isBoss) * (if isBoss then 1 else role.Damage)
 	if elite then
 		health *= E.Elite.Health
 		damage *= E.Elite.Damage
@@ -620,10 +623,68 @@ local function bossFight(run)
 end
 
 -- A section is done the moment its group is dead: the exit opens.
+-- Floor traps of the section (Config.GateMap.Hazards): while the section
+-- is fought, each trap warns with a red circle, then hits everyone on it.
+local function hazards(run, zone)
+	local H = Config.GateMap.Hazards
+	local kind = H.Kinds[run.map.Biome.Theme] or H.Kinds.Assembly
+	for i, spot in ipairs(zone.Hazards or {}) do
+		task.spawn(function()
+			task.wait(i * 1.7)
+			while runs[run] and run.zoneIndex == zone.Index and zone.Alive > 0 do
+				local center = Vector3.new(spot.X, run.groundY, spot.Z)
+				require(script.Parent.Telegraph).Circle(run.fxFolder, center, H.Radius, H.Warn, kind.Color)
+				task.wait(H.Warn)
+				if not runs[run] then
+					return
+				end
+				require(script.Parent.AbilityService).Fx("Ring", center, H.Radius, kind.Color)
+				for _, player in ipairs(members(run)) do
+					local root = rootOf(player)
+					local humanoid = root and player.Character:FindFirstChildOfClass("Humanoid")
+					if humanoid and humanoid.Health > 0 and Vector3.new(root.Position.X - center.X, 0, root.Position.Z - center.Z).Magnitude <= H.Radius then
+						humanoid:TakeDamage(humanoid.MaxHealth * H.PlayerShare)
+					end
+				end
+				for model in pairs(run.mobs) do
+					local humanoid = model:FindFirstChildOfClass("Humanoid")
+					local root = model.PrimaryPart
+					if humanoid and root and humanoid.Health > 0 and not model:GetAttribute("Dying") and Vector3.new(root.Position.X - center.X, 0, root.Position.Z - center.Z).Magnitude <= H.Radius then
+						local share = if model:GetAttribute("Boss") then H.MobShare * 0.15 else H.MobShare
+						local any = members(run)[1]
+						if any then
+							DungeonRuns.Damage(any, model, humanoid.MaxHealth * share, false, "Heavy")
+						end
+					end
+				end
+				task.wait(run.rng:NextNumber(H.Every[1], H.Every[2]))
+			end
+		end)
+	end
+end
+
+-- A cleared section leaves a supply cache at its exit (Config.Sections.Cache).
+local function supplyCache(run, zone)
+	local CC = W.Cache
+	local exit = zone.Exit
+	local at = if exit then exit.Position - Vector3.new(0, exit.Size.Y / 2, 0) + exit.CFrame.LookVector * -4 else zone.Center
+	local tier = run.location.Tier + (zone.Index - 1) * run.location.TierStep
+	for _, player in ipairs(members(run)) do
+		local credits = PlayerState.AddCredits(player, Config.KillCredits(tier, false) * CC.Credits)
+		PlayerState.AddCores(player, CC.Cores)
+		Remotes.Notify(player, CC.Text:format(tostring(credits), CC.Cores), "gold")
+		if run.rng:NextNumber() < CC.ItemChance and DungeonRuns.OnCacheItem then
+			DungeonRuns.OnCacheItem(player, tier, Vector3.new(at.X, run.groundY, at.Z), run.location.Rank)
+		end
+	end
+	pcall(Effects.Burst, Vector3.new(at.X, run.groundY + 2, at.Z), Config.Theme.Gold, 30, 20, 1.5)
+end
+
 local function zoneFlow(run, zone)
 	run.zoneIndex = zone.Index
 	run.phase = "Fight"
 	pushState(run)
+	hazards(run, zone)
 	if not waitUntil(run, function()
 		return zone.Alive <= 0
 	end) then
@@ -631,6 +692,7 @@ local function zoneFlow(run, zone)
 	end
 	openBarrier(zone.Exit)
 	notifyAll(run, W.Texts.Cleared, "gold")
+	supplyCache(run, zone)
 	-- a breather: the team gets part of its health back
 	for _, player in ipairs(members(run)) do
 		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -768,7 +830,7 @@ local function kill(model, killer, quiet: boolean?)
 		local _, count = affixes:gsub(",", ",")
 		weight *= 1 + (count + 1) * E.Affixes.Loot -- every affix: more loot
 	end
-	local lootInfo = { Rank = run.location.Rank, Enemy = enemy, Elite = elite, Red = run.red, Weight = weight }
+	local lootInfo = { Rank = run.location.Rank, Enemy = enemy, Elite = elite, Red = run.red, Weight = weight, Level = run.location.Level }
 	if killer and run.stats[killer] then
 		run.stats[killer].kills += 1
 	end
@@ -941,12 +1003,15 @@ function DungeonRuns.Damage(player, model, damage: number, isCrit: boolean?, fla
 	if root and from and not model:GetAttribute("Boss") and humanoid.Health > 0 and not isBlocked then
 		local away = root.Position - from.Position
 		away = Vector3.new(away.X, 0, away.Z)
-		if away.Magnitude > 0.1 then
-			local k = CB.Knockback
-			local strength = if flag == "Execute" then CB.Execute.Knockback elseif flag == "Heavy" or isCrit then k.CritMult else 1
-			local speed = k.Normal * strength * (if model:GetAttribute("Elite") then k.EliteMult else 1)
-			root.AssemblyLinearVelocity = away.Unit * speed + Vector3.new(0, speed * 0.25, 0)
-			model:SetAttribute("StaggerUntil", Workspace:GetServerTimeNow() + k.Stagger)
+		local k = CB.Knockback
+		local strong = flag == "Execute" or flag == "Heavy" or isCrit
+		local t = Workspace:GetServerTimeNow()
+		-- only strong hits push and stagger, and not over and over
+		if away.Magnitude > 0.1 and strong and t - (model:GetAttribute("LastStagger") or 0) >= k.StaggerEvery then
+			local speed = (if flag == "Execute" then CB.Execute.Knockback else k.CritMult) * (if model:GetAttribute("Elite") then k.EliteMult else 1)
+			root.AssemblyLinearVelocity = away.Unit * speed + Vector3.new(0, speed * 0.2, 0)
+			model:SetAttribute("StaggerUntil", t + k.Stagger)
+			model:SetAttribute("LastStagger", t)
 		end
 	end
 	if humanoid.Health <= 0 then

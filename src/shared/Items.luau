@@ -200,9 +200,10 @@ local function index()
 	end
 end
 
--- The look (base) of a drop follows its item level: biome 1..4.
+-- The look (base, and the armor set) of a drop follows its item level:
+-- biome 1..5 (5 drop sets, Config.ArmorSets).
 local function biomeFor(level: number): number
-	return math.clamp(math.ceil(level / (I.MaxLevel / 4)), 1, 4)
+	return math.clamp(math.ceil(level / (I.MaxLevel / 5)), 1, 5)
 end
 
 -- A new instance without a uid (ItemService gives one).

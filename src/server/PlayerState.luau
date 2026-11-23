@@ -322,8 +322,20 @@ function PlayerState.Sync(player)
 	publishCrystals(player, data)
 	player:SetAttribute("RoomReached", data.RoomReached)
 	player:SetAttribute("Level", data.Level)
-	player:SetAttribute("Xp", data.Xp)
-	player:SetAttribute("XpNext", Config.XpToNext(data.Level))
+	-- at the max level the XP bar shows the next Возвышение point
+	local A = if type(data.Ascension) == "table" then data.Ascension else { Points = 0, Xp = 0, Spent = {} }
+	data.Ascension = A
+	A.Spent = if type(A.Spent) == "table" then A.Spent else {}
+	local maxed = data.Level >= Config.Progression.Level.MaxLevel
+	player:SetAttribute("Xp", if maxed then math.floor(A.Xp or 0) else data.Xp)
+	player:SetAttribute("XpNext", if maxed then Config.AscensionXp() else Config.XpToNext(data.Level))
+	local spentA = 0
+	for _, v in pairs(A.Spent) do
+		spentA += v
+	end
+	player:SetAttribute("AscensionPoints", A.Points or 0)
+	player:SetAttribute("AscensionFree", math.max(0, (A.Points or 0) - spentA))
+	player:SetAttribute("AscensionSpent", game:GetService("HttpService"):JSONEncode(A.Spent))
 	publishSkills(player, data)
 	for _, kind in ipairs(Config.BoostKinds) do
 		player:SetAttribute("Boost" .. kind, data.Boosts[kind] or 0)

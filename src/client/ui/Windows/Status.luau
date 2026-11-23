@@ -26,7 +26,7 @@ local remote = ReplicatedStorage:WaitForChild("Status")
 
 local Status = {}
 
-local window = Window.new("Статус", nil, Vector2.new(720, 460), "user")
+local window = Window.new("Статус", nil, Vector2.new(720, 560), "user")
 local content = window.Content
 
 local busy = false
@@ -95,6 +95,32 @@ resetButton.Activated:Connect(function()
 	request("Reset")
 end)
 
+-- Возвышение (after the max level, Config.Ascension): 4 lines with "+"
+local AS = Config.Ascension
+local ascPanel = Style.Panel(content, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, -70), Size = UDim2.new(1, 0, 0, 92), Fill = C.PanelDark, Border = C.GoldDim, Cut = 8, ZIndex = 33 })
+local ascTitle = Style.Label(ascPanel, AS.Texts.Title, 14, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(14, 6), Size = UDim2.new(0.6, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
+local _ = ascTitle
+local ascFree = Style.Label(ascPanel, "", 13, C.Text, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 6), Size = UDim2.new(0.5, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 34 })
+local ascLocked = Style.Label(ascPanel, "", 13, C.Muted, { Position = UDim2.fromOffset(0, 30), Size = UDim2.new(1, 0, 0, 50), ZIndex = 34 })
+local ascCells = {}
+for i, line in ipairs(AS.Lines) do
+	local cell = Instance.new("Frame")
+	cell.BackgroundTransparency = 1
+	cell.Position = UDim2.new((i - 1) / #AS.Lines, 8, 0, 30)
+	cell.Size = UDim2.new(1 / #AS.Lines, -16, 0, 54)
+	cell.ZIndex = 34
+	cell.Parent = ascPanel
+	local icon = Icons.Make(cell, line.Icon, 20, C.Gold, 35)
+	icon.Position = UDim2.fromOffset(0, 4)
+	Style.Label(cell, line.Name, 13, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(26, 2), Size = UDim2.new(1, -70, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
+	local value = Style.Label(cell, "0", 11, C.Muted, { Position = UDim2.fromOffset(26, 20), Size = UDim2.new(1, -70, 0, 14), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
+	local plus, plusApi = Style.IconButton(cell, { Icon = "plus", Size = 34, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 2), ZIndex = 36, Cut = 6 })
+	plus.Activated:Connect(function()
+		request("Ascend", line.Id, 1)
+	end)
+	ascCells[line.Id] = { cell = cell, value = value, plusApi = plusApi, line = line }
+end
+
 -- bottom: the main stats
 local MAIN = {
 	{ "Damage", "АТАКА", "sword" }, { "Defense", "ЗАЩИТА", "shield", "pct" },
@@ -135,6 +161,21 @@ function refresh()
 	end
 	resetButton.Text = if resetArmed then T.Sure else T.ResetShort
 	resetCost.Text = T.ResetCost:format(Format.Number(A.ResetCost + A.ResetPerLevel * level))
+	-- Возвышение
+	local maxLevel = Config.Progression.Level.MaxLevel
+	local ascFreeN = player:GetAttribute("AscensionFree") or 0
+	local points = player:GetAttribute("AscensionPoints") or 0
+	local open = level >= maxLevel
+	ascLocked.Visible = not open
+	ascLocked.Text = ("Откроется на %d уровне: опыт пойдёт в очки возвышения (до %d)"):format(maxLevel, AS.MaxPoints)
+	ascFree.Text = if open then AS.Texts.Free:format(ascFreeN) .. "   ·   " .. AS.Texts.Total:format(points, AS.MaxPoints) else ""
+	local spentA = PlayerData.Table("AscensionSpent")
+	for id, ui in pairs(ascCells) do
+		ui.cell.Visible = open
+		local n = spentA[id] or 0
+		ui.value.Text = ("%d  ·  %s"):format(n, ui.line.Text)
+		ui.plusApi.SetActive(ascFreeN > 0)
+	end
 	local all = PlayerData.Table("Stats")
 	for i, def in ipairs(MAIN) do
 		local v = all[def[1]] or 0
@@ -142,7 +183,7 @@ function refresh()
 	end
 end
 
-PlayerData.Changed({ "Attributes", "StatPoints", "Stats", "Level", "Class" }, function()
+PlayerData.Changed({ "Attributes", "StatPoints", "Stats", "Level", "Class", "AscensionFree", "AscensionPoints", "AscensionSpent" }, function()
 	if window.IsOpen() then
 		refresh()
 	end

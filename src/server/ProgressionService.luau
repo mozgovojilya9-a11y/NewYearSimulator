@@ -144,9 +144,33 @@ local function addXp(player, data, amount: number, raw: boolean?)
 	if amount <= 0 then
 		return
 	end
+	local maxLevel = P.Level.MaxLevel
+	if data.Level >= maxLevel then
+		-- max level: XP fills Возвышение points (Config.Ascension)
+		local A = data.Ascension
+		local AS = Config.Ascension
+		if (A.Points or 0) >= AS.MaxPoints then
+			return
+		end
+		A.Xp = (A.Xp or 0) + amount
+		local cost = Config.AscensionXp()
+		local got = 0
+		while A.Xp >= cost and A.Points < AS.MaxPoints do
+			A.Xp -= cost
+			A.Points += 1
+			got += 1
+		end
+		if got > 0 then
+			Remotes.Notify(player, AS.Texts.Got, "gold")
+			PlayerState.Sync(player)
+		else
+			player:SetAttribute("Xp", math.floor(A.Xp))
+		end
+		return
+	end
 	data.Xp += amount
 	local gained = 0
-	while data.Xp >= xpToNext(data.Level) do
+	while data.Level < maxLevel and data.Xp >= xpToNext(data.Level) do
 		data.Xp -= xpToNext(data.Level)
 		data.Level += 1
 		gained += 1
@@ -238,7 +262,7 @@ local function status(player)
 		for i, quest in ipairs(data[set.Field].List) do
 			local def = defIn(set, quest.Id)
 			if def then
-				list[i] = { Text = def.Text, Target = def.Target, Progress = quest.Progress, Claimed = quest.Claimed, Credits = math.floor(def.Credits * creditScale(data)), Crystals = def.Crystals or 0, Xp = P.Level.XpPerQuest * data.Level * (def.XpMult or 1) }
+				list[i] = { Text = def.Text, Target = def.Target, Progress = quest.Progress, Claimed = quest.Claimed, Credits = math.floor(def.Credits * creditScale(data)), Crystals = def.Crystals or 0, Xp = math.floor(Config.KillXp(data.Level) * P.Level.QuestKills * (def.XpMult or 1)) }
 			end
 		end
 		return list
@@ -348,7 +372,7 @@ local function claimQuest(player, index, setName)
 	end
 	quest.Claimed = true
 	local amount = earnCredits(player, def.Credits * creditScale(data))
-	local xp = P.Level.XpPerQuest * data.Level * (def.XpMult or 1)
+	local xp = Config.KillXp(data.Level) * P.Level.QuestKills * (def.XpMult or 1)
 	addXp(player, data, xp)
 	local crystals = PlayerState.AddCrystals(player, def.Crystals or 0)
 	ProgressionService.RefreshReady(player)
@@ -445,7 +469,18 @@ function ProgressionService.OnKill(player, room: number, isBoss: boolean, positi
 		questProgress(player, "Boss", 1)
 		GameEvents.Fire(player, "Boss", 1)
 	end
-	addXp(player, data, (if isBoss then P.Level.XpPerBoss else P.Level.XpPerKill) * room * weight * StreakService.Mult(player, "Xp"))
+	-- XP by the player's level (Config.KillXp keeps the 160-level pace);
+	-- a location far below the player gives less
+	local xp = Config.KillXp(data.Level) * (if isBoss then P.Level.BossKills else weight)
+	local locLevel = info and info.Level
+	if locLevel then
+		local gap = data.Level - locLevel - P.Level.EasyGap
+		if gap > 0 then
+			xp *= math.max(P.Level.EasyMin, 1 - gap * P.Level.EasyDrop)
+		end
+	end
+	local _ = room
+	addXp(player, data, xp * StreakService.Mult(player, "Xp"))
 end
 
 function ProgressionService.OnRoomCleared(player, room: number)

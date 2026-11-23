@@ -158,7 +158,7 @@ local function lunge(state, targetRoot)
 	local from = state.root.Position
 	local to = Vector3.new(targetRoot.Position.X, from.Y, targetRoot.Position.Z)
 	local gap = (to - from).Magnitude - state.reach - 1.5
-	if gap <= 0.2 then
+	if gap <= 0.2 or L.Distance <= 0 then
 		return
 	end
 	local step = (to - from).Unit * math.min(L.Distance, gap)
@@ -198,6 +198,7 @@ local function melee(state, model, role)
 			knock(player, state.root.Position, if state.elite or state.isBoss then E.Lunge.KnockElite else E.Lunge.Knock)
 		end
 	end
+	state.recoverUntil = os.clock() + E.Recover -- a short pause after the strike
 	state.lastAttack = os.clock()
 	state.busy = false
 end
@@ -762,7 +763,7 @@ local function tick()
 			end
 			continue
 		end
-		if clock < (state.readyAt or 0) then
+		if clock < (state.readyAt or 0) or clock < (state.recoverUntil or 0) then
 			continue
 		end
 		local stunned, slow = statusOf(model)

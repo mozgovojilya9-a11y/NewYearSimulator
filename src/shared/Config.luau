@@ -18,6 +18,8 @@ Config.DataStoreName = "AuraClicker_v3" -- v3 (2026-11-21): owner's fresh playte
 -- fields missing from an older save. IDs stored in saves (weapons,
 -- pets) must never be renamed without a migration.
 Config.StartingData = {
+	-- after the max level XP fills Возвышение points (Config.Ascension)
+	Ascension = { Points = 0, Xp = 0, Spent = {} },
 	Credits = 0, -- "Нано-кредиты" (монеты): forge, resets, cosmetics
 	Cores = 0, -- "Нано-ядра": from salvaged items, spent in the forge
 	Crystals = 0, -- "Кристаллы" earned in the game (quests, achievements, login, bosses, codes)
@@ -190,7 +192,7 @@ Config.Items = {
 	MaxInventory = 80,
 	LevelPerRoom = 5, -- item level of a drop = room x this -+ LevelSpread
 	LevelSpread = 2,
-	MaxLevel = 100,
+	MaxLevel = 160, -- a drop's item level = the player's level (-2..+1)
 	Weapon = { Base = 3, Growth = 1.046 }, -- L 25 -> 9, 50 -> 28, 75 -> 87, 100 -> 270 (Uncommon); slower than the room curve: levels, rarity and the forge close the gap
 	Armor = { HealthBase = 6, HealthPerLevel = 1.5, ChestMult = 1.5, DefenseBase = 0.015, DefensePerLevel = 0.0006 },
 	RarityMult = { Common = 0.85, Uncommon = 1, Rare = 1.15, Epic = 1.32, Legendary = 1.52, Mythic = 1.76, Secret = 2.05 },
@@ -382,11 +384,11 @@ Config.Gates = {
 	-- A rank opens at Level once a location of Requires was cleared.
 	RankInfo = {
 		E = { Name = "Ранг E", Level = 1, Text = "Первые разломы: роботы цеха и лаборатории" },
-		D = { Name = "Ранг D", Level = 8, Requires = "E", Text = "Опасные сектора: плавильня, заражение, Нексус" },
-		C = { Name = "Ранг C", Level = 18, Requires = "D", Text = "Кристальные пещеры и улей биомассы" },
-		B = { Name = "Ранг B", Level = 26, Requires = "C", Text = "Резервное ядро ИИ" },
-		A = { Name = "Ранг A", Level = 34, Requires = "B", Text = "Ледяная цитадель" },
-		S = { Name = "Ранг S", Level = 42, Requires = "A", Text = "Орбитальное ИИ-ядро" },
+		D = { Name = "Ранг D", Level = 20, Requires = "E", Text = "Опасные сектора: плавильня, заражение, Нексус" },
+		C = { Name = "Ранг C", Level = 55, Requires = "D", Text = "Кристальные пещеры и улей биомассы" },
+		B = { Name = "Ранг B", Level = 90, Requires = "C", Text = "Резервное ядро ИИ" },
+		A = { Name = "Ранг A", Level = 115, Requires = "B", Text = "Ледяная цитадель" },
+		S = { Name = "Ранг S", Level = 140, Requires = "A", Text = "Орбитальное ИИ-ядро" },
 	},
 	-- Locations: a path of Sections (each: how many enemies already stand
 	-- there as one group) + a boss arena. No waves: kill the group, the
@@ -400,33 +402,33 @@ Config.Gates = {
 			Tier = 1, TierStep = 1, Sections = { 5, 6, 4 }, Elites = { 0 }, BossTier = 2, Level = 1, GearScore = 10, ParSeconds = 200, Seed = 11,
 			Mobs = { "SpiderBot", "Assembler", "HoverDrone", "AsmGunner", "AsmShield" }, Boss = "ForemanMech", Icon = "gear" },
 		{ Id = "E_Cryo", Rank = "E", Biome = "Cryo", Name = "Криолаборатория", Text = "Ледяные камеры треснули. Внутри — то, что держали в холоде.",
-			Tier = 4, TierStep = 1, Sections = { 5, 6, 5 }, Level = 5, GearScore = 60, ParSeconds = 210, Seed = 23,
+			Tier = 4, TierStep = 1, Sections = { 5, 6, 5 }, Level = 10, GearScore = 40, ParSeconds = 210, Seed = 23,
 			Mobs = { "FrostSpider", "CryoAndroid", "WallTurret", "HoverDrone", "CryoMedic", "CryoBomber" }, Boss = "CryoOverseer", Icon = "vortex" },
 		{ Id = "D_Smelter", Rank = "D", Biome = "Smelter", Name = "Плавильный реактор", Text = "Каналы расплава, жар и тяжёлые мехи плавильни.",
-			Tier = 7, TierStep = 1, Sections = { 6, 6, 5 }, Level = 9, GearScore = 140, ParSeconds = 230, Seed = 37,
+			Tier = 7, TierStep = 1, Sections = { 6, 6, 5 }, Level = 20, GearScore = 80, ParSeconds = 230, Seed = 37,
 			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic", "SlagBomber" }, Boss = "MoltenColossus", Icon = "flame" },
 		{ Id = "D_Infected", Rank = "D", Biome = "Infected", Name = "Заражённый сектор", Text = "Нано-биомасса пожирает металл. Роботы стали её носителями.",
-			Tier = 9, TierStep = 1, Sections = { 5, 6, 6, 5 }, Level = 12, GearScore = 190, ParSeconds = 270, Seed = 41,
-			Mobs = { "InfectedCrawler", "InfectedBrute", "InfectedSpitter", "InfectedMedic", "SporeBomber", "InfectedStalker" }, Boss = "HiveMother", Icon = "skull" },
+			Tier = 9, TierStep = 1, Sections = { 5, 6, 6, 5 }, Level = 30, GearScore = 120, ParSeconds = 270, Seed = 41,
+			Mobs = { "ZombieWalker", "ZombieRunner", "ZombieBrute", "InfectedSpitter", "InfectedMedic", "SporeBomber" }, Boss = "HiveMother", Icon = "skull" },
 		{ Id = "D_Nexus", Rank = "D", Biome = "Nexus", Name = "Ядро Нексуса", Text = "Сердце ИИ. Его стражи не знают пощады.",
-			Tier = 11, TierStep = 1, Sections = { 6, 6, 7, 5 }, Level = 15, GearScore = 250, ParSeconds = 280, Seed = 53,
+			Tier = 11, TierStep = 1, Sections = { 6, 6, 7, 5 }, Level = 42, GearScore = 170, ParSeconds = 280, Seed = 53,
 			Mobs = { "PhaseAndroid", "NexusSentinel", "NanoSwarm", "WallTurret", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
 		-- higher ranks: mixed pools from several biomes, more elites with
 		-- more affixes (Config.Enemies.Affixes.Count)
 		{ Id = "C_Foundry", Rank = "C", Biome = "Crystal", Name = "Кристальные пещеры", Text = "Под цитаделью растут нано-кристаллы. Их охраняют дроны и турели.",
-			Tier = 14, TierStep = 1, Sections = { 6, 7, 7, 6 }, Elites = { 1, 2, 2, 2 }, Level = 18, GearScore = 330, ParSeconds = 300, Seed = 61,
+			Tier = 14, TierStep = 1, Sections = { 6, 7, 7, 6 }, Elites = { 1, 2, 2, 2 }, Level = 55, GearScore = 220, ParSeconds = 300, Seed = 61,
 			Mobs = { "FrostSpider", "CryoAndroid", "HoverDrone", "WallTurret", "NanoSwarm", "CryoBomber", "NexusSentinel" }, Boss = "CryoOverseer", Icon = "flame" },
 		{ Id = "C_Hive", Rank = "C", Biome = "Infected", Name = "Улей биомассы", Text = "Биомасса проросла сквозь этажи. Охотники нападают со спины.",
-			Tier = 15, TierStep = 1, Sections = { 6, 7, 7, 6 }, Elites = { 1, 2, 2, 2 }, Level = 20, GearScore = 360, ParSeconds = 300, Seed = 67,
-			Mobs = { "InfectedCrawler", "InfectedBrute", "NanoSwarm", "InfectedSpitter", "SporeBomber", "InfectedStalker" }, Boss = "HiveMother", Icon = "skull" },
+			Tier = 15, TierStep = 1, Sections = { 6, 7, 7, 6 }, Elites = { 1, 2, 2, 2 }, Level = 70, GearScore = 280, ParSeconds = 300, Seed = 67,
+			Mobs = { "ZombieWalker", "ZombieRunner", "ZombieBrute", "InfectedStalker", "InfectedSpitter", "SporeBomber" }, Boss = "HiveMother", Icon = "skull" },
 		{ Id = "B_Core", Rank = "B", Biome = "Nexus", Name = "Ядро-2", Text = "Резервное ядро ИИ. Фазовые стражи и всё, что они собрали.",
-			Tier = 17, TierStep = 1, Sections = { 7, 7, 8, 6 }, Elites = { 2, 2, 3, 2 }, Level = 26, GearScore = 440, ParSeconds = 320, Seed = 71,
+			Tier = 17, TierStep = 1, Sections = { 7, 7, 8, 6 }, Elites = { 2, 2, 3, 2 }, Level = 90, GearScore = 360, ParSeconds = 320, Seed = 71,
 			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic", "CryoPhantom", "SlagBomber" }, Boss = "Juggernaut", Icon = "eye" },
 		{ Id = "A_Citadel", Rank = "A", Biome = "Cryo", Name = "Ледяная цитадель", Text = "Замёрзшая крепость. Фантомы, турели и бомбы во льду.",
-			Tier = 19, TierStep = 1, Sections = { 7, 8, 8, 7 }, Elites = { 2, 3, 3, 3 }, Level = 34, GearScore = 520, ParSeconds = 340, Seed = 79,
+			Tier = 19, TierStep = 1, Sections = { 7, 8, 8, 7 }, Elites = { 2, 3, 3, 3 }, Level = 115, GearScore = 460, ParSeconds = 340, Seed = 79,
 			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic", "CryoBomber", "CryoPhantom", "NexusShield" }, Boss = "CryoOverseer", Icon = "vortex" },
 		{ Id = "S_Throne", Rank = "S", Biome = "Orbital", Name = "Орбитальное ИИ-ядро", Text = "Ядро ИИ на орбите. Последний рубеж.",
-			Tier = 21, TierStep = 1, Sections = { 8, 8, 8, 7 }, Elites = { 3, 3, 3, 3 }, Level = 42, GearScore = 600, ParSeconds = 360, Seed = 83,
+			Tier = 21, TierStep = 1, Sections = { 8, 8, 8, 7 }, Elites = { 3, 3, 3, 3 }, Level = 140, GearScore = 560, ParSeconds = 360, Seed = 83,
 			Mobs = { "PhaseAndroid", "NexusSentinel", "InfectedBrute", "SmeltGunner", "NexusShield", "SlagBomber", "InfectedStalker", "CryoPhantom", "NanoSwarm", "WallTurret" }, Boss = "AICore", Icon = "eye" },
 	},
 	Texts = {
@@ -465,7 +467,8 @@ Config.GateMap = {
 	Origin = Vector3.new(0, 0, -4000), -- far from the hub: never visible
 	SlotSpacing = 1600, -- runs sit side by side along X
 	MaxRuns = 24,
-	ZoneSize = 84, -- square zones
+	ZoneSize = 84, -- square zones (default)
+	Sizes = { 68, 78, 90, 104 }, -- 23.11: rooms of different sizes (seeded per location)
 	BossSize = 112, -- the boss arena
 	WallHeight = 26,
 	Corridor = { Length = 28, Width = 18, Height = 16 },
@@ -474,6 +477,23 @@ Config.GateMap = {
 	Pylons = 4, -- lamp pylons per zone
 	Ceiling = true, -- closed halls: a roof with girders and light slits
 	FloorTile = 18, -- studs per tile of the AI floor material
+	-- 23.11 Hazards: every room of a location has a few floor traps of its
+	-- biome; a trap shows a red circle (Warn s), then hits everyone on it
+	-- - players AND enemies (lure them in!). Every = seconds between hits.
+	Hazards = {
+		Count = 2, Radius = 7, Warn = 1.1, Every = { 5, 8 },
+		PlayerShare = 0.12, -- of the player's max HP
+		MobShare = 0.35, -- of an enemy's max HP (bosses: x0.15)
+		Kinds = {
+			Assembly = { Name = "Пресс", Color = Color3.fromRGB(255, 190, 60) },
+			Smelter = { Name = "Выброс лавы", Color = Color3.fromRGB(255, 110, 30) },
+			Cryo = { Name = "Крио-выброс", Color = Color3.fromRGB(120, 230, 255) },
+			Infected = { Name = "Споры", Color = Color3.fromRGB(120, 255, 90) },
+			Nexus = { Name = "Разряд", Color = Color3.fromRGB(255, 61, 184) },
+			Crystal = { Name = "Кристальный разряд", Color = Color3.fromRGB(170, 110, 255) },
+			Orbital = { Name = "Орбитальный луч", Color = Color3.fromRGB(196, 110, 255) },
+		},
+	},
 	-- glowing chevrons on the floor point the way to the exit (sheet 07)
 	Chevrons = { Every = 7, Width = 3.4 },
 	-- section layouts (GateMap), shuffled per location (seeded)
@@ -491,7 +511,10 @@ Config.GateMap = {
 --   XP / credits of a kill x Reward, elites x EliteReward, swarm x SwarmReward.
 Config.Sections = {
 	Elites = { 0, 0, 1, 1 },
-	Aggro = 30, -- studs
+	-- 23.11: a cleared section leaves a supply cache at its exit: credits
+	-- (x the kill credits of its tier), cores and an item with a chance
+	Cache = { Credits = 12, Cores = 4, ItemChance = 0.6, Text = "Контейнер снабжения: +%s кр., +%d ядер" },
+	Aggro = 44, -- studs: entering the room wakes its group
 	ClearHeal = 0.5, -- a cleared section heals every member by this share of max HP
 	Spread = 10, -- radius of a group
 	GroupCount = 0.35,
@@ -646,6 +669,10 @@ Config.Mobs = {
 		WallTurret = { Name = "Настенная турель", Role = "Turret", Asset = "Mob_Turret", Height = 4.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "SnowGolem" },
 		NanoSwarm = { Name = "Нано-рой", Role = "Swarm", Asset = "Mob_Swarm", Height = 3.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "FlyingEye", Float = true },
 		AICore = { Name = "ИИ-Ядро", Boss = true, Asset = "Boss_AICore", Height = 7.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord", Float = true, Title = "Центральный нано-интеллект" },
+		-- zombies (Studio avatar generator, GameAssets/Mobs/Rig_Zombie; own head)
+		ZombieWalker = { Name = "Зомби-рабочий", Role = "Melee", Rig = "Rig_Zombie", Helmet = false, Height = 5.6, Glow = Color3.fromRGB(120, 255, 90), Builder = "ZombieMiner" },
+		ZombieRunner = { Name = "Зомби-бегун", Role = "Swarm", Rig = "Rig_Zombie", Helmet = false, Height = 4.8, Tint = Color3.fromRGB(150, 200, 130), TintAmount = 0.3, Glow = Color3.fromRGB(120, 255, 90), Builder = "ZombieMiner" },
+		ZombieBrute = { Name = "Зомби-громила", Role = "Shield", Rig = "Rig_Zombie", Helmet = false, Height = 7.2, Tint = Color3.fromRGB(110, 150, 100), TintAmount = 0.35, Glow = Color3.fromRGB(120, 255, 90), Builder = "Yeti" },
 		-- Bombers and blinkers (spiders / androids with new behaviour)
 		CryoBomber = { Name = "Крио-подрывник", Role = "Bomber", Asset = "Mob_SpiderBot", Height = 2.6, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider" },
 		SlagBomber = { Name = "Шлак-подрывник", Role = "Bomber", Asset = "Mob_SpiderBot", Height = 2.6, Tint = Color3.fromRGB(255, 110, 40), TintAmount = 0.55, Glow = Color3.fromRGB(255, 140, 40), Builder = "GoblinSmith" },
@@ -740,17 +767,19 @@ Config.Party = {
 
 Config.Enemies = {
 	Roles = {
-		Melee = { Health = 1, Damage = 1, Speed = 12, Range = 4.5, Cooldown = 1.6, Telegraph = 0.55 },
-		Swarm = { Health = 0.35, Damage = 0.45, Speed = 17, Range = 3.5, Cooldown = 1.1, Telegraph = 0.35, Pack = 3 },
-		Ranged = { Health = 0.75, Damage = 0.9, Speed = 10, Range = 40, Keep = 22, Cooldown = 2.8, Telegraph = 0.8, Width = 2.6 },
-		Shield = { Health = 1.7, Damage = 1.1, Speed = 8, Range = 5, Cooldown = 2.2, Telegraph = 0.7, Front = 70, Block = 0.8 },
-		Healer = { Health = 0.7, Damage = 0, Speed = 11, Keep = 26, Every = 4, Heal = 0.18, Range = 30 },
+		-- 23.11: one rhythm for everyone - similar speeds, a clear 0.6 s
+		-- wind-up, a strike, then Recover seconds of standing still
+		Melee = { Health = 1, Damage = 1, Speed = 14, Range = 5, Cooldown = 1.8, Telegraph = 0.6 },
+		Swarm = { Health = 0.35, Damage = 0.45, Speed = 15, Range = 4, Cooldown = 1.4, Telegraph = 0.45, Pack = 3 },
+		Ranged = { Health = 0.75, Damage = 0.9, Speed = 12, Range = 40, Keep = 22, Cooldown = 2.6, Telegraph = 0.8, Width = 2.6 },
+		Shield = { Health = 1.7, Damage = 1.1, Speed = 12, Range = 5.5, Cooldown = 2.2, Telegraph = 0.7, Front = 70, Block = 0.8 },
+		Healer = { Health = 0.7, Damage = 0, Speed = 12, Keep = 26, Every = 4, Heal = 0.18, Range = 30 },
 		-- a wall turret: never moves, long range, shoots bolts (sheet 04)
 		Turret = { Health = 1.1, Damage = 1, Speed = 0, Range = 52, Keep = 0, Cooldown = 2.2, Telegraph = 0.7, Width = 2.4 },
 		-- runs at the player, stops, flashes and blows itself up (Radius)
-		Bomber = { Health = 0.4, Damage = 2.2, Speed = 19, Range = 6, Radius = 9, Telegraph = 0.9, Cooldown = 99 },
+		Bomber = { Health = 0.4, Damage = 2.2, Speed = 16, Range = 6, Radius = 9, Telegraph = 0.9, Cooldown = 99 },
 		-- blinks behind the player (Blink seconds apart), then strikes
-		Blinker = { Health = 0.8, Damage = 1.1, Speed = 13, Range = 4.5, Cooldown = 1.5, Telegraph = 0.45, Blink = 5, BlinkFrom = 9 },
+		Blinker = { Health = 0.8, Damage = 1.1, Speed = 14, Range = 5, Cooldown = 1.8, Telegraph = 0.55, Blink = 6, BlinkFrom = 12 },
 	},
 	RoleNames = { Melee = "ближний бой", Swarm = "рой", Ranged = "стрелок", Shield = "щитоносец", Healer = "лекарь", Bomber = "подрывник", Blinker = "телепортер", Turret = "турель" },
 	DeathSeconds = 1.4, -- a rigged mob stays this long after death (animation + dissolve)
@@ -834,7 +863,8 @@ Config.Enemies = {
 	-- knocked back (studs/s; elites and bosses harder). Within Surround.From
 	-- studs melee mobs spread around the player instead of queueing.
 	-- Ranged mobs side-step Strafe.Distance every Strafe.Every seconds.
-	Lunge = { Distance = 4, Seconds = 0.12, Knock = 38, KnockElite = 60 },
+	Lunge = { Distance = 0, Seconds = 0.12, Knock = 30, KnockElite = 48 }, -- Distance 0: no lunge (it looked like a teleport)
+	Recover = 0.5, -- after a strike the mob stands still this long
 	Surround = { From = 14 },
 	Strafe = { Every = 1.6, Distance = 7 },
 	-- Ranged shots are visible projectiles (client AbilityFx "Bolt"): they
@@ -1202,12 +1232,15 @@ Config.Combat = {
 	FxColor = Color3.fromRGB(46, 230, 255),
 	-- Feel of a hit: knockback impulse (studs/s, crits and abilities x
 	-- CritMult), a short stagger of the mob, client hitstop and combo.
-	Knockback = { Normal = 10, CritMult = 2.2, Stagger = 0.18, EliteMult = 0.4 },
+	-- a regular hit only flinches the mob (no stop); crits, the 3rd combo
+	-- hit and skills push it a little and stagger it (Stagger seconds, not
+	-- again within StaggerEvery)
+	Knockback = { Normal = 0, CritMult = 7, Stagger = 0.25, StaggerEvery = 1.5, EliteMult = 0.4 },
 	HitStop = { Normal = 0.05, Crit = 0.1, Heavy = 0.12 }, -- Heavy: 3rd combo hit, finisher, skills
 	Combo = { Window = 2, Text = "КОМБО x%d" },
 	-- Finisher: a hit on a (non-boss) enemy below Threshold of its health
 	-- is a finishing blow: x Mult damage, extra knockback, "ДОБИВАНИЕ".
-	Execute = { Threshold = 0.25, Mult = 2.2, Knockback = 2.5, Text = "ДОБИВАНИЕ" },
+	Execute = { Threshold = 0.25, Mult = 2.2, Knockback = 14, Text = "ДОБИВАНИЕ" },
 	-- Camera shake (amplitude in studs, seconds) by hit strength.
 	Shake = { Heavy = { 0.35, 0.18 }, Execute = { 0.5, 0.22 }, Skill = { 0.45, 0.25 } },
 	HurtEvery = 0.6, -- seconds: the "hit taken" reaction plays at most this often
@@ -1493,6 +1526,57 @@ function Config.RecommendedDamage(room: number): number
 	return math.max(1, math.floor(value))
 end
 
+-- 23.11: enemies scale with the LEVEL of their location (Gates.Locations
+-- .Level + LevelPerSection per section, + BossLevels for the boss), so
+-- the 160-level curve and the content always match:
+--   ExpectedDamage(L) = what a player of level L hits with an Uncommon
+--   weapon of their level, a little enhance and some Сила;
+--   ExpectedHealth(L) = their max HP with armor of their level.
+function Config.ExpectedDamage(level: number): number
+	local function at(l)
+		local w = Config.Items.Weapon
+		local weapon = w.Base * w.Growth ^ l * (Config.Items.RarityMult.Uncommon or 1)
+		local enhance = 1 + Config.Forge.PerLevel * math.min(10, l / 12)
+		local str = 1 + 0.01 * Config.Attributes.PointsPerLevel * (l - 1) * 0.4
+		return weapon * enhance * str * Config.LevelMult(l)
+	end
+	if level < 5 then
+		return 1 + (at(5) - 1) * (level - 1) / 4 -- a fresh player with the Stick
+	end
+	return at(level)
+end
+
+function Config.ExpectedHealth(level: number): number
+	local a = Config.Items.Armor
+	local armor = (a.HealthBase + a.HealthPerLevel * level) * 3.5
+	return Config.Player.Health + Config.Stats.HealthPerLevel * (level - 1) + armor
+end
+
+function Config.ExpectedDefense(level: number): number
+	local a = Config.Items.Armor
+	return math.min(0.6, Config.Stats.DefensePerLevel * (level - 1) + 3 * (a.DefenseBase + a.DefensePerLevel * level))
+end
+
+Config.Difficulty = {
+	LevelPerSection = 2,
+	BossLevels = 4, -- the boss is this many levels above the location
+	HitsToKill = 3, -- a regular enemy at the right level
+	BossHits = 40,
+	HitShare = 0.04, -- one hit of a regular enemy = this share of the player's HP (after defense)
+	BossHitMult = 1.6,
+}
+
+function Config.MobHealthAt(level: number, isBoss: boolean): number
+	local d = Config.Difficulty
+	return Config.ExpectedDamage(level) * (if isBoss then d.BossHits else d.HitsToKill)
+end
+
+function Config.MobDamageAt(level: number, isBoss: boolean): number
+	local d = Config.Difficulty
+	local hit = Config.ExpectedHealth(level) * d.HitShare / (1 - Config.ExpectedDefense(level))
+	return math.max(1, math.floor(hit * (if isBoss then d.BossHitMult else 1)))
+end
+
 function Config.MobHealth(room: number, isBoss: boolean): number
 	local d = Config.Dungeon
 	return Config.RecommendedDamage(room) * (if isBoss then d.BossClicksToKill else d.ClicksToKill)
@@ -1558,23 +1642,40 @@ Config.Weapons = {
 -- Bonus (damage multiplier). Style = look built by Shared.ArmorBuilder.
 Config.ArmorSlots = { "Helmet", "Chest", "Legs" }
 Config.ArmorSlotNames = { Helmet = "Шлем", Chest = "Нагрудник", Legs = "Поножи" }
+-- 23.11: five sets. Drop sets follow the item level (Biome 1..5 =
+-- levels 1-32, 33-64, 65-96, 97-128, 129-160); wearing 2 pieces of one
+-- set gives Set2, all 3 (the full set) also Set3 (StatService).
 Config.ArmorSets = {
 	Bone = { Name = "Сет монтажника", Biome = 1, Rarity = "Uncommon", Health = 20, Defense = 0.03, Bonus = 0.10, ItemLevel = 20,
+		Set2 = { HealthPct = 0.08 }, Set3 = { DamagePct = 0.12, Regen = 3 },
 		Style = { Kind = "Assembly", Main = Color3.fromRGB(70, 74, 84), Trim = Color3.fromRGB(255, 176, 50), Glow = Color3.fromRGB(255, 190, 70), Visor = Color3.fromRGB(30, 34, 40), Material = Enum.Material.Metal } },
 	Ice = { Name = "Крио-сет", Biome = 2, Rarity = "Rare", Health = 45, Defense = 0.05, Bonus = 0.20, ItemLevel = 45,
+		Set2 = { Defense = 0.05 }, Set3 = { DamagePct = 0.2, SlowOnHit = 1.2 },
 		Style = { Kind = "Cryo", Main = Color3.fromRGB(226, 234, 244), Trim = Color3.fromRGB(120, 150, 180), Glow = Color3.fromRGB(46, 230, 255), Visor = Color3.fromRGB(140, 220, 255), Material = Enum.Material.SmoothPlastic } },
 	Lava = { Name = "Термо-сет", Biome = 3, Rarity = "Epic", Health = 90, Defense = 0.07, Bonus = 0.35, ItemLevel = 70,
+		Set2 = { CritChance = 0.05 }, Set3 = { DamagePct = 0.25, CritDamage = 0.4 },
 		Style = { Kind = "Thermo", Main = Color3.fromRGB(46, 42, 44), Trim = Color3.fromRGB(110, 70, 50), Glow = Color3.fromRGB(255, 120, 30), Visor = Color3.fromRGB(255, 140, 40), Material = Enum.Material.DiamondPlate } },
 	Abyss = { Name = "Сет Нексуса", Biome = 4, Rarity = "Legendary", Health = 160, Defense = 0.09, Bonus = 0.50, ItemLevel = 95,
+		Set2 = { AttackSpeed = 0.1 }, Set3 = { DamagePct = 0.3, Lifesteal = 0.04 },
 		Style = { Kind = "Nexus", Main = Color3.fromRGB(34, 26, 52), Trim = Color3.fromRGB(110, 70, 190), Glow = Color3.fromRGB(255, 61, 184), Visor = Color3.fromRGB(255, 61, 184), Material = Enum.Material.Metal } },
-	-- Robux exclusive (Config.Products "ArmorRoyal"): between Ice and Lava.
+	Orbit = { Name = "Орбитальный сет", Biome = 5, Rarity = "Legendary", Health = 220, Defense = 0.1, Bonus = 0.6, ItemLevel = 145,
+		Set2 = { HealthPct = 0.12, Luck = 0.15 }, Set3 = { DamagePct = 0.4, CritChance = 0.06, DropChance = 0.03 },
+		Style = { Kind = "Nexus", Main = Color3.fromRGB(230, 226, 236), Trim = Color3.fromRGB(226, 182, 92), Glow = Color3.fromRGB(255, 201, 60), Visor = Color3.fromRGB(255, 201, 60), Material = Enum.Material.Metal } },
+	-- Robux exclusive (Config.Products "ArmorRoyal")
 	Royal = { Name = "Королевский сет", Rarity = "Legendary", Health = 70, Defense = 0.06, Bonus = 0.28, ItemLevel = 60, Robux = true,
+		Set2 = { Luck = 0.15 }, Set3 = { DamagePct = 0.2, XpPct = 0.15 },
 		Style = { Kind = "Royal", Main = Color3.fromRGB(240, 240, 248), Trim = Color3.fromRGB(255, 201, 60), Glow = Color3.fromRGB(46, 230, 255), Visor = Color3.fromRGB(46, 230, 255), Material = Enum.Material.Metal } },
 }
-Config.ArmorSetOrder = { "Bone", "Ice", "Lava", "Abyss", "Royal" }
+-- names of the set bonus stats (inventory)
+Config.SetStatNames = {
+	DamagePct = "урона", HealthPct = "HP", Defense = "защиты", CritChance = "шанса крита", CritDamage = "крит. урона",
+	AttackSpeed = "скорости атаки", Lifesteal = "вампиризма", Luck = "удачи", DropChance = "шанса добычи",
+	Regen = "HP/с регенерации", SlowOnHit = "с замедления от удара", XpPct = "опыта",
+}
+Config.ArmorSetOrder = { "Bone", "Ice", "Lava", "Abyss", "Orbit", "Royal" }
 Config.Armor = {}
 do
-	local adjective = { Bone = { "Монтажный", "Монтажные" }, Ice = { "Крио-", "Крио-" }, Lava = { "Термо-", "Термо-" }, Royal = { "Королевский", "Королевские" } }
+	local adjective = { Bone = { "Монтажный", "Монтажные" }, Ice = { "Крио-", "Крио-" }, Lava = { "Термо-", "Термо-" }, Orbit = { "Орбитальный", "Орбитальные" }, Royal = { "Королевский", "Королевские" } }
 	local noun = { Helmet = "шлем", Chest = "нагрудник", Legs = "поножи" }
 	local nounCapital = { Helmet = "Шлем", Chest = "Нагрудник", Legs = "Поножи" }
 	for _, setId in ipairs(Config.ArmorSetOrder) do
@@ -1879,6 +1980,18 @@ Config.Progression = {
 	--   tools/pacing.py --tune to Pacing.Targets.Levels (21.11): level 5
 	--   ~10 min, 10 ~30 min, 25 ~4 h of active play, slower after 25
 	Level = {
+		-- 23.11 (owner): max level 160; level 120 in ~2 h, 160 in ~8 h of
+		-- active play. Time per level (minutes) = Fast + level / FastSlope up
+		-- to SlowFrom, then SlowBase x SlowGrowth^(level - SlowFrom); a kill
+		-- gives XpToNext / (that time x KillsPerMinute), so the pace holds no
+		-- matter which location is farmed (far too easy ones give less).
+		MaxLevel = 160,
+		KillsPerMinute = 5.5,
+		Fast = 0.3, FastSlope = 86, SlowFrom = 120, SlowBase = 1.7, SlowGrowth = 1.07,
+		BossKills = 8, -- a boss = this many kills
+		QuestKills = 12, -- a quest reward = this many kills (x the quest's XpMult)
+		-- a location far below the player's level gives less XP
+		EasyGap = 25, EasyDrop = 0.04, EasyMin = 0.2,
 		XpBase = 44.3,
 		XpExponent = 2.025,
 		-- after LateFrom every level costs LateGrowth times more on top of
@@ -1899,11 +2012,51 @@ Config.Progression = {
 	},
 }
 
--- XP needed for the next level at `level` (formula above).
+-- XP needed for the next level at `level` (a smooth number to show; the
+-- pace comes from Config.KillXp).
 function Config.XpToNext(level: number): number
+	return math.floor(40 * math.max(1, level) ^ 1.6 + 60)
+end
+
+-- Minutes of active play one level takes (Progression.Level).
+function Config.LevelMinutes(level: number): number
 	local l = Config.Progression.Level
-	local late = if level > l.LateFrom then l.LateGrowth ^ (level - l.LateFrom) else 1
-	return math.floor(l.XpBase * math.max(1, level) ^ l.XpExponent * late)
+	if level < l.SlowFrom then
+		return l.Fast + level / l.FastSlope
+	end
+	return l.SlowBase * l.SlowGrowth ^ (level - l.SlowFrom)
+end
+
+-- XP of one regular kill for a player of `level`.
+function Config.KillXp(level: number): number
+	local l = Config.Progression.Level
+	level = math.clamp(level, 1, l.MaxLevel)
+	return Config.XpToNext(level) / (Config.LevelMinutes(level) * l.KillsPerMinute)
+end
+
+-- Возвышение (after the max level): every point costs XP and gives a
+-- small boost of the line it is spent in; MaxPoints in total.
+Config.Ascension = {
+	MaxPoints = 400,
+	Minutes = 12, -- of active play per point
+	Lines = {
+		{ Id = "Damage", Name = "Мощь", Icon = "sword", Stat = "DamagePct", Per = 0.006, Text = "+0.6% урона" },
+		{ Id = "Health", Name = "Стойкость", Icon = "heart", Stat = "HealthPct", Per = 0.008, Text = "+0.8% HP" },
+		{ Id = "Crit", Name = "Точность", Icon = "target", Stat = "CritChance", Per = 0.0015, Text = "+0.15% крита" },
+		{ Id = "Luck", Name = "Фортуна", Icon = "eye", Stat = "Luck", Per = 0.01, Text = "+1% удачи" },
+	},
+	Texts = {
+		Title = "ВОЗВЫШЕНИЕ",
+		Free = "Очки возвышения: %d",
+		Total = "%d / %d",
+		Got = "+1 очко возвышения",
+		Max = "Все очки возвышения получены",
+		NoPoints = "Нет очков возвышения",
+	},
+}
+
+function Config.AscensionXp(): number
+	return math.floor(Config.KillXp(Config.Progression.Level.MaxLevel) * Config.Progression.Level.KillsPerMinute * Config.Ascension.Minutes)
 end
 
 -- Equipment on the character (visual only). Grip = offset of the weapon
@@ -2774,10 +2927,10 @@ Config.Ui = {
 -- Ranks by level (shown under the name in the profile).
 Config.Ranks = {
 	{ Level = 1, Name = "Новобранец" },
-	{ Level = 10, Name = "Оператор" },
-	{ Level = 20, Name = "Страж" },
-	{ Level = 35, Name = "Командор" },
-	{ Level = 50, Name = "Легенда Нексуса" },
+	{ Level = 20, Name = "Оператор" },
+	{ Level = 55, Name = "Страж" },
+	{ Level = 90, Name = "Командор" },
+	{ Level = 140, Name = "Легенда Нексуса" },
 }
 
 function Config.RankFor(level: number)

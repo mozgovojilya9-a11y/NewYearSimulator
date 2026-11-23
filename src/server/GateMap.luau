@@ -747,11 +747,41 @@ local function buildZone(folder, biome, rng: Random, index: number, center: Vect
 	end
 	roof(m, biome, center, size, size, H)
 	m.Parent = folder
+	-- trap spots: free floor away from the doors and the post
+	local hazards = {}
+	local tries = 0
+	while #hazards < G.Hazards.Count and tries < 40 do
+		tries += 1
+		local p = center + Vector3.new(rng:NextNumber(-half * 0.6, half * 0.6), 0, rng:NextNumber(-half * 0.6, half * 0.6))
+		local ok = free(p, G.Hazards.Radius)
+		for _, b in ipairs(blocks) do
+			if Vector3.new(p.X - b.X, 0, p.Z - b.Z).Magnitude < G.Hazards.Radius + 5 then
+				ok = false
+			end
+		end
+		for _, h in ipairs(hazards) do
+			if (h - p).Magnitude < G.Hazards.Radius * 2.5 then
+				ok = false
+			end
+		end
+		if ok then
+			table.insert(hazards, p)
+			-- the trap's plate: a steel ring with hazard marks (looks dangerous at rest)
+			local kind = G.Hazards.Kinds[biome.Theme] or G.Hazards.Kinds.Assembly
+			local plate = NanoKit.Cylinder(m, "HazardPlate", 0.12, G.Hazards.Radius * 2, CFrame.new(p + Vector3.new(0, 0.06, 0)) * CFrame.Angles(0, 0, math.rad(90)), biome.Metal:Lerp(Color3.new(0, 0, 0), 0.3), M.Plate)
+			plate.CanCollide = false
+			for k = 0, 7 do
+				local a = k / 8 * math.pi * 2
+				Panel(m, "HazardMark", Vector3.new(1.6, 0.05, 0.5), CFrame.new(p + Vector3.new(math.cos(a) * (G.Hazards.Radius - 1), 0.14, math.sin(a) * (G.Hazards.Radius - 1))) * CFrame.Angles(0, -a, 0), kind.Color, M.Neon, { CanCollide = false, Transparency = 0.35 })
+			end
+		end
+	end
 	return {
 		Index = index,
 		Model = m,
 		Center = center,
 		Size = size,
+		Hazards = hazards,
 		Post = post,
 		Blocks = blocks,
 		Exit = exitBarrier,
@@ -891,14 +921,21 @@ function GateMap.Build(location, slot: number)
 		local j = rng:NextInteger(1, i)
 		order[i], order[j] = order[j], order[i]
 	end
+	-- every room its own size (Config.GateMap.Sizes, seeded)
+	local sizes = {}
 	for index = 1, #location.Sections do
+		sizes[index] = G.Sizes[rng:NextInteger(1, #G.Sizes)]
+	end
+	size = sizes[1]
+	for index = 1, #location.Sections do
+		size = sizes[index]
 		local exitX = rng:NextInteger(-math.floor(size * 0.28), math.floor(size * 0.28))
 		local layout = order[(index - 1) % #order + 1]
 		local zone = buildZone(folder, biome, rng, index, center, size, entryX, exitX, layout)
 		table.insert(zones, zone)
 		-- the next room's door sits right in front of this exit
 		local doorOut = center + Vector3.new(exitX, 0, -size / 2)
-		local nextSize = if index == #location.Sections then G.BossSize else size
+		local nextSize = if index == #location.Sections then G.BossSize else sizes[index + 1]
 		local nextEntryX = rng:NextInteger(-math.floor(nextSize * 0.2), math.floor(nextSize * 0.2))
 		local nextCenter = Vector3.new(doorOut.X - nextEntryX, center.Y, doorOut.Z - C.Length - nextSize / 2)
 		buildCorridor(folder, biome, doorOut, Vector3.new(doorOut.X, center.Y, doorOut.Z - C.Length))
@@ -909,7 +946,7 @@ function GateMap.Build(location, slot: number)
 	local arena = buildArena(folder, biome, center, G.BossSize, entryX, location.Boss)
 	-- bedrock and the lowest point
 	local first = zones[1].Center
-	local minZ, maxZ = center.Z - G.BossSize, first.Z + size
+	local minZ, maxZ = center.Z - G.BossSize, first.Z + sizes[1]
 	WorldKit.Part(folder, {
 		Name = "Bedrock",
 		Size = Vector3.new(size * 4, 4, maxZ - minZ),

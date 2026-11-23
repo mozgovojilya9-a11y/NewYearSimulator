@@ -106,10 +106,36 @@ local function compute(player)
 			wear(piece)
 		end
 	end
-	local set = PlayerState.ActiveSet(player)
+	-- set bonuses: 2 pieces of one set -> Set2, all 3 -> Set2 + Set3
 	local damageMult = 1
-	if set then
-		damageMult *= 1 + set.Bonus
+	local setBonus = {}
+	local counts = {}
+	for _, slot in ipairs(Config.ArmorSlots) do
+		local piece = PlayerState.ArmorIn(player, slot)
+		if piece and piece.Set then
+			counts[piece.Set] = (counts[piece.Set] or 0) + 1
+		end
+	end
+	for setId, n in pairs(counts) do
+		local def = Config.ArmorSets[setId]
+		if def then
+			for stat, v in pairs(if n >= 2 then def.Set2 or {} else {}) do
+				setBonus[stat] = (setBonus[stat] or 0) + v
+			end
+			for stat, v in pairs(if n >= 3 then def.Set3 or {} else {}) do
+				setBonus[stat] = (setBonus[stat] or 0) + v
+			end
+		end
+	end
+	-- Возвышение points
+	local asc = {}
+	if type(data.Ascension) == "table" and type(data.Ascension.Spent) == "table" then
+		for _, line in ipairs(Config.Ascension.Lines) do
+			local n = data.Ascension.Spent[line.Id] or 0
+			if n > 0 then
+				asc[line.Stat] = (asc[line.Stat] or 0) + n * line.Per
+			end
+		end
 	end
 
 	-- Skill tree passives of the current class
@@ -131,6 +157,8 @@ local function compute(player)
 	end
 	add(skill)
 	add(gear)
+	add(setBonus)
+	add(asc)
 	for _, source in ipairs(StatService.Sources) do
 		add(source(player, data) or {})
 	end
@@ -164,7 +192,7 @@ local function compute(player)
 
 	-- XP and credits multipliers
 	local vip = if Passes.Owns(player, "VIP") then 1 + Config.VipBonus else 1
-	stats.XpMult = vip * (if Passes.Owns(player, "Xp2x") then 2 else 1) * (if PlayerState.BoostActive(player, "Xp") then 2 else 1)
+	stats.XpMult = vip * (if Passes.Owns(player, "Xp2x") then 2 else 1) * (if PlayerState.BoostActive(player, "Xp") then 2 else 1) * (1 + (bonus.XpPct or 0))
 	stats.CreditsMult = vip * (if Passes.Owns(player, "Credits2x") then 2 else 1) * (if PlayerState.BoostActive(player, "Credits") then 2 else 1)
 
 	-- Damage = weapon x level x bonuses

@@ -188,9 +188,9 @@ for index, slot in ipairs(SLOTS) do
 end
 local totals = Style.Panel(content, { Position = UDim2.fromOffset(0, DOLL_H + 8), Size = UDim2.new(0, LEFT, 1, -(DOLL_H + 8)), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33 })
 local scoreLabel = Style.Label(totals, "", 15, C.Gold, { Position = UDim2.fromOffset(10, 8), Size = UDim2.new(1, -20, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
-local setLabel = Style.Label(totals, "", 12, C.Muted, { Position = UDim2.fromOffset(10, 28), Size = UDim2.new(1, -20, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 34 })
-local moneyLabel = Style.Label(totals, "", 13, C.Text, { Position = UDim2.fromOffset(10, 62), Size = UDim2.new(1, -20, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
-local countLabel = Style.Label(totals, "", 12, C.Muted, { Position = UDim2.fromOffset(10, 80), Size = UDim2.new(1, -20, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
+local setLabel = Style.Label(totals, "", 11, C.Muted, { Position = UDim2.fromOffset(10, 28), Size = UDim2.new(1, -20, 0, 44), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 34 })
+local moneyLabel = Style.Label(totals, "", 13, C.Text, { Position = UDim2.fromOffset(10, 76), Size = UDim2.new(1, -20, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
+local countLabel = Style.Label(totals, "", 12, C.Muted, { Position = UDim2.fromOffset(10, 94), Size = UDim2.new(1, -20, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
 
 ---------------------------------------------------------------------
 -- Center: filters, sort, mass salvage, grid
@@ -507,13 +507,37 @@ function refresh()
 		end
 	end
 	scoreLabel.Text = "GEAR SCORE  " .. Format.Number(player:GetAttribute("Stat_GearScore") or 0)
-	local set = Config.ArmorSets[player:GetAttribute("ArmorSet") or ""]
-	if set then
-		setLabel.Text = ("Сет «%s» 3/3: +%d%% урона"):format(set.Name, math.floor(set.Bonus * 100 + 0.5))
-		setLabel.TextColor3 = C.Gold
-	else
-		setLabel.Text = "Бонус сета: 3 части одного сета брони"
-		setLabel.TextColor3 = C.Muted
+	-- set bonuses (Config.ArmorSets Set2 / Set3): the set with the most worn pieces
+	do
+		local counts, best, bestN = {}, nil, 0
+		for _, slot in ipairs({ "Helmet", "Chest", "Legs" }) do
+			local worn = PlayerData.Worn(slot)
+			local base = worn and Config.ItemById.Armor and Config.ItemById.Armor[worn.Id]
+			local setId = worn and (worn.Set or (base and base.Set)) -- the view reads its base
+			if setId then
+				counts[setId] = (counts[setId] or 0) + 1
+				if counts[setId] > bestN then
+					best, bestN = setId, counts[setId]
+				end
+			end
+		end
+		local def = best and Config.ArmorSets[best]
+		local function line(bonus)
+			local parts = {}
+			for stat, v in pairs(bonus or {}) do
+				local name = Config.SetStatNames[stat] or stat
+				local text = if stat == "Regen" or stat == "SlowOnHit" then ("+%s %s"):format(tostring(v), name) else ("+%d%% %s"):format(math.floor(v * 100 + 0.5), name)
+				table.insert(parts, text)
+			end
+			return table.concat(parts, ", ")
+		end
+		if def then
+			setLabel.Text = ("«%s» %d/3\n2: %s\n3: %s"):format(def.Name, bestN, line(def.Set2), line(def.Set3))
+			setLabel.TextColor3 = if bestN >= 3 then C.Gold elseif bestN >= 2 then C.Text else C.Muted
+		else
+			setLabel.Text = "Собери 2–3 части одного сета брони: бонусы"
+			setLabel.TextColor3 = C.Muted
+		end
 	end
 	moneyLabel.Text = ("%s кр.   •   %s ядер"):format(Format.Number(player:GetAttribute("Credits") or 0), Format.Number(player:GetAttribute("Cores") or 0))
 
