@@ -306,12 +306,6 @@ function HubIsland.Build(root, base: Vector3)
 	for _, side in ipairs({ -1, 1 }) do
 		NanoKit.Strip(folder, (bcf * CFrame.new(side * AB.Width / 2, 0.2, -length / 2)).Position, (bcf * CFrame.new(side * AB.Width / 2, 0.2, length / 2)).Position, AB.Color, 0.3)
 	end
-	local count = math.floor(length / 8)
-	for k = 1, count do
-		local p = (bcf * CFrame.new(0, 0.25, -length / 2 + k * length / (count + 1))).Position
-		local chevron = Panel(folder, "BridgeChevron", Vector3.new(AB.Width * 0.5, 0.1, 0.5), CFrame.lookAt(p, p + bcf.LookVector), AB.Color, M.Neon, { CanCollide = false, CastShadow = false, Transparency = 0.3 })
-		NanoKit.Tag(chevron, "Pulse", { Period = 1.6 + (k % 3) * 0.2 })
-	end
 	-- 5. nobody walks off the edge
 	for i = 1, 4 do
 		local a, b = top + corners[i], top + corners[i % 4 + 1]

@@ -179,7 +179,7 @@ RunService.RenderStepped:Connect(function()
 	last = now
 	local place = player:GetAttribute("StoryPlace") or ""
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if place == "" or not root or player:GetAttribute("Zone") ~= "Hub" then
+	if not G.Arrows or place == "" or not root or player:GetAttribute("Zone") ~= "Hub" then
 		hideFrom(1)
 		return
 	end

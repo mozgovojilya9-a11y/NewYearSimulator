@@ -494,8 +494,6 @@ Config.GateMap = {
 			Orbital = { Name = "Орбитальный луч", Color = Color3.fromRGB(196, 110, 255) },
 		},
 	},
-	-- glowing chevrons on the floor point the way to the exit (sheet 07)
-	Chevrons = { Every = 7, Width = 3.4 },
 	-- section layouts (GateMap), shuffled per location (seeded)
 	Layouts = { "Pillars", "Cross", "Core", "Split" }, -- clean rooms: one clear shape, nothing scattered
 	Texts = { Zone = "ЗОНА %d", Boss = "АРЕНА" },
@@ -633,52 +631,52 @@ Config.Mobs = {
 	-- their non-humanoid mesh models (Asset, rigged with a Core joint).
 	Defs = {
 		-- 1. Сборочный цех
-		SpiderBot = { Name = "Паукобот", Role = "Swarm", Asset = "Mob_SpiderBot", Height = 2.8, Builder = "IceSpider" },
-		Assembler = { Name = "Робот-сборщик", Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 5.6, Tint = Color3.fromRGB(255, 190, 70), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "ZombieMiner" },
-		AsmGunner = { Name = "Монтажник-стрелок", Role = "Ranged", Rig = "Rig_Assembler", Weapon = "Weapon_Blaster_2", Asset = "Mob_Sniper", Height = 5.6, Glow = Color3.fromRGB(255, 190, 70), Builder = "SkeletonArcher" },
-		AsmShield = { Name = "Щитовой погрузчик", Role = "Shield", Rig = "Rig_Heavy", Asset = "Mob_ShieldBearer", Height = 6, Glow = Color3.fromRGB(255, 190, 70), Builder = "ZombieMiner" },
+		SpiderBot = { Name = "Паукобот", Speed = 11, Role = "Swarm", Asset = "Mob_SpiderBot", Height = 2.8, Builder = "IceSpider" },
+		Assembler = { Name = "Робот-сборщик", Speed = 9, Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 5.6, Tint = Color3.fromRGB(255, 190, 70), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "ZombieMiner" },
+		AsmGunner = { Name = "Монтажник-стрелок", Speed = 8, Role = "Ranged", Rig = "Rig_Assembler", Weapon = "Weapon_Blaster_2", Asset = "Mob_Sniper", Height = 5.6, Glow = Color3.fromRGB(255, 190, 70), Builder = "SkeletonArcher" },
+		AsmShield = { Name = "Щитовой погрузчик", Speed = 7, Role = "Shield", Rig = "Rig_Heavy", Asset = "Mob_ShieldBearer", Height = 6, Glow = Color3.fromRGB(255, 190, 70), Builder = "ZombieMiner" },
 		ForemanMech = { Name = "Мех-бригадир", Boss = true, Asset = "Boss_Mech", AltAsset = "Mob_Mech", Height = 6.2, Tint = Color3.fromRGB(255, 170, 60), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "SlimeKing", Title = "Хозяин конвейера" },
 		-- 2. Криолаборатория
-		FrostSpider = { Name = "Ледяной паукобот", Role = "Swarm", Asset = "Mob_SpiderBot", Height = 3, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider" },
-		CryoAndroid = { Name = "Крио-андроид", Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 6, Tint = Color3.fromRGB(170, 220, 255), TintAmount = 0.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "Yeti" },
-		CryoBot = { Name = "Крио-турель", Role = "Ranged", Asset = "Mob_BlueBot", Height = 4.6, Glow = Color3.fromRGB(120, 230, 255), Builder = "SnowGolem" },
-		CryoMedic = { Name = "Крио-медик", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(200, 235, 255), TintAmount = 0.3, Glow = Color3.fromRGB(120, 230, 255), Builder = "FlyingEye", Float = true },
+		FrostSpider = { Name = "Ледяной паукобот", Speed = 10.5, Role = "Swarm", Asset = "Mob_SpiderBot", Height = 3, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider" },
+		CryoAndroid = { Name = "Крио-андроид", Speed = 8, Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 6, Tint = Color3.fromRGB(170, 220, 255), TintAmount = 0.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "Yeti" },
+		CryoBot = { Name = "Крио-турель", Speed = 7, Role = "Ranged", Asset = "Mob_BlueBot", Height = 4.6, Glow = Color3.fromRGB(120, 230, 255), Builder = "SnowGolem" },
+		CryoMedic = { Name = "Крио-медик", Speed = 8, Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(200, 235, 255), TintAmount = 0.3, Glow = Color3.fromRGB(120, 230, 255), Builder = "FlyingEye", Float = true },
 		CryoOverseer = { Name = "Крио-надзиратель", Boss = true, Asset = "Boss_AICore", AltAsset = "Mob_Overseer", Height = 7, Tint = Color3.fromRGB(150, 210, 255), TintAmount = 0.45, Glow = Color3.fromRGB(46, 230, 255), Builder = "IceBoneLord", Float = true, Title = "Страж холода" },
 		-- 3. Плавильный реактор
-		SlagBot = { Name = "Шлакобот", Role = "Swarm", Asset = "Mob_SpiderBot", Height = 2.8, Tint = Color3.fromRGB(255, 130, 40), TintAmount = 0.45, Glow = Color3.fromRGB(255, 160, 60), Builder = "GoblinSmith" },
-		Smelter = { Name = "Андроид-плавильщик", Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_RedAndroid", Height = 6, Glow = Color3.fromRGB(255, 140, 40), Builder = "FireImp" },
-		SmeltGunner = { Name = "Литейный стрелок", Role = "Ranged", Rig = "Rig_Assembler", Weapon = "Weapon_Blaster_2", Asset = "Mob_Sniper", Height = 5.6, Tint = Color3.fromRGB(255, 120, 50), TintAmount = 0.3, Glow = Color3.fromRGB(255, 140, 40), Builder = "SkeletonArcher" },
-		SmeltShield = { Name = "Жаростойкий щитоносец", Role = "Shield", Rig = "Rig_Heavy", Asset = "Mob_ShieldBearer", Height = 6.2, Tint = Color3.fromRGB(255, 120, 50), TintAmount = 0.3, Glow = Color3.fromRGB(255, 140, 40), Builder = "MagmaGolem" },
-		SmeltMedic = { Name = "Ремонтный дрон", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(255, 150, 70), TintAmount = 0.3, Glow = Color3.fromRGB(255, 160, 60), Builder = "FlyingEye", Float = true },
+		SlagBot = { Name = "Шлакобот", Speed = 11, Role = "Swarm", Asset = "Mob_SpiderBot", Height = 2.8, Tint = Color3.fromRGB(255, 130, 40), TintAmount = 0.45, Glow = Color3.fromRGB(255, 160, 60), Builder = "GoblinSmith" },
+		Smelter = { Name = "Андроид-плавильщик", Speed = 8.5, Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_RedAndroid", Height = 6, Glow = Color3.fromRGB(255, 140, 40), Builder = "FireImp" },
+		SmeltGunner = { Name = "Литейный стрелок", Speed = 8, Role = "Ranged", Rig = "Rig_Assembler", Weapon = "Weapon_Blaster_2", Asset = "Mob_Sniper", Height = 5.6, Tint = Color3.fromRGB(255, 120, 50), TintAmount = 0.3, Glow = Color3.fromRGB(255, 140, 40), Builder = "SkeletonArcher" },
+		SmeltShield = { Name = "Жаростойкий щитоносец", Speed = 6.5, Role = "Shield", Rig = "Rig_Heavy", Asset = "Mob_ShieldBearer", Height = 6.2, Tint = Color3.fromRGB(255, 120, 50), TintAmount = 0.3, Glow = Color3.fromRGB(255, 140, 40), Builder = "MagmaGolem" },
+		SmeltMedic = { Name = "Ремонтный дрон", Speed = 8, Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(255, 150, 70), TintAmount = 0.3, Glow = Color3.fromRGB(255, 160, 60), Builder = "FlyingEye", Float = true },
 		MoltenColossus = { Name = "Плавильный колосс", Boss = true, Asset = "Boss_Mech", AltAsset = "Mob_Android", Height = 6.2, Tint = Color3.fromRGB(255, 110, 30), TintAmount = 0.45, Glow = Color3.fromRGB(255, 150, 40), Builder = "FireChief", Title = "Сердце плавильни" },
 		-- 4. Заражённый сектор
-		InfectedCrawler = { Name = "Заражённый ползун", Role = "Swarm", Asset = "Mob_InfectedCrawler", AltAsset = "Mob_SpiderBot", Height = 2.8, Glow = Color3.fromRGB(120, 255, 90), Builder = "IceSpider" },
-		InfectedBrute = { Name = "Заражённый громила", Role = "Melee", Rig = "Rig_Heavy", Asset = "Mob_InfectedBrute", AltAsset = "Mob_Android", Height = 6.2, Glow = Color3.fromRGB(120, 255, 90), Builder = "Yeti" },
-		InfectedSpitter = { Name = "Плевун", Role = "Ranged", Rig = "Rig_Assembler", Weapon = "Weapon_Blaster_2", Asset = "Mob_Sniper", Height = 5.6, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "SkeletonArcher" },
-		InfectedMedic = { Name = "Спороносец", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "FlyingEye", Float = true },
+		InfectedCrawler = { Name = "Заражённый ползун", Speed = 12, Role = "Swarm", Asset = "Mob_InfectedCrawler", AltAsset = "Mob_SpiderBot", Height = 2.8, Glow = Color3.fromRGB(120, 255, 90), Builder = "IceSpider" },
+		InfectedBrute = { Name = "Заражённый громила", Speed = 7.5, Role = "Melee", Rig = "Rig_Heavy", Asset = "Mob_InfectedBrute", AltAsset = "Mob_Android", Height = 6.2, Glow = Color3.fromRGB(120, 255, 90), Builder = "Yeti" },
+		InfectedSpitter = { Name = "Плевун", Speed = 8, Role = "Ranged", Rig = "Rig_Assembler", Weapon = "Weapon_Blaster_2", Asset = "Mob_Sniper", Height = 5.6, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "SkeletonArcher" },
+		InfectedMedic = { Name = "Спороносец", Speed = 8, Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "FlyingEye", Float = true },
 		HiveMother = { Name = "Матка улья", Boss = true, Asset = "Boss_AICore", AltAsset = "Mob_Overseer", Height = 7, Glow = Color3.fromRGB(120, 255, 90), Builder = "AbyssLord", Float = true, Title = "Источник заражения" },
 		-- 5. Ядро Нексуса
-		PhaseAndroid = { Name = "Фазовый андроид", Role = "Blinker", Rig = "Rig_Assembler", Asset = "Mob_RedAndroid", Height = 4.2, Tint = Color3.fromRGB(170, 80, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost" },
-		NexusSentinel = { Name = "Страж Нексуса", Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(120, 60, 200), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
-		NexusDrone = { Name = "Дрон Нексуса", Role = "Ranged", Asset = "Mob_Robot", Height = 5.2, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.45, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye" },
-		NexusShield = { Name = "Бастион Нексуса", Role = "Shield", Rig = "Rig_Heavy", Asset = "Mob_ShieldBearer", Height = 6.2, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.35, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
-		NexusMedic = { Name = "Корректор", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(170, 90, 255), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye", Float = true },
+		PhaseAndroid = { Name = "Фазовый андроид", Speed = 10, Role = "Blinker", Rig = "Rig_Assembler", Asset = "Mob_RedAndroid", Height = 4.2, Tint = Color3.fromRGB(170, 80, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost" },
+		NexusSentinel = { Name = "Страж Нексуса", Speed = 10, Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(120, 60, 200), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
+		NexusDrone = { Name = "Дрон Нексуса", Speed = 8.5, Role = "Ranged", Asset = "Mob_Robot", Height = 5.2, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.45, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye" },
+		NexusShield = { Name = "Бастион Нексуса", Speed = 7, Role = "Shield", Rig = "Rig_Heavy", Asset = "Mob_ShieldBearer", Height = 6.2, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.35, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
+		NexusMedic = { Name = "Корректор", Speed = 8.5, Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(170, 90, 255), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye", Float = true },
 		Juggernaut = { Name = "Джаггернаут", Boss = true, Asset = "Boss_Mech", Height = 6.2, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord", Title = "Воля Нексуса" },
 		-- sheet 04 enemies (Studio mesh generator, GameAssets/Mobs)
-		HoverDrone = { Name = "Дрон-охотник", Role = "Ranged", Asset = "Mob_Drone", Height = 3, Glow = Color3.fromRGB(46, 230, 255), Builder = "FlyingEye", Float = true },
+		HoverDrone = { Name = "Дрон-охотник", Speed = 9, Role = "Ranged", Asset = "Mob_Drone", Height = 3, Glow = Color3.fromRGB(46, 230, 255), Builder = "FlyingEye", Float = true },
 		WallTurret = { Name = "Настенная турель", Role = "Turret", Asset = "Mob_Turret", Height = 4.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "SnowGolem" },
-		NanoSwarm = { Name = "Нано-рой", Role = "Swarm", Asset = "Mob_Swarm", Height = 3.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "FlyingEye", Float = true },
+		NanoSwarm = { Name = "Нано-рой", Speed = 10, Role = "Swarm", Asset = "Mob_Swarm", Height = 3.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "FlyingEye", Float = true },
 		AICore = { Name = "ИИ-Ядро", Boss = true, Asset = "Boss_AICore", Height = 7.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord", Float = true, Title = "Центральный нано-интеллект" },
 		-- zombies (Studio avatar generator, GameAssets/Mobs/Rig_Zombie; own head)
-		ZombieWalker = { Name = "Зомби-рабочий", Role = "Melee", Rig = "Rig_Zombie", Helmet = false, Height = 5.6, Glow = Color3.fromRGB(120, 255, 90), Builder = "ZombieMiner" },
-		ZombieRunner = { Name = "Зомби-бегун", Role = "Swarm", Rig = "Rig_Zombie", Helmet = false, Height = 4.8, Tint = Color3.fromRGB(150, 200, 130), TintAmount = 0.3, Glow = Color3.fromRGB(120, 255, 90), Builder = "ZombieMiner" },
-		ZombieBrute = { Name = "Зомби-громила", Role = "Shield", Rig = "Rig_Zombie", Helmet = false, Height = 7.2, Tint = Color3.fromRGB(110, 150, 100), TintAmount = 0.35, Glow = Color3.fromRGB(120, 255, 90), Builder = "Yeti" },
+		ZombieWalker = { Name = "Зомби-рабочий", Speed = 5.5, Role = "Melee", Rig = "Rig_Zombie", Helmet = false, Height = 5.6, Glow = Color3.fromRGB(120, 255, 90), Builder = "ZombieMiner" },
+		ZombieRunner = { Name = "Зомби-бегун", Speed = 12.5, Role = "Swarm", Rig = "Rig_Zombie", Helmet = false, Height = 4.8, Tint = Color3.fromRGB(150, 200, 130), TintAmount = 0.3, Glow = Color3.fromRGB(120, 255, 90), Builder = "ZombieMiner" },
+		ZombieBrute = { Name = "Зомби-громила", Speed = 6, ClipSet = "ZombieBrute", Role = "Shield", Rig = "Rig_Zombie", Helmet = false, Height = 7.2, Tint = Color3.fromRGB(110, 150, 100), TintAmount = 0.35, Glow = Color3.fromRGB(120, 255, 90), Builder = "Yeti" },
 		-- Bombers and blinkers (spiders / androids with new behaviour)
-		CryoBomber = { Name = "Крио-подрывник", Role = "Bomber", Asset = "Mob_SpiderBot", Height = 2.6, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider" },
-		SlagBomber = { Name = "Шлак-подрывник", Role = "Bomber", Asset = "Mob_SpiderBot", Height = 2.6, Tint = Color3.fromRGB(255, 110, 40), TintAmount = 0.55, Glow = Color3.fromRGB(255, 140, 40), Builder = "GoblinSmith" },
-		SporeBomber = { Name = "Споровая бомба", Role = "Bomber", Asset = "Mob_InfectedCrawler", AltAsset = "Mob_SpiderBot", Height = 2.6, Glow = Color3.fromRGB(120, 255, 90), Builder = "IceSpider" },
-		CryoPhantom = { Name = "Крио-фантом", Role = "Blinker", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 5.4, Tint = Color3.fromRGB(150, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost" },
-		InfectedStalker = { Name = "Заражённый охотник", Role = "Blinker", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 5.6, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "AuraGhost" },
+		CryoBomber = { Name = "Крио-подрывник", Speed = 12, Role = "Bomber", Asset = "Mob_SpiderBot", Height = 2.6, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider" },
+		SlagBomber = { Name = "Шлак-подрывник", Speed = 12, Role = "Bomber", Asset = "Mob_SpiderBot", Height = 2.6, Tint = Color3.fromRGB(255, 110, 40), TintAmount = 0.55, Glow = Color3.fromRGB(255, 140, 40), Builder = "GoblinSmith" },
+		SporeBomber = { Name = "Споровая бомба", Speed = 11, Role = "Bomber", Asset = "Mob_InfectedCrawler", AltAsset = "Mob_SpiderBot", Height = 2.6, Glow = Color3.fromRGB(120, 255, 90), Builder = "IceSpider" },
+		CryoPhantom = { Name = "Крио-фантом", Speed = 9, Role = "Blinker", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 5.4, Tint = Color3.fromRGB(150, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost" },
+		InfectedStalker = { Name = "Заражённый охотник", Speed = 10, Role = "Blinker", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 5.6, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "AuraGhost" },
 	},
 }
 for id, def in pairs(Config.Mobs.Defs) do
@@ -767,19 +765,21 @@ Config.Party = {
 
 Config.Enemies = {
 	Roles = {
-		-- 23.11: one rhythm for everyone - similar speeds, a clear 0.6 s
-		-- wind-up, a strike, then Recover seconds of standing still
-		Melee = { Health = 1, Damage = 1, Speed = 14, Range = 5, Cooldown = 1.8, Telegraph = 0.6 },
-		Swarm = { Health = 0.35, Damage = 0.45, Speed = 15, Range = 4, Cooldown = 1.4, Telegraph = 0.45, Pack = 3 },
-		Ranged = { Health = 0.75, Damage = 0.9, Speed = 12, Range = 40, Keep = 22, Cooldown = 2.6, Telegraph = 0.8, Width = 2.6 },
-		Shield = { Health = 1.7, Damage = 1.1, Speed = 12, Range = 5.5, Cooldown = 2.2, Telegraph = 0.7, Front = 70, Block = 0.8 },
-		Healer = { Health = 0.7, Damage = 0, Speed = 12, Keep = 26, Every = 4, Heal = 0.18, Range = 30 },
+		-- 23.11: one rhythm for everyone - a clear wind-up, a strike, then
+		-- Recover seconds of standing still. Speed here is the default; a
+		-- kind sets its own (Config.Mobs.Defs[*].Speed): zombie walkers
+		-- shamble at 5.5, runners sprint at 12.5. The player runs at 16.
+		Melee = { Health = 1, Damage = 1, Speed = 9, Range = 5, Cooldown = 1.8, Telegraph = 0.6 },
+		Swarm = { Health = 0.35, Damage = 0.45, Speed = 11, Range = 4, Cooldown = 1.4, Telegraph = 0.45, Pack = 3 },
+		Ranged = { Health = 0.75, Damage = 0.9, Speed = 8, Range = 40, Keep = 22, Cooldown = 2.6, Telegraph = 0.8, Width = 2.6 },
+		Shield = { Health = 1.7, Damage = 1.1, Speed = 7, Range = 5.5, Cooldown = 2.2, Telegraph = 0.7, Front = 70, Block = 0.8 },
+		Healer = { Health = 0.7, Damage = 0, Speed = 8, Keep = 26, Every = 4, Heal = 0.18, Range = 30 },
 		-- a wall turret: never moves, long range, shoots bolts (sheet 04)
 		Turret = { Health = 1.1, Damage = 1, Speed = 0, Range = 52, Keep = 0, Cooldown = 2.2, Telegraph = 0.7, Width = 2.4 },
 		-- runs at the player, stops, flashes and blows itself up (Radius)
-		Bomber = { Health = 0.4, Damage = 2.2, Speed = 16, Range = 6, Radius = 9, Telegraph = 0.9, Cooldown = 99 },
+		Bomber = { Health = 0.4, Damage = 2.2, Speed = 12, Range = 6, Radius = 9, Telegraph = 0.9, Cooldown = 99 },
 		-- blinks behind the player (Blink seconds apart), then strikes
-		Blinker = { Health = 0.8, Damage = 1.1, Speed = 14, Range = 5, Cooldown = 1.8, Telegraph = 0.55, Blink = 6, BlinkFrom = 12 },
+		Blinker = { Health = 0.8, Damage = 1.1, Speed = 9, Range = 5, Cooldown = 1.8, Telegraph = 0.55, Blink = 6, BlinkFrom = 12 },
 	},
 	RoleNames = { Melee = "ближний бой", Swarm = "рой", Ranged = "стрелок", Shield = "щитоносец", Healer = "лекарь", Bomber = "подрывник", Blinker = "телепортер", Turret = "турель" },
 	DeathSeconds = 1.4, -- a rigged mob stays this long after death (animation + dissolve)
@@ -791,11 +791,30 @@ Config.Enemies = {
 	-- the start of the clip to its Hit pose (it then holds there).
 	Clips = {
 		Idle = { Id = "rbxassetid://122948269421381", Loop = true },
-		Walk = { Id = "rbxassetid://71489987240856", Loop = true, Speed = 1 },
-		Attack = { Id = "rbxassetid://76229594400834", From = 1.4, To = 3, Hit = 2.05 },
+		Walk = { Id = "rbxassetid://71489987240856", Loop = true, Speed = 1, Pace = 10 },
+		-- 24.11: a real punch - the fist goes back, a step and a straight hit
+		-- (the old clip barely moved the arms, the owner saw no attack)
+		Attack = { Id = "rbxassetid://99494124830302", From = 0.5, To = 1.56, Hit = 1.2 },
 		Shoot = { Id = "rbxassetid://140309687212400", From = 0.4, To = 2.4, Hit = 1.05 },
 		Hurt = { Id = "rbxassetid://124936625962581", From = 3, To = 4 },
 		Death = { Id = "rbxassetid://94694447003331", From = 0.4, To = 2.6 },
+	},
+	-- Own clips per rig (Config.Mobs.Defs[*].ClipSet, else its Rig name):
+	-- they replace the shared ones above. Made with the Studio animation
+	-- generator on these rigs (24.11).
+	ClipSets = {
+		-- heavy loaders: both fists up and down onto the floor
+		Rig_Heavy = { Attack = { Id = "rbxassetid://71854937890077", From = 0.2, To = 1.9, Hit = 1.0 } },
+		-- zombies: a hunched shamble and a two-handed claw slam
+		Rig_Zombie = {
+			Walk = { Id = "rbxassetid://136975549763504", Loop = true, Pace = 6 },
+			Attack = { Id = "rbxassetid://75405640341736", From = 0.4, To = 1.9, Hit = 1.3 },
+		},
+		-- the zombie brute slams like a heavy, walks like a zombie
+		ZombieBrute = {
+			Walk = { Id = "rbxassetid://136975549763504", Loop = true, Pace = 6 },
+			Attack = { Id = "rbxassetid://71854937890077", From = 0.2, To = 1.9, Hit = 1.0 },
+		},
 	},
 	WindUp = 0.5,
 	-- Rigged mobs (MobBuilder.fromRig): the generated human head is hidden
@@ -819,7 +838,7 @@ Config.Enemies = {
 			{ Id = "Explosive", Name = "Взрывной", Color = Color3.fromRGB(255, 120, 40), Radius = 10, Delay = 1.1, Mult = 2 },
 			{ Id = "Vampire", Name = "Вампир", Color = Color3.fromRGB(220, 40, 70), Heal = 0.6 },
 			{ Id = "Shielded", Name = "Защищённый", Color = Color3.fromRGB(80, 170, 255), Every = 9, Seconds = 3, Take = 0.15 },
-			{ Id = "Swift", Name = "Стремительный", Color = Color3.fromRGB(255, 230, 90), Speed = 1.45, Cooldown = 0.65 },
+			{ Id = "Swift", Name = "Стремительный", Color = Color3.fromRGB(255, 230, 90), Speed = 1.25, Cooldown = 0.75 },
 			{ Id = "Summoner", Name = "Призыватель", Color = Color3.fromRGB(190, 90, 255), Every = 10, Count = 2 },
 			{ Id = "Thorns", Name = "Шипастый", Color = Color3.fromRGB(150, 255, 120), Reflect = 0.12 },
 		},
@@ -988,7 +1007,7 @@ Config.Classes = {
 		Id = "Pulse", Name = "Импульс", Icon = "spear", Color = Color3.fromRGB(255, 61, 184),
 		Short = "Энерго-копьё: 2 удара и удар на 360°, рывок с ударом.",
 		Text = "Подвижный боец с энерго-копьём. Два быстрых укола и третий удар на 360° по всем вокруг. Рывок [Shift] бьёт всех на пути.",
-		Tags = { { Icon = "burst", Text = "Область" }, { Icon = "dash", Text = "Мобильность" }, { Icon = "flame", Text = "Бурст" } },
+		Tags = { { Icon = "burst", Text = "Область" }, { Icon = "dash", Text = "Рывки" }, { Icon = "flame", Text = "Бурст" } },
 		Difficulty = 3,
 		Key = { "Pulse_A3", "Pulse_A6", "Pulse_C3" },
 		Avatar = "Class_Pulse",
@@ -1872,7 +1891,7 @@ Config.Attributes = {
 		{ Id = "Str", Name = "Сила", Icon = "sword", Text = "Урон", PerPoint = { DamagePct = 0.01 }, Lines = { "+1% урона" } },
 		{ Id = "Agi", Name = "Ловкость", Icon = "dash", Text = "Скорость атаки и крит", PerPoint = { AttackSpeed = 0.004, CritChance = 0.002 }, Lines = { "+0.4% скорости атаки", "+0.2% шанса крита" } },
 		{ Id = "Vit", Name = "Живучесть", Icon = "heart", Text = "HP и защита", PerPoint = { Health = 8, Defense = 0.001 }, Lines = { "+8 макс. HP", "+0.1% защиты" } },
-		{ Id = "Per", Name = "Восприятие", Icon = "eye", Text = "Удача и шанс добычи", PerPoint = { Luck = 0.01, DropChance = 0.002 }, Lines = { "+1% удачи (редкость в пределах ранга)", "+0.2% шанса добычи" } },
+		{ Id = "Per", Name = "Восприятие", Icon = "eye", Text = "Удача и шанс добычи", PerPoint = { Luck = 0.01, DropChance = 0.002 }, Lines = { "+1% удачи", "+0.2% шанса добычи" } },
 	},
 	Texts = {
 		Title = "СТАТУС",
@@ -2616,6 +2635,8 @@ Config.HubLayout = {
 	-- the player along the route to the story quest's place (client
 	-- QuestGuide). Points are offsets from the spawn, walked in order.
 	Guide = {
+		-- 23.11 owner: no crawling floor arrows (only the "!" over NPCs)
+		Arrows = false,
 		Step = 4, -- studs between chevrons
 		Max = 36, -- chevrons drawn at most
 		Speed = 3, -- studs per second they crawl forward

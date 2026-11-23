@@ -45,16 +45,6 @@ local function path(parent, base: Vector3, points, color: Color3)
 		local cf = CFrame.lookAt((a + b) / 2, b)
 		-- the line (+ a little overlap so corners are closed)
 		Panel(m, "Line", Vector3.new(G.Width, 0.1, length + G.Width), cf, color:Lerp(Color3.new(0, 0, 0), 0.25), M.Smooth, { CanCollide = false, CastShadow = false })
-		-- chevrons pointing along the way
-		local dir = (b - a).Unit
-		local n = math.floor(length / G.ChevronEvery)
-		for k = 1, n do
-			local p = a + dir * (k * G.ChevronEvery - G.ChevronEvery / 2)
-			local look = CFrame.lookAt(p, p + dir)
-			for _, side in ipairs({ -1, 1 }) do
-				Panel(m, "Chevron", Vector3.new(0.3, 0.12, 1.5), look * CFrame.new(side * 0.42, 0.02, 0.1) * CFrame.Angles(0, math.rad(side * 40), 0), color, M.Neon, { CanCollide = false, CastShadow = false })
-			end
-		end
 	end
 	return m
 end

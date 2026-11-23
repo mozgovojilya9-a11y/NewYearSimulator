@@ -335,11 +335,22 @@ function Window.Tabs(parent, defs, _accent: Color3?, width: number?)
 	for order, def in ipairs(defs) do
 		local tab = Instance.new("TextButton")
 		tab.LayoutOrder = order
-		tab.Size = UDim2.fromOffset(width or 130, 38)
+		-- tabs share the bar evenly (never past the window edge), at most
+		-- `width` px each; a long name shrinks its text to fit
+		local n = #defs
+		tab.Size = UDim2.new(1 / n, -4 * (n - 1) / n, 0, 38)
+		local cap = Instance.new("UISizeConstraint")
+		cap.MaxSize = Vector2.new(width or 130, 38)
+		cap.Parent = tab
 		tab.BackgroundColor3 = C.Card
 		tab.BackgroundTransparency = 1
 		tab.Font = Style.Font
 		tab.TextSize = 15
+		tab.TextScaled = true
+		local fit = Instance.new("UITextSizeConstraint")
+		fit.MaxTextSize = 15
+		fit.MinTextSize = 9
+		fit.Parent = tab
 		tab.Text = Style.Upper(def.Text)
 		tab.TextColor3 = C.Muted
 		tab.AutoButtonColor = false

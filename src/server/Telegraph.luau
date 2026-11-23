@@ -47,9 +47,9 @@ end
 function Telegraph.Circle(parent, center: Vector3, radius: number, seconds: number, color: Color3)
 	local flat = CFrame.Angles(0, 0, math.rad(90))
 	local at = CFrame.new(center.X, center.Y + 0.08, center.Z) * flat
-	local edge = part(parent, { Name = "WarnEdge", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.06, radius * 2, radius * 2), CFrame = at, Color = color, Transparency = 0.35 })
+	local edge = part(parent, { Name = "WarnEdge", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.06, radius * 2, radius * 2), CFrame = at, Color = color, Transparency = 0.5 })
 	local inner = part(parent, { Name = "WarnInner", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.07, radius * 2 - 0.6, radius * 2 - 0.6), CFrame = at * CFrame.new(0.01, 0, 0), Color = Color3.fromRGB(20, 8, 8), Transparency = 0.45 })
-	local fill = part(parent, { Name = "WarnFill", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.08, 0.2, 0.2), CFrame = at * CFrame.new(0.02, 0, 0), Color = color, Transparency = 0.4 })
+	local fill = part(parent, { Name = "WarnFill", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.08, 0.2, 0.2), CFrame = at * CFrame.new(0.02, 0, 0), Color = color, Transparency = 0.62 })
 	TweenService:Create(fill, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { Size = Vector3.new(0.08, radius * 2 - 0.6, radius * 2 - 0.6) }):Play()
 	local parts = { edge, inner, fill }
 	flashAndRemove(parts, seconds)
@@ -59,9 +59,9 @@ end
 function Telegraph.Rect(parent, cf: CFrame, length: number, width: number, seconds: number, color: Color3)
 	local base = CFrame.new(cf.Position + Vector3.new(0, 0.08, 0)) * cf.Rotation
 	local mid = base * CFrame.new(0, 0, -length / 2)
-	local edge = part(parent, { Name = "WarnEdge", Size = Vector3.new(width, 0.06, length), CFrame = mid, Color = color, Transparency = 0.35 })
+	local edge = part(parent, { Name = "WarnEdge", Size = Vector3.new(width, 0.06, length), CFrame = mid, Color = color, Transparency = 0.5 })
 	local inner = part(parent, { Name = "WarnInner", Size = Vector3.new(width - 0.5, 0.07, length - 0.5), CFrame = mid * CFrame.new(0, 0.01, 0), Color = Color3.fromRGB(20, 8, 8), Transparency = 0.45 })
-	local fill = part(parent, { Name = "WarnFill", Size = Vector3.new(width - 0.5, 0.08, 0.2), CFrame = base * CFrame.new(0, 0.02, -0.1), Color = color, Transparency = 0.4 })
+	local fill = part(parent, { Name = "WarnFill", Size = Vector3.new(width - 0.5, 0.08, 0.2), CFrame = base * CFrame.new(0, 0.02, -0.1), Color = color, Transparency = 0.62 })
 	TweenService:Create(fill, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { Size = Vector3.new(width - 0.5, 0.08, length - 0.5), CFrame = mid * CFrame.new(0, 0.02, 0) }):Play()
 	local parts = { edge, inner, fill }
 	flashAndRemove(parts, seconds)
@@ -73,12 +73,23 @@ function Telegraph.Line(parent, from: Vector3, to: Vector3, width: number, secon
 	if length < 0.5 then
 		return {}
 	end
-	local line = part(parent, { Name = "WarnLine", Size = Vector3.new(0.18, 0.18, length), CFrame = CFrame.lookAt((from + to) / 2, to), Color = color, Transparency = 0.25 })
+	local line = part(parent, { Name = "WarnLine", Size = Vector3.new(0.18, 0.18, length), CFrame = CFrame.lookAt((from + to) / 2, to), Color = color, Transparency = 0.55 })
 	local floorFrom = Vector3.new(from.X, to.Y - 2.8, from.Z)
 	local floorTo = Vector3.new(to.X, to.Y - 2.8, to.Z)
 	local strip = part(parent, { Name = "WarnStrip", Size = Vector3.new(width, 0.06, (floorTo - floorFrom).Magnitude), CFrame = CFrame.lookAt((floorFrom + floorTo) / 2, floorTo), Color = color, Transparency = 0.7 })
-	TweenService:Create(strip, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { Transparency = 0.35 }):Play()
+	TweenService:Create(strip, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { Transparency = 0.55 }):Play()
 	local parts = { line, strip }
+	flashAndRemove(parts, seconds)
+	return parts
+end
+
+-- A charging glow at a gun muzzle (ordinary shooters: no line across
+-- the floor, the owner found those annoying - 23.11). A small ball that
+-- swells until the shot.
+function Telegraph.Muzzle(parent, at: Vector3, seconds: number, color: Color3)
+	local ball = part(parent, { Name = "WarnMuzzle", Shape = Enum.PartType.Ball, Size = Vector3.new(0.3, 0.3, 0.3), CFrame = CFrame.new(at), Color = color, Transparency = 0.2 })
+	TweenService:Create(ball, TweenInfo.new(seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Size = Vector3.new(1.3, 1.3, 1.3) }):Play()
+	local parts = { ball }
 	flashAndRemove(parts, seconds)
 	return parts
 end
@@ -128,7 +139,7 @@ function Telegraph.Cone(parent, cf: CFrame, radius: number, angle: number, secon
 	for i = 0, steps - 1 do
 		for _, w in ipairs(triangle(parent, origin, edgePoint(i, radius), edgePoint(i + 1, radius), 0.06, { Name = "WarnCone", Color = color, Transparency = 0.75 })) do
 			table.insert(parts, w)
-			TweenService:Create(w, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { Transparency = 0.35 }):Play()
+			TweenService:Create(w, TweenInfo.new(seconds, Enum.EasingStyle.Linear), { Transparency = 0.55 }):Play()
 		end
 	end
 	-- the outer arc edge

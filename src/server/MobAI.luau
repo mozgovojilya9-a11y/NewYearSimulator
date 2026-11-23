@@ -271,7 +271,8 @@ local function shoot(state, model, role)
 		to = wall.Position -- the line on the floor ends at the wall too
 	end
 	model:SetAttribute("Telegraph", true)
-	Telegraph.Line(state.run.fxFolder, from, to, role.Width, role.Telegraph, RED)
+	local muzzle = from + (to - from).Unit * (state.reach + 1)
+	Telegraph.Muzzle(state.run.fxFolder, muzzle, role.Telegraph, model:GetAttribute("Color") or RED)
 	task.wait(role.Telegraph)
 	model:SetAttribute("Telegraph", false)
 	if mobs[model] and model.Parent then
@@ -893,7 +894,11 @@ function MobAI.Register(run, model)
 	local isBoss = model:GetAttribute("Boss") == true
 	local roleName = model:GetAttribute("Role") or "Melee"
 	local role = E.Roles[roleName] or E.Roles.Melee
-	local speed = if isBoss then Config.Dungeon.Mob.BossWalkSpeed + 3 else role.Speed
+	local def = Config.Mobs.Defs[model:GetAttribute("Kind") or ""]
+	local speed = if isBoss then Config.Dungeon.Mob.BossWalkSpeed + 3 else (def and def.Speed or role.Speed)
+	if not isBoss and speed > 0 then
+		speed *= 0.92 + math.random() * 0.16 -- no two walk exactly in step
+	end
 	local cooldownMult = 1
 	if hasAffix(model, "Swift") then
 		speed *= AFFIX.Swift.Speed

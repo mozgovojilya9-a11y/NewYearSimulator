@@ -159,8 +159,23 @@ end
 
 local CLIPS = Config.Enemies.Clips
 
+-- the clips of one mob: the shared ones + its rig's own set
+-- (Config.Enemies.ClipSets by the kind's ClipSet or Rig)
+local function clipsFor(model: Model)
+	local def = Config.Mobs.Defs[model:GetAttribute("Kind") or ""]
+	local set = def and Config.Enemies.ClipSets[def.ClipSet or def.Rig or ""]
+	if not set then
+		return CLIPS
+	end
+	local merged = table.clone(CLIPS)
+	for name, clip in pairs(set) do
+		merged[name] = clip
+	end
+	return merged
+end
+
 local function loadTrack(state, name: string)
-	local clip = CLIPS[name]
+	local clip = state.clips[name]
 	if not clip or (clip.Id or "") == "" or not state.animator then
 		return nil
 	end
@@ -187,7 +202,7 @@ local function playClip(state, name: string, seconds: number?)
 	if not track then
 		return nil
 	end
-	local clip = CLIPS[name]
+	local clip = state.clips[name]
 	local from, to = clip.From or 0, clip.To or track.Length
 	local speed = if seconds then (to - from) / math.max(0.05, seconds) else 1
 	track:Play(0.08, 1, speed)
@@ -349,6 +364,7 @@ local function watch(model: Model)
 	if model:GetAttribute("Rigged") then
 		local humanoid = model:FindFirstChildOfClass("Humanoid")
 		state.rig = true
+		state.clips = clipsFor(model)
 		state.animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
 		state.tracks = {}
 		state.joints = {}
@@ -369,8 +385,9 @@ local function watch(model: Model)
 			state.windingUp = true
 			if state.rig then
 				-- wind up to the strike pose and hold there
-				local name = if (model:GetAttribute("Role") == "Ranged" or model:GetAttribute("Role") == "Turret") and CLIPS.Shoot and CLIPS.Shoot.Id ~= "" then "Shoot" else "Attack"
-				local clip = CLIPS[name]
+				local clips = state.clips or CLIPS
+				local name = if (model:GetAttribute("Role") == "Ranged" or model:GetAttribute("Role") == "Turret") and clips.Shoot and clips.Shoot.Id ~= "" then "Shoot" else "Attack"
+				local clip = clips[name]
 				local share = (clip.To - clip.From) / math.max(0.05, clip.Hit - clip.From)
 				local track = playClip(state, name, Config.Enemies.WindUp * share)
 				if track then
@@ -386,7 +403,7 @@ local function watch(model: Model)
 				-- the red warning sign over the head: a dark diamond with a red "!"
 				warning = Instance.new("BillboardGui")
 				warning.Name = "Warning"
-				warning.Size = UDim2.fromOffset(38, 38)
+				warning.Size = UDim2.fromOffset(26, 26)
 				warning.StudsOffsetWorldSpace = Vector3.new(0, (model:GetAttribute("Height") or 6) * 0.6 + 2.2, 0)
 				warning.AlwaysOnTop = true
 				warning.LightInfluence = 0
@@ -403,7 +420,7 @@ local function watch(model: Model)
 				stroke.Thickness = 2.5
 				stroke.Parent = diamond
 				diamond.Parent = warning
-				local mark = Style.Label(warning, "!", 26, Style.Colors.Red, { Font = Style.FontTitle, Size = UDim2.fromScale(1, 1) })
+				local mark = Style.Label(warning, "!", 18, Style.Colors.Red, { Font = Style.FontTitle, Size = UDim2.fromScale(1, 1) })
 				local scale = Instance.new("UIScale")
 				scale.Scale = 0.4
 				scale.Parent = diamond
@@ -414,12 +431,13 @@ local function watch(model: Model)
 				Style.Tween(scale, 0.15, { Scale = 1 })
 				Style.Tween(markScale, 0.15, { Scale = 1 })
 			end
+			-- 23.11 owner: no red fill over the whole mob - a thin red outline
+			-- only (the wind-up pose and the small "!" say the rest)
 			if not highlight then
 				highlight = Instance.new("Highlight")
-				highlight.FillColor = Style.Colors.Red
-				highlight.FillTransparency = 0.45
+				highlight.FillTransparency = 1
 				highlight.OutlineColor = Style.Colors.Red
-				highlight.OutlineTransparency = 0
+				highlight.OutlineTransparency = 0.35
 				highlight.DepthMode = Enum.HighlightDepthMode.Occluded
 				highlight.Parent = model
 			end
@@ -543,12 +561,14 @@ RunService.Stepped:Connect(function(_, dt)
 		end
 		local velocity = s.root.AssemblyLinearVelocity
 		local speed = Vector3.new(velocity.X, 0, velocity.Z).Magnitude
-		s.walk += (math.clamp(speed / 8, 0, 1) - s.walk) * math.min(1, dt * 8)
+		local pace = if s.clips and s.clips.Walk then s.clips.Walk.Pace or 10 else 10
+		s.walk += (math.clamp(speed / (pace * 0.5), 0, 1) - s.walk) * math.min(1, dt * 8)
 		if s.rig then
 			local walk = s.tracks.Walk
 			if walk then
+				-- the steps match the mob's own speed (Pace = studs/s at 1x)
 				walk:AdjustWeight(math.max(0.001, s.walk), 0.1)
-				walk:AdjustSpeed(math.clamp(speed / 10, 0.6, 1.6))
+				walk:AdjustSpeed(math.clamp(speed / pace, 0.5, 1.8))
 			end
 			continue
 		end

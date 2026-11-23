@@ -506,26 +506,6 @@ local function hangingLamp(parent, biome, p: Vector3, height: number)
 	light.Parent = shade
 end
 
--- A path of glowing chevrons on the floor from a to b (sheet 07).
-local function chevrons(parent, a: Vector3, b: Vector3, color: Color3)
-	local CH = G.Chevrons
-	local flat = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
-	local length = flat.Magnitude
-	if length < 4 then
-		return
-	end
-	local dir = flat.Unit
-	local n = math.floor(length / CH.Every)
-	for k = 1, n do
-		local p = a + dir * (k * CH.Every - CH.Every / 2)
-		local look = CFrame.lookAt(Vector3.new(p.X, a.Y + 0.08, p.Z), Vector3.new(p.X, a.Y + 0.08, p.Z) + dir)
-		for _, side in ipairs({ -1, 1 }) do
-			local bar = Panel(parent, "Chevron", Vector3.new(0.5, 0.06, CH.Width), look * CFrame.new(side * CH.Width * 0.3, 0, 0.6) * CFrame.Angles(0, math.rad(side * 50), 0), color, M.Neon, { CanCollide = false, CastShadow = false, Transparency = 0.15 })
-			NanoKit.Tag(bar, "Pulse", { Period = 1.4 + (k % 4) * 0.15 })
-		end
-	end
-end
-
 -- An overhead gantry crane: two rails along the side walls, a bridge
 -- beam across, a trolley with a hook block (sheet 07 factory).
 local function crane(parent, biome, center: Vector3, half: number, H: number, rng: Random)
@@ -719,10 +699,6 @@ local function buildZone(folder, biome, rng: Random, index: number, center: Vect
 			table.insert(blocks, base)
 		end
 	end
-	-- the way forward: chevrons from the entry to the exit (sheet 07)
-	if exitX then
-		chevrons(m, center + Vector3.new(entryX or 0, 0, half - 6), center + Vector3.new(exitX, 0, -half + 4), biome.Accent)
-	end
 	-- biome set pieces
 	if biome.Theme == "Assembly" or biome.Theme == "Smelter" then
 		crane(m, biome, center, half, H, rng)
@@ -766,13 +742,14 @@ local function buildZone(folder, biome, rng: Random, index: number, center: Vect
 		end
 		if ok then
 			table.insert(hazards, p)
-			-- the trap's plate: a steel ring with hazard marks (looks dangerous at rest)
+			-- the trap's plate: a steel disc with dim marks on the rim (no glowing
+			-- arrows on the floor - owner, 23.11)
 			local kind = G.Hazards.Kinds[biome.Theme] or G.Hazards.Kinds.Assembly
 			local plate = NanoKit.Cylinder(m, "HazardPlate", 0.12, G.Hazards.Radius * 2, CFrame.new(p + Vector3.new(0, 0.06, 0)) * CFrame.Angles(0, 0, math.rad(90)), biome.Metal:Lerp(Color3.new(0, 0, 0), 0.3), M.Plate)
 			plate.CanCollide = false
 			for k = 0, 7 do
 				local a = k / 8 * math.pi * 2
-				Panel(m, "HazardMark", Vector3.new(1.6, 0.05, 0.5), CFrame.new(p + Vector3.new(math.cos(a) * (G.Hazards.Radius - 1), 0.14, math.sin(a) * (G.Hazards.Radius - 1))) * CFrame.Angles(0, -a, 0), kind.Color, M.Neon, { CanCollide = false, Transparency = 0.35 })
+				Panel(m, "HazardMark", Vector3.new(1.2, 0.05, 0.4), CFrame.new(p + Vector3.new(math.cos(a) * (G.Hazards.Radius - 0.8), 0.14, math.sin(a) * (G.Hazards.Radius - 0.8))) * CFrame.Angles(0, -a, 0), kind.Color:Lerp(Color3.new(0, 0, 0), 0.45), M.Smooth, { CanCollide = false, CastShadow = false })
 			end
 		end
 	end
@@ -801,7 +778,6 @@ local function buildCorridor(folder, biome, from: Vector3, to: Vector3)
 		NanoKit.Strip(m, (cf * CFrame.new(side * (C.Width / 2 - 0.1), 2, -length / 2)).Position, (cf * CFrame.new(side * (C.Width / 2 - 0.1), 2, length / 2)).Position, biome.Accent, 0.14)
 	end
 	Panel(m, "Roof", Vector3.new(C.Width + 6, 1, length), cf * CFrame.new(0, C.Height + 2.5, 0), biome.Metal, M.Metal)
-	chevrons(m, from, to, biome.Accent)
 	local lamp = Panel(m, "Lamp", Vector3.new(3, 0.3, 1.4), cf * CFrame.new(0, C.Height + 1.8, 0), biome.Light, M.Neon, { CanCollide = false })
 	local light = Instance.new("SpotLight")
 	light.Face = Enum.NormalId.Bottom
