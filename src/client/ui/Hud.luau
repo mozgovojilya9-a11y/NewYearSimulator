@@ -286,9 +286,10 @@ for order, def in ipairs(U.Bar) do
 	barButtons[def.Id] = api
 	local action = actions[def.Id]
 	button.Activated:Connect(function()
-		local open = Window.Current()
+		-- close only when THIS window is the one on screen (windows that
+		-- share header tabs used to close each other)
 		for _, w in ipairs(action.Windows) do
-			if open == w then
+			if w.IsOpen and w.IsOpen() then
 				Window.CloseAll()
 				return
 			end
@@ -316,9 +317,8 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	for _, def in ipairs(U.Bar) do
 		if def.Key and input.KeyCode == def.Key then
 			local action = actions[def.Id]
-			local open = Window.Current()
 			for _, w in ipairs(action.Windows) do
-				if open == w then
+				if w.IsOpen and w.IsOpen() then
 					Window.CloseAll()
 					return
 				end
@@ -383,7 +383,7 @@ local function refreshTracker()
 		end
 		lastQuest, lastReady = q.Title, q.Ready == true
 		qTitle.Text = q.Title
-		qText.Text = "" -- 22.11: title + progress only
+		qText.Text = q.Text or "" -- sheet 02: the quest with its task line
 		local target = math.max(1, tonumber(q.Target) or 1)
 		local progress = math.clamp(tonumber(q.Progress) or 0, 0, target)
 		qFill.Size = UDim2.fromScale(progress / target, 1)
@@ -719,7 +719,7 @@ local hpTrack, hpFill, hpText = Style.Bar(bottom, {
 	AnchorPoint = Vector2.new(0.5, 1),
 	Position = UDim2.new(0.5, 0, 1, 0),
 	Size = UDim2.new(1, 0, 0, 20),
-	Color = C.Health,
+	Color = U.HealthColor, -- green like sheet 02
 	Border = C.GoldDim,
 	ZIndex = 6,
 	TextSize = 13,
@@ -888,8 +888,8 @@ end)
 local play = Instance.new("TextButton")
 play.Name = "Play"
 play.AnchorPoint = Vector2.new(1, 1)
-play.Position = UDim2.new(1, -16, 1, -(AC.Height + 28))
-play.Size = UDim2.fromOffset(200, 54)
+play.Position = UDim2.new(1, -16, 1, -(AC.Height + 22))
+play.Size = UDim2.fromOffset(170, 46)
 play.BackgroundTransparency = 1
 play.Text = ""
 play.AutoButtonColor = false
@@ -909,7 +909,7 @@ end
 local playIcon = Icons.Make(play, "play", 26, Color3.fromRGB(28, 22, 10), 8)
 playIcon.AnchorPoint = Vector2.new(0, 0.5)
 playIcon.Position = UDim2.new(0, 22, 0.5, 0)
-local playLabel = Style.Label(play, U.Play.Text, 26, Color3.fromRGB(28, 22, 10), {
+local playLabel = Style.Label(play, U.Play.Text, 20, Color3.fromRGB(28, 22, 10), {
 	Font = Style.FontTitle,
 	Position = UDim2.fromOffset(56, 0),
 	Size = UDim2.new(1, -66, 1, 0),

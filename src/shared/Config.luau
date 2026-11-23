@@ -2708,6 +2708,7 @@ Config.Ui = {
 	-- the vertical panel under the profile (sheet 02): rows icon + name + [key]
 	Nav = { Width = 170, Height = 34, Gap = 6 },
 	TrackerTop = 62, -- the quest tracker on the right, under the wallet
+	HealthColor = Color3.fromRGB(74, 206, 96), -- the HP bar (sheet 02)
 	-- bottom right: the attack button and the skills on an arc around it
 	-- (offsets of the slot centres from the attack button's centre)
 	Actions = {

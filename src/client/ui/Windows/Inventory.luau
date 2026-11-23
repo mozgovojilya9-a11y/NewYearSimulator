@@ -99,8 +99,6 @@ doll.LightColor = Color3.fromRGB(255, 236, 210)
 doll.LightDirection = Vector3.new(-0.4, -1, -0.6)
 doll.ZIndex = 33
 doll.Parent = content
-local dollWorld = Instance.new("WorldModel")
-dollWorld.Parent = doll
 local dollCamera = Instance.new("Camera")
 dollCamera.FieldOfView = 30
 dollCamera.Parent = doll
@@ -140,11 +138,13 @@ local function rebuildDoll()
 		end
 	end
 	copy:PivotTo(CFrame.new(0, 0, 0))
-	copy.Parent = dollWorld
+	-- straight into the viewport: a WorldModel there did not redraw until
+	-- something else changed (seen in Studio)
+	copy.Parent = doll
 	dollModel = copy
 	local box, size = copy:GetBoundingBox()
 	local look = box.Position
-	dollCamera.CFrame = CFrame.lookAt(look + Vector3.new(0, size.Y * 0.08, size.Y * 2.1), look)
+	dollCamera.CFrame = CFrame.lookAt(look + Vector3.new(0, size.Y * 0.05, size.Y * 2.9), look)
 end
 game:GetService("RunService").RenderStepped:Connect(function(dt)
 	if dollModel and window.IsOpen() then

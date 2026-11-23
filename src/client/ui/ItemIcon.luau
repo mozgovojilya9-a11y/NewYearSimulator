@@ -83,8 +83,9 @@ function ItemIcon.Create(parent: GuiObject, category: string, item, size: UDim2,
 	viewport.ZIndex = zIndex + 1
 	viewport.Parent = frame
 
-	local world = Instance.new("WorldModel")
-	world.Parent = viewport
+	-- the model goes straight into the viewport: inside a WorldModel some
+	-- icons stayed empty (no redraw), seen in Studio
+	local world = viewport
 	for _, p in ipairs(model:GetDescendants()) do
 		if p:IsA("BasePart") then
 			p.Anchored = true
