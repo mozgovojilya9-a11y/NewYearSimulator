@@ -369,7 +369,7 @@ local function watch(model: Model)
 			state.windingUp = true
 			if state.rig then
 				-- wind up to the strike pose and hold there
-				local name = if model:GetAttribute("Role") == "Ranged" and CLIPS.Shoot and CLIPS.Shoot.Id ~= "" then "Shoot" else "Attack"
+				local name = if (model:GetAttribute("Role") == "Ranged" or model:GetAttribute("Role") == "Turret") and CLIPS.Shoot and CLIPS.Shoot.Id ~= "" then "Shoot" else "Attack"
 				local clip = CLIPS[name]
 				local share = (clip.To - clip.From) / math.max(0.05, clip.Hit - clip.From)
 				local track = playClip(state, name, Config.Enemies.WindUp * share)

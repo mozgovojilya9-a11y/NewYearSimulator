@@ -370,6 +370,11 @@ local function spawnMob(run, defId: string, position: Vector3, opts)
 	WorldKit.UpdateHealth(model.PrimaryPart, health, health)
 	if elite then
 		decorateElite(model, affixes[1] and affixes[1].Color)
+		-- the elite android of sheet 04 carries an energy shield (visual;
+		-- only the Shield role blocks hits)
+		if (def.Role or "Melee") == "Melee" and def.Role ~= "Shield" then
+			addShield(model)
+		end
 	end
 	if def.Role == "Shield" then
 		addShield(model)

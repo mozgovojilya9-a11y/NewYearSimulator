@@ -827,7 +827,7 @@ local function tick()
 			if clock - state.lastAttack >= role.Every then
 				task.spawn(heal, state, model, role)
 			end
-		elseif kind == "Ranged" then
+		elseif kind == "Ranged" or kind == "Turret" then
 			if distance > role.Range - 4 or not canSee(state, targetRoot) then
 				-- too far, or a wall in the way: come closer
 				state.humanoid:MoveTo(targetRoot.Position)

@@ -398,10 +398,10 @@ Config.Gates = {
 	Locations = {
 		{ Id = "E_Assembly", Rank = "E", Biome = "Assembly", Name = "Сборочный цех", Text = "Конвейеры встали, роботы-сборщики вышли из-под контроля.",
 			Tier = 1, TierStep = 1, Sections = { 5, 6, 4 }, Elites = { 0 }, BossTier = 2, Level = 1, GearScore = 10, ParSeconds = 200, Seed = 11,
-			Mobs = { "SpiderBot", "Assembler", "AsmGunner", "AsmShield" }, Boss = "ForemanMech", Icon = "gear" },
+			Mobs = { "SpiderBot", "Assembler", "HoverDrone", "AsmGunner", "AsmShield" }, Boss = "ForemanMech", Icon = "gear" },
 		{ Id = "E_Cryo", Rank = "E", Biome = "Cryo", Name = "Криолаборатория", Text = "Ледяные камеры треснули. Внутри — то, что держали в холоде.",
 			Tier = 4, TierStep = 1, Sections = { 5, 6, 5 }, Level = 5, GearScore = 60, ParSeconds = 210, Seed = 23,
-			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic", "CryoBomber" }, Boss = "CryoOverseer", Icon = "vortex" },
+			Mobs = { "FrostSpider", "CryoAndroid", "WallTurret", "HoverDrone", "CryoMedic", "CryoBomber" }, Boss = "CryoOverseer", Icon = "vortex" },
 		{ Id = "D_Smelter", Rank = "D", Biome = "Smelter", Name = "Плавильный реактор", Text = "Каналы расплава, жар и тяжёлые мехи плавильни.",
 			Tier = 7, TierStep = 1, Sections = { 6, 6, 5 }, Level = 9, GearScore = 140, ParSeconds = 230, Seed = 37,
 			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic", "SlagBomber" }, Boss = "MoltenColossus", Icon = "flame" },
@@ -410,7 +410,7 @@ Config.Gates = {
 			Mobs = { "InfectedCrawler", "InfectedBrute", "InfectedSpitter", "InfectedMedic", "SporeBomber", "InfectedStalker" }, Boss = "HiveMother", Icon = "skull" },
 		{ Id = "D_Nexus", Rank = "D", Biome = "Nexus", Name = "Ядро Нексуса", Text = "Сердце ИИ. Его стражи не знают пощады.",
 			Tier = 11, TierStep = 1, Sections = { 6, 6, 7, 5 }, Level = 15, GearScore = 250, ParSeconds = 280, Seed = 53,
-			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
+			Mobs = { "PhaseAndroid", "NexusSentinel", "NanoSwarm", "WallTurret", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
 		-- higher ranks: mixed pools from several biomes, more elites with
 		-- more affixes (Config.Enemies.Affixes.Count)
 		{ Id = "C_Foundry", Rank = "C", Biome = "Smelter", Name = "Глубинная литейная", Text = "Ниже реактора. Расплав, подрывники и щиты в три ряда.",
@@ -418,7 +418,7 @@ Config.Gates = {
 			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic", "SlagBomber", "NexusSentinel" }, Boss = "MoltenColossus", Icon = "flame" },
 		{ Id = "C_Hive", Rank = "C", Biome = "Infected", Name = "Улей биомассы", Text = "Биомасса проросла сквозь этажи. Охотники нападают со спины.",
 			Tier = 15, TierStep = 1, Sections = { 6, 7, 7, 6 }, Elites = { 1, 2, 2, 2 }, Level = 20, GearScore = 360, ParSeconds = 300, Seed = 67,
-			Mobs = { "InfectedCrawler", "InfectedBrute", "InfectedSpitter", "InfectedMedic", "SporeBomber", "InfectedStalker" }, Boss = "HiveMother", Icon = "skull" },
+			Mobs = { "InfectedCrawler", "InfectedBrute", "NanoSwarm", "InfectedSpitter", "SporeBomber", "InfectedStalker" }, Boss = "HiveMother", Icon = "skull" },
 		{ Id = "B_Core", Rank = "B", Biome = "Nexus", Name = "Ядро-2", Text = "Резервное ядро ИИ. Фазовые стражи и всё, что они собрали.",
 			Tier = 17, TierStep = 1, Sections = { 7, 7, 8, 6 }, Elites = { 2, 2, 3, 2 }, Level = 26, GearScore = 440, ParSeconds = 320, Seed = 71,
 			Mobs = { "PhaseAndroid", "NexusSentinel", "NexusDrone", "NexusShield", "NexusMedic", "CryoPhantom", "SlagBomber" }, Boss = "Juggernaut", Icon = "eye" },
@@ -427,7 +427,7 @@ Config.Gates = {
 			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic", "CryoBomber", "CryoPhantom", "NexusShield" }, Boss = "CryoOverseer", Icon = "vortex" },
 		{ Id = "S_Throne", Rank = "S", Biome = "Nexus", Name = "Трон Нексуса", Text = "Последний рубеж. Здесь собраны худшие машины всех цехов.",
 			Tier = 21, TierStep = 1, Sections = { 8, 8, 8, 7 }, Elites = { 3, 3, 3, 3 }, Level = 42, GearScore = 600, ParSeconds = 360, Seed = 83,
-			Mobs = { "PhaseAndroid", "NexusSentinel", "InfectedBrute", "SmeltGunner", "NexusShield", "SlagBomber", "InfectedStalker", "CryoPhantom" }, Boss = "Juggernaut", Icon = "eye" },
+			Mobs = { "PhaseAndroid", "NexusSentinel", "InfectedBrute", "SmeltGunner", "NexusShield", "SlagBomber", "InfectedStalker", "CryoPhantom", "NanoSwarm", "WallTurret" }, Boss = "AICore", Icon = "eye" },
 	},
 	Texts = {
 		Title = "ВРАТА",
@@ -612,33 +612,38 @@ Config.Mobs = {
 		Assembler = { Name = "Робот-сборщик", Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 5.6, Tint = Color3.fromRGB(255, 190, 70), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "ZombieMiner" },
 		AsmGunner = { Name = "Монтажник-стрелок", Role = "Ranged", Rig = "Rig_Assembler", Weapon = "Weapon_Blaster_2", Asset = "Mob_Sniper", Height = 5.6, Glow = Color3.fromRGB(255, 190, 70), Builder = "SkeletonArcher" },
 		AsmShield = { Name = "Щитовой погрузчик", Role = "Shield", Rig = "Rig_Heavy", Asset = "Mob_ShieldBearer", Height = 6, Glow = Color3.fromRGB(255, 190, 70), Builder = "ZombieMiner" },
-		ForemanMech = { Name = "Мех-бригадир", Boss = true, Rig = "Rig_Heavy", Asset = "Boss_Foreman", Turn = 90, AltAsset = "Mob_Mech", Height = 6, Tint = Color3.fromRGB(255, 170, 60), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "SlimeKing", Title = "Хозяин конвейера" },
+		ForemanMech = { Name = "Мех-бригадир", Boss = true, Asset = "Boss_Mech", AltAsset = "Mob_Mech", Height = 6.2, Tint = Color3.fromRGB(255, 170, 60), TintAmount = 0.25, Glow = Color3.fromRGB(255, 190, 70), Builder = "SlimeKing", Title = "Хозяин конвейера" },
 		-- 2. Криолаборатория
 		FrostSpider = { Name = "Ледяной паукобот", Role = "Swarm", Asset = "Mob_SpiderBot", Height = 3, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider" },
 		CryoAndroid = { Name = "Крио-андроид", Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_Android", Height = 6, Tint = Color3.fromRGB(170, 220, 255), TintAmount = 0.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "Yeti" },
 		CryoBot = { Name = "Крио-турель", Role = "Ranged", Asset = "Mob_BlueBot", Height = 4.6, Glow = Color3.fromRGB(120, 230, 255), Builder = "SnowGolem" },
 		CryoMedic = { Name = "Крио-медик", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(200, 235, 255), TintAmount = 0.3, Glow = Color3.fromRGB(120, 230, 255), Builder = "FlyingEye", Float = true },
-		CryoOverseer = { Name = "Крио-надзиратель", Boss = true, Rig = "Rig_Heavy", Asset = "Boss_Cryo", AltAsset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(150, 210, 255), TintAmount = 0.45, Glow = Color3.fromRGB(46, 230, 255), Builder = "IceBoneLord", Title = "Страж холода" },
+		CryoOverseer = { Name = "Крио-надзиратель", Boss = true, Asset = "Boss_AICore", AltAsset = "Mob_Overseer", Height = 7, Tint = Color3.fromRGB(150, 210, 255), TintAmount = 0.45, Glow = Color3.fromRGB(46, 230, 255), Builder = "IceBoneLord", Float = true, Title = "Страж холода" },
 		-- 3. Плавильный реактор
 		SlagBot = { Name = "Шлакобот", Role = "Swarm", Asset = "Mob_SpiderBot", Height = 2.8, Tint = Color3.fromRGB(255, 130, 40), TintAmount = 0.45, Glow = Color3.fromRGB(255, 160, 60), Builder = "GoblinSmith" },
 		Smelter = { Name = "Андроид-плавильщик", Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_RedAndroid", Height = 6, Glow = Color3.fromRGB(255, 140, 40), Builder = "FireImp" },
 		SmeltGunner = { Name = "Литейный стрелок", Role = "Ranged", Rig = "Rig_Assembler", Weapon = "Weapon_Blaster_2", Asset = "Mob_Sniper", Height = 5.6, Tint = Color3.fromRGB(255, 120, 50), TintAmount = 0.3, Glow = Color3.fromRGB(255, 140, 40), Builder = "SkeletonArcher" },
 		SmeltShield = { Name = "Жаростойкий щитоносец", Role = "Shield", Rig = "Rig_Heavy", Asset = "Mob_ShieldBearer", Height = 6.2, Tint = Color3.fromRGB(255, 120, 50), TintAmount = 0.3, Glow = Color3.fromRGB(255, 140, 40), Builder = "MagmaGolem" },
 		SmeltMedic = { Name = "Ремонтный дрон", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(255, 150, 70), TintAmount = 0.3, Glow = Color3.fromRGB(255, 160, 60), Builder = "FlyingEye", Float = true },
-		MoltenColossus = { Name = "Плавильный колосс", Boss = true, Rig = "Rig_Heavy", Asset = "Boss_Molten", AltAsset = "Mob_Android", Height = 6.2, Tint = Color3.fromRGB(255, 110, 30), TintAmount = 0.45, Glow = Color3.fromRGB(255, 150, 40), Builder = "FireChief", Title = "Сердце плавильни" },
+		MoltenColossus = { Name = "Плавильный колосс", Boss = true, Asset = "Boss_Mech", AltAsset = "Mob_Android", Height = 6.2, Tint = Color3.fromRGB(255, 110, 30), TintAmount = 0.45, Glow = Color3.fromRGB(255, 150, 40), Builder = "FireChief", Title = "Сердце плавильни" },
 		-- 4. Заражённый сектор
 		InfectedCrawler = { Name = "Заражённый ползун", Role = "Swarm", Asset = "Mob_InfectedCrawler", AltAsset = "Mob_SpiderBot", Height = 2.8, Glow = Color3.fromRGB(120, 255, 90), Builder = "IceSpider" },
 		InfectedBrute = { Name = "Заражённый громила", Role = "Melee", Rig = "Rig_Heavy", Asset = "Mob_InfectedBrute", AltAsset = "Mob_Android", Height = 6.2, Glow = Color3.fromRGB(120, 255, 90), Builder = "Yeti" },
 		InfectedSpitter = { Name = "Плевун", Role = "Ranged", Rig = "Rig_Assembler", Weapon = "Weapon_Blaster_2", Asset = "Mob_Sniper", Height = 5.6, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "SkeletonArcher" },
 		InfectedMedic = { Name = "Спороносец", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(110, 200, 80), TintAmount = 0.45, Glow = Color3.fromRGB(120, 255, 90), Builder = "FlyingEye", Float = true },
-		HiveMother = { Name = "Матка улья", Boss = true, Asset = "Boss_HiveMother", AltAsset = "Mob_Overseer", Height = 6.4, Glow = Color3.fromRGB(120, 255, 90), Builder = "AbyssLord", Title = "Источник заражения" },
+		HiveMother = { Name = "Матка улья", Boss = true, Asset = "Boss_AICore", AltAsset = "Mob_Overseer", Height = 7, Glow = Color3.fromRGB(120, 255, 90), Builder = "AbyssLord", Float = true, Title = "Источник заражения" },
 		-- 5. Ядро Нексуса
 		PhaseAndroid = { Name = "Фазовый андроид", Role = "Blinker", Rig = "Rig_Assembler", Asset = "Mob_RedAndroid", Height = 4.2, Tint = Color3.fromRGB(170, 80, 255), TintAmount = 0.5, Glow = Color3.fromRGB(46, 230, 255), Builder = "AuraGhost" },
 		NexusSentinel = { Name = "Страж Нексуса", Role = "Melee", Rig = "Rig_Assembler", Asset = "Mob_Overseer", Height = 6, Tint = Color3.fromRGB(120, 60, 200), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
 		NexusDrone = { Name = "Дрон Нексуса", Role = "Ranged", Asset = "Mob_Robot", Height = 5.2, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.45, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye" },
 		NexusShield = { Name = "Бастион Нексуса", Role = "Shield", Rig = "Rig_Heavy", Asset = "Mob_ShieldBearer", Height = 6.2, Tint = Color3.fromRGB(150, 80, 255), TintAmount = 0.35, Glow = Color3.fromRGB(255, 61, 184), Builder = "ShadowKnight" },
 		NexusMedic = { Name = "Корректор", Role = "Healer", Asset = "Mob_MedicDrone", Height = 3.4, Tint = Color3.fromRGB(170, 90, 255), TintAmount = 0.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "FlyingEye", Float = true },
-		Juggernaut = { Name = "Джаггернаут", Boss = true, Rig = "Rig_Heavy", Asset = "Boss_Juggernaut", Height = 6.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord", Title = "Воля Нексуса" },
+		Juggernaut = { Name = "Джаггернаут", Boss = true, Asset = "Boss_Mech", Height = 6.2, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord", Title = "Воля Нексуса" },
+		-- sheet 04 enemies (Studio mesh generator, GameAssets/Mobs)
+		HoverDrone = { Name = "Дрон-охотник", Role = "Ranged", Asset = "Mob_Drone", Height = 3, Glow = Color3.fromRGB(46, 230, 255), Builder = "FlyingEye", Float = true },
+		WallTurret = { Name = "Настенная турель", Role = "Turret", Asset = "Mob_Turret", Height = 4.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "SnowGolem" },
+		NanoSwarm = { Name = "Нано-рой", Role = "Swarm", Asset = "Mob_Swarm", Height = 3.4, Glow = Color3.fromRGB(46, 230, 255), Builder = "FlyingEye", Float = true },
+		AICore = { Name = "ИИ-Ядро", Boss = true, Asset = "Boss_AICore", Height = 7.4, Glow = Color3.fromRGB(255, 61, 184), Builder = "AbyssLord", Float = true, Title = "Центральный нано-интеллект" },
 		-- Bombers and blinkers (spiders / androids with new behaviour)
 		CryoBomber = { Name = "Крио-подрывник", Role = "Bomber", Asset = "Mob_SpiderBot", Height = 2.6, Tint = Color3.fromRGB(160, 215, 255), TintAmount = 0.5, Glow = Color3.fromRGB(120, 230, 255), Builder = "IceSpider" },
 		SlagBomber = { Name = "Шлак-подрывник", Role = "Bomber", Asset = "Mob_SpiderBot", Height = 2.6, Tint = Color3.fromRGB(255, 110, 40), TintAmount = 0.55, Glow = Color3.fromRGB(255, 140, 40), Builder = "GoblinSmith" },
@@ -738,12 +743,14 @@ Config.Enemies = {
 		Ranged = { Health = 0.75, Damage = 0.9, Speed = 10, Range = 40, Keep = 22, Cooldown = 2.8, Telegraph = 0.8, Width = 2.6 },
 		Shield = { Health = 1.7, Damage = 1.1, Speed = 8, Range = 5, Cooldown = 2.2, Telegraph = 0.7, Front = 70, Block = 0.8 },
 		Healer = { Health = 0.7, Damage = 0, Speed = 11, Keep = 26, Every = 4, Heal = 0.18, Range = 30 },
+		-- a wall turret: never moves, long range, shoots bolts (sheet 04)
+		Turret = { Health = 1.1, Damage = 1, Speed = 0, Range = 52, Keep = 0, Cooldown = 2.2, Telegraph = 0.7, Width = 2.4 },
 		-- runs at the player, stops, flashes and blows itself up (Radius)
 		Bomber = { Health = 0.4, Damage = 2.2, Speed = 19, Range = 6, Radius = 9, Telegraph = 0.9, Cooldown = 99 },
 		-- blinks behind the player (Blink seconds apart), then strikes
 		Blinker = { Health = 0.8, Damage = 1.1, Speed = 13, Range = 4.5, Cooldown = 1.5, Telegraph = 0.45, Blink = 5, BlinkFrom = 9 },
 	},
-	RoleNames = { Melee = "ближний бой", Swarm = "рой", Ranged = "стрелок", Shield = "щитоносец", Healer = "лекарь", Bomber = "подрывник", Blinker = "телепортер" },
+	RoleNames = { Melee = "ближний бой", Swarm = "рой", Ranged = "стрелок", Shield = "щитоносец", Healer = "лекарь", Bomber = "подрывник", Blinker = "телепортер", Turret = "турель" },
 	DeathSeconds = 1.4, -- a rigged mob stays this long after death (animation + dissolve)
 	-- Animations of rigged mobs (client MobFx): clip ids from the Studio
 	-- animation generator; From..To = the part played, Hit = the strike
@@ -790,7 +797,7 @@ Config.Enemies = {
 		Scale = 1.35,
 		Health = 4,
 		Damage = 1.6,
-		Aura = Color3.fromRGB(255, 201, 60),
+		Aura = Color3.fromRGB(255, 61, 184), -- magenta like the elite android on sheet 04
 		Shockwave = { Every = 7, Radius = 11, Telegraph = 1, Mult = 2 }, -- the extra attack
 		Prefix = "Элитный ",
 	},
