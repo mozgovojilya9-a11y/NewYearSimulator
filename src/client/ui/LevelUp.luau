@@ -6,9 +6,9 @@
 	  * for the local player (LevelUp remote: level, skill points gained,
 	    previous level): a flash, a short camera zoom, the sound
 	    Config.Assets.Sounds.LevelUp and the window
-	    a short banner "УРОВЕНЬ / 8 / +1 очко навыков" that fades by
-	    itself (no window, no buttons; stats are spent automatically).
-	    Several level-ups in a row become one banner.
+	    the golden "[ СИСТЕМА ] УРОВЕНЬ ПОВЫШЕН" notification of sheet 02
+	    (old -> new level, stat and skill points); no dim, no buttons, it
+	    fades by itself. Several level-ups in a row become one.
 ]]
 
 local Players = game:GetService("Players")
@@ -116,55 +116,111 @@ end
 Players.PlayerAdded:Connect(watchPlayer)
 
 ---------------------------------------------------------------------
--- The banner (22.11: no window, no buttons - it never stops the game)
+-- The notification (sheet 02): golden wings, "[ СИСТЕМА ]",
+-- "УРОВЕНЬ ПОВЫШЕН", "Ур. 7  »  Ур. 8", the points gained. No dim, no
+-- buttons: it fades by itself after FX.BannerSeconds or on a tap.
 ---------------------------------------------------------------------
 
-local banner = Instance.new("Frame")
+local W = 520
+local banner = Instance.new("TextButton")
 banner.Name = "LevelUpWindow"
 banner.AnchorPoint = Vector2.new(0.5, 0.5)
-banner.Position = UDim2.fromScale(0.5, 0.3)
-banner.Size = UDim2.fromOffset(420, 120)
+banner.Position = UDim2.fromScale(0.5, 0.36)
+banner.Size = UDim2.fromOffset(W, 250)
 banner.BackgroundTransparency = 1
+banner.Text = ""
+banner.AutoButtonColor = false
 banner.ZIndex = 90
 banner.Visible = false
 banner.Parent = Style.Gui
-local small = Style.Label(banner, T.Title, 18, Config.Theme.Cyan, { Font = Style.FontTitle, Size = UDim2.new(1, 0, 0, 22), ZIndex = 91 })
-local big = Style.Label(banner, "", 64, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 70), ZIndex = 91 })
-local extra = Style.Label(banner, "", 15, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 92), Size = UDim2.new(1, 0, 0, 20), ZIndex = 91 })
-local bigScale = Instance.new("UIScale")
-bigScale.Parent = big
+local fit = Instance.new("UIScale")
+fit.Parent = banner
+local panel = Style.Panel(banner, { Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 1, -40), Fill = Color3.fromRGB(14, 12, 10), Transparency = 0.08, Border = C.Gold, Cut = 14, ZIndex = 91 })
+-- golden wings and a diamond over the panel
+local crest = Instance.new("Frame")
+crest.AnchorPoint = Vector2.new(0.5, 0)
+crest.Position = UDim2.fromScale(0.5, 0)
+crest.Size = UDim2.fromOffset(300, 70)
+crest.BackgroundTransparency = 1
+crest.ZIndex = 93
+crest.Parent = banner
+local function bar(x: number, y: number, w: number, rot: number)
+	local f = Instance.new("Frame")
+	f.AnchorPoint = Vector2.new(0.5, 0.5)
+	f.Position = UDim2.new(0.5, x, 0, y)
+	f.Size = UDim2.fromOffset(w, 6)
+	f.Rotation = rot
+	f.BackgroundColor3 = C.Gold
+	f.BorderSizePixel = 0
+	f.ZIndex = 94
+	f.Parent = crest
+	return f
+end
+for _, side in ipairs({ -1, 1 }) do
+	for k = 0, 3 do
+		bar(side * (52 + k * 14), 38 + k * 7, 90 - k * 16, side * (-18 + k * 4))
+	end
+end
+local diamond = Instance.new("Frame")
+diamond.AnchorPoint = Vector2.new(0.5, 0.5)
+diamond.Position = UDim2.new(0.5, 0, 0, 36)
+diamond.Size = UDim2.fromOffset(34, 34)
+diamond.Rotation = 45
+diamond.BackgroundColor3 = C.Gold
+diamond.BorderSizePixel = 0
+diamond.ZIndex = 95
+diamond.Parent = crest
+local system = Style.Label(panel, T.System, 15, Config.Theme.Cyan, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 30), Size = UDim2.new(1, 0, 0, 18), ZIndex = 92 })
+local title = Style.Label(panel, T.Title, 40, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 48), Size = UDim2.new(1, 0, 0, 44), ZIndex = 92 })
+local levels = Style.Label(panel, "", 26, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 96), Size = UDim2.new(1, 0, 0, 30), ZIndex = 92 })
+Style.Rule(panel, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 132), Size = UDim2.new(1, -80, 0, 1), Color = C.GoldDim, ZIndex = 92 })
+local gains = Style.Label(panel, "", 16, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 140), Size = UDim2.new(1, 0, 0, 44), TextWrapped = true, ZIndex = 92 })
+local titleScale = Instance.new("UIScale")
+titleScale.Parent = title
+local LABELS = { system, title, levels, gains }
 local shownAt = 0
 
-local function show(_from: number, to: number, skillPoints: number)
-	small.Text = T.Title
-	big.Text = tostring(to)
-	extra.Text = if skillPoints > 0 then T.Skills:format(skillPoints) else ""
-	for _, label in ipairs({ small, big, extra }) do
-		label.TextTransparency = 0
+local function setFade(t: number, seconds: number)
+	for _, label in ipairs(LABELS) do
+		Style.Tween(label, seconds, { TextTransparency = t })
 		local stroke = label:FindFirstChildOfClass("UIStroke")
 		if stroke then
-			stroke.Transparency = 0
+			Style.Tween(stroke, seconds, { Transparency = t })
 		end
 	end
+end
+
+local function hide()
+	shownAt = 0
+	banner.Visible = false
+end
+banner.Activated:Connect(hide)
+
+local function show(from: number, to: number, skillPoints: number)
+	levels.Text = T.Levels:format(from, to)
+	local lines = { T.Stats:format((to - from) * Config.Attributes.PointsPerLevel) }
+	if skillPoints > 0 then
+		table.insert(lines, T.Skills:format(skillPoints))
+	end
+	gains.Text = table.concat(lines, "     ")
+	local camera = Workspace.CurrentCamera
+	fit.Scale = math.min(1, (camera.ViewportSize.X - 24) / W)
 	banner.Visible = true
-	bigScale.Scale = 1.8
-	Style.Tween(bigScale, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
+	setFade(0, 0)
+	banner.Position = UDim2.fromScale(0.5, 0.4)
+	Style.Tween(banner, 0.35, { Position = UDim2.fromScale(0.5, 0.36) }, Enum.EasingStyle.Back)
+	titleScale.Scale = 1.4
+	Style.Tween(titleScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
 	local stamp = os.clock()
 	shownAt = stamp
-	task.delay(FX.BannerSeconds or 1.8, function()
+	task.delay(FX.BannerSeconds or 3.5, function()
 		if shownAt ~= stamp then
 			return
 		end
-		for _, label in ipairs({ small, big, extra }) do
-			Style.Tween(label, 0.4, { TextTransparency = 1 })
-			local stroke = label:FindFirstChildOfClass("UIStroke")
-			if stroke then
-				Style.Tween(stroke, 0.4, { Transparency = 1 })
-			end
-		end
-		task.delay(0.45, function()
+		setFade(1, 0.5)
+		task.delay(0.55, function()
 			if shownAt == stamp then
-				banner.Visible = false
+				hide()
 			end
 		end)
 	end)

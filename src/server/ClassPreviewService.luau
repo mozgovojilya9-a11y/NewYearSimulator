@@ -1,7 +1,10 @@
 --[[
 	ClassPreviewService.luau
-	The class screen shows three unique class characters (not the player's
-	avatar): rigged R15 models in ServerStorage/GameAssets/Avatars named
+	The class screen (sheet 03) shows the player's OWN avatar in the class
+	armor: the server builds an R15 rig from the player's HumanoidDescription
+	into ReplicatedStorage.ClassPreviews.<UserId>. The unique class
+	characters stay as the fallback (and stand in the Academy):
+	rigged R15 models in ServerStorage/GameAssets/Avatars named
 	Config.Classes[i].Avatar (made with the Studio avatar generator). The
 	server copies them, cleaned (no scripts, only the root anchored, an
 	Animator added), into ReplicatedStorage.ClassPreviews.<ClassId>; the
@@ -55,6 +58,35 @@ local function mannequin(class): Model?
 	return if ok then model else nil
 end
 
+-- The player's own avatar as an R15 rig (sheet 03: the class preview is
+-- the player in the class armor): ClassPreviews.<UserId>. Only the server
+-- can build a rig from a HumanoidDescription.
+local function buildAvatar(folder, player)
+	local description
+	local ok = pcall(function()
+		description = Players:GetHumanoidDescriptionFromUserId(math.max(1, player.UserId))
+	end)
+	if not ok or not description then
+		description = Instance.new("HumanoidDescription")
+	end
+	local model
+	ok = pcall(function()
+		model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
+	end)
+	if not ok or not model or not player.Parent then
+		return
+	end
+	clean(model)
+	model.Name = tostring(player.UserId)
+	model.Archivable = true
+	model:PivotTo(CFrame.new(0, -500, 0))
+	local old = folder:FindFirstChild(model.Name)
+	if old then
+		old:Destroy()
+	end
+	model.Parent = folder
+end
+
 function ClassPreviewService.Init()
 	local folder = Instance.new("Folder")
 	folder.Name = "ClassPreviews"
@@ -76,6 +108,18 @@ function ClassPreviewService.Init()
 		end
 	end
 	folder.Parent = ReplicatedStorage
+	Players.PlayerAdded:Connect(function(player)
+		task.spawn(buildAvatar, folder, player)
+	end)
+	for _, player in ipairs(Players:GetPlayers()) do
+		task.spawn(buildAvatar, folder, player)
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		local model = folder:FindFirstChild(tostring(player.UserId))
+		if model then
+			model:Destroy()
+		end
+	end)
 end
 
 return ClassPreviewService

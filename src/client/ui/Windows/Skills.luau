@@ -323,6 +323,7 @@ function Skills.Refresh()
 
 	local nodes = Config.SkillTrees[viewed]
 	for b, bu in ipairs(branchUis) do
+		local tint = SK.Branches[b].Color or class.Color -- sheet 03: every branch its own color
 		local spent, max = 0, 0
 		for position, ui in pairs(bu.nodes) do
 			local id = viewed .. "_" .. bu.branch.Id .. position
@@ -332,18 +333,19 @@ function Skills.Refresh()
 			max += node.MaxRank
 			local unlocked = level >= node.Level
 			local selected = selectedNode == id
-			local border = if selected then C.Text elseif rank >= node.MaxRank then C.Gold elseif rank > 0 then C.GoldDim else C.Line
+			local border = if selected then C.Text elseif rank >= node.MaxRank then C.Gold elseif rank > 0 or unlocked then tint else C.Line
 			ui.shape.SetBorder(border)
-			ui.shape.SetFill(if rank > 0 then Style.Darker(class.Color, 0.7) else C.CardDark, 0)
-			Icons.Set(ui.icon, if unlocked then node.Icon else "lock", if rank > 0 then C.Text elseif unlocked then C.Muted else C.Line)
+			ui.shape.SetFill(if rank > 0 then Style.Darker(tint, 0.62) elseif unlocked then Style.Darker(tint, 0.86) else C.CardDark, 0)
+			Icons.Set(ui.icon, if unlocked then node.Icon else "lock", if rank > 0 then C.Text elseif unlocked then tint else C.Line)
 			ui.rank.Text = if unlocked then ("%d/%d"):format(rank, node.MaxRank) else ("ур. %d"):format(node.Level)
 			ui.rank.TextColor3 = if rank > 0 then C.Text else C.Muted
 		end
 		for _, link in ipairs(bu.links) do
 			local id = viewed .. "_" .. bu.branch.Id .. link.from
-			link.frame.BackgroundColor3 = if rankOf(r, id) > 0 then class.Color else C.Line
+			link.frame.BackgroundColor3 = if rankOf(r, id) > 0 then tint else C.Line
 		end
 		bu.header.Text = SK.Branches[b].Name
+		bu.header.TextColor3 = tint
 		bu.count.Text = ("%d/%d"):format(spent, max)
 		local _ = nodes
 	end

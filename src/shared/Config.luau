@@ -1023,7 +1023,7 @@ Config.AFK = {
 -- summed up in one window.
 Config.LevelUpFx = {
 	Gather = 0.4,
-	BannerSeconds = 1.8, -- the level banner fades after this
+	BannerSeconds = 3.5, -- the level-up notification fades after this
 	PillarSeconds = 1.6,
 	PillarColor = Color3.fromRGB(120, 235, 255),
 	RingColor = Color3.fromRGB(255, 214, 110),
@@ -1031,9 +1031,9 @@ Config.LevelUpFx = {
 	ZoomSeconds = 0.6,
 	Texts = {
 		System = "[ СИСТЕМА ]",
-		Title = "УРОВЕНЬ",
-		Levels = "%d  →  %d",
-		Stats = "Очки характеристик: +%d",
+		Title = "УРОВЕНЬ ПОВЫШЕН",
+		Levels = "Ур. %d   »   Ур. %d",
+		Stats = "+%d очка характеристик",
 		Skills = "+%d очко навыков",
 		Opened = "ОТКРЫЛОСЬ",
 		Node = "Навык «%s» (ветка %s)",
@@ -1235,10 +1235,11 @@ Config.Skills = {
 	},
 	Levels = { 1, 2, 4, 6, 8, 11, 14, 20 }, -- unlock level by position (22.11: sooner, choices come early)
 	Branches = {
-		{ Id = "A", Name = "Атака", Icon = "sword" },
-		{ Id = "D", Name = "Защита", Icon = "shield" },
-		{ Id = "C", Name = "Контроль", Icon = "vortex" },
-		{ Id = "S", Name = "Выживание", Icon = "plus" },
+		-- Color = the branch's color on the tree (sheet 03)
+		{ Id = "A", Name = "Атака", Icon = "sword", Color = Color3.fromRGB(255, 84, 84) },
+		{ Id = "D", Name = "Защита", Icon = "shield", Color = Color3.fromRGB(70, 160, 255) },
+		{ Id = "C", Name = "Контроль", Icon = "vortex", Color = Color3.fromRGB(176, 104, 255) },
+		{ Id = "S", Name = "Выживание", Icon = "plus", Color = Color3.fromRGB(90, 226, 120) },
 	},
 	-- Stat names of passives (shown on the node card).
 	StatNames = {
@@ -1754,15 +1755,6 @@ Config.System = {
 -- back for ResetCost + ResetPerLevel x level credits.
 Config.Attributes = {
 	PointsPerLevel = 3,
-	-- 22.11: points are spent automatically by class (no "+" buttons, no
-	-- nagging): Auto[class][attribute] = share of the level's points.
-	-- Points the player had spent by hand before stay where they are.
-	Auto = {
-		Blade = { Str = 0.4, Vit = 0.4, Agi = 0.2 },
-		Pulse = { Str = 0.35, Agi = 0.45, Vit = 0.2 },
-		Gunner = { Str = 0.3, Agi = 0.3, Per = 0.4 },
-		Default = { Str = 0.4, Agi = 0.2, Vit = 0.3, Per = 0.1 },
-	},
 	ResetCost = 50,
 	ResetPerLevel = 10,
 	List = {
@@ -1774,6 +1766,10 @@ Config.Attributes = {
 	Texts = {
 		Title = "СТАТУС",
 		Points = "Свободных очков: %d",
+		FreeTitle = "СВОБОДНЫЕ ОЧКИ",
+		ResetShort = "Сброс",
+		Sure = "Точно сбросить?",
+		ResetCost = "%s кр.",
 		Reset = "Сбросить  •  %s кр.",
 		ResetDone = "Очки характеристик возвращены",
 		NoPoints = "Нет свободных очков",
@@ -2321,10 +2317,18 @@ Config.HubLayout = {
 		Spawn = { Floor = Color3.fromRGB(128, 122, 116), Wall = Color3.fromRGB(150, 146, 140), Accent = Color3.fromRGB(214, 178, 104), Light = Color3.fromRGB(255, 236, 212) },
 		Atrium = { Floor = Color3.fromRGB(138, 132, 126), Wall = Color3.fromRGB(168, 160, 150), Accent = Color3.fromRGB(206, 180, 128), Light = Color3.fromRGB(255, 234, 204) },
 		Gates = { Floor = Color3.fromRGB(112, 114, 120), Wall = Color3.fromRGB(116, 122, 128), Accent = Color3.fromRGB(122, 196, 206), Light = Color3.fromRGB(226, 240, 246) },
-		Supply = { Floor = Color3.fromRGB(54, 52, 60), Wall = Color3.fromRGB(132, 126, 134), Accent = Color3.fromRGB(168, 150, 206), Light = Color3.fromRGB(255, 228, 196) },
-		Forge = { Floor = Color3.fromRGB(56, 46, 44), Wall = Color3.fromRGB(128, 104, 94), Accent = Color3.fromRGB(226, 128, 76), Light = Color3.fromRGB(255, 204, 156) },
-		Academy = { Floor = Color3.fromRGB(64, 60, 52), Wall = Color3.fromRGB(170, 154, 124), Accent = Color3.fromRGB(220, 182, 96), Light = Color3.fromRGB(255, 236, 198) },
+		Supply = { Floor = Color3.fromRGB(128, 124, 130), Wall = Color3.fromRGB(132, 126, 134), Accent = Color3.fromRGB(168, 150, 206), Light = Color3.fromRGB(255, 228, 196) },
+		Forge = { Floor = Color3.fromRGB(118, 104, 98), Wall = Color3.fromRGB(128, 104, 94), Accent = Color3.fromRGB(226, 128, 76), Light = Color3.fromRGB(255, 204, 156) },
+		Academy = { Floor = Color3.fromRGB(150, 140, 122), Wall = Color3.fromRGB(170, 154, 124), Accent = Color3.fromRGB(220, 182, 96), Light = Color3.fromRGB(255, 236, 198) },
 	},
+	-- display capsules along the Supply hall's west wall (HubGuide)
+	Capsules = {
+		From = Vector3.new(-172, 0, -48), Step = Vector3.new(0, 0, -15),
+		Rarities = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic" },
+		Height = 8, Diameter = 4.2, ItemSize = 4.4,
+	},
+	-- the Academy pedestals: the class characters (GameAssets/Avatars) this tall
+	Academy = { DisplayHeight = 7 },
 	-- the atrium garden (HubGuide): { x, z } offsets from the spawn base
 	Garden = {
 		TreeHeight = 11,
@@ -2694,11 +2698,21 @@ Config.Ui = {
 		{ Id = "Status", Icon = "user", Label = "Статус", Key = Enum.KeyCode.C },
 		{ Id = "Skills", Icon = "skills", Label = "Навыки", Key = Enum.KeyCode.K },
 		{ Id = "Quests", Icon = "quest", Label = "Задания", Key = Enum.KeyCode.J },
-		{ Id = "Shop", Icon = "gem", Label = "Магазин" },
+		{ Id = "Shop", Icon = "gem", Label = "Магазин", Key = Enum.KeyCode.M },
 		{ Id = "Teleport", Icon = "map", Label = "Телепорт", Key = Enum.KeyCode.T },
 		{ Id = "Afk", Icon = "moon", Label = "АФК-зона", Key = Enum.KeyCode.Z },
+		{ Id = "Settings", Icon = "gear", Label = "Настройки" },
 	},
 	BarButton = 44,
+	-- the vertical panel under the profile (sheet 02): rows icon + name + [key]
+	Nav = { Width = 170, Height = 34, Gap = 6 },
+	TrackerTop = 62, -- the quest tracker on the right, under the wallet
+	-- bottom right: the attack button and the skills on an arc around it
+	-- (offsets of the slot centres from the attack button's centre)
+	Actions = {
+		Width = 300, Height = 250, Attack = 96,
+		Slots = { Q = { -116, 4 }, E = { -94, -80 }, R = { -14, -116 }, Dash = { -200, 34 }, Block = { -186, -52 } },
+	},
 	-- Bottom center: HP and the ability slots (Q / E / R / dash).
 	AbilitySlots = {
 		{ Slot = "Q", Key = Enum.KeyCode.Q },

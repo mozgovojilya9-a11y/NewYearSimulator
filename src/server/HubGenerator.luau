@@ -1153,6 +1153,39 @@ end
 
 -- Academy: 3 class pedestals around the center with the class weapon
 -- floating over each, facing the entrance; the terminal by the door.
+-- A display copy of a class character (GameAssets/Avatars/<class.Avatar>):
+-- scripts stripped, anchored, scaled to DisplayHeight, standing on `cf`.
+local function displayAvatar(parent, class, cf: CFrame)
+	local source = game:GetService("ServerStorage"):FindFirstChild("GameAssets")
+	source = source and source:FindFirstChild("Avatars")
+	local own = source and source:FindFirstChild(class.Avatar or "")
+	if not (own and own:IsA("Model")) then
+		return nil
+	end
+	own.Archivable = true
+	local model = own:Clone()
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("LuaSourceContainer") or d:IsA("Sound") then
+			d:Destroy()
+		elseif d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+		elseif d:IsA("Humanoid") then
+			d.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+			d.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+		end
+	end
+	local _, size = model:GetBoundingBox()
+	if size.Y > 0.1 then
+		pcall(model.ScaleTo, model, model:GetScale() * L.Academy.DisplayHeight / size.Y)
+	end
+	Assets.PlaceOnGround(model, cf)
+	model.Name = "ClassDisplay_" .. class.Id
+	model.Parent = parent
+	return model
+end
+
 local function buildAcademy()
 	sideHall("Academy", "W")
 	local th = theme("Academy")
@@ -1174,10 +1207,25 @@ local function buildAcademy()
 		local ring = NanoKit.Cylinder(m, "PedestalRing", 0.2, 5.25, CFrame.new(p + Vector3.new(0, 1.45, 0)) * CFrame.Angles(0, 0, math.rad(90)), class.Color, M.Neon)
 		ring.CanCollide = false
 		NanoKit.Cylinder(m, "PedestalInlay", 0.06, 3.2, CFrame.new(p + Vector3.new(0, 1.66, 0)) * CFrame.Angles(0, 0, math.rad(90)), class.Color:Lerp(C.Beam, 0.7), M.Metal).CanCollide = false
+		-- the class's armored character (GameAssets/Avatars) under a glass dome
+		-- in the class color (sheet 01); the spinning weapon is the fallback
+		local avatar = displayAvatar(m, class, CFrame.lookAt(p + Vector3.new(0, 1.7, 0), Vector3.new(entrance.X, p.Y + 1.7, entrance.Z)))
+		if avatar then
+			local glass = NanoKit.Column(m, "Dome", 9, 5.4, p + Vector3.new(0, 1.7, 0), class.Color:Lerp(Color3.new(1, 1, 1), 0.6), M.Glass)
+			glass.Transparency = 0.82
+			glass.CanCollide = false
+			NanoKit.Column(m, "DomeCap", 0.6, 5.8, p + Vector3.new(0, 10.7, 0), C.Steel, M.Metal)
+			local capRing = NanoKit.Column(m, "DomeLight", 0.2, 5.3, p + Vector3.new(0, 10.6, 0), class.Color, M.Neon)
+			capRing.CanCollide = false
+			WorldKit.Light(capRing, class.Color, 14, 1.4)
+		end
 		local look = table.clone(Config.Weapons[1])
 		look.Class = class.Id
 		look.Rarity = "Rare"
-		local ok, model = pcall(WeaponBuilder.Build, look)
+		local ok, model = false, nil
+		if not avatar then
+			ok, model = pcall(WeaponBuilder.Build, look)
+		end
 		if ok and model then
 			WeaponBuilder.SetAnchored(model, true)
 			for _, d in ipairs(model:GetDescendants()) do

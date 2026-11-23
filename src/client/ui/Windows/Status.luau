@@ -1,9 +1,10 @@
 --[[
 	Status.luau
-	"Статус": name, class, rank and level on top; the four attributes as
-	bars (they grow by themselves with the level, split by the class:
-	Config.Attributes.Auto); МОЩЬ - one number to chase; every final stat
-	on the right. The server does the math (StatService).
+	"Статус" (sheet 02_ui_kit.png): the four attributes in rows - icon,
+	name, what a point gives, the value and a "+" button (+5 on a second
+	small button); on the right the free points in a big number and the
+	reset for credits; along the bottom the main stats АТАКА / ЗАЩИТА /
+	HP / КРИТ. The server does the math (Status remote, StatService).
 ]]
 
 local Players = game:GetService("Players")
@@ -12,114 +13,133 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local PlayerData = require(script.Parent.Parent.Parent.PlayerData)
+local Popups = require(script.Parent.Parent.Popups)
 local Icons = require(script.Parent.Parent.Icons)
 local Style = require(script.Parent.Parent.Style)
 local Window = require(script.Parent.Window)
 
 local C = Style.Colors
 local A = Config.Attributes
+local T = A.Texts
 local player = Players.LocalPlayer
+local remote = ReplicatedStorage:WaitForChild("Status")
 
 local Status = {}
 
-local window = Window.new("Статус", nil, Vector2.new(760, 500), "user")
+local window = Window.new("Статус", nil, Vector2.new(720, 460), "user")
 local content = window.Content
 
--- header: name, class, rank, level
-local head = Style.Panel(content, { Size = UDim2.new(1, 0, 0, 58), Fill = C.PanelDark, Border = C.Cyan:Lerp(C.Line, 0.5), Cut = 10, ZIndex = 33 })
-local nameLabel = Style.Label(head, player.DisplayName, 20, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(14, 8), Size = UDim2.new(0.6, 0, 0, 24), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
-local _ = nameLabel
-local classLabel = Style.Label(head, "", 13, C.Gold, { Position = UDim2.fromOffset(14, 33), Size = UDim2.new(0.6, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
-local levelLabel = Style.Label(head, "", 26, C.Cyan, { Font = Style.FontTitle, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 6), Size = UDim2.fromOffset(220, 28), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 34 })
-local pointsLabel = Style.Label(head, "", 13, C.Gold, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 35), Size = UDim2.fromOffset(260, 16), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 34 })
+local busy = false
+local function request(action, id, count)
+	if busy then
+		return
+	end
+	busy = true
+	task.spawn(function()
+		local ok, message = remote:InvokeServer(action, id, count)
+		busy = false
+		if message and message ~= "" then
+			Popups.Toast(message, if ok then "good" else "bad")
+		end
+		if ok then
+			Style.PlaySound("Ui", 1.3, 0.5)
+		end
+	end)
+end
 
--- left: attributes - they grow by themselves (Config.Attributes.Auto),
--- shown as bars; no buttons
-local LEFT = 430
+-- left: the four attribute rows
+local LEFT = 500
+local ROW = 66
 local rows = {}
 for i, def in ipairs(A.List) do
-	local row = Style.Panel(content, { Position = UDim2.fromOffset(0, 68 + (i - 1) * 62), Size = UDim2.fromOffset(LEFT, 54), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33 })
-	local icon = Icons.Make(row, def.Icon, 26, C.Cyan, 35)
-	icon.Position = UDim2.fromOffset(14, 14)
-	Style.Label(row, Style.Upper(def.Name), 15, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(52, 7), Size = UDim2.fromOffset(170, 18), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
-	Style.Label(row, def.Text, 11, C.Muted, { Position = UDim2.fromOffset(200, 9), Size = UDim2.fromOffset(150, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
-	local value = Style.Label(row, "0", 22, C.Gold, { Font = Style.FontTitle, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 4), Size = UDim2.fromOffset(60, 24), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 35 })
-	local back = Instance.new("Frame")
-	back.Position = UDim2.fromOffset(52, 34)
-	back.Size = UDim2.new(1, -66, 0, 6)
-	back.BackgroundColor3 = Color3.fromRGB(30, 30, 34)
-	back.BorderSizePixel = 0
-	back.ZIndex = 35
-	back.Parent = row
-	local fill = Instance.new("Frame")
-	fill.Size = UDim2.fromScale(0, 1)
-	fill.BackgroundColor3 = C.Cyan
-	fill.BorderSizePixel = 0
-	fill.ZIndex = 36
-	fill.Parent = back
-	rows[def.Id] = { value = value, fill = fill }
+	local row = Style.Panel(content, { Position = UDim2.fromOffset(0, (i - 1) * (ROW + 8)), Size = UDim2.fromOffset(LEFT, ROW), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33 })
+	local icon = Icons.Make(row, def.Icon, 28, C.Gold, 35)
+	icon.Position = UDim2.fromOffset(16, (ROW - 28) / 2)
+	Style.Label(row, Style.Upper(def.Name), 17, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(58, 10), Size = UDim2.fromOffset(220, 22), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
+	Style.Label(row, table.concat(def.Lines, "  ·  "), 11, C.Muted, { Position = UDim2.fromOffset(58, 36), Size = UDim2.fromOffset(280, 18), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 35 })
+	local value = Style.Label(row, "0", 26, C.Text, { Font = Style.FontTitle, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -104, 0.5, 0), Size = UDim2.fromOffset(70, 30), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 35 })
+	local plus, plusApi = Style.IconButton(row, { Icon = "plus", Size = 40, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -54, 0.5, 0), ZIndex = 36, Cut = 6 })
+	local plus5 = Style.Button(row, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(40, 40), Text = "+5", TextSize = 13, Color = C.Card, ZIndex = 36 })
+	plus.Activated:Connect(function()
+		request("Add", def.Id, 1)
+	end)
+	plus5.Activated:Connect(function()
+		request("Add", def.Id, 5)
+	end)
+	rows[def.Id] = { value = value, plusApi = plusApi, plus5 = plus5 }
 end
-local powerLabel = Style.Label(content, "", 34, C.Gold, { Font = Style.FontTitle, AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, -4), Size = UDim2.fromOffset(LEFT, 40), ZIndex = 34 })
+
+-- right: free points and the reset
+local side = Style.Panel(content, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(1, -(LEFT + 12), 0, 4 * (ROW + 8) - 8), Fill = C.PanelDark, Border = C.Line, Cut = 10, ZIndex = 33 })
+Style.Label(side, T.FreeTitle, 14, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 28), Size = UDim2.new(1, 0, 0, 18), ZIndex = 34 })
+local freeLabel = Style.Label(side, "0", 56, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 54), Size = UDim2.new(1, 0, 0, 62), ZIndex = 34 })
+local freeScale = Instance.new("UIScale")
+freeScale.Parent = freeLabel
+local resetButton = Style.Button(side, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -24), Size = UDim2.new(1, -36, 0, 44), Text = "", TextSize = 15, Color = C.Card, Icon = "reset", ZIndex = 34 })
+local resetCost = Style.Label(side, "", 11, C.Muted, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -6), Size = UDim2.new(1, -20, 0, 14), ZIndex = 34 })
+local resetArmed = false
 local refresh
-
--- right: final stats
-local stats = Style.Panel(content, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 68), Size = UDim2.new(1, -(LEFT + 12), 1, -68), Fill = C.PanelDark, Border = C.Line, Cut = 10, ZIndex = 33 })
-Style.Label(stats, "ХАРАКТЕРИСТИКИ", 12, C.Gold, { Position = UDim2.fromOffset(12, 8), Size = UDim2.new(1, -24, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
-local STAT_ROWS = {
-	{ "Damage", "Урон" }, { "MaxHealth", "Макс. HP" }, { "Defense", "Защита", "pct" }, { "AttackSpeed", "Скорость атаки", "x" },
-	{ "CritChance", "Шанс крита", "pct" }, { "CritDamage", "Крит. урон", "x" }, { "Luck", "Удача", "x" }, { "DropChance", "Шанс добычи", "plus" },
-	{ "Regen", "Регенерация", "hp" }, { "Lifesteal", "Вампиризм", "pct" }, { "GearScore", "Gear Score" },
-}
-local statLabels = {}
-for i, def in ipairs(STAT_ROWS) do
-	local y = 30 + (i - 1) * 24
-	Style.Label(stats, def[2], 13, C.Muted, { Position = UDim2.fromOffset(12, y), Size = UDim2.new(0.6, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
-	statLabels[i] = Style.Label(stats, "", 14, C.Text, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, y), Size = UDim2.new(0.4, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 34 })
-end
-
-local function statText(value: number, kind: string?): string
-	if kind == "pct" then
-		return tostring(math.floor(value * 1000 + 0.5) / 10) .. "%"
-	elseif kind == "plus" then
-		return "+" .. tostring(math.floor(value * 1000 + 0.5) / 10) .. "%"
-	elseif kind == "x" then
-		return "x" .. tostring(math.floor(value * 100 + 0.5) / 100)
-	elseif kind == "hp" then
-		return tostring(math.floor(value * 10 + 0.5) / 10) .. " HP/с"
+resetButton.Activated:Connect(function()
+	if not resetArmed then
+		resetArmed = true
+		refresh()
+		task.delay(3, function()
+			if resetArmed then
+				resetArmed = false
+				refresh()
+			end
+		end)
+		return
 	end
-	return Format.Number(value)
+	resetArmed = false
+	request("Reset")
+end)
+
+-- bottom: the main stats
+local MAIN = {
+	{ "Damage", "АТАКА", "sword" }, { "Defense", "ЗАЩИТА", "shield", "pct" },
+	{ "MaxHealth", "HP", "heart" }, { "CritChance", "КРИТ", "burst", "pct" },
+}
+local strip = Style.Panel(content, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, 62), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33 })
+local mainLabels = {}
+for i, def in ipairs(MAIN) do
+	local cell = Instance.new("Frame")
+	cell.BackgroundTransparency = 1
+	cell.Position = UDim2.new((i - 1) / #MAIN, 0, 0, 0)
+	cell.Size = UDim2.new(1 / #MAIN, 0, 1, 0)
+	cell.ZIndex = 34
+	cell.Parent = strip
+	local icon = Icons.Make(cell, def[3], 24, C.Muted, 35)
+	icon.Position = UDim2.fromOffset(18, 19)
+	Style.Label(cell, def[2], 11, C.Muted, { Position = UDim2.fromOffset(52, 10), Size = UDim2.new(1, -56, 0, 14), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
+	mainLabels[i] = Style.Label(cell, "", 20, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(52, 26), Size = UDim2.new(1, -56, 0, 24), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
 end
 
+local lastFree = 0
 function refresh()
 	local level = player:GetAttribute("Level") or 1
-	local class = Config.ClassById[player:GetAttribute("Class") or ""]
-	classLabel.Text = (if class then class.Name else Config.Ui.Texts.NoClass) .. "  •  " .. Config.RankFor(level).Name
-	levelLabel.Text = "УРОВЕНЬ " .. level
-	pointsLabel.Text = ""
+	local free = player:GetAttribute("StatPoints") or 0
+	freeLabel.Text = tostring(free)
+	freeLabel.TextColor3 = if free > 0 then C.Gold else C.Muted
+	if free > lastFree then
+		freeScale.Scale = 1.3
+		Style.Tween(freeScale, 0.25, { Scale = 1 })
+	end
+	lastFree = free
 	local spent = PlayerData.Table("Attributes")
-	local used = 0
-	for _, v in pairs(spent) do
-		used += v
-	end
-	local free = math.max(0, Config.StatPointsAtLevel(level) - used)
-	local shares = A.Auto[player:GetAttribute("Class") or ""] or A.Auto.Default
-	local totals, top = {}, 1
-	for _, def in ipairs(A.List) do
-		totals[def.Id] = math.floor((spent[def.Id] or 0) + free * (shares[def.Id] or 0))
-		top = math.max(top, totals[def.Id])
-	end
 	for _, def in ipairs(A.List) do
 		local row = rows[def.Id]
-		row.value.Text = tostring(totals[def.Id])
-		Style.Tween(row.fill, 0.3, { Size = UDim2.fromScale(totals[def.Id] / top, 1) })
+		row.value.Text = tostring(spent[def.Id] or 0)
+		row.plusApi.SetActive(free > 0)
+		row.plus5.TextTransparency = if free >= 5 then 0 else 0.5
 	end
+	resetButton.Text = if resetArmed then T.Sure else T.ResetShort
+	resetCost.Text = T.ResetCost:format(Format.Number(A.ResetCost + A.ResetPerLevel * level))
 	local all = PlayerData.Table("Stats")
-	for i, def in ipairs(STAT_ROWS) do
-		statLabels[i].Text = statText(all[def[1]] or 0, def[3])
+	for i, def in ipairs(MAIN) do
+		local v = all[def[1]] or 0
+		mainLabels[i].Text = if def[4] == "pct" then tostring(math.floor(v * 1000 + 0.5) / 10) .. "%" else Format.Number(v)
 	end
-	-- one number to chase: МОЩЬ
-	local dps = (all.Damage or 1) * (all.AttackSpeed or 1) * (1 + (all.CritChance or 0) * math.max(0, (all.CritDamage or 1.5) - 1))
-	powerLabel.Text = "МОЩЬ  " .. Format.Number(math.floor(dps * 10 + (all.MaxHealth or 100) / 2))
 end
 
 PlayerData.Changed({ "Attributes", "StatPoints", "Stats", "Level", "Class" }, function()
@@ -128,6 +148,7 @@ PlayerData.Changed({ "Attributes", "StatPoints", "Stats", "Level", "Class" }, fu
 	end
 end)
 window.OnOpen = function()
+	resetArmed = false
 	refresh()
 end
 

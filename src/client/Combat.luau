@@ -149,6 +149,12 @@ local function useSlot(slot: string)
 	end
 end
 Hud.OnAbility = useSlot
+-- the big attack button (phones): a hit at the screen centre / nearest mob
+Hud.OnAttack = function()
+	local camera = Workspace.CurrentCamera
+	local size = camera.ViewportSize
+	click(camera:ViewportPointToRay(size.X / 2, size.Y / 2))
+end
 
 -- The server answers a dash with the distance: move our own character
 -- (we own its physics) quickly along the direction.

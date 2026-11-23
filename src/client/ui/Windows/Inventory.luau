@@ -1,7 +1,9 @@
 --[[
 	Inventory.luau
 	"Инвентарь": the player's gear (item instances).
-	  left   - the four worn slots, set bonus, Gear Score, монеты / ядра
+	  left   - the paper doll (sheet 02): the player's character turning in a
+	           viewport, the four worn slots around it; set bonus, Gear
+	           Score, монеты / ядра under it
 	  center - filters by type, sorting, mass salvage by rarity, the grid
 	           (rarity frame, +N, lock, green arrow = better than worn)
 	  right  - the selected item: stats compared with what is worn in its
@@ -81,13 +83,83 @@ end
 -- Left: worn slots
 ---------------------------------------------------------------------
 
-local LEFT, RIGHT = 214, 258
+local LEFT, RIGHT = 250, 258
+local SLOT = 66
+-- the paper doll (sheet 02): the player's character turning slowly in the
+-- middle, the four worn slots around it
+local DOLL_H = 300
+local SLOT_AT = { Weapon = { 0, 18 }, Chest = { 0, 18 + SLOT + 14 }, Helmet = { LEFT - SLOT, 18 }, Legs = { LEFT - SLOT, 18 + SLOT + 14 } }
+local doll = Instance.new("ViewportFrame")
+doll.Name = "Doll"
+doll.Position = UDim2.fromOffset(SLOT - 6, 0)
+doll.Size = UDim2.fromOffset(LEFT - 2 * SLOT + 12, DOLL_H)
+doll.BackgroundTransparency = 1
+doll.Ambient = Color3.fromRGB(170, 160, 150)
+doll.LightColor = Color3.fromRGB(255, 236, 210)
+doll.LightDirection = Vector3.new(-0.4, -1, -0.6)
+doll.ZIndex = 33
+doll.Parent = content
+local dollWorld = Instance.new("WorldModel")
+dollWorld.Parent = doll
+local dollCamera = Instance.new("Camera")
+dollCamera.FieldOfView = 30
+dollCamera.Parent = doll
+doll.CurrentCamera = dollCamera
+local pedestal = Instance.new("Frame")
+pedestal.AnchorPoint = Vector2.new(0.5, 1)
+pedestal.Position = UDim2.new(0, LEFT / 2, 0, DOLL_H - 6)
+pedestal.Size = UDim2.fromOffset(110, 14)
+pedestal.BackgroundColor3 = C.Gold
+pedestal.BackgroundTransparency = 0.55
+pedestal.BorderSizePixel = 0
+pedestal.ZIndex = 32
+pedestal.Parent = content
+Style.Corner(pedestal, UDim.new(1, 0))
+local dollModel, dollAngle = nil, 0
+local function rebuildDoll()
+	if dollModel then
+		dollModel:Destroy()
+		dollModel = nil
+	end
+	local character = player.Character
+	if not character then
+		return
+	end
+	character.Archivable = true
+	local ok, copy = pcall(function()
+		return character:Clone()
+	end)
+	if not ok or not copy then
+		return
+	end
+	for _, d in ipairs(copy:GetDescendants()) do
+		if d:IsA("LuaSourceContainer") or d:IsA("Sound") or d:IsA("BillboardGui") or d:IsA("ParticleEmitter") then
+			d:Destroy()
+		elseif d:IsA("BasePart") then
+			d.Anchored = true
+		end
+	end
+	copy:PivotTo(CFrame.new(0, 0, 0))
+	copy.Parent = dollWorld
+	dollModel = copy
+	local box, size = copy:GetBoundingBox()
+	local look = box.Position
+	dollCamera.CFrame = CFrame.lookAt(look + Vector3.new(0, size.Y * 0.08, size.Y * 2.1), look)
+end
+game:GetService("RunService").RenderStepped:Connect(function(dt)
+	if dollModel and window.IsOpen() then
+		dollAngle += dt * 0.5
+		dollModel:PivotTo(CFrame.Angles(0, dollAngle, 0))
+	end
+end)
 local slotCards = {}
 for index, slot in ipairs(SLOTS) do
 	local card = Instance.new("TextButton")
 	card.Name = slot
-	card.Position = UDim2.fromOffset(0, (index - 1) * 82)
-	card.Size = UDim2.fromOffset(LEFT, 74)
+	local at = SLOT_AT[slot]
+	card.Position = UDim2.fromOffset(at[1], at[2])
+	card.Size = UDim2.fromOffset(SLOT, SLOT)
+	card.LayoutOrder = index
 	card.BackgroundTransparency = 1
 	card.AutoButtonColor = false
 	card.Text = ""
@@ -95,14 +167,15 @@ for index, slot in ipairs(SLOTS) do
 	card.Parent = content
 	local _, shape = Style.Panel(card, { Size = UDim2.fromScale(1, 1), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33 })
 	local icon = Instance.new("Frame")
-	icon.Position = UDim2.fromOffset(8, 8)
-	icon.Size = UDim2.fromOffset(58, 58)
+	icon.Position = UDim2.fromOffset(4, 4)
+	icon.Size = UDim2.fromOffset(SLOT - 8, SLOT - 8)
 	icon.BackgroundTransparency = 1
 	icon.ZIndex = 34
 	icon.Parent = card
-	Style.Label(card, Style.Upper(SLOT_NAMES[slot]), 11, C.Muted, { Position = UDim2.fromOffset(74, 7), Size = UDim2.new(1, -80, 0, 14), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
-	local name = Style.Label(card, "", 14, C.Text, { Position = UDim2.fromOffset(74, 23), Size = UDim2.new(1, -80, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 35 })
-	local stat = Style.Label(card, "", 12, C.Gold, { Position = UDim2.fromOffset(74, 44), Size = UDim2.new(1, -80, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 35 })
+	-- the slot name under the tile; the name / stat show in the card on the right
+	Style.Label(card, Style.Upper(SLOT_NAMES[slot]), 10, C.Muted, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, 1), Size = UDim2.new(1, 10, 0, 12), ZIndex = 35 })
+	local name = Style.Label(card, "", 1, C.Text, { Visible = false, ZIndex = 35 })
+	local stat = Style.Label(card, "", 1, C.Gold, { Visible = false, ZIndex = 35 })
 	slotCards[slot] = { icon = icon, name = name, stat = stat, shape = shape, shown = nil }
 	card.Activated:Connect(function()
 		local worn = PlayerData.Worn(slot)
@@ -113,7 +186,7 @@ for index, slot in ipairs(SLOTS) do
 		refresh()
 	end)
 end
-local totals = Style.Panel(content, { Position = UDim2.fromOffset(0, 4 * 82), Size = UDim2.new(0, LEFT, 1, -(4 * 82)), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33 })
+local totals = Style.Panel(content, { Position = UDim2.fromOffset(0, DOLL_H + 8), Size = UDim2.new(0, LEFT, 1, -(DOLL_H + 8)), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33 })
 local scoreLabel = Style.Label(totals, "", 15, C.Gold, { Position = UDim2.fromOffset(10, 8), Size = UDim2.new(1, -20, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
 local setLabel = Style.Label(totals, "", 12, C.Muted, { Position = UDim2.fromOffset(10, 28), Size = UDim2.new(1, -20, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 34 })
 local moneyLabel = Style.Label(totals, "", 13, C.Text, { Position = UDim2.fromOffset(10, 62), Size = UDim2.new(1, -20, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
@@ -514,7 +587,15 @@ window.OnOpen = function()
 	overlay.Visible = false
 	armed = nil
 	refresh()
+	task.defer(rebuildDoll) -- the doll wears what the character wears now
 end
+-- equipment changed while open: dress the doll again (the server swaps
+-- the models on the character a moment later)
+PlayerData.Changed({ "Equipped" }, function()
+	if window.IsOpen() then
+		task.delay(0.4, rebuildDoll)
+	end
+end)
 
 -- Opens the inventory with an item selected (loot feed click).
 function Inventory.Show(uid: string?)

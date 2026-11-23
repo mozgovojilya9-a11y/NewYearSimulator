@@ -301,10 +301,11 @@ Roblox-игра «Aura Clicker» в сеттинге **нано-будущего
   (generate_avatar, generate_mesh, generate_procedural_model,
   generate_material, generate_animation) → процедурная модель только
   как временная заглушка.
-- Превью класса (обновлено 22.11) = три УНИКАЛЬНЫХ персонажа, по
-  одному на класс (НЕ аватар игрока): риггованные R15 в
-  `GameAssets/Avatars` (`Class_Blade`, `Class_Pulse`, `Class_Gunner`,
-  сделаны generate_avatar), с оружием класса и idle-анимацией.
+- Превью класса (обновлено 23.11, задание владельца по листу 03) =
+  АВАТАР ИГРОКА в броне класса с оружием и idle-анимацией. Три
+  уникальных персонажа классов (`GameAssets/Avatars`: `Class_Blade`,
+  `Class_Pulse`, `Class_Gunner`) — запасной вариант превью и фигуры на
+  постаментах в Академии.
 
 - Код не выдумывает asset ID. Ассеты загружает владелец.
 - Готовые модели владелец кладёт в `ServerStorage/GameAssets/`

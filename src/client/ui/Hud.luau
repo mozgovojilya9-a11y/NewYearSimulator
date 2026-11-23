@@ -56,6 +56,7 @@ local LEFT = 14
 
 local Hud = {}
 Hud.OnAbility = nil -- (slot) set by the combat module: a tap on an ability slot
+Hud.OnAttack = nil -- () set by the combat module: the big attack button
 
 -- Inventory [G] and Status [C] share header tabs with the artifacts.
 local Stats = require(script.Parent.Windows.Stats)
@@ -201,16 +202,17 @@ refreshProfile()
 ---------------------------------------------------------------------
 
 local B = U.BarButton
+local NAV = U.Nav
 local bar = Instance.new("Frame")
 bar.Name = "IconBar"
 bar.Position = UDim2.fromOffset(LEFT, TOP + P.Height + 8)
-bar.Size = UDim2.fromOffset(P.Width, B)
+bar.Size = UDim2.fromOffset(NAV.Width, (NAV.Height + NAV.Gap) * #U.Bar)
 bar.BackgroundTransparency = 1
 bar.ZIndex = 5
 bar.Parent = Style.Gui
 local barLayout = Instance.new("UIListLayout")
-barLayout.FillDirection = Enum.FillDirection.Horizontal
-barLayout.Padding = UDim.new(0, 7)
+barLayout.FillDirection = Enum.FillDirection.Vertical
+barLayout.Padding = UDim.new(0, NAV.Gap)
 barLayout.SortOrder = Enum.SortOrder.LayoutOrder
 barLayout.Parent = bar
 
@@ -226,12 +228,61 @@ local actions = {
 	Afk = { Open = function()
 		require(script.Parent.Parent.Afk).Toggle()
 	end, Windows = {} },
+	Settings = { Open = Settings.Open, Windows = { Settings.Window } },
 }
+
+-- One row of the panel (sheet 02): icon, name, [key]; a red badge.
+local function navButton(parent, def, order)
+	local button = Instance.new("TextButton")
+	button.Name = def.Id
+	button.LayoutOrder = order
+	button.Size = UDim2.fromOffset(NAV.Width, NAV.Height)
+	button.BackgroundTransparency = 1
+	button.Text = ""
+	button.AutoButtonColor = false
+	button.ZIndex = 6
+	button.Parent = parent
+	local shape = Style.Chamfer(button, { Fill = C.PanelDark, Transparency = U.PanelTransparency, Border = C.Line, Cut = 6, Thickness = 1.5 })
+	local icon = Icons.Make(button, def.Icon, 20, C.Text, 7)
+	icon.AnchorPoint = Vector2.new(0, 0.5)
+	icon.Position = UDim2.new(0, 10, 0.5, 0)
+	Style.Label(button, def.Label, 14, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(38, 0), Size = UDim2.new(1, -78, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 7 })
+	local key = Style.Label(button, if def.Key then "[" .. def.Key.Name .. "]" else "", 11, C.GoldDim, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 0), Size = UDim2.new(0, 36, 1, 0), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 7 })
+	key.Visible = not Style.IsTouch()
+	local badge = Instance.new("Frame")
+	badge.AnchorPoint = Vector2.new(0.5, 0.5)
+	badge.Position = UDim2.fromOffset(28, 8)
+	badge.Size = UDim2.fromOffset(16, 16)
+	badge.BackgroundColor3 = C.Red
+	badge.BorderSizePixel = 0
+	badge.Visible = false
+	badge.ZIndex = 9
+	badge.Parent = button
+	Style.Corner(badge, UDim.new(1, 0))
+	local badgeText = Style.Label(badge, "", 10, C.Text, { Font = Style.FontTitle, Size = UDim2.fromScale(1, 1), ZIndex = 10 })
+	local api = {}
+	local active = false
+	function api.SetActive(on: boolean)
+		active = on
+		shape.SetBorder(if on then C.Gold else C.Line)
+		Icons.Set(icon, def.Icon, if on then C.Gold else C.Text)
+	end
+	function api.Badge(n: number)
+		badge.Visible = n > 0
+		badgeText.Text = if n > 9 then "9+" else tostring(n)
+	end
+	button.MouseEnter:Connect(function()
+		shape.SetBorder(C.GoldDim)
+	end)
+	button.MouseLeave:Connect(function()
+		shape.SetBorder(if active then C.Gold else C.Line)
+	end)
+	return button, api
+end
 
 local barButtons = {} -- [id] = api
 for order, def in ipairs(U.Bar) do
-	local keyText = if def.Key then def.Key.Name else nil
-	local button, api = Style.IconButton(bar, { Name = def.Id, Icon = def.Icon, Size = B, LayoutOrder = order, ZIndex = 6, Key = keyText })
+	local button, api = navButton(bar, def, order)
 	barButtons[def.Id] = api
 	local action = actions[def.Id]
 	button.Activated:Connect(function()
@@ -243,16 +294,6 @@ for order, def in ipairs(U.Bar) do
 			end
 		end
 		action.Open()
-	end)
-	-- tooltip
-	local tip = Style.Plate(button, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, 6), Size = UDim2.fromOffset(110, 24), ZIndex = 20 })
-	tip.Visible = false
-	Style.Label(tip, def.Label .. (if keyText and not Style.IsTouch() then " [" .. keyText .. "]" else ""), 12, C.Text, { Size = UDim2.fromScale(1, 1), ZIndex = 21 })
-	button.MouseEnter:Connect(function()
-		tip.Visible = true
-	end)
-	button.MouseLeave:Connect(function()
-		tip.Visible = false
 	end)
 end
 
@@ -289,6 +330,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 end)
 
 local function refreshBadges()
+	local _ = B
 	barButtons.Status.Badge(player:GetAttribute("StatPoints") or 0)
 	barButtons.Skills.Badge(player:GetAttribute("SkillPoints") or 0)
 	barButtons.Quests.Badge(if player:GetAttribute("RewardReady") then 1 else (player:GetAttribute("QuestsReady") or 0))
@@ -304,7 +346,8 @@ refreshBadges()
 
 local tracker = Style.Panel(Style.Gui, {
 	Name = "QuestTracker",
-	Position = UDim2.fromOffset(LEFT, TOP + P.Height + 8 + B + 12),
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -16, 0, U.TrackerTop),
 	Size = UDim2.fromOffset(250, 96),
 	ZIndex = 5,
 	Border = C.Line,
@@ -524,8 +567,6 @@ trLayout.Padding = UDim.new(0, 6)
 trLayout.SortOrder = Enum.SortOrder.LayoutOrder
 trLayout.Parent = topRight
 
-local settingsButton = Style.IconButton(topRight, { Name = "Settings", Icon = "gear", Size = 42, LayoutOrder = 1, ZIndex = 6 })
-settingsButton.Activated:Connect(Settings.Open)
 local soundButton, soundApi = Style.IconButton(topRight, { Name = "Sound", Icon = "sound", Size = 42, LayoutOrder = 2, ZIndex = 6 })
 soundButton.Activated:Connect(function()
 	local on = Settings.ToggleSound()
@@ -541,28 +582,60 @@ local bottom = Instance.new("Frame")
 bottom.Name = "BottomCenter"
 bottom.AnchorPoint = Vector2.new(0.5, 1)
 bottom.Position = UDim2.new(0.5, 0, 1, -14)
-bottom.Size = UDim2.fromOffset(U.HealthWidth, S + 40)
+bottom.Size = UDim2.fromOffset(U.HealthWidth, 24)
 bottom.BackgroundTransparency = 1
 bottom.Parent = Style.Gui
 
+-- bottom right (sheet 02): a big attack button, Q / E / R on an arc
+-- around it, dash and block next to them
+local AC = U.Actions
 local slotRow = Instance.new("Frame")
 slotRow.Name = "Abilities"
-slotRow.AnchorPoint = Vector2.new(0.5, 0)
-slotRow.Position = UDim2.fromScale(0.5, 0)
-slotRow.Size = UDim2.fromOffset(#U.AbilitySlots * (S + 8) - 8, S)
+slotRow.AnchorPoint = Vector2.new(1, 1)
+slotRow.Position = UDim2.new(1, -16, 1, -16)
+slotRow.Size = UDim2.fromOffset(AC.Width, AC.Height)
 slotRow.BackgroundTransparency = 1
-slotRow.Parent = bottom
-local slotLayout = Instance.new("UIListLayout")
-slotLayout.FillDirection = Enum.FillDirection.Horizontal
-slotLayout.Padding = UDim.new(0, 8)
-slotLayout.SortOrder = Enum.SortOrder.LayoutOrder
-slotLayout.Parent = slotRow
+slotRow.Parent = Style.Gui
+local attack = Instance.new("TextButton")
+attack.Name = "Attack"
+attack.AnchorPoint = Vector2.new(0.5, 0.5)
+attack.Position = UDim2.fromOffset(AC.Width - AC.Attack / 2, AC.Height - AC.Attack / 2)
+attack.Size = UDim2.fromOffset(AC.Attack, AC.Attack)
+attack.BackgroundColor3 = C.PanelDark
+attack.BackgroundTransparency = 0.1
+attack.Text = ""
+attack.AutoButtonColor = false
+attack.ZIndex = 6
+attack.Parent = slotRow
+Style.Corner(attack, UDim.new(1, 0))
+local attackStroke = Instance.new("UIStroke")
+attackStroke.Color = C.Gold
+attackStroke.Thickness = 3
+attackStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+attackStroke.Parent = attack
+local attackIcon = Icons.Make(attack, "sword", math.floor(AC.Attack * 0.5), C.Gold, 7)
+attackIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+attackIcon.Position = UDim2.fromScale(0.5, 0.5)
+local function refreshAttackIcon()
+	local class = Config.ClassById[player:GetAttribute("Class") or ""]
+	Icons.Set(attackIcon, if class then class.Icon else "sword", C.Gold)
+end
+player:GetAttributeChangedSignal("Class"):Connect(refreshAttackIcon)
+refreshAttackIcon()
+attack.Activated:Connect(function()
+	if Hud.OnAttack then
+		Hud.OnAttack()
+	end
+end)
 
 local slots = {} -- [slot] = { button, icon, shade, timer, keyLabel, shape }
 for order, def in ipairs(U.AbilitySlots) do
 	local button = Instance.new("TextButton")
 	button.Name = "Slot_" .. def.Slot
 	button.LayoutOrder = order
+	local at = AC.Slots[def.Slot] or { 0, 0 }
+	button.AnchorPoint = Vector2.new(0.5, 0.5)
+	button.Position = UDim2.fromOffset(AC.Width - AC.Attack / 2 + at[1], AC.Height - AC.Attack / 2 + at[2])
 	button.Size = UDim2.fromOffset(S, S)
 	button.BackgroundTransparency = 1
 	button.Text = ""
@@ -617,7 +690,7 @@ local function refreshLoadout()
 		Icons.Set(ui.icon, iconName, if active then C.Gold elseif filled then C.Text else C.Line)
 		ui.shape.SetBorder(if active then C.Gold elseif filled then C.GoldDim else C.Line)
 	end
-	slotRow.Size = UDim2.fromOffset(shown * (S + 8) - 8, S)
+	local _ = shown
 end
 player:GetAttributeChangedSignal("Loadout"):Connect(refreshLoadout)
 player:GetAttributeChangedSignal("Class"):Connect(refreshLoadout)
@@ -677,8 +750,8 @@ end
 
 local credits = Style.Panel(Style.Gui, {
 	Name = "Credits",
-	AnchorPoint = Vector2.new(0, 1),
-	Position = UDim2.new(0, LEFT, 1, -14),
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -66, 0, 10),
 	Size = UDim2.fromOffset(250, 42),
 	ZIndex = 5,
 	Border = C.Line,
@@ -730,7 +803,7 @@ local GF = Config.Gifts
 local gift = Instance.new("TextButton")
 gift.Name = "Gift"
 gift.AnchorPoint = Vector2.new(0, 1)
-gift.Position = UDim2.new(0, LEFT, 1, -62)
+gift.Position = UDim2.new(0, LEFT, 1, -14)
 gift.Size = UDim2.fromOffset(250, 36)
 gift.BackgroundTransparency = 1
 gift.Text = ""
@@ -815,8 +888,8 @@ end)
 local play = Instance.new("TextButton")
 play.Name = "Play"
 play.AnchorPoint = Vector2.new(1, 1)
-play.Position = UDim2.new(1, -16, 1, -14)
-play.Size = UDim2.fromOffset(214, 62)
+play.Position = UDim2.new(1, -16, 1, -(AC.Height + 28))
+play.Size = UDim2.fromOffset(200, 54)
 play.BackgroundTransparency = 1
 play.Text = ""
 play.AutoButtonColor = false
