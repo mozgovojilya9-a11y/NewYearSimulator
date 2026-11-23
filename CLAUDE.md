@@ -345,7 +345,7 @@ Roblox-игра «Aura Clicker» в сеттинге **нано-будущего
 
 ## Правила кода
 
-- Rojo + Luau. Мир строится процедурно (`HubGenerator`,
+- Rojo + Luau. Мир строится процедурно (`HubCitadel` — хаб по листу 01,
   `DungeonGenerator`) + ассеты из `GameAssets`. `StarterGui` пуст.
 - Все числа, шансы, рецепты, цвета, тексты, ID — в
   `src/shared/Config.luau`.

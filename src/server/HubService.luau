@@ -1,17 +1,17 @@
 --[[
 	HubService.luau
-	Builds the hub (HubGenerator) at server start and hands out its
+	Builds the hub (HubCitadel) at server start and hands out its
 	parts (portal, forge, prompts, leaderboards, spawn) to the services.
 ]]
 
-local HubGenerator = require(script.Parent.HubGenerator)
+local HubCitadel = require(script.Parent.HubCitadel)
 
 local HubService = {}
 
 local hub
 
 function HubService.Init()
-	hub = HubGenerator.Build()
+	hub = HubCitadel.Build()
 	return hub
 end
 

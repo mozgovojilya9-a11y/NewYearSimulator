@@ -383,7 +383,7 @@ function refresh()
 	for _, rank in ipairs(G.Ranks) do
 		local ui = rankCards[rank]
 		local open, reason = rankOpen(rank)
-		ui.status.Text = if open then G.RankInfo[rank].Text else reason
+		ui.status.Text = if open then (G.RankInfo[rank].Short or G.RankInfo[rank].Text) else reason -- the card is small: the short line
 		ui.status.TextColor3 = if open then C.Muted else Color3.fromRGB(200, 120, 110)
 		ui.lock.Visible = not open
 		ui.shape.SetBorder(if rank == selectedRank then G.Colors[rank] else C.Line)

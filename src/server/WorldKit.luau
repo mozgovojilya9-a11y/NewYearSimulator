@@ -2,7 +2,7 @@
 	WorldKit.luau
 	Helpers for building the world from code in the "brick" look:
 	stud-topped blocks, tiled floors, crenellated walls, surface signs,
-	beams and health bars. Used by HubGenerator and GateMap;
+	beams and health bars. Used by HubCitadel and GateMap;
 	it never parents anything to Workspace by itself.
 ]]
 

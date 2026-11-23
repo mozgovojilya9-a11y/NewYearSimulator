@@ -383,8 +383,8 @@ Config.Gates = {
 	},
 	-- A rank opens at Level once a location of Requires was cleared.
 	RankInfo = {
-		E = { Name = "Ранг E", Level = 1, Text = "Первые разломы: роботы цеха и лаборатории" },
-		D = { Name = "Ранг D", Level = 20, Requires = "E", Text = "Опасные сектора: плавильня, заражение, Нексус" },
+		E = { Name = "Ранг E", Level = 1, Text = "Первые разломы: роботы цеха и лаборатории", Short = "Завод и лаборатория" },
+		D = { Name = "Ранг D", Level = 20, Requires = "E", Text = "Опасные сектора: плавильня, заражение, Нексус", Short = "Плавильня, заражение, Нексус" },
 		C = { Name = "Ранг C", Level = 55, Requires = "D", Text = "Кристальные пещеры и улей биомассы" },
 		B = { Name = "Ранг B", Level = 90, Requires = "C", Text = "Резервное ядро ИИ" },
 		A = { Name = "Ранг A", Level = 115, Requires = "B", Text = "Ледяная цитадель" },
@@ -1054,7 +1054,7 @@ Config.AFK = {
 	Items = { Common = 70, Uncommon = 25, Rare = 5 }, -- weights; nothing higher
 	HourLimit = 180, -- rewarded ticks per hour (30 minutes of full rewards)
 	MinCredits = 1, -- per tick after the limit
-	Origin = Vector3.new(-330, 0, 150), -- the small island next to the hub (sheet 01), linked by a light bridge
+	Origin = Vector3.new(135, 0, 92), -- the small island south-east of the hub (sheet 01), linked by a light bridge
 	Radius = 46,
 	Texts = {
 		Title = "АФК-ЗОНА",
@@ -2409,24 +2409,15 @@ Config.Lighting = {
 --
 -- Every hall has its own colors (Theme), central object and decor groups
 -- along the walls and in the corners; the middle and the paths stay free.
--- The hub as a floating island (HubIsland, concept sheet 01): the rim
--- slab and the rock under the halls, warm light strips and lamps on the
--- edge, glowing crystals, distant islands { offset, radius, towers },
--- banners with the crest { x, z, look x, look z }, the atrium's hologram
--- cube. OpenAtrium = no roof over the atrium (sky and clouds).
+-- The sky around the hub (HubIsland): rock under the island, glowing
+-- crystals, distant islands { offset from the centre, radius, towers },
+-- the clouds, the atrium's hologram cube, the gate ring and its colors.
 Config.HubIsland = {
 	Seed = 7,
-	Footprint = { -186, 168, 22, -226 }, -- x0, x1, z0, z1 of the halls (from the spawn)
-	Margin = 14,
-	SlabDepth = 10,
 	RockDepth = 150,
 	RockLayers = 8,
 	Crystals = 10,
-	LampEvery = 24,
-	OpenAtrium = true,
 	RimColor = Color3.fromRGB(70, 70, 76),
-	DeckColor = Color3.fromRGB(150, 142, 132),
-	TerraceStep = 30, -- grid of the terrace decor between the halls
 	CloudSea = { { -260, 0.35 }, { -235, 0.6 }, { -215, 0.8 } }, -- y, transparency
 	CloudColor = Color3.fromRGB(236, 214, 222),
 	RockColor = Color3.fromRGB(88, 80, 78),
@@ -2442,18 +2433,7 @@ Config.HubIsland = {
 		{ Vector3.new(60, 230, -950), 70, 5 },
 		{ Vector3.new(-950, 100, -120), 50, 3 },
 	},
-	Banner = { Height = 16, Width = 4, Length = 8, Cloth = Color3.fromRGB(34, 38, 70) },
-	Banners = {
-		{ -12, -22, 0, -90 }, { 12, -22, 0, -90 },
-		{ -44, -60, 0, -90 }, { 44, -60, 0, -90 },
-		{ -44, -122, 0, -90 }, { 44, -122, 0, -90 },
-		{ -14, -158, 0, -90 }, { 14, -158, 0, -90 },
-	},
 	Hologram = { Size = 7, Height = 11, Base = 10, Color = Color3.fromRGB(120, 230, 255) },
-	Facade = { Step = 16, Width = 2.6, Out = 1.6 }, -- hall facades outside
-	-- the light bridge from the hub island to the AFK island (decor: you
-	-- get there with the АФК button / portal)
-	AfkBridge = { From = Vector3.new(-200, -0.6, 30), Width = 6, Color = Color3.fromRGB(120, 220, 255) },
 	PortalColors = { Color3.fromRGB(150, 90, 255), Color3.fromRGB(96, 70, 220) }, -- the gate's violet field (sheet 01)
 	-- the Gate hall portal ring and the rank badges over it
 	GateRing = {
@@ -2466,32 +2446,89 @@ Config.HubIsland = {
 	},
 }
 
+-- Нано-Цитадель (HubCitadel, concept sheet 01_hub_map.png, rebuilt from
+-- scratch 24.11): an open round floating island. Center = offset of the
+-- island centre from the spawn (north is -Z, east +X). Angles (Signs,
+-- Boards, decor lists) are degrees clockwise from north; radii from the
+-- centre. Ground level: the spawn forecourt (south, |x| < Corridor) and
+-- the round atrium (AtriumRadius). The terrace (2nd level, TerraceHeight
+-- up) rings the atrium out to the rim wall (WallInner..WallOuter, up to
+-- WallTop); the halls stand on it at their Signs angles.
+Config.Citadel = {
+	Center = Vector3.new(0, 0, -100),
+	IslandRadius = 114,
+	AtriumRadius = 58,
+	TerraceHeight = 10,
+	TerraceOuter = 104,
+	WallInner = 104,
+	WallOuter = 112,
+	WallTop = 24,
+	SignHeight = 9.5, -- hall signs on the wall, above the terrace
+	SlitEvery = 6, -- degrees between the warm slits on the wall
+	WindowRows = { 4, 13, 19 }, -- lit windows on the outer face (y)
+	PlinthDepth = 14,
+	PlinthWindowEvery = 9, -- studs
+	Pilasters = 40, -- on the terrace face towards the atrium
+	Corridor = 20, -- half width of the spawn forecourt / corridor
+	ForecourtFront = 22, -- z of the forecourt's front edge (from the spawn)
+	TreeHeight = 10,
+	SpawnRing = Color3.fromRGB(80, 220, 255),
+	SpawnPylons = { X = 15, Z = -16, Height = 20 },
+	BannerCloth = Color3.fromRGB(34, 38, 70),
+	AfkColor = Color3.fromRGB(150, 120, 255),
+	AfkBridgeWidth = 6,
+	-- stairs from the atrium up to the terrace (radial, at these angles)
+	Stairs = {
+		{ Theta = 0, Width = 22, Run = 18 },
+		{ Theta = 90, Width = 10, Run = 18 },
+		{ Theta = 270, Width = 10, Run = 18 },
+	},
+	-- the bridge across the atrium's north part: Z = distance north of the centre
+	Bridge = { Z = 28, Width = 10, Columns = { -30, 30 } },
+	Signs = { Gates = 0, Forge = 50, Academy = 108, Afk = 145, Supply = 278, RedGate = 312 },
+	Boards = { -20, -30 }, -- 8 the leaderboards (Config.HubLayout.Leaderboards in order)
+	QuestBoard = 22, -- 9
+	GateKeeper = 30,
+	Gate = {
+		R = 94, Radius = 15, DaisWidth = 50, DaisDepth = 12, DaisHeight = 2, PylonHeight = 30,
+		-- towers behind the gate: angle shift, radius, width, height
+		Towers = { { -26, 128, 16, 70 }, { 26, 128, 16, 74 }, { -12, 140, 20, 96 }, { 12, 140, 20, 92 }, { 0, 152, 26, 120 }, { -42, 132, 12, 52 }, { 42, 132, 12, 56 } },
+	},
+	Forge = { R = 84, Platform = 22, ConsoleShift = -9, Arm = Color3.fromRGB(226, 172, 64), Belts = { { -15, -5 }, { 5, 15 } } },
+	Academy = { R = 94, Spread = 13, TerminalShift = -24 },
+	Supply = { R = 84, CapsuleStep = 6.5 },
+	Atrium = {
+		Trees = { 35, 145, 215, 325 }, TreeRadius = 30,
+		Benches = { 50, 130, 230, 310 }, BenchRadius = 20,
+		Lamps = { 20, 160, 200, 340 }, LampRadius = 46,
+		WallTrees = { 45, 135, 225, 315 },
+		DaisPlanters = { 0, 90, 180, 270 }, DaisPlanterRadius = 12,
+	},
+	-- roofs over the halls: { hall (Signs key), half angle, depth from the wall }
+	Pavilion = { Height = 15, RoofDepth = 8, Halls = { { "Supply", 20, 16 }, { "Forge", 19, 16 }, { "Academy", 21, 16 } } },
+	ButtressEvery = 15, -- degrees between the outer wall buttresses
+	TerraceDecor = {
+		JointEvery = 7.5,
+		WallPlanters = { { 200, 236 }, { 240, 255 }, { 72, 86 } }, -- free arcs along the wall
+		Trees = { 80, 130, 215, 250, 333 },
+		Benches = { 72, 232 },
+		Lamps = { 30, 118, 152, 208, 242, 320 }, -- by the rail, never in front of a hall
+		Banners = { 86, 127, 210, 238, 254, 326 },
+	},
+	Colors = {
+		Floor = Color3.fromRGB(202, 196, 186), -- light warm stone (sheet 01)
+		FloorDark = Color3.fromRGB(160, 154, 146),
+		Stone = Color3.fromRGB(118, 114, 112), -- the terrace face over the atrium
+		Wall = Color3.fromRGB(64, 64, 72), -- graphite walls, pylons
+		WallDark = Color3.fromRGB(44, 44, 50),
+		WallLight = Color3.fromRGB(98, 98, 106),
+		Trim = Color3.fromRGB(214, 170, 88), -- gold trims
+		Slit = Color3.fromRGB(255, 196, 110), -- warm light slits
+	},
+}
+
 Config.HubLayout = {
 	Name = "Нано-Цитадель",
-	WallThickness = 2,
-	Pilaster = 12, -- pilasters on the walls every N studs
-	Halls = {
-		Spawn = { Rect = { -20, 20, 15, -15 }, Height = 20, Theme = "Spawn", Name = "СПАВН" },
-		Atrium = { Rect = { -100, 100, -15, -165 }, Height = 34, Theme = "Atrium", Name = "АТРИУМ" },
-		Gates = { Rect = { -60, 60, -165, -220 }, Height = 42, Theme = "Gates", Name = "ЗАЛ ВРАТ" },
-		Supply = { Rect = { -180, -100, -30, -150 }, Height = 22, Theme = "Supply", Name = "ЗАЛ СНАБЖЕНИЯ" },
-		Forge = { Rect = { 100, 162, -100, -165 }, Height = 24, Theme = "Forge", Name = "ФАБРИКАТОР" },
-		Academy = { Rect = { 100, 162, -15, -76 }, Height = 22, Theme = "Academy", Name = "АКАДЕМИЯ КЛАССОВ" },
-	},
-	-- Wide arches between halls (on the atrium walls): side + center.
-	Doors = {
-		{ Side = "S", At = 0, Width = 20, Height = 14, To = "Spawn" },
-		{ Side = "N", At = 0, Width = 24, Height = 18, To = "Gates" },
-		{ Side = "W", At = -45, Width = 18, Height = 14, To = "Supply" },
-		{ Side = "E", At = -43, Width = 18, Height = 14, To = "Academy" },
-		{ Side = "E", At = -135, Width = 18, Height = 14, To = "Forge" },
-	},
-	-- Atrium: balcony (2nd level) along the walls, a bridge across, stairs.
-	Balcony = { Height = 22, Depth = 22, Column = 12 },
-	Bridge = { Z = -90, Width = 12 },
-	Stairs = { { X = -42, Z0 = -46 }, { X = 42, Z0 = -46 }, { X = -42, Z0 = -134 }, { X = 42, Z0 = -134 } }, -- foot of each stair -> the bridge (2 from the south, 2 from the north)
-	StairWidth = 8,
-	Skylight = { Rect = { -60, 60, -40, -140 }, Mullion = 5, Truss = 12 },
 	-- Hall colors. Accent = thin light strips and signs, Light = lamps.
 	-- 22.11: one calm palette (warm concrete, graphite floors, warm white
 	-- light); halls differ by a muted tint and their central object.
@@ -2503,25 +2540,13 @@ Config.HubLayout = {
 		Forge = { Floor = Color3.fromRGB(118, 104, 98), Wall = Color3.fromRGB(128, 104, 94), Accent = Color3.fromRGB(226, 128, 76), Light = Color3.fromRGB(255, 204, 156) },
 		Academy = { Floor = Color3.fromRGB(150, 140, 122), Wall = Color3.fromRGB(170, 154, 124), Accent = Color3.fromRGB(220, 182, 96), Light = Color3.fromRGB(255, 236, 198) },
 	},
-	-- display capsules along the Supply hall's west wall (HubGuide)
+	-- display capsules by the Supply terminal, one per rarity (HubCitadel)
 	Capsules = {
-		From = Vector3.new(-172, 0, -48), Step = Vector3.new(0, 0, -15),
 		Rarities = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic" },
-		Height = 8, Diameter = 4.2, ItemSize = 4.4,
+		Height = 8, Diameter = 4.2, ItemSize = 3.3,
 	},
 	-- the Academy pedestals: the class characters (GameAssets/Avatars) this tall
 	Academy = { DisplayHeight = 7 },
-	-- the atrium garden (HubGuide): { x, z } offsets from the spawn base
-	Garden = {
-		TreeHeight = 11,
-		Models = { "Prop_Sakura", "Prop_Sakura", "Prop_Tree" }, -- GameAssets/Props, by turns
-		Trees = { { -20, -72 }, { 20, -72 }, { -20, -108 }, { 20, -108 }, { -58, -70 }, { 58, -70 }, { -58, -118 }, { 58, -118 }, { -40, -140 }, { 40, -140 } },
-		Beds = { { -42, -92, 14, 6 }, { 42, -92, 14, 6 } }, -- x, z, width, depth
-		Benches = { { -30, -84, 0, -90 }, { 30, -84, 0, -90 }, { -30, -98, 0, -90 }, { 30, -98, 0, -90 } }, -- x, z, look at x, z
-	},
-	-- AI-generated MaterialVariants (MaterialService, made in Studio);
-	-- missing names simply fall back to the base material.
-	Materials = { Floor = "NanoFloor", Wall = "NanoWall", ForgeFloor = "NanoFloor" }, -- the AI "ForgeFloor" looked like lava camo: off
 	-- Shared colors of the structure.
 	Colors = {
 		Paint = Color3.fromRGB(176, 140, 62),
@@ -2534,102 +2559,34 @@ Config.HubLayout = {
 		Screen = Color3.fromRGB(16, 22, 30),
 		Runner = Color3.fromRGB(62, 61, 62),
 	},
-	Lamp = { Range = 26, Brightness = 1.8, Angle = 120 },
-	Pendant = { Range = 34, Brightness = 1.2, Drop = 4 },
-	Portal = { Width = 20, Height = 26, FrameWidth = 7, FrameDepth = 6, Curtains = 5, CurtainTransparency = 0.86, SignHeight = 6 },
-	-- Decor groups (plan squares): hall, Kind, offset from the hall's
-	-- corner ("SW", "NE", ...) or a wall point { Side, At }.
-	Decor = {
-		{ Hall = "Spawn", Wall = "W", At = 0, Kind = "Bench" },
-		{ Hall = "Spawn", Corner = "SW", Kind = "Plant" },
-		{ Hall = "Spawn", Corner = "SE", Kind = "Plant" },
-		{ Hall = "Atrium", Corner = "SW", Kind = "Cargo" },
-		{ Hall = "Atrium", Corner = "SE", Kind = "Cargo" },
-		{ Hall = "Atrium", Corner = "NW", Kind = "Pipes" },
-		{ Hall = "Atrium", Corner = "NE", Kind = "Pipes" },
-		{ Hall = "Atrium", Wall = "S", At = -40, Kind = "Bench" },
-		{ Hall = "Atrium", Wall = "S", At = 40, Kind = "Bench" },
-		{ Hall = "Atrium", Wall = "S", At = -70, Kind = "Console" },
-		{ Hall = "Atrium", Wall = "S", At = 70, Kind = "Console" },
-		{ Hall = "Atrium", Wall = "W", At = -80, Kind = "Rack" },
-		{ Hall = "Atrium", Wall = "W", At = -105, Kind = "Bench" },
-		{ Hall = "Atrium", Wall = "W", At = -130, Kind = "Console" },
-		{ Hall = "Atrium", Wall = "E", At = -80, Kind = "Bench" },
-		{ Hall = "Atrium", Wall = "E", At = -100, Kind = "Rack" },
-		{ Hall = "Gates", Corner = "NW", Kind = "Plant" },
-		{ Hall = "Gates", Corner = "NE", Kind = "Plant" },
-		{ Hall = "Gates", Corner = "SW", Kind = "Console" },
-		{ Hall = "Gates", Corner = "SE", Kind = "Console" },
-		{ Hall = "Supply", Corner = "NW", Kind = "Plant" },
-		{ Hall = "Supply", Corner = "SW", Kind = "Plant" },
-		{ Hall = "Supply", Wall = "W", At = -70, Kind = "Bench" },
-		{ Hall = "Supply", Wall = "W", At = -110, Kind = "Bench" },
-		{ Hall = "Supply", Corner = "NE", Kind = "Plant" },
-		{ Hall = "Supply", Corner = "SE", Kind = "Plant" },
-		{ Hall = "Forge", Corner = "SW", Kind = "Cargo" },
-		{ Hall = "Forge", Corner = "NW", Kind = "Rack" },
-		{ Hall = "Forge", Corner = "SE", Kind = "Pipes" },
-		{ Hall = "Academy", Corner = "SW", Kind = "Plant" },
-		{ Hall = "Academy", Corner = "SE", Kind = "Plant" },
-		{ Hall = "Academy", Corner = "NE", Kind = "Plant" },
-		{ Hall = "Academy", Wall = "S", At = 131, Kind = "Bench" },
-	},
-	-- Way-finding (HubGuide.luau). Paths = colored lines on the floor with
-	-- chevrons from the spawn arch to every hall (the hall's Accent color,
-	-- as on docs/design/hub_plan.png); points are { x, z } offsets from the
-	-- spawn. Posts = sign posts with arrow plates at the forks.
-	Signs = {
-		Width = 1.4,
-		ChevronEvery = 9,
-		Paths = {
-			{ To = "Gates", Points = { { 0, -16 }, { 0, -74 }, { -13, -82 }, { -13, -98 }, { 0, -106 }, { 0, -172 } } },
-			{ To = "Supply", Points = { { -5, -16 }, { -5, -31 }, { -70, -31 }, { -70, -45 }, { -124, -45 }, { -124, -80 } } },
-			{ To = "Academy", Points = { { 5, -16 }, { 5, -31 }, { 70, -31 }, { 70, -43 }, { 114, -43 } } },
-			{ To = "Forge", Points = { { 9, -16 }, { 9, -26 }, { 86, -26 }, { 86, -135 }, { 114, -135 } } },
-		},
-		Posts = {
-			{ At = { 13, -40 }, Arrows = { { Dir = "N", To = "Gates" }, { Dir = "W", To = "Supply" }, { Dir = "E", To = "Academy" }, { Dir = "E", To = "Forge" } } },
-			{ At = { 93, -52 }, Arrows = { { Dir = "N", To = "Forge" }, { Dir = "S", To = "Academy" } } },
-		},
-		Names = { Gates = "ЗАЛ ВРАТ", Academy = "АКАДЕМИЯ", Forge = "КУЗНИЦА", Supply = "СНАБЖЕНИЕ", Spawn = "СПАВН", Atrium = "АТРИУМ" },
-	},
-	-- Central object of a hall (GameAssets/Props model, AI-made; procedural
-	-- fallback) with its own light in the hall's Light color.
-	Centers = {
-		{ Hall = "Atrium", Hologram = true, At = { 0, -90 }, Height = 11, Light = Color3.fromRGB(255, 226, 180) },
-		{ Hall = "Spawn", Model = "Center_Spawn", At = { 0, 0 }, Height = 1.2, Light = Color3.fromRGB(255, 226, 180), Flat = true },
-	},
-	-- Терминал снабжения (pulls, GachaService) in the atrium's west side.
-	-- the capsule machine in the middle of the Зал снабжения (west), the
-	-- AFK portal by its north wall
-	Supply = { At = { -140, -86 }, Face = { -100, -86 }, Model = "Prop_SupplyMachine", Height = 9 },
-	AfkPortal = { At = { -140, -140 }, Face = { -140, -100 } },
-	-- Teleport window (HUD button): name, point { x, z } and the facing point.
+	-- Терминал снабжения (pulls, GachaService): the capsule machine model
+	Supply = { Model = "Prop_SupplyMachine", Height = 9 },
+	-- Teleport window (HUD button): point { x, z } from the spawn, Y = the
+	-- floor height there (the terrace is Config.Citadel.TerraceHeight up),
+	-- and the point to face.
 	Teleports = {
 		{ Id = "Spawn", Name = "Спавн", Icon = "play", At = { 0, 6 }, Face = { 0, -20 } },
-		{ Id = "Gates", Name = "Зал Врат", Icon = "gate", At = { 0, -175 }, Face = { 0, -200 } },
-		{ Id = "Forge", Name = "Кузница", Icon = "hammer", At = { 112, -132 }, Face = { 131, -132 } },
-		{ Id = "Academy", Name = "Академия классов", Icon = "academy", At = { 112, -45 }, Face = { 131, -45 } },
-		{ Id = "Supply", Name = "Зал снабжения", Icon = "crystal", At = { -124, -86 }, Face = { -140, -86 } },
+		{ Id = "Gates", Name = "Зал Врат", Icon = "gate", At = { 0, -178 }, Y = 10, Face = { 0, -200 } },
+		{ Id = "Forge", Name = "Кузница", Icon = "hammer", At = { 54, -145 }, Y = 10, Face = { 64, -154 } },
+		{ Id = "Academy", Name = "Академия классов", Icon = "academy", At = { 74, -76 }, Y = 10, Face = { 89, -71 } },
+		{ Id = "Supply", Name = "Терминал снабжения", Icon = "crystal", At = { -69, -110 }, Y = 10, Face = { -83, -112 } },
 	},
-	Leaderboards = { -- on the atrium north wall, either side of the Gate hall arch
-		{ Kind = "Level", Title = "Топ уровней", At = -42 },
-		{ Kind = "Room", Title = "Глубже всех в данже", At = -66 },
+	-- 8 leaderboards beside the gate (angles: Config.Citadel.Boards)
+	Leaderboards = {
+		{ Kind = "Level", Title = "Топ уровней" },
+		{ Kind = "Room", Title = "Глубже всех в данже" },
 	},
-	QuestBoard = { At = 42 }, -- 9: board + the Смотритель Врат NPC
 	Mentor = { Offset = Vector3.new(13, 0, -8), Face = Vector3.new(0, 0, 4) }, -- 3: next to the spawn, facing it
-	GateKeeper = { Offset = Vector3.new(54, 0, -150) },
-	-- First path of a new player (plan's yellow dashes): waypoints the floor
-	-- guide follows from the spawn into each hall (client QuestGuide).
+	-- named points of the hub (from the spawn)
 	Waypoints = {
 		Spawn = Vector3.new(0, 0, 0),
-		AtriumSouth = Vector3.new(0, 0, -30),
-		AtriumCenter = Vector3.new(0, 0, -90),
-		AtriumNorth = Vector3.new(0, 0, -150),
-		SupplyDoor = Vector3.new(-104, 0, -45),
-		AcademyDoor = Vector3.new(104, 0, -43),
-		ForgeDoor = Vector3.new(104, 0, -135),
-		GatesDoor = Vector3.new(0, 0, -168),
+		AtriumSouth = Vector3.new(0, 0, -44),
+		AtriumCenter = Vector3.new(0, 0, -100),
+		AtriumNorth = Vector3.new(0, 0, -140),
+		SupplyDoor = Vector3.new(-62, 10, -100),
+		AcademyDoor = Vector3.new(62, 10, -100),
+		ForgeDoor = Vector3.new(50, 10, -150),
+		GatesDoor = Vector3.new(0, 10, -162),
 	},
 	-- Floor guide (plan's yellow dashes): gold chevrons on the floor from
 	-- the player along the route to the story quest's place (client
@@ -2672,8 +2629,8 @@ Config.HubLayout = {
 		PortalSub = "Подземелье · Нано-фабрика",
 		Forge = "ФАБРИКАТОР",
 		ForgeSub = "Заточка и возвышение",
-		Supply = "ЗАЛ СНАБЖЕНИЯ",
-		SupplySub = "Крутки · портал в АФК-зону",
+		Supply = "ТЕРМИНАЛ СНАБЖЕНИЯ",
+		SupplySub = "Крутки за Кристаллы",
 		AfkPortal = "АФК-ЗОНА",
 		AfkPortalSub = "Награды, пока тебя нет",
 		Academy = "АКАДЕМИЯ",

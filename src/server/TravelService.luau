@@ -74,8 +74,9 @@ function TravelService.Init(hubInfo)
 			for _, def in ipairs(Config.HubLayout.Teleports) do
 				if def.Id == id and player.Character then
 					local base = hub.SpawnCFrame.Position - Vector3.new(0, 4, 0)
-					local p = base + Vector3.new(def.At[1], 3, def.At[2])
-					local f = base + Vector3.new(def.Face[1], 3, def.Face[2])
+					local y = 3 + (def.Y or 0) -- terrace halls stand on the 2nd level
+					local p = base + Vector3.new(def.At[1], y, def.At[2])
+					local f = base + Vector3.new(def.Face[1], y, def.Face[2])
 					player.Character:PivotTo(CFrame.lookAt(p, f))
 					return true
 				end

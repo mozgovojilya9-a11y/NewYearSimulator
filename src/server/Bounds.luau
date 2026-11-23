@@ -1,7 +1,7 @@
 --[[
 	Bounds.luau
 	Last line of defence against leaving the map. The world itself is
-	closed by invisible walls (HubGenerator / GateMap); if a
+	closed by invisible walls (HubCitadel / GateMap); if a
 	character still ends up below Config.Bounds.FallY, it is teleported
 	back softly: hub -> spawn, gate run -> entry of the current zone.
 	No death, the run goes on. FallenPartsDestroyHeight is far below.

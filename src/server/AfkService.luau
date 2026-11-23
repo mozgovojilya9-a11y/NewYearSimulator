@@ -202,7 +202,8 @@ local function build()
 		end
 	end
 	-- two more small floating islands to the sides
-	for _, off in ipairs({ Vector3.new(-120, -40, -60), Vector3.new(130, -70, 40) }) do
+	-- (on the far side from the hub, which is north-west of the AFK island)
+	for _, off in ipairs({ Vector3.new(95, -40, 70), Vector3.new(70, -70, -95) }) do
 		local p = o + off
 		NanoKit.Cylinder(folder, "Island", 3, 26, CFrame.new(p) * CFrame.Angles(0, 0, math.rad(90)), stone, M.Concrete).CanCollide = false
 		NanoKit.Cylinder(folder, "IslandRock", 10, 16, CFrame.new(p + Vector3.new(0, -6, 0)) * CFrame.Angles(0, 0, math.rad(90)), stone:Lerp(Color3.new(0, 0, 0), 0.35), M.Concrete).CanCollide = false
