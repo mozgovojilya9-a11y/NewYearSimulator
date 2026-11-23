@@ -128,6 +128,53 @@ local function build()
 	glow.Range = 20
 	glow.Brightness = 1.2
 	glow.Parent = crystal
+	-- the rewards hologram (sheet 07): a projector, a floating cyan panel
+	-- with a gift glyph and the session timer (the client writes "Timer")
+	local holo = o + Vector3.new(0, 0, -(R - 14))
+	local hcf = CFrame.lookAt(holo, Vector3.new(o.X, holo.Y, o.Z))
+	NanoKit.Cylinder(folder, "HoloBase", 0.8, 6, CFrame.new(holo + Vector3.new(0, 0.4, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(60, 60, 68), M.Metal)
+	local lens = NanoKit.Cylinder(folder, "HoloLens", 0.2, 4.6, CFrame.new(holo + Vector3.new(0, 0.85, 0)) * CFrame.Angles(0, 0, math.rad(90)), Config.Theme.Cyan, M.Neon)
+	lens.CanCollide = false
+	local screen = Panel(folder, "HoloScreen", Vector3.new(9, 6, 0.1), hcf * CFrame.new(0, 6.5, 0), Config.Theme.Cyan, M.Glass, { Transparency = 0.75, CanCollide = false, CastShadow = false })
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "AfkHologram"
+	gui.Face = Enum.NormalId.Front
+	gui.LightInfluence = 0
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 60
+	gui.Parent = screen
+	local function label(name, text, y, h, size, color)
+		local l = Instance.new("TextLabel")
+		l.Name = name
+		l.BackgroundTransparency = 1
+		l.Position = UDim2.new(0, 0, y, 0)
+		l.Size = UDim2.new(1, 0, h, 0)
+		l.Font = Enum.Font.GothamBlack
+		l.Text = text
+		l.TextColor3 = color
+		l.TextSize = size
+		l.Parent = gui
+		return l
+	end
+	label("Title", A.Texts.Hologram, 0.06, 0.18, 52, Color3.fromRGB(220, 250, 255))
+	label("Gift", "", 0.24, 0.4, 10, Config.Theme.Cyan)
+	label("Timer", "0:00", 0.68, 0.24, 64, Color3.fromRGB(255, 255, 255))
+	-- the gift glyph: a box with a ribbon, drawn with frames
+	local giftHolder = gui:FindFirstChild("Gift")
+	for _, f in ipairs({ { 0.5, 0.62, 0.3, 0.5 }, { 0.5, 0.36, 0.36, 0.14 }, { 0.5, 0.56, 0.05, 0.64 } }) do
+		local fr = Instance.new("Frame")
+		fr.AnchorPoint = Vector2.new(0.5, 0.5)
+		fr.Position = UDim2.fromScale(f[1], f[2])
+		fr.Size = UDim2.fromScale(f[3] * 0.4, f[4])
+		fr.BackgroundColor3 = Config.Theme.Cyan
+		fr.BackgroundTransparency = 0.15
+		fr.BorderSizePixel = 0
+		fr.Parent = giftHolder
+	end
+	NanoKit.Tag(screen, "Bob", { Amplitude = 0.3, Period = 4 })
+	WorldKit.Light(lens, Config.Theme.Cyan, 16, 1)
+	local _hcf = hcf
+
 	-- the way back: a small arch with an "E" circle
 	local back = o + Vector3.new(0, 0, R - 4)
 	local bcf = CFrame.lookAt(back, Vector3.new(o.X, back.Y, o.Z))

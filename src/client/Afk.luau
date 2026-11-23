@@ -92,6 +92,13 @@ local function render()
 	end
 	local elapsed = os.clock() - stateClock
 	timeLabel.Text = clock(state.Seconds + elapsed)
+	-- the rewards hologram on the island shows our own timer
+	local zone = workspace:FindFirstChild("AfkZone")
+	local screen = zone and zone:FindFirstChild("HoloScreen", true)
+	local holo = screen and screen:FindFirstChild("AfkHologram")
+	if holo and holo:FindFirstChild("Timer") then
+		holo.Timer.Text = clock(state.Seconds + elapsed)
+	end
 	rows.Xp.Text = Format.Number(state.Xp)
 	rows.Credits.Text = Format.Number(state.Credits)
 	rows.Crystals.Text = Format.Number(state.Crystals)
