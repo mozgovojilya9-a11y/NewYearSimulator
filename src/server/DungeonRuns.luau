@@ -1076,6 +1076,17 @@ function DungeonRuns.Start(location, players, opts)
 	slots[slot] = run
 	runs[run] = true
 	run.map = GateMap.Build(location, slot)
+	if run.red then
+		-- Red Gates (sheet 07): the same dungeon, every light and glow red
+		local red = Config.RedGate.Color
+		for _, d in ipairs(run.map.Folder:GetDescendants()) do
+			if d:IsA("Light") then
+				d.Color = red
+			elseif d:IsA("BasePart") and d.Material == Enum.Material.Neon then
+				d.Color = red
+			end
+		end
+	end
 	run.zones = run.map.Zones
 	local mobFolder = Instance.new("Folder")
 	mobFolder.Name = "Mobs"
@@ -1097,7 +1108,7 @@ function DungeonRuns.Start(location, players, opts)
 			character:PivotTo(run.map.Start * CFrame.new((i - 1) * 3 - 4.5, 0, 0))
 		end
 		player:SetAttribute("Zone", "Dungeon")
-		player:SetAttribute("Biome", location.Biome)
+		player:SetAttribute("Biome", if run.red then "Red" else location.Biome)
 		player:SetAttribute("GateRun", location.Id)
 		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		local list = {}

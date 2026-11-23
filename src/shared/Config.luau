@@ -383,10 +383,10 @@ Config.Gates = {
 	RankInfo = {
 		E = { Name = "Ранг E", Level = 1, Text = "Первые разломы: роботы цеха и лаборатории" },
 		D = { Name = "Ранг D", Level = 8, Requires = "E", Text = "Опасные сектора: плавильня, заражение, Нексус" },
-		C = { Name = "Ранг C", Level = 18, Requires = "D", Text = "Литейная и улей: щиты, подрывники, охотники" },
+		C = { Name = "Ранг C", Level = 18, Requires = "D", Text = "Кристальные пещеры и улей биомассы" },
 		B = { Name = "Ранг B", Level = 26, Requires = "C", Text = "Резервное ядро ИИ" },
 		A = { Name = "Ранг A", Level = 34, Requires = "B", Text = "Ледяная цитадель" },
-		S = { Name = "Ранг S", Level = 42, Requires = "A", Text = "Трон Нексуса" },
+		S = { Name = "Ранг S", Level = 42, Requires = "A", Text = "Орбитальное ИИ-ядро" },
 	},
 	-- Locations: a path of Sections (each: how many enemies already stand
 	-- there as one group) + a boss arena. No waves: kill the group, the
@@ -396,7 +396,7 @@ Config.Gates = {
 	-- Level / GearScore = what is recommended. ParSeconds = time of an S.
 	-- Ready = false: a placeholder (shown as "Скоро"), add data to open it.
 	Locations = {
-		{ Id = "E_Assembly", Rank = "E", Biome = "Assembly", Name = "Сборочный цех", Text = "Конвейеры встали, роботы-сборщики вышли из-под контроля.",
+		{ Id = "E_Assembly", Rank = "E", Biome = "Assembly", Name = "Заброшенный завод", Text = "Конвейеры встали, роботы-сборщики вышли из-под контроля.",
 			Tier = 1, TierStep = 1, Sections = { 5, 6, 4 }, Elites = { 0 }, BossTier = 2, Level = 1, GearScore = 10, ParSeconds = 200, Seed = 11,
 			Mobs = { "SpiderBot", "Assembler", "HoverDrone", "AsmGunner", "AsmShield" }, Boss = "ForemanMech", Icon = "gear" },
 		{ Id = "E_Cryo", Rank = "E", Biome = "Cryo", Name = "Криолаборатория", Text = "Ледяные камеры треснули. Внутри — то, что держали в холоде.",
@@ -413,9 +413,9 @@ Config.Gates = {
 			Mobs = { "PhaseAndroid", "NexusSentinel", "NanoSwarm", "WallTurret", "NexusShield", "NexusMedic" }, Boss = "Juggernaut", Icon = "eye" },
 		-- higher ranks: mixed pools from several biomes, more elites with
 		-- more affixes (Config.Enemies.Affixes.Count)
-		{ Id = "C_Foundry", Rank = "C", Biome = "Smelter", Name = "Глубинная литейная", Text = "Ниже реактора. Расплав, подрывники и щиты в три ряда.",
+		{ Id = "C_Foundry", Rank = "C", Biome = "Crystal", Name = "Кристальные пещеры", Text = "Под цитаделью растут нано-кристаллы. Их охраняют дроны и турели.",
 			Tier = 14, TierStep = 1, Sections = { 6, 7, 7, 6 }, Elites = { 1, 2, 2, 2 }, Level = 18, GearScore = 330, ParSeconds = 300, Seed = 61,
-			Mobs = { "SlagBot", "Smelter", "SmeltGunner", "SmeltShield", "SmeltMedic", "SlagBomber", "NexusSentinel" }, Boss = "MoltenColossus", Icon = "flame" },
+			Mobs = { "FrostSpider", "CryoAndroid", "HoverDrone", "WallTurret", "NanoSwarm", "CryoBomber", "NexusSentinel" }, Boss = "CryoOverseer", Icon = "flame" },
 		{ Id = "C_Hive", Rank = "C", Biome = "Infected", Name = "Улей биомассы", Text = "Биомасса проросла сквозь этажи. Охотники нападают со спины.",
 			Tier = 15, TierStep = 1, Sections = { 6, 7, 7, 6 }, Elites = { 1, 2, 2, 2 }, Level = 20, GearScore = 360, ParSeconds = 300, Seed = 67,
 			Mobs = { "InfectedCrawler", "InfectedBrute", "NanoSwarm", "InfectedSpitter", "SporeBomber", "InfectedStalker" }, Boss = "HiveMother", Icon = "skull" },
@@ -425,7 +425,7 @@ Config.Gates = {
 		{ Id = "A_Citadel", Rank = "A", Biome = "Cryo", Name = "Ледяная цитадель", Text = "Замёрзшая крепость. Фантомы, турели и бомбы во льду.",
 			Tier = 19, TierStep = 1, Sections = { 7, 8, 8, 7 }, Elites = { 2, 3, 3, 3 }, Level = 34, GearScore = 520, ParSeconds = 340, Seed = 79,
 			Mobs = { "FrostSpider", "CryoAndroid", "CryoBot", "CryoMedic", "CryoBomber", "CryoPhantom", "NexusShield" }, Boss = "CryoOverseer", Icon = "vortex" },
-		{ Id = "S_Throne", Rank = "S", Biome = "Nexus", Name = "Трон Нексуса", Text = "Последний рубеж. Здесь собраны худшие машины всех цехов.",
+		{ Id = "S_Throne", Rank = "S", Biome = "Orbital", Name = "Орбитальное ИИ-ядро", Text = "Ядро ИИ на орбите. Последний рубеж.",
 			Tier = 21, TierStep = 1, Sections = { 8, 8, 8, 7 }, Elites = { 3, 3, 3, 3 }, Level = 42, GearScore = 600, ParSeconds = 360, Seed = 83,
 			Mobs = { "PhaseAndroid", "NexusSentinel", "InfectedBrute", "SmeltGunner", "NexusShield", "SlagBomber", "InfectedStalker", "CryoPhantom", "NanoSwarm", "WallTurret" }, Boss = "AICore", Icon = "eye" },
 	},
@@ -474,8 +474,10 @@ Config.GateMap = {
 	Pylons = 4, -- lamp pylons per zone
 	Ceiling = true, -- closed halls: a roof with girders and light slits
 	FloorTile = 18, -- studs per tile of the AI floor material
+	-- glowing chevrons on the floor point the way to the exit (sheet 07)
+	Chevrons = { Every = 7, Width = 3.4 },
 	-- section layouts (GateMap), shuffled per location (seeded)
-	Layouts = { "Pillars", "Cross", "Core", "Split", "Yard", "Lanes" },
+	Layouts = { "Pillars", "Cross", "Core", "Split" }, -- clean rooms: one clear shape, nothing scattered
 	Texts = { Zone = "ЗОНА %d", Boss = "АРЕНА" },
 }
 
@@ -2638,6 +2640,23 @@ Config.DungeonLayout = {
 			Metal = Color3.fromRGB(62, 70, 60), Accent = Color3.fromRGB(120, 255, 90), Light = Color3.fromRGB(210, 255, 200), Glow = Color3.fromRGB(120, 255, 90),
 			Atmosphere = { Color = Color3.fromRGB(120, 150, 100), Decay = Color3.fromRGB(60, 90, 50) },
 			Lighting = { Ambient = Color3.fromRGB(80, 94, 76), OutdoorAmbient = Color3.fromRGB(74, 88, 70) } },
+		-- sheet 07: rank C Crystal Caverns, rank S Orbital AI Core
+		{ Name = "Кристальные пещеры", Theme = "Crystal", WallMaterial = Enum.Material.Slate, FloorMaterial = Enum.Material.Slate, PanelMaterial = Enum.Material.Rock, Decor = "Crystal",
+			StoneA = Color3.fromRGB(70, 74, 96), StoneB = Color3.fromRGB(58, 60, 82), Floor = Color3.fromRGB(56, 60, 78), FloorB = Color3.fromRGB(46, 48, 66),
+			Metal = Color3.fromRGB(66, 68, 86), Accent = Color3.fromRGB(80, 220, 255), Light = Color3.fromRGB(190, 220, 255), Glow = Color3.fromRGB(170, 110, 255),
+			Atmosphere = { Color = Color3.fromRGB(110, 110, 170), Decay = Color3.fromRGB(60, 50, 110) },
+			Lighting = { Ambient = Color3.fromRGB(82, 84, 112), OutdoorAmbient = Color3.fromRGB(78, 80, 108) } },
+		{ Name = "Орбитальное ИИ-ядро", Theme = "Orbital", WallMaterial = Enum.Material.Metal, FloorMaterial = Enum.Material.SmoothPlastic, PanelMaterial = Enum.Material.Foil, Decor = "Orbital",
+			StoneA = Color3.fromRGB(86, 82, 110), StoneB = Color3.fromRGB(70, 66, 96), Floor = Color3.fromRGB(48, 44, 66), FloorB = Color3.fromRGB(38, 34, 54),
+			Metal = Color3.fromRGB(62, 58, 84), Accent = Color3.fromRGB(196, 110, 255), Light = Color3.fromRGB(230, 210, 255), Glow = Color3.fromRGB(255, 61, 184),
+			Atmosphere = { Color = Color3.fromRGB(130, 100, 180), Decay = Color3.fromRGB(70, 40, 120) },
+			Lighting = { Ambient = Color3.fromRGB(90, 80, 116), OutdoorAmbient = Color3.fromRGB(84, 74, 110) } },
+		-- Red Gates: the same dungeon in red light (client Zone, theme "Red")
+		{ Name = "Красные Врата", Theme = "Red", Decor = "Assembly",
+			StoneA = Color3.fromRGB(110, 70, 70), StoneB = Color3.fromRGB(90, 60, 60), Floor = Color3.fromRGB(50, 34, 34), FloorB = Color3.fromRGB(40, 28, 28),
+			Metal = Color3.fromRGB(70, 50, 50), Accent = Color3.fromRGB(255, 50, 60), Light = Color3.fromRGB(255, 120, 110), Glow = Color3.fromRGB(255, 50, 60),
+			Atmosphere = { Color = Color3.fromRGB(170, 60, 60), Decay = Color3.fromRGB(110, 20, 30) },
+			Lighting = { Ambient = Color3.fromRGB(120, 60, 60), OutdoorAmbient = Color3.fromRGB(110, 54, 54) } },
 	},
 	BossBarrierColor = Color3.fromRGB(255, 61, 184),
 

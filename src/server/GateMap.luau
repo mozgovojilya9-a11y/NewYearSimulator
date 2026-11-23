@@ -64,6 +64,24 @@ local function conveyor(parent, biome, from: Vector3, to: Vector3)
 	end
 end
 
+-- Glowing crystal clusters (sheet 07 Crystal Caverns).
+local function crystalCluster(parent, biome, p: Vector3, scale: number, rng: Random)
+	local m = NanoKit.Model(parent, "Crystals")
+	for i = 1, rng:NextInteger(3, 6) do
+		local h = rng:NextNumber(3, 8) * scale
+		local w = rng:NextNumber(0.8, 1.8) * scale
+		local color = if i % 3 == 0 then biome.Glow else biome.Accent
+		local c = Panel(m, "Crystal", Vector3.new(w, h, w), CFrame.new(p + Vector3.new(rng:NextNumber(-1.5, 1.5) * scale, h * 0.4, rng:NextNumber(-1.5, 1.5) * scale)) * CFrame.Angles(rng:NextNumber(-0.45, 0.45), rng:NextNumber(0, 6.28), rng:NextNumber(-0.45, 0.45)), color, M.Glass, { Transparency = 0.15 })
+		if i == 1 then
+			WorldKit.Light(c, color, 16 * scale, 1.2)
+			local core = Panel(m, "CrystalCore", Vector3.new(w * 0.4, h * 0.7, w * 0.4), c.CFrame, color, M.Neon, { CanCollide = false, Transparency = 0.2 })
+			local _ = core
+		end
+	end
+	Panel(m, "Rock", Vector3.new(4, 1.6, 4) * scale, CFrame.new(p + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, rng:NextNumber(0, 6), 0.2), biome.StoneB, Enum.Material.Rock)
+	return m
+end
+
 -- The biome's signature machine in a room corner.
 local function machine(parent, biome, cf: CFrame)
 	local theme = biome.Theme
@@ -102,6 +120,13 @@ local function machine(parent, biome, cf: CFrame)
 		NanoKit.Tag(core, "Spin", { Speed = 50, Axis = "Y" })
 		NanoKit.Column(parent, "CorePylon", 2.5, 4, cf.Position, biome.Metal, M.Metal)
 		WorldKit.Light(core, biome.Glow, 20, 1.4)
+	elseif theme == "Crystal" then
+		crystalCluster(parent, biome, cf.Position, 2.6, Random.new(5))
+	elseif theme == "Orbital" then
+		local core = Panel(parent, "OrbitalCore", Vector3.new(4, 4, 4), cf * CFrame.new(0, 7, 0), biome.Glow, M.Neon, { Shape = Enum.PartType.Ball, CanCollide = false, Transparency = 0.15 })
+		NanoKit.Tag(core, "Pulse", { Period = 2 })
+		NanoKit.Column(parent, "CorePylon", 4, 5, cf.Position, biome.Metal, M.Metal)
+		WorldKit.Light(core, biome.Glow, 26, 1.6)
 	else -- Assembly: robotic arm over a workbench
 		Panel(parent, "Bench", Vector3.new(6, 2.6, 3), cf * CFrame.new(0, 1.3, 0), biome.Metal, M.Plate)
 		NanoKit.Column(parent, "ArmBase", 3, 1.4, (cf * CFrame.new(2, 2.6, 0)).Position, biome.Accent, M.Metal)
@@ -188,6 +213,28 @@ local function biomeDecor(parent, biome, from: Vector3, to: Vector3, side: numbe
 			if i % 2 == 1 then
 				WorldKit.Light(pod, biome.Glow, 12, 0.8)
 			end
+		end
+	elseif kind == "Crystal" then
+		local rng = Random.new(math.floor(from.X * 7 + from.Z * 3))
+		local count = math.max(3, math.floor(length / 9))
+		for i = 1, count do
+			local p = from + dir * (length * (i - 0.5) / count) + Vector3.new(-side * rng:NextNumber(0, 3), 0, 0)
+			crystalCluster(parent, biome, p, rng:NextNumber(0.9, 1.5), rng)
+		end
+	elseif kind == "Orbital" then
+		-- holo screens on the wall and light lines on the floor
+		local count = math.max(2, math.floor(length / 14))
+		for i = 1, count do
+			local p = from + dir * (length * (i - 0.5) / count)
+			local cf = CFrame.lookAt(p + Vector3.new(0, 7, 0), p + Vector3.new(-side, 7, 0))
+			local screen = Panel(parent, "HoloScreen", Vector3.new(6, 3.6, 0.1), cf, biome.Accent, M.Neon, { CanCollide = false, Transparency = 0.6 })
+			for r = 1, 3 do
+				Panel(parent, "HoloLine", Vector3.new(4.4 - r * 0.8, 0.15, 0.05), cf * CFrame.new(0, 1 - r * 0.6, -0.08), Color3.new(1, 1, 1), M.Neon, { CanCollide = false, Transparency = 0.3 })
+			end
+			WorldKit.Light(screen, biome.Accent, 12, 0.8)
+		end
+		for _, off in ipairs({ -1.5, 1.5 }) do
+			NanoKit.Strip(parent, from + Vector3.new(-side * (4 + off), 0.06, 0), to + Vector3.new(-side * (4 + off), 0.06, 0), biome.Accent, 0.25)
 		end
 	else
 		conveyor(parent, biome, from, to)
@@ -459,6 +506,69 @@ local function hangingLamp(parent, biome, p: Vector3, height: number)
 	light.Parent = shade
 end
 
+-- A path of glowing chevrons on the floor from a to b (sheet 07).
+local function chevrons(parent, a: Vector3, b: Vector3, color: Color3)
+	local CH = G.Chevrons
+	local flat = Vector3.new(b.X - a.X, 0, b.Z - a.Z)
+	local length = flat.Magnitude
+	if length < 4 then
+		return
+	end
+	local dir = flat.Unit
+	local n = math.floor(length / CH.Every)
+	for k = 1, n do
+		local p = a + dir * (k * CH.Every - CH.Every / 2)
+		local look = CFrame.lookAt(Vector3.new(p.X, a.Y + 0.08, p.Z), Vector3.new(p.X, a.Y + 0.08, p.Z) + dir)
+		for _, side in ipairs({ -1, 1 }) do
+			local bar = Panel(parent, "Chevron", Vector3.new(0.5, 0.06, CH.Width), look * CFrame.new(side * CH.Width * 0.3, 0, 0.6) * CFrame.Angles(0, math.rad(side * 50), 0), color, M.Neon, { CanCollide = false, CastShadow = false, Transparency = 0.15 })
+			NanoKit.Tag(bar, "Pulse", { Period = 1.4 + (k % 4) * 0.15 })
+		end
+	end
+end
+
+-- An overhead gantry crane: two rails along the side walls, a bridge
+-- beam across, a trolley with a hook block (sheet 07 factory).
+local function crane(parent, biome, center: Vector3, half: number, H: number, rng: Random)
+	local m = NanoKit.Model(parent, "Crane")
+	local y = H - 3
+	for _, side in ipairs({ -1, 1 }) do
+		Panel(m, "CraneRail", Vector3.new(1.4, 1.2, half * 2 - 4), CFrame.new(center + Vector3.new(side * (half - 2), y, 0)), biome.Metal, M.Metal, { CanCollide = false })
+	end
+	local z = rng:NextNumber(-half * 0.4, half * 0.4)
+	Panel(m, "CraneBeam", Vector3.new(half * 2 - 4, 1.8, 2), CFrame.new(center + Vector3.new(0, y - 1.4, z)), Color3.fromRGB(210, 160, 40), M.Metal, { CanCollide = false })
+	for k = -1, 1, 2 do
+		Panel(m, "HazardStripe", Vector3.new(half * 2 - 4, 0.3, 0.1), CFrame.new(center + Vector3.new(0, y - 1.4 + k * 0.5, z - 1.05)), Color3.fromRGB(30, 30, 30), M.Smooth, { CanCollide = false })
+	end
+	local x = rng:NextNumber(-half * 0.5, half * 0.5)
+	Panel(m, "Trolley", Vector3.new(3, 1.6, 3), CFrame.new(center + Vector3.new(x, y - 3, z)), biome.Metal, M.Metal, { CanCollide = false })
+	Panel(m, "Cable", Vector3.new(0.2, 6, 0.2), CFrame.new(center + Vector3.new(x, y - 6.8, z)), Color3.fromRGB(20, 20, 24), M.Metal, { CanCollide = false })
+	local hook = Panel(m, "HookBlock", Vector3.new(2, 2, 1.4), CFrame.new(center + Vector3.new(x, y - 10.6, z)), Color3.fromRGB(210, 160, 40), M.Metal, { CanCollide = false })
+	NanoKit.Tag(hook, "Bob", { Amplitude = 0.4, Period = 3 })
+	local lamp = Panel(m, "CraneLamp", Vector3.new(1.2, 0.3, 1.2), CFrame.new(center + Vector3.new(x, y - 3.9, z)), biome.Light, M.Neon, { CanCollide = false })
+	local spot = Instance.new("SpotLight")
+	spot.Face = Enum.NormalId.Bottom
+	spot.Color = biome.Light
+	spot.Range = H
+	spot.Angle = 70
+	spot.Brightness = 2
+	spot.Parent = lamp
+	return m
+end
+
+-- A catwalk along a side wall at mid height with a railing and posts.
+local function catwalk(parent, biome, center: Vector3, half: number, side: number)
+	local m = NanoKit.Model(parent, "Catwalk")
+	local y = 10
+	local x = center.X + side * (half - 3.5)
+	local length = half * 2 - 10
+	Panel(m, "Deck", Vector3.new(5, 0.5, length), CFrame.new(x, center.Y + y, center.Z), biome.Metal, M.Plate, { CanCollide = false })
+	NanoKit.Railing(m, Vector3.new(x - side * 2.5, center.Y + y + 0.25, center.Z - length / 2), Vector3.new(x - side * 2.5, center.Y + y + 0.25, center.Z + length / 2), 3, biome.Accent)
+	for z = -length / 2, length / 2, 12 do
+		Panel(m, "CatwalkPost", Vector3.new(0.6, y, 0.6), CFrame.new(x, center.Y + y / 2, center.Z + z), biome.Metal, M.Metal, { CanCollide = false })
+	end
+	return m
+end
+
 -- Zone layouts: every section has its own shape (Config.GateMap.Layouts).
 --   Pillars  a hall of thick round pillars
 --   Cross    solid blocks fill the corners: a cross-shaped room
@@ -489,13 +599,6 @@ function LAYOUTS.Cross(m, biome, rng, center, half, H, free, add)
 			mass(m, biome, CFrame.new(p), Vector3.new(s, H * 0.55, s))
 			add(p)
 			add(p + Vector3.new(-c[1] * s * 0.3, 0, -c[2] * s * 0.3))
-		end
-	end
-	for _ = 1, 3 do
-		local p = center + Vector3.new(rng:NextNumber(-half * 0.3, half * 0.3), 0, rng:NextNumber(-half * 0.1, half * 0.4))
-		if free(p, 6) then
-			clutter(m, biome, rng, p)
-			add(p)
 		end
 	end
 end
@@ -529,13 +632,6 @@ function LAYOUTS.Split(m, biome, rng, center, half, H, free, add)
 			for x = x1 + 4, x2 - 4, 8 do
 				add(Vector3.new(center.X + x, center.Y, z))
 			end
-		end
-	end
-	for _ = 1, 3 do
-		local p = center + Vector3.new(rng:NextNumber(-half * 0.7, half * 0.7), 0, rng:NextNumber(half * 0.2, half * 0.6))
-		if free(p, 6) then
-			clutter(m, biome, rng, p)
-			add(p)
 		end
 	end
 end
@@ -577,12 +673,6 @@ local function buildZone(folder, biome, rng: Random, index: number, center: Vect
 	local H = G.WallHeight
 	local C = G.Corridor
 	floorPart(m, center, size, size, biome, "Floor")
-	-- a few darker floor plates (wear), never the same pattern twice
-	for _ = 1, rng:NextInteger(3, 6) do
-		local w, d = rng:NextNumber(8, 18), rng:NextNumber(6, 14)
-		local p = center + Vector3.new(rng:NextNumber(-half + w / 2, half - w / 2), 0.03, rng:NextNumber(-half + d / 2, half - d / 2))
-		Panel(m, "FloorPlate", Vector3.new(w, 0.12, d), CFrame.new(p), biome.Metal:Lerp(biome.Floor, 0.4), M.Plate, { CanCollide = false })
-	end
 	-- walls with door gaps (south = entry, north = exit)
 	local sw, se, nw, ne = center + Vector3.new(-half, 0, half), center + Vector3.new(half, 0, half), center + Vector3.new(-half, 0, -half), center + Vector3.new(half, 0, -half)
 	wall(m, biome, sw, se, Vector3.new(0, 0, -1), H, if entryX then { { center = entryX + half, width = C.Width } } else nil)
@@ -619,6 +709,34 @@ local function buildZone(folder, biome, rng: Random, index: number, center: Vect
 		local decorX = center.X + side * (half - 4)
 		biomeDecor(m, biome, Vector3.new(decorX, center.Y, center.Z + half - 18), Vector3.new(decorX, center.Y, center.Z - half + 18), side)
 	end
+	-- tidy storage: crate stacks squared to the walls in two corners
+	for _, cx in ipairs({ -1, 1 }) do
+		local base = center + Vector3.new(cx * (half - 5), 0, -half + 5)
+		if free(base, 3) then
+			NanoKit.Crate(m, CFrame.new(base), Vector3.new(4, 4, 4))
+			NanoKit.Crate(m, CFrame.new(base + Vector3.new(-cx * 4.4, 0, 0)), Vector3.new(4, 4, 4))
+			NanoKit.Crate(m, CFrame.new(base + Vector3.new(0, 4, 0)), Vector3.new(4, 4, 4))
+			table.insert(blocks, base)
+		end
+	end
+	-- the way forward: chevrons from the entry to the exit (sheet 07)
+	if exitX then
+		chevrons(m, center + Vector3.new(entryX or 0, 0, half - 6), center + Vector3.new(exitX, 0, -half + 4), biome.Accent)
+	end
+	-- biome set pieces
+	if biome.Theme == "Assembly" or biome.Theme == "Smelter" then
+		crane(m, biome, center, half, H, rng)
+		if layout ~= "Cross" then
+			catwalk(m, biome, center, half, if rng:NextNumber() < 0.5 then -1 else 1)
+		end
+	elseif biome.Theme == "Crystal" then
+		for _, c in ipairs({ { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } }) do
+			local p = center + Vector3.new(c[1] * (half - 6), 0, c[2] * (half - 6))
+			if free(p, 4) then
+				crystalCluster(m, biome, p, 1.8, rng)
+			end
+		end
+	end
 	-- light: hanging lamps on a loose grid (pillars carry their own)
 	if layout ~= "Pillars" then
 		for _, x in ipairs({ -0.4, 0.4 }) do
@@ -653,6 +771,7 @@ local function buildCorridor(folder, biome, from: Vector3, to: Vector3)
 		NanoKit.Strip(m, (cf * CFrame.new(side * (C.Width / 2 - 0.1), 2, -length / 2)).Position, (cf * CFrame.new(side * (C.Width / 2 - 0.1), 2, length / 2)).Position, biome.Accent, 0.14)
 	end
 	Panel(m, "Roof", Vector3.new(C.Width + 6, 1, length), cf * CFrame.new(0, C.Height + 2.5, 0), biome.Metal, M.Metal)
+	chevrons(m, from, to, biome.Accent)
 	local lamp = Panel(m, "Lamp", Vector3.new(3, 0.3, 1.4), cf * CFrame.new(0, C.Height + 1.8, 0), biome.Light, M.Neon, { CanCollide = false })
 	local light = Instance.new("SpotLight")
 	light.Face = Enum.NormalId.Bottom
@@ -697,8 +816,27 @@ local function buildArena(folder, biome, center: Vector3, size: number, entryX: 
 	gate.Transparency = 1
 	-- rings and the boss platform
 	for i, r in ipairs({ 0.82, 0.55, 0.3 }) do
-		local disc = NanoKit.Cylinder(m, "ArenaRing", 0.08 + i * 0.01, size * r, CFrame.new(center + Vector3.new(0, 0.04 + i * 0.01, 0)) * CFrame.Angles(0, 0, math.rad(90)), if i % 2 == 1 then biome.Accent:Lerp(biome.Floor, 0.5) else biome.FloorB, M.Smooth)
+		local disc = NanoKit.Cylinder(m, "ArenaRing", 0.08 + i * 0.01, size * r, CFrame.new(center + Vector3.new(0, 0.04 + i * 0.01, 0)) * CFrame.Angles(0, 0, math.rad(90)), if i % 2 == 1 then biome.Floor:Lerp(Color3.new(0, 0, 0), 0.3) else biome.FloorB, M.Smooth)
 		disc.CanCollide = false
+	end
+	-- thin red glowing rings on the floor (sheet 07 boss arena)
+	for i, r in ipairs({ 0.84, 0.57, 0.32, 0.12 }) do
+		local ring = size * r / 2
+		local n = math.floor(ring * 1.2) + 12
+		for k = 0, n - 1 do
+			local a = (k + 0.5) / n * math.pi * 2
+			Panel(m, "ArenaGlow", Vector3.new(0.35, 0.05, ring * math.pi * 2 / n + 0.05), CFrame.new(center + Vector3.new(math.cos(a) * ring, 0.13 + i * 0.01, math.sin(a) * ring)) * CFrame.Angles(0, -a, 0), Config.DungeonLayout.BossBarrierColor, M.Neon, { CanCollide = false, CastShadow = false, Transparency = 0.25 })
+		end
+	end
+	-- banners with the crest on the back wall
+	for _, x in ipairs({ -0.3, 0.3 }) do
+		local p = center + Vector3.new(size * x, H * 0.5, -half + 2)
+		Panel(m, "ArenaBanner", Vector3.new(6, 14, 0.2), CFrame.new(p), Color3.fromRGB(60, 22, 34), Enum.Material.Fabric, { CanCollide = false })
+		Panel(m, "BannerTrim", Vector3.new(6, 0.4, 0.3), CFrame.new(p + Vector3.new(0, 7, 0.05)), Color3.fromRGB(226, 182, 92), M.Metal, { CanCollide = false })
+		Panel(m, "BannerCrest", Vector3.new(1.6, 1.6, 0.1), CFrame.new(p + Vector3.new(0, 2, 0.15)) * CFrame.Angles(0, 0, math.rad(45)), Color3.fromRGB(226, 182, 92), M.Neon, { CanCollide = false })
+		for _, sx in ipairs({ -1, 1 }) do
+			Panel(m, "BannerWing", Vector3.new(2.4, 0.3, 0.1), CFrame.new(p + Vector3.new(sx * 1.6, 1, 0.15)) * CFrame.Angles(0, 0, math.rad(sx * 25)), Color3.fromRGB(226, 182, 92), M.Metal, { CanCollide = false })
+		end
 	end
 	-- big pylons on the diagonals
 	for _, c in ipairs({ { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } }) do
