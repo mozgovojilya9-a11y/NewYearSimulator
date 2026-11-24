@@ -1,8 +1,7 @@
 --[[
 	Status.luau
-	"Статус" (sheet 02_ui_kit.png): the four attributes in rows - icon,
-	name, what a point gives, the value and a "+" button (+5 on a second
-	small button); on the right the free points in a big number and the
+	"Статус" (sheet 02_ui_kit.png): the four attributes in rows - icon in a
+	frame, "Сила (СИЛ)", the value and a gold "+"; on the right the free points in a big number and the
 	reset for credits; along the bottom the main stats АТАКА / ЗАЩИТА /
 	HP / КРИТ. The server does the math (Status remote, StatService).
 ]]
@@ -26,7 +25,7 @@ local remote = ReplicatedStorage:WaitForChild("Status")
 
 local Status = {}
 
-local window = Window.new("Статус", nil, Vector2.new(720, 560), "user")
+local window = Window.new("Статус", nil, Vector2.new(780, 470), "user")
 local content = window.Content
 
 local busy = false
@@ -47,32 +46,30 @@ local function request(action, id, count)
 	end)
 end
 
--- left: the four attribute rows
-local LEFT = 500
-local ROW = 66
+-- left: the four attribute rows (sheet 02): an icon in a frame, "Сила
+-- (СИЛ)", the value and a gold "+"
+local LEFT = 520
+local ROW = 52
 local rows = {}
 for i, def in ipairs(A.List) do
 	local row = Style.Panel(content, { Position = UDim2.fromOffset(0, (i - 1) * (ROW + 8)), Size = UDim2.fromOffset(LEFT, ROW), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33 })
-	local icon = Icons.Make(row, def.Icon, 28, C.Gold, 35)
-	icon.Position = UDim2.fromOffset(16, (ROW - 28) / 2)
-	Style.Label(row, Style.Upper(def.Name), 17, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(58, 10), Size = UDim2.fromOffset(220, 22), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
-	Style.Label(row, table.concat(def.Lines, "  ·  "), 11, C.Muted, { Position = UDim2.fromOffset(58, 36), Size = UDim2.fromOffset(280, 18), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 35 })
-	local value = Style.Label(row, "0", 26, C.Text, { Font = Style.FontTitle, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -104, 0.5, 0), Size = UDim2.fromOffset(70, 30), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 35 })
-	local plus, plusApi = Style.IconButton(row, { Icon = "plus", Size = 40, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -54, 0.5, 0), ZIndex = 36, Cut = 6 })
-	local plus5 = Style.Button(row, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(40, 40), Text = "+5", TextSize = 13, Color = C.Card, ZIndex = 36 })
+	local box = Style.Panel(row, { Position = UDim2.fromOffset(8, 6), Size = UDim2.fromOffset(ROW - 12, ROW - 12), Fill = C.CardDark, Border = C.GoldDim, Cut = 5, ZIndex = 34 })
+	local icon = Icons.Make(box, def.Icon, 24, C.Gold, 35)
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	Style.Label(row, ("%s (%s)"):format(def.Name, def.Short or ""), 16, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(ROW + 8, 0), Size = UDim2.new(1, -(ROW + 150), 1, 0), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 35 })
+	local value = Style.Label(row, "0", 22, C.Text, { Font = Style.FontTitle, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -56, 0.5, 0), Size = UDim2.fromOffset(80, 28), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 35 })
+	local plus, plusApi = Style.IconButton(row, { Icon = "plus", Size = 36, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), ZIndex = 36, Cut = 6 })
 	plus.Activated:Connect(function()
 		request("Add", def.Id, 1)
 	end)
-	plus5.Activated:Connect(function()
-		request("Add", def.Id, 5)
-	end)
-	rows[def.Id] = { value = value, plusApi = plusApi, plus5 = plus5 }
+	rows[def.Id] = { value = value, plusApi = plusApi }
 end
 
 -- right: free points and the reset
 local side = Style.Panel(content, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(1, -(LEFT + 12), 0, 4 * (ROW + 8) - 8), Fill = C.PanelDark, Border = C.Line, Cut = 10, ZIndex = 33 })
-Style.Label(side, T.FreeTitle, 14, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 28), Size = UDim2.new(1, 0, 0, 18), ZIndex = 34 })
-local freeLabel = Style.Label(side, "0", 56, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 54), Size = UDim2.new(1, 0, 0, 62), ZIndex = 34 })
+Style.Label(side, T.FreeTitle, 13, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 18), Size = UDim2.new(1, 0, 0, 18), ZIndex = 34 })
+local freeLabel = Style.Label(side, "0", 50, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 0, 56), ZIndex = 34 })
 local freeScale = Instance.new("UIScale")
 freeScale.Parent = freeLabel
 local resetButton = Style.Button(side, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -24), Size = UDim2.new(1, -36, 0, 44), Text = "", TextSize = 15, Color = C.Card, Icon = "reset", ZIndex = 34 })
@@ -97,11 +94,11 @@ end)
 
 -- Возвышение (after the max level, Config.Ascension): 4 lines with "+"
 local AS = Config.Ascension
-local ascPanel = Style.Panel(content, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, -70), Size = UDim2.new(1, 0, 0, 92), Fill = C.PanelDark, Border = C.GoldDim, Cut = 8, ZIndex = 33 })
+local ascPanel = Style.Panel(content, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, -70), Size = UDim2.new(1, 0, 0, 84), Fill = C.PanelDark, Border = C.GoldDim, Cut = 8, ZIndex = 33 })
 local ascTitle = Style.Label(ascPanel, AS.Texts.Title, 14, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(14, 6), Size = UDim2.new(0.6, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
 local _ = ascTitle
 local ascFree = Style.Label(ascPanel, "", 13, C.Text, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 6), Size = UDim2.new(0.5, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 34 })
-local ascLocked = Style.Label(ascPanel, "", 13, C.Muted, { Position = UDim2.fromOffset(0, 30), Size = UDim2.new(1, 0, 0, 50), ZIndex = 34 })
+local ascLocked = Style.Label(ascPanel, "", 13, C.Muted, { Position = UDim2.fromOffset(14, 30), Size = UDim2.new(1, -28, 0, 44), TextWrapped = true, ZIndex = 34 })
 local ascCells = {}
 for i, line in ipairs(AS.Lines) do
 	local cell = Instance.new("Frame")
@@ -157,7 +154,6 @@ function refresh()
 		local row = rows[def.Id]
 		row.value.Text = tostring(spent[def.Id] or 0)
 		row.plusApi.SetActive(free > 0)
-		row.plus5.TextTransparency = if free >= 5 then 0 else 0.5
 	end
 	resetButton.Text = if resetArmed then T.Sure else T.ResetShort
 	resetCost.Text = T.ResetCost:format(Format.Number(A.ResetCost + A.ResetPerLevel * level))
@@ -167,7 +163,7 @@ function refresh()
 	local points = player:GetAttribute("AscensionPoints") or 0
 	local open = level >= maxLevel
 	ascLocked.Visible = not open
-	ascLocked.Text = ("Откроется на %d уровне: опыт пойдёт в очки возвышения (до %d)"):format(maxLevel, AS.MaxPoints)
+	ascLocked.Text = ("С %d уровня опыт идёт в очки возвышения (до %d)"):format(maxLevel, AS.MaxPoints)
 	ascFree.Text = if open then AS.Texts.Free:format(ascFreeN) .. "   ·   " .. AS.Texts.Total:format(points, AS.MaxPoints) else ""
 	local spentA = PlayerData.Table("AscensionSpent")
 	for id, ui in pairs(ascCells) do

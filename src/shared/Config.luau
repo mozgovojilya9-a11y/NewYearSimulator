@@ -1888,10 +1888,10 @@ Config.Attributes = {
 	ResetCost = 50,
 	ResetPerLevel = 10,
 	List = {
-		{ Id = "Str", Name = "Сила", Icon = "sword", Text = "Урон", PerPoint = { DamagePct = 0.01 }, Lines = { "+1% урона" } },
-		{ Id = "Agi", Name = "Ловкость", Icon = "dash", Text = "Скорость атаки и крит", PerPoint = { AttackSpeed = 0.004, CritChance = 0.002 }, Lines = { "+0.4% скорости атаки", "+0.2% шанса крита" } },
-		{ Id = "Vit", Name = "Живучесть", Icon = "heart", Text = "HP и защита", PerPoint = { Health = 8, Defense = 0.001 }, Lines = { "+8 макс. HP", "+0.1% защиты" } },
-		{ Id = "Per", Name = "Восприятие", Icon = "eye", Text = "Удача и шанс добычи", PerPoint = { Luck = 0.01, DropChance = 0.002 }, Lines = { "+1% удачи", "+0.2% шанса добычи" } },
+		{ Id = "Str", Name = "Сила", Short = "СИЛ", Icon = "sword", Text = "Урон", PerPoint = { DamagePct = 0.01 }, Lines = { "+1% урона" } },
+		{ Id = "Agi", Name = "Ловкость", Short = "ЛОВ", Icon = "dash", Text = "Скорость атаки и крит", PerPoint = { AttackSpeed = 0.004, CritChance = 0.002 }, Lines = { "+0.4% скорости атаки", "+0.2% шанса крита" } },
+		{ Id = "Vit", Name = "Живучесть", Short = "ЖИВ", Icon = "heart", Text = "HP и защита", PerPoint = { Health = 8, Defense = 0.001 }, Lines = { "+8 макс. HP", "+0.1% защиты" } },
+		{ Id = "Per", Name = "Восприятие", Short = "ВОС", Icon = "eye", Text = "Удача и шанс добычи", PerPoint = { Luck = 0.01, DropChance = 0.002 }, Lines = { "+1% удачи", "+0.2% шанса добычи" } },
 	},
 	Texts = {
 		Title = "СТАТУС",
@@ -2849,7 +2849,7 @@ Config.Ui = {
 	PanelTransparency = 0.12, -- HUD panels are slightly see-through
 	WindowTransparency = 0.04,
 	-- Top-left: profile under the Roblox buttons, the icon bar under it.
-	Profile = { Width = 300, Height = 86, Avatar = 66 },
+	Profile = { Width = 330, Height = 90, Avatar = 64 }, -- round avatar, Ур. pill, gate rank pill (sheet 02)
 	-- Icon bar: Id = window, Key = hotkey (shown on the button; hidden on touch).
 	Bar = {
 		{ Id = "Inventory", Icon = "bag", Label = "Инвентарь", Key = Enum.KeyCode.G },

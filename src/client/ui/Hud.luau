@@ -81,6 +81,8 @@ local profile = Style.Panel(Style.Gui, {
 	Position = UDim2.fromOffset(LEFT, TOP),
 	Size = UDim2.fromOffset(P.Width, P.Height),
 	ZIndex = 5,
+	Border = C.GoldDim,
+	Cut = 10,
 })
 
 -- the profile opens the Статистика window
@@ -99,22 +101,24 @@ profileButton.Activated:Connect(function()
 	end
 end)
 
-local avatarFrame = Style.Panel(profile, {
-	Position = UDim2.fromOffset(10, (P.Height - P.Avatar) / 2),
-	Size = UDim2.fromOffset(P.Avatar, P.Avatar),
-	ZIndex = 6,
-	Fill = C.CardDark,
-	Transparency = 0,
-	Border = C.GoldDim,
-	Cut = 8,
-})
+-- the round avatar in a gold ring (sheet 02)
+local avatarFrame = Instance.new("Frame")
+avatarFrame.Name = "AvatarRing"
+avatarFrame.Position = UDim2.fromOffset(10, 8)
+avatarFrame.Size = UDim2.fromOffset(P.Avatar, P.Avatar)
+avatarFrame.BackgroundColor3 = C.CardDark
+avatarFrame.ZIndex = 6
+avatarFrame.Parent = profile
+Style.Corner(avatarFrame, UDim.new(1, 0))
+Style.Stroke(avatarFrame, 2.5, C.Gold).LineJoinMode = Enum.LineJoinMode.Round -- a round ring, not a square
 local avatar = Instance.new("ImageLabel")
 avatar.Name = "Avatar"
-avatar.Position = UDim2.fromOffset(4, 4)
-avatar.Size = UDim2.new(1, -8, 1, -8)
+avatar.Position = UDim2.fromOffset(3, 3)
+avatar.Size = UDim2.new(1, -6, 1, -6)
 avatar.BackgroundTransparency = 1
 avatar.ZIndex = 7
 avatar.Parent = avatarFrame
+Style.Corner(avatar, UDim.new(1, 0))
 task.spawn(function()
 	local ok, image = pcall(function()
 		return Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
@@ -126,73 +130,109 @@ task.spawn(function()
 	end
 end)
 
--- level badge over the avatar's corner
+-- "Ур. N" pill under the avatar
 local badge = Style.Panel(profile, {
 	Name = "LevelBadge",
 	AnchorPoint = Vector2.new(0.5, 0.5),
-	Position = UDim2.fromOffset(10 + P.Avatar - 4, (P.Height + P.Avatar) / 2 - 4),
-	Size = UDim2.fromOffset(30, 26),
+	Position = UDim2.fromOffset(10 + P.Avatar / 2, 8 + P.Avatar),
+	Size = UDim2.fromOffset(62, 22),
 	ZIndex = 9,
-	Fill = C.Gold,
+	Fill = C.PanelDark,
 	Transparency = 0,
-	Border = Color3.fromRGB(255, 226, 140),
+	Border = C.Gold,
 	Cut = 6,
-	Thickness = 1,
+	Thickness = 1.5,
 })
-local levelLabel = Style.Label(badge, "1", 15, Color3.fromRGB(26, 20, 8), { Font = Style.FontTitle, Size = UDim2.fromScale(1, 1), ZIndex = 10 })
-levelLabel:FindFirstChildOfClass("UIStroke").Enabled = false
+local levelLabel = Style.Label(badge, "Ур. 1", 13, C.Gold, { Font = Style.FontTitle, Size = UDim2.fromScale(1, 1), ZIndex = 10 })
 
-local x0 = 10 + P.Avatar + 12
-local nameLabel = Style.Label(profile, player.DisplayName, 17, C.Text, {
+local x0 = 10 + P.Avatar + 14
+local nameLabel = Style.Label(profile, player.DisplayName, 18, C.Text, {
 	Font = Style.FontTitle,
 	Position = UDim2.fromOffset(x0, 8),
-	Size = UDim2.new(1, -x0 - 10, 0, 20),
+	Size = UDim2.new(1, -x0 - 96, 0, 22),
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextTruncate = Enum.TextTruncate.AtEnd,
 	ZIndex = 6,
 })
-local _ = nameLabel
-local classIcon = Icons.Make(profile, "user", 15, C.Gold, 7)
-classIcon.Position = UDim2.fromOffset(x0, 32)
-local classLabel = Style.Label(profile, "", 13, C.Gold, {
-	Position = UDim2.fromOffset(x0 + 20, 31),
-	Size = UDim2.new(1, -x0 - 30, 0, 16),
+-- the crown right after the name
+local crown = Icons.Make(profile, "crown", 16, C.Gold, 7)
+local function placeCrown()
+	crown.Position = UDim2.fromOffset(x0 + math.min(nameLabel.TextBounds.X, nameLabel.AbsoluteSize.X) + 6, 11)
+end
+nameLabel:GetPropertyChangedSignal("TextBounds"):Connect(placeCrown)
+task.defer(placeCrown)
+-- class and title under the name
+local classLabel = Style.Label(profile, "", 12, C.Muted, {
+	Position = UDim2.fromOffset(x0, 32),
+	Size = UDim2.new(1, -x0 - 12, 0, 16),
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextTruncate = Enum.TextTruncate.AtEnd,
-	RichText = true,
 	ZIndex = 6,
 })
+-- the best open gate rank as a pill on the right ("Ранг D")
+local rankPill = Style.Panel(profile, {
+	Name = "RankPill",
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, -10, 0, 9),
+	Size = UDim2.fromOffset(78, 24),
+	ZIndex = 7,
+	Fill = C.PanelDark,
+	Transparency = 0,
+	Border = C.Gold,
+	Cut = 6,
+	Thickness = 1.5,
+})
+local rankLabel = Style.Label(rankPill, "", 13, C.Gold, { Font = Style.FontTitle, Size = UDim2.fromScale(1, 1), ZIndex = 8 })
+-- the cyan XP bar with "XP a / b" (sheet 02)
 local xpTrack, xpFill = Style.Bar(profile, {
 	Position = UDim2.fromOffset(x0, 56),
-	Size = UDim2.new(1, -x0 - 12, 0, 7),
-	Color = C.Xp,
+	Size = UDim2.new(1, -x0 - 12, 0, 8),
+	Color = C.Cyan,
 	ZIndex = 6,
 })
 local _ = xpTrack
-local xpText = Style.Label(profile, "", 11, C.Muted, {
-	Position = UDim2.fromOffset(x0, 66),
-	Size = UDim2.new(1, -x0 - 12, 0, 13),
-	TextXAlignment = Enum.TextXAlignment.Right,
+local xpText = Style.Label(profile, "", 11, C.Text, {
+	Position = UDim2.fromOffset(x0, 67),
+	Size = UDim2.new(1, -x0 - 12, 0, 14),
+	TextXAlignment = Enum.TextXAlignment.Left,
 	ZIndex = 6,
 })
+
+local function bestRank(): string?
+	local ranks = decode("GateRanks")
+	local best
+	if type(ranks) == "table" then
+		for _, rank in ipairs(Config.Gates.Ranks) do
+			if ranks[rank] then
+				best = rank
+			end
+		end
+	end
+	return best
+end
 
 local function refreshProfile()
 	local level = player:GetAttribute("Level") or 1
 	local xp = player:GetAttribute("Xp") or 0
 	local xpNext = math.max(1, player:GetAttribute("XpNext") or 100)
-	levelLabel.Text = tostring(level)
+	levelLabel.Text = "Ур. " .. level
 	Style.Tween(xpFill, 0.3, { Size = UDim2.fromScale(math.clamp(xp / xpNext, 0, 1), 1) })
-	xpText.Text = ("%s / %s XP"):format(Format.Number(xp), Format.Number(xpNext))
+	xpText.Text = ("XP  %s / %s"):format(Format.Number(xp), Format.Number(xpNext))
 	local classId = player:GetAttribute("Class") or ""
-	local classDef = Config.Classes and Config.ClassById and Config.ClassById[classId]
+	local classDef = Config.ClassById and Config.ClassById[classId]
 	local rank = Config.RankFor(level)
-	Icons.Set(classIcon, if classDef then classDef.Icon else "user", C.Gold)
-	local hex = string.format("#%02X%02X%02X", C.Muted.R * 255, C.Muted.G * 255, C.Muted.B * 255)
 	local title = player:GetAttribute("Title")
 	local shown = if type(title) == "string" and title ~= "" then title else rank.Name
-	classLabel.Text = (if classDef then Style.Upper(classDef.Name) else Style.Upper(T.NoClass)) .. ('  <font color="%s">%s</font>'):format(hex, shown)
+	classLabel.Text = (if classDef then classDef.Name else T.NoClass) .. "  ·  " .. shown
+	local gate = bestRank()
+	rankPill.Visible = gate ~= nil
+	if gate then
+		rankLabel.Text = "Ранг " .. gate
+		local color = Config.HubIsland.GateRing.RankColors[gate] or C.Gold
+		rankLabel.TextColor3 = color
+	end
 end
-for _, attribute in ipairs({ "Level", "Xp", "XpNext", "Class", "Title" }) do
+for _, attribute in ipairs({ "Level", "Xp", "XpNext", "Class", "Title", "GateRanks" }) do
 	player:GetAttributeChangedSignal(attribute):Connect(refreshProfile)
 end
 refreshProfile()
@@ -553,25 +593,7 @@ end)
 -- Top right: settings, sound
 ---------------------------------------------------------------------
 
-local topRight = Instance.new("Frame")
-topRight.Name = "TopRight"
-topRight.AnchorPoint = Vector2.new(1, 0)
-topRight.Position = UDim2.new(1, -14, 0, 10)
-topRight.Size = UDim2.fromOffset(96, 42)
-topRight.BackgroundTransparency = 1
-topRight.Parent = Style.Gui
-local trLayout = Instance.new("UIListLayout")
-trLayout.FillDirection = Enum.FillDirection.Horizontal
-trLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-trLayout.Padding = UDim.new(0, 6)
-trLayout.SortOrder = Enum.SortOrder.LayoutOrder
-trLayout.Parent = topRight
-
-local soundButton, soundApi = Style.IconButton(topRight, { Name = "Sound", Icon = "sound", Size = 42, LayoutOrder = 2, ZIndex = 6 })
-soundButton.Activated:Connect(function()
-	local on = Settings.ToggleSound()
-	Icons.Set(soundApi.Icon, if on then "sound" else "mute", if on then C.Text else C.Muted)
-end)
+-- (sound and music: the Settings window)
 
 ---------------------------------------------------------------------
 -- Bottom center: HP + ability slots
@@ -748,54 +770,67 @@ end
 -- Bottom left: credits and Кристаллы
 ---------------------------------------------------------------------
 
-local credits = Style.Panel(Style.Gui, {
-	Name = "Credits",
-	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -66, 0, 10),
-	Size = UDim2.fromOffset(250, 42),
-	ZIndex = 5,
-	Border = C.Line,
-	Cut = 8,
-})
-local creditsIcon = Icons.Make(credits, "credits", 24, C.Gold, 6)
-creditsIcon.AnchorPoint = Vector2.new(0, 0.5)
-creditsIcon.Position = UDim2.new(0, 12, 0.5, 0)
-local creditsValue = Style.Label(credits, "0", 19, C.Text, {
-	Font = Style.FontTitle,
-	Position = UDim2.fromOffset(44, 0),
-	Size = UDim2.fromOffset(100, 42),
-	TextXAlignment = Enum.TextXAlignment.Left,
-	ZIndex = 6,
-})
-local creditsScale = Instance.new("UIScale")
-creditsScale.Parent = creditsValue
-local lastCredits = player:GetAttribute("Credits") or 0
-local function refreshCredits()
-	local value = player:GetAttribute("Credits") or 0
-	creditsValue.Text = Format.Number(value)
-	if value > lastCredits then
-		creditsScale.Scale = 1.15
-		Style.Tween(creditsScale, 0.25, { Scale = 1 })
+-- The wallet, top right (sheet 02): three pills - Нано-кредиты,
+-- Нано-ядра, Кристаллы - each with its value and a gold "+" (opens the
+-- shop on the matching tab).
+local walletBar = Instance.new("Frame")
+walletBar.Name = "Wallet"
+walletBar.AnchorPoint = Vector2.new(1, 0)
+walletBar.Position = UDim2.new(1, -14, 0, 10)
+walletBar.Size = UDim2.fromOffset(3 * 156 + 2 * 8, 40)
+walletBar.BackgroundTransparency = 1
+walletBar.Parent = Style.Gui
+local walletLayout = Instance.new("UIListLayout")
+walletLayout.FillDirection = Enum.FillDirection.Horizontal
+walletLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+walletLayout.Padding = UDim.new(0, 8)
+walletLayout.SortOrder = Enum.SortOrder.LayoutOrder
+walletLayout.Parent = walletBar
+
+local function walletPill(order: number, icon: string, color: Color3, attribute: string, tab: string)
+	local pill = Style.Panel(walletBar, {
+		Name = attribute,
+		LayoutOrder = order,
+		Size = UDim2.fromOffset(156, 40),
+		ZIndex = 5,
+		Border = C.GoldDim,
+		Cut = 8,
+	})
+	local mark = Icons.Make(pill, icon, 24, color, 6)
+	mark.AnchorPoint = Vector2.new(0, 0.5)
+	mark.Position = UDim2.new(0, 10, 0.5, 0)
+	local value = Style.Label(pill, "0", 18, C.Text, {
+		Font = Style.FontTitle,
+		Position = UDim2.fromOffset(40, 0),
+		Size = UDim2.new(1, -82, 1, 0),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 6,
+	})
+	local plus = Style.IconButton(pill, { Icon = "plus", Size = 30, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -5, 0.5, 0), ZIndex = 7, Cut = 5 })
+	plus.Activated:Connect(function()
+		Store.Open(tab)
+	end)
+	local scale = Instance.new("UIScale")
+	scale.Parent = value
+	local last = player:GetAttribute(attribute) or 0
+	local function refreshValue()
+		local v = player:GetAttribute(attribute) or 0
+		value.Text = Format.Number(v)
+		if v > last then
+			scale.Scale = 1.15
+			Style.Tween(scale, 0.25, { Scale = 1 })
+		end
+		last = v
 	end
-	lastCredits = value
+	player:GetAttributeChangedSignal(attribute):Connect(refreshValue)
+	refreshValue()
+	return pill
 end
-player:GetAttributeChangedSignal("Credits"):Connect(refreshCredits)
-refreshCredits()
-local crystalsIcon = Icons.Make(credits, "crystal", 22, Config.Crystals.Color, 6)
-crystalsIcon.AnchorPoint = Vector2.new(0, 0.5)
-crystalsIcon.Position = UDim2.new(0, 152, 0.5, 0)
-local crystalsValue = Style.Label(credits, "0", 19, C.Text, {
-	Font = Style.FontTitle,
-	Position = UDim2.fromOffset(180, 0),
-	Size = UDim2.fromOffset(64, 42),
-	TextXAlignment = Enum.TextXAlignment.Left,
-	ZIndex = 6,
-})
-local function refreshCrystals()
-	crystalsValue.Text = Format.Number(player:GetAttribute("Crystals") or 0)
-end
-player:GetAttributeChangedSignal("Crystals"):Connect(refreshCrystals)
-refreshCrystals()
+local credits = walletPill(1, "credits", C.Gold, "Credits", "Market")
+walletPill(2, "core", C.Cyan, "Cores", "Market")
+walletPill(3, "crystal", Config.Crystals.Color, "Crystals", "Crystals")
+local _ = credits
 
 -- Playtime gift (EngageService): above the wallet, the next gift and a
 -- timer; when ready it glows gold and a click claims it.

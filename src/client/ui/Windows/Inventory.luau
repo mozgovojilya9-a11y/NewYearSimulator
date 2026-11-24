@@ -31,11 +31,12 @@ local remote = ReplicatedStorage:WaitForChild("Items")
 
 local Inventory = {}
 
-local window = Window.new("Инвентарь", nil, Vector2.new(900, 540), "bag")
+local window = Window.new("Инвентарь", nil, Vector2.new(960, 560), "bag")
 local content = window.Content
 
 local SLOTS = { "Weapon", "Helmet", "Chest", "Legs" }
 local SLOT_NAMES = { Weapon = "Оружие", Helmet = "Шлем", Chest = "Нагрудник", Legs = "Поножи" }
+local SLOT_ICONS = { Weapon = "sword", Helmet = "helmet", Chest = "armor", Legs = "legs" }
 local CLASS_NAMES = { Any = "любой класс" }
 for _, class in ipairs(Config.Classes) do
 	CLASS_NAMES[class.Id] = class.Name
@@ -83,12 +84,13 @@ end
 -- Left: worn slots
 ---------------------------------------------------------------------
 
-local LEFT, RIGHT = 250, 258
-local SLOT = 66
--- the paper doll (sheet 02): the player's character turning slowly in the
--- middle, the four worn slots around it
+local LEFT = 320
+local SLOT = 70
+-- the paper doll (sheet 02): the player's character turning slowly on a
+-- gold pedestal in the middle, the worn slots around it (rarity frames),
+-- the three artifact slots under it
 local DOLL_H = 300
-local SLOT_AT = { Weapon = { 0, 18 }, Chest = { 0, 18 + SLOT + 14 }, Helmet = { LEFT - SLOT, 18 }, Legs = { LEFT - SLOT, 18 + SLOT + 14 } }
+local SLOT_AT = { Weapon = { 0, 20 }, Chest = { 0, 20 + SLOT + 26 }, Helmet = { LEFT - SLOT, 20 }, Legs = { LEFT - SLOT, 20 + SLOT + 26 } }
 local doll = Instance.new("ViewportFrame")
 doll.Name = "Doll"
 doll.Position = UDim2.fromOffset(SLOT - 6, 0)
@@ -103,16 +105,28 @@ local dollCamera = Instance.new("Camera")
 dollCamera.FieldOfView = 30
 dollCamera.Parent = doll
 doll.CurrentCamera = dollCamera
+-- the gold pedestal ring under the figure
 local pedestal = Instance.new("Frame")
 pedestal.AnchorPoint = Vector2.new(0.5, 1)
-pedestal.Position = UDim2.new(0, LEFT / 2, 0, DOLL_H - 6)
-pedestal.Size = UDim2.fromOffset(110, 14)
+pedestal.Position = UDim2.new(0, LEFT / 2, 0, DOLL_H - 4)
+pedestal.Size = UDim2.fromOffset(170, 20)
 pedestal.BackgroundColor3 = C.Gold
-pedestal.BackgroundTransparency = 0.55
+pedestal.BackgroundTransparency = 0.92
 pedestal.BorderSizePixel = 0
 pedestal.ZIndex = 32
 pedestal.Parent = content
 Style.Corner(pedestal, UDim.new(1, 0))
+Style.Stroke(pedestal, 2, C.Gold).LineJoinMode = Enum.LineJoinMode.Round
+local pedestalCore = Instance.new("Frame")
+pedestalCore.AnchorPoint = Vector2.new(0.5, 0.5)
+pedestalCore.Position = UDim2.fromScale(0.5, 0.5)
+pedestalCore.Size = UDim2.new(0.62, 0, 0.5, 0)
+pedestalCore.BackgroundColor3 = C.Gold
+pedestalCore.BackgroundTransparency = 0.8
+pedestalCore.BorderSizePixel = 0
+pedestalCore.ZIndex = 32
+pedestalCore.Parent = pedestal
+Style.Corner(pedestalCore, UDim.new(1, 0))
 local dollModel, dollAngle = nil, 0
 local function rebuildDoll()
 	if dollModel then
@@ -144,7 +158,7 @@ local function rebuildDoll()
 	dollModel = copy
 	local box, size = copy:GetBoundingBox()
 	local look = box.Position
-	dollCamera.CFrame = CFrame.lookAt(look + Vector3.new(0, size.Y * 0.05, size.Y * 2.9), look)
+	dollCamera.CFrame = CFrame.lookAt(look + Vector3.new(0, size.Y * 0.05, size.Y * 2.3), look)
 end
 game:GetService("RunService").RenderStepped:Connect(function(dt)
 	if dollModel and window.IsOpen() then
@@ -165,7 +179,11 @@ for index, slot in ipairs(SLOTS) do
 	card.Text = ""
 	card.ZIndex = 33
 	card.Parent = content
-	local _, shape = Style.Panel(card, { Size = UDim2.fromScale(1, 1), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33 })
+	local _, shape = Style.Panel(card, { Size = UDim2.fromScale(1, 1), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33, Thickness = 2 })
+	-- a dim slot icon while the slot is empty
+	local hint = Icons.Make(card, SLOT_ICONS[slot], 30, C.Line, 34)
+	hint.AnchorPoint = Vector2.new(0.5, 0.5)
+	hint.Position = UDim2.fromScale(0.5, 0.5)
 	local icon = Instance.new("Frame")
 	icon.Position = UDim2.fromOffset(4, 4)
 	icon.Size = UDim2.fromOffset(SLOT - 8, SLOT - 8)
@@ -176,7 +194,8 @@ for index, slot in ipairs(SLOTS) do
 	Style.Label(card, Style.Upper(SLOT_NAMES[slot]), 10, C.Muted, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, 1), Size = UDim2.new(1, 10, 0, 12), ZIndex = 35 })
 	local name = Style.Label(card, "", 1, C.Text, { Visible = false, ZIndex = 35 })
 	local stat = Style.Label(card, "", 1, C.Gold, { Visible = false, ZIndex = 35 })
-	slotCards[slot] = { icon = icon, name = name, stat = stat, shape = shape, shown = nil }
+	local plusN = Style.Label(card, "", 12, C.Gold, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -4, 1, -2), Size = UDim2.fromOffset(30, 14), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 38 })
+	slotCards[slot] = { icon = icon, name = name, stat = stat, shape = shape, hint = hint, plusN = plusN, shown = nil }
 	card.Activated:Connect(function()
 		local worn = PlayerData.Worn(slot)
 		if worn then
@@ -186,11 +205,56 @@ for index, slot in ipairs(SLOTS) do
 		refresh()
 	end)
 end
-local totals = Style.Panel(content, { Position = UDim2.fromOffset(0, DOLL_H + 8), Size = UDim2.new(0, LEFT, 1, -(DOLL_H + 8)), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33 })
+-- the three artifact slots under the figure (sheet 02); a click opens Артефакты
+local ART = 56
+local artSlots = {}
+for i = 1, Config.Artifacts.Slots do
+	local card = Instance.new("TextButton")
+	card.Name = "Artifact" .. i
+	card.AnchorPoint = Vector2.new(0.5, 0)
+	card.Position = UDim2.new(0, LEFT / 2 + (i - (Config.Artifacts.Slots + 1) / 2) * (ART + 14), 0, DOLL_H + 4)
+	card.Size = UDim2.fromOffset(ART, ART)
+	card.BackgroundTransparency = 1
+	card.AutoButtonColor = false
+	card.Text = ""
+	card.ZIndex = 33
+	card.Parent = content
+	local _, shape = Style.Panel(card, { Size = UDim2.fromScale(1, 1), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33, Thickness = 2 })
+	local holder = Instance.new("Frame")
+	holder.Size = UDim2.fromScale(1, 1)
+	holder.BackgroundTransparency = 1
+	holder.ZIndex = 34
+	holder.Parent = card
+	artSlots[i] = { shape = shape, holder = holder, shown = nil }
+	card.Activated:Connect(function()
+		require(script.Parent.Artifacts).Open()
+	end)
+end
+local function refreshArtifacts()
+	local state = PlayerData.Table("Artifacts")
+	local owned = if type(state.Owned) == "table" then state.Owned else {}
+	for i, ui in ipairs(artSlots) do
+		local id = (type(state.Slots) == "table" and state.Slots[i]) or ""
+		local def = Config.ArtifactById[id]
+		local has = def ~= nil and owned[id] ~= nil
+		local color = if has then (Config.Rarity[def.Rarity] or Config.Rarity.Rare).Color else C.Line
+		ui.shape.SetBorder(color)
+		local key = if has then id else ""
+		if ui.shown ~= key then
+			ui.shown = key
+			ui.holder:ClearAllChildren()
+			local icon = Icons.Make(ui.holder, if has then def.Icon or "star" else "gem", 28, if has then color else C.Line, 35)
+			icon.AnchorPoint = Vector2.new(0.5, 0.5)
+			icon.Position = UDim2.fromScale(0.5, 0.5)
+		end
+	end
+end
+
+local totals = Style.Panel(content, { Position = UDim2.fromOffset(0, DOLL_H + ART + 12), Size = UDim2.new(0, LEFT, 1, -(DOLL_H + ART + 12)), Fill = C.PanelDark, Border = C.Line, Cut = 8, ZIndex = 33 })
 local scoreLabel = Style.Label(totals, "", 15, C.Gold, { Position = UDim2.fromOffset(10, 8), Size = UDim2.new(1, -20, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
 local setLabel = Style.Label(totals, "", 11, C.Muted, { Position = UDim2.fromOffset(10, 28), Size = UDim2.new(1, -20, 0, 44), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 34 })
-local moneyLabel = Style.Label(totals, "", 13, C.Text, { Position = UDim2.fromOffset(10, 76), Size = UDim2.new(1, -20, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
-local countLabel = Style.Label(totals, "", 12, C.Muted, { Position = UDim2.fromOffset(10, 94), Size = UDim2.new(1, -20, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34 })
+local moneyLabel = Style.Label(totals, "", 1, C.Text, { Visible = false, ZIndex = 34 }) -- the wallet is in the HUD now
+local countLabel = Style.Label(totals, "", 12, C.Muted, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 9), Size = UDim2.new(0.5, 0, 0, 16), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 34 })
 
 ---------------------------------------------------------------------
 -- Center: filters, sort, mass salvage, grid
@@ -198,35 +262,36 @@ local countLabel = Style.Label(totals, "", 12, C.Muted, { Position = UDim2.fromO
 
 local center = Instance.new("Frame")
 center.Position = UDim2.fromOffset(LEFT + 12, 0)
-center.Size = UDim2.new(1, -(LEFT + RIGHT + 24), 1, 0)
+center.Size = UDim2.new(1, -(LEFT + 12), 1, 0)
 center.BackgroundTransparency = 1
 center.ZIndex = 32
 center.Parent = content
 
-local FILTERS = { { "All", "Все" }, { "Weapon", "Оружие" }, { "Helmet", "Шлем" }, { "Chest", "Нагр." }, { "Legs", "Поножи" } }
+-- filter chips as icons (sheet 02), then sorting and mass salvage
+local FILTERS = { { "All", "all" }, { "Weapon", "sword" }, { "Helmet", "helmet" }, { "Chest", "armor" }, { "Legs", "legs" } }
 local filterButtons = {}
 for i, def in ipairs(FILTERS) do
-	local button, setColor = Style.Button(center, { Position = UDim2.new((i - 1) / #FILTERS, 0, 0, 0), Size = UDim2.new(1 / #FILTERS, -4, 0, 28), Text = def[2], TextSize = 12, Color = C.Card, ZIndex = 34 })
-	filterButtons[def[1]] = setColor
+	local button, api = Style.IconButton(center, { Icon = def[2], Size = 38, Position = UDim2.fromOffset((i - 1) * 44, 0), ZIndex = 34, Cut = 6 })
+	filterButtons[def[1]] = api
 	button.Activated:Connect(function()
 		filter = def[1]
 		refresh()
 	end)
 end
-local sortButton = Style.Button(center, { Position = UDim2.fromOffset(0, 34), Size = UDim2.new(0.5, -4, 0, 28), Text = "", TextSize = 12, Color = C.Card, ZIndex = 34 })
+local sortButton = Style.Button(center, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -46, 0, 0), Size = UDim2.fromOffset(150, 38), Text = "", TextSize = 12, Color = C.Card, Icon = "sort", ZIndex = 34 })
 sortButton.Activated:Connect(function()
 	sortMode = sortMode % #SORTS + 1
 	refresh()
 end)
-local salvageButton = Style.Button(center, { Position = UDim2.new(0.5, 0, 0, 34), Size = UDim2.new(0.5, -4, 0, 28), Text = "Разобрать по редкости", TextSize = 12, Color = C.Card, ZIndex = 34 })
+local salvageButton = Style.IconButton(center, { Icon = "recycle", Size = 38, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), ZIndex = 34, Cut = 6 })
 
 local gridHolder = Instance.new("Frame")
-gridHolder.Position = UDim2.fromOffset(0, 68)
-gridHolder.Size = UDim2.new(1, 0, 1, -68)
+gridHolder.Position = UDim2.fromOffset(0, 48)
+gridHolder.Size = UDim2.new(1, 0, 1, -48)
 gridHolder.BackgroundTransparency = 1
 gridHolder.ZIndex = 32
 gridHolder.Parent = center
-local CELL = 68
+local CELL = 78
 local grid = Window.Grid(gridHolder, UDim2.fromOffset(CELL, CELL), 6)
 local empty = Style.Label(gridHolder, "Пусто. Предметы падают с роботов во Вратах.", 14, C.Muted, { Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 0, 40), TextWrapped = true, ZIndex = 33 })
 
@@ -277,7 +342,7 @@ local function cellFor(view)
 end
 
 -- mass salvage overlay
-local overlay = Style.Panel(center, { Position = UDim2.fromOffset(0, 66), Size = UDim2.new(1, 0, 0, 236), Fill = C.PanelDark, Transparency = 0.02, Border = C.GoldDim, Cut = 8, ZIndex = 40, Visible = false })
+local overlay = Style.Panel(center, { Position = UDim2.fromOffset(0, 46), Size = UDim2.new(1, 0, 0, 236), Fill = C.PanelDark, Transparency = 0.02, Border = C.GoldDim, Cut = 8, ZIndex = 40, Visible = false })
 Style.Label(overlay, "РАЗОБРАТЬ ВСЁ ЭТОЙ РЕДКОСТИ И НИЖЕ", 12, C.Gold, { Position = UDim2.fromOffset(10, 8), Size = UDim2.new(1, -20, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 41 })
 Style.Label(overlay, "Надетые, под замком и заточенные предметы не трогаем.", 11, C.Muted, { Position = UDim2.fromOffset(10, 26), Size = UDim2.new(1, -20, 0, 14), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 41 })
 local overlayRows = {}
@@ -326,14 +391,20 @@ end
 -- Right: the selected item
 ---------------------------------------------------------------------
 
-local details = Style.Panel(content, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.new(0, RIGHT, 1, 0), Fill = C.PanelDark, Border = C.Line, Cut = 10, ZIndex = 33 })
+-- the selected item: a card floating over the grid (sheet 02 tooltip)
+local details, detailsShape = Style.Panel(content, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -6, 1, -6), Size = UDim2.fromOffset(300, 352), Fill = C.PanelDark, Transparency = 0.02, Border = C.Gold, Cut = 10, ZIndex = 44, Thickness = 2 })
+for _, d in ipairs({ details }) do
+	d.ZIndex = 44
+end
+local plusBig = Style.Label(details, "", 24, C.Gold, { Font = Style.FontTitle, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -44, 0, 10), Size = UDim2.fromOffset(60, 28), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 46 })
+local closeCard = Style.IconButton(details, { Icon = "close", Size = 28, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 8), ZIndex = 47, Cut = 5 })
 local iconHolder = Instance.new("Frame")
 iconHolder.Position = UDim2.fromOffset(12, 12)
 iconHolder.Size = UDim2.fromOffset(84, 84)
 iconHolder.BackgroundTransparency = 1
 iconHolder.ZIndex = 34
 iconHolder.Parent = details
-local dName = Style.Label(details, "", 16, C.Text, { Position = UDim2.fromOffset(104, 12), Size = UDim2.new(1, -114, 0, 38), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 35 })
+local dName = Style.Label(details, "", 16, C.Text, { Position = UDim2.fromOffset(104, 12), Size = UDim2.new(1, -170, 0, 38), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 35 })
 local dRarity = Style.Label(details, "", 12, C.Muted, { Position = UDim2.fromOffset(104, 52), Size = UDim2.new(1, -114, 0, 14), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
 local dLevel = Style.Label(details, "", 12, C.Muted, { Position = UDim2.fromOffset(104, 68), Size = UDim2.new(1, -114, 0, 14), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
 local dClass = Style.Label(details, "", 12, C.Muted, { Position = UDim2.fromOffset(104, 84), Size = UDim2.new(1, -114, 0, 14), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
@@ -347,7 +418,21 @@ local dCompare = Style.Label(details, "", 11, C.Muted, { AnchorPoint = Vector2.n
 local equipButton, equipColor = Style.Button(details, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -50), Size = UDim2.new(1, -66, 0, 36), Text = "Надеть", TextSize = 15, Color = C.Gold, ZIndex = 35 })
 local lockButton, lockApi = Style.IconButton(details, { Icon = "lock", Size = 36, AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -12, 1, -50), ZIndex = 35, Cut = 6 })
 local scrapButton = Style.Button(details, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -10), Size = UDim2.new(1, -24, 0, 32), Text = "", TextSize = 13, Color = C.Card, ZIndex = 35 })
-local dEmpty = Style.Label(details, "Выбери предмет", 14, C.Muted, { Position = UDim2.fromOffset(0, 160), Size = UDim2.new(1, 0, 0, 20), ZIndex = 35 })
+local dEmpty = Style.Label(details, "", 1, C.Muted, { Visible = false, ZIndex = 35 })
+closeCard.Activated:Connect(function()
+	selected = nil
+	refresh()
+end)
+
+-- the card floats over the grid: everything in it is drawn above the cells
+local function lift(root: Instance)
+	for _, d in ipairs(root:GetDescendants()) do
+		if d:IsA("GuiObject") and d.ZIndex < 44 then -- the card's own body / frame is at 44
+			d.ZIndex += 12
+		end
+	end
+end
+lift(details)
 
 local scrapArmed = false
 equipButton.Activated:Connect(function()
@@ -401,7 +486,8 @@ local shownIcon
 local function showDetails()
 	local view = PlayerData.Items()[selected or ""]
 	local has = view ~= nil
-	dEmpty.Visible = not has
+	details.Visible = has
+	dEmpty.Visible = false
 	for _, o in ipairs({ dName, dRarity, dLevel, dClass, dCompare, equipButton, lockButton, scrapButton, iconHolder }) do
 		o.Visible = has
 	end
@@ -418,9 +504,12 @@ local function showDetails()
 		shownIcon = iconKey
 		iconHolder:ClearAllChildren()
 		ItemIcon.Create(iconHolder, view.Kind, view, UDim2.fromScale(1, 1), UDim2.new())
+		lift(iconHolder)
 	end
-	dName.Text = view.Name
+	dName.Text = view.BaseName or view.Name
 	dName.TextColor3 = rarity.Color
+	plusBig.Text = if view.Enhance > 0 then "+" .. view.Enhance else ""
+	detailsShape.SetBorder(rarity.Color)
 	dRarity.Text = rarity.Name .. "  •  " .. SLOT_NAMES[view.Slot]
 	dRarity.TextColor3 = rarity.Color
 	dLevel.Text = Config.Items.Texts.Level:format(view.ItemLevel)
@@ -496,6 +585,9 @@ function refresh()
 				ItemIcon.Create(ui.icon, view.Kind, Items.LookFor(view, player:GetAttribute("Class")), UDim2.fromScale(1, 1), UDim2.new())
 			end
 		end
+		ui.hint.Visible = view == nil
+		ui.plusN.Text = if view and view.Enhance > 0 then "+" .. view.Enhance else ""
+		ui.shape.SetBorder(if view then (Config.Rarity[view.Rarity] or Config.Rarity.Common).Color else C.Line)
 		if view then
 			ui.name.Text = view.Name
 			ui.name.TextColor3 = (Config.Rarity[view.Rarity] or Config.Rarity.Common).Color
@@ -539,6 +631,7 @@ function refresh()
 			setLabel.TextColor3 = C.Muted
 		end
 	end
+	refreshArtifacts()
 	moneyLabel.Text = ("%s кр.   •   %s ядер"):format(Format.Number(player:GetAttribute("Credits") or 0), Format.Number(player:GetAttribute("Cores") or 0))
 
 	-- grid
@@ -550,9 +643,9 @@ function refresh()
 			table.insert(list, view)
 		end
 	end
-	countLabel.Text = ("Предметов: %d / %d"):format(total, Config.Items.MaxInventory)
+	countLabel.Text = ("%d / %d"):format(total, Config.Items.MaxInventory)
 	local sort = SORTS[sortMode]
-	sortButton.Text = "Сортировка: " .. sort.Name
+	sortButton.Text = sort.Name
 	table.sort(list, function(a, b)
 		local ka, kb = sort.Key(a), sort.Key(b)
 		if ka ~= kb then
@@ -560,8 +653,8 @@ function refresh()
 		end
 		return a.Uid < b.Uid
 	end)
-	for id, setColor in pairs(filterButtons) do
-		setColor(if id == filter then C.Gold else C.Card)
+	for id, api in pairs(filterButtons) do
+		api.SetActive(id == filter)
 	end
 	local alive = {}
 	for order, view in ipairs(list) do
@@ -602,7 +695,7 @@ function refresh()
 	showDetails()
 end
 
-PlayerData.Changed({ "Items", "Equipped", "Cores", "Credits", "ArmorSet", "Stat_GearScore", "Class" }, function()
+PlayerData.Changed({ "Items", "Equipped", "Cores", "Credits", "ArmorSet", "Stat_GearScore", "Class", "Artifacts" }, function()
 	if window.IsOpen() then
 		refresh()
 	end
