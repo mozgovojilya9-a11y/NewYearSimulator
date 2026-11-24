@@ -1679,7 +1679,7 @@ Config.ArmorSets = {
 		Style = { Kind = "Nexus", Main = Color3.fromRGB(34, 26, 52), Trim = Color3.fromRGB(110, 70, 190), Glow = Color3.fromRGB(255, 61, 184), Visor = Color3.fromRGB(255, 61, 184), Material = Enum.Material.Metal } },
 	Orbit = { Name = "Орбитальный сет", Biome = 5, Rarity = "Legendary", Health = 220, Defense = 0.1, Bonus = 0.6, ItemLevel = 145,
 		Set2 = { HealthPct = 0.12, Luck = 0.15 }, Set3 = { DamagePct = 0.4, CritChance = 0.06, DropChance = 0.03 },
-		Style = { Kind = "Nexus", Main = Color3.fromRGB(230, 226, 236), Trim = Color3.fromRGB(226, 182, 92), Glow = Color3.fromRGB(255, 201, 60), Visor = Color3.fromRGB(255, 201, 60), Material = Enum.Material.Metal } },
+		Style = { Kind = "Orbit", Main = Color3.fromRGB(230, 226, 236), Trim = Color3.fromRGB(226, 182, 92), Glow = Color3.fromRGB(255, 201, 60), Visor = Color3.fromRGB(255, 201, 60), Material = Enum.Material.Metal } },
 	-- Robux exclusive (Config.Products "ArmorRoyal")
 	Royal = { Name = "Королевский сет", Rarity = "Legendary", Health = 70, Defense = 0.06, Bonus = 0.28, ItemLevel = 60, Robux = true,
 		Set2 = { Luck = 0.15 }, Set3 = { DamagePct = 0.2, XpPct = 0.15 },

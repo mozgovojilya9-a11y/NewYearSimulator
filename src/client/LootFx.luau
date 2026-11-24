@@ -171,7 +171,7 @@ local function spawnItem(id: number, instance, position: Vector3)
 		if view.Kind == "Weapon" then
 			return WeaponBuilder.Build(view)
 		end
-		return ArmorBuilder.Build(view)
+		return ArmorBuilder.Build(view, game:GetService("Players").LocalPlayer:GetAttribute("Class"))
 	end)
 	if ok and model then
 		still(model)

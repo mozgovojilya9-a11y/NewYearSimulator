@@ -21,7 +21,7 @@ local function buildFor(category: string, item)
 		WeaponBuilder.SetAnchored(model, true)
 		return model
 	elseif category == "Armor" then
-		return ArmorBuilder.Build(item)
+		return ArmorBuilder.Build(item, game:GetService("Players").LocalPlayer:GetAttribute("Class"))
 	end
 	return nil
 end

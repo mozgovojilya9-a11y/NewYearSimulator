@@ -101,10 +101,67 @@ local function refreshWeapon(player, character)
 	refreshShield(player, character)
 end
 
+-- Armor replaces the avatar's own clothes and accessories where it sits
+-- (a costume made of layered clothing would cover the armor): helmet ->
+-- hats / hair / face, chest -> jackets, shirts, shoulder and back items,
+-- legs -> pants and shoes. Taking the armor off shows them again.
+local ACCESSORY_SLOT = {
+	[Enum.AccessoryType.Hat] = "Helmet", [Enum.AccessoryType.Hair] = "Helmet", [Enum.AccessoryType.Face] = "Helmet",
+	[Enum.AccessoryType.Eyebrow] = "Helmet", [Enum.AccessoryType.Eyelash] = "Helmet",
+	[Enum.AccessoryType.Neck] = "Chest", [Enum.AccessoryType.Shoulder] = "Chest", [Enum.AccessoryType.Front] = "Chest",
+	[Enum.AccessoryType.Back] = "Chest", [Enum.AccessoryType.Waist] = "Chest", [Enum.AccessoryType.Jacket] = "Chest",
+	[Enum.AccessoryType.Sweater] = "Chest", [Enum.AccessoryType.Shirt] = "Chest", [Enum.AccessoryType.TShirt] = "Chest",
+	[Enum.AccessoryType.Pants] = "Legs", [Enum.AccessoryType.Shorts] = "Legs", [Enum.AccessoryType.DressSkirt] = "Legs",
+	[Enum.AccessoryType.LeftShoe] = "Legs", [Enum.AccessoryType.RightShoe] = "Legs",
+}
+local ATTACHMENT_SLOT = {
+	HatAttachment = "Helmet", HairAttachment = "Helmet", FaceFrontAttachment = "Helmet", FaceCenterAttachment = "Helmet",
+	NeckAttachment = "Chest", BodyFrontAttachment = "Chest", BodyBackAttachment = "Chest", LeftCollarAttachment = "Chest",
+	RightCollarAttachment = "Chest", LeftShoulderAttachment = "Chest", RightShoulderAttachment = "Chest",
+	WaistFrontAttachment = "Chest", WaistBackAttachment = "Chest", WaistCenterAttachment = "Chest",
+	LeftFootAttachment = "Legs", RightFootAttachment = "Legs",
+}
+
+local function accessorySlot(accessory: Accessory): string?
+	local slot = ACCESSORY_SLOT[accessory.AccessoryType]
+	if slot then
+		return slot
+	end
+	local handle = accessory:FindFirstChild("Handle")
+	local attachment = handle and handle:FindFirstChildWhichIsA("Attachment")
+	return attachment and ATTACHMENT_SLOT[attachment.Name]
+end
+
+local function hideUnderArmor(player, character)
+	for _, accessory in ipairs(character:GetChildren()) do
+		if accessory:IsA("Accessory") then
+			local slot = accessorySlot(accessory)
+			local covered = slot ~= nil and PlayerState.ArmorIn(player, slot) ~= nil
+			for _, part in ipairs(accessory:GetDescendants()) do
+				if part:IsA("BasePart") then
+					local original = part:GetAttribute("ArmorOrigT")
+					if covered then
+						if original == nil then
+							part:SetAttribute("ArmorOrigT", part.Transparency)
+						end
+						part.Transparency = 1
+					elseif original ~= nil then
+						part.Transparency = original
+						part:SetAttribute("ArmorOrigT", nil)
+					end
+				end
+			end
+		end
+	end
+	-- classic shirts / pants stay under the armor anyway (the shells cover them)
+end
+
 local function refreshArmor(player, character)
 	for _, slot in ipairs(Config.ArmorSlots) do
 		local piece = PlayerState.ArmorIn(player, slot)
-		local key = if piece then piece.Id .. "|" .. (player:GetAttribute("Look" .. slot) or "") else ""
+		local classId = player:GetAttribute("Class") or ""
+		-- the look follows the item (rarity, enhance) and the class (silhouette)
+		local key = if piece then piece.Id .. "|" .. (player:GetAttribute("Look" .. slot) or "") .. "|" .. classId else ""
 		local name = "Armor_" .. slot
 		local old = character:FindFirstChild(name)
 		if not old or old:GetAttribute("LookKey") ~= key then
@@ -112,13 +169,14 @@ local function refreshArmor(player, character)
 				old:Destroy()
 			end
 			if piece then
-				local model = ArmorBuilder.Attach(character, piece)
+				local model = ArmorBuilder.Attach(character, piece, classId)
 				if model then
 					model:SetAttribute("LookKey", key)
 				end
 			end
 		end
 	end
+	hideUnderArmor(player, character)
 end
 
 -- Max health follows the armor; the current health keeps its share.
@@ -181,6 +239,7 @@ function EquipmentService.Init()
 			local character = onCharacter()
 			if character then
 				refreshWeapon(player, character)
+				refreshArmor(player, character) -- the armor silhouette follows the class
 			end
 		end)
 		for _, attribute in ipairs({ "EquippedWeapon", "LookWeapon" }) do
@@ -207,12 +266,22 @@ function EquipmentService.Init()
 				refreshHealth(player, character)
 			end
 		end)
+		local function watchAccessories(character)
+			-- avatar accessories arrive a bit later than the rig
+			character.ChildAdded:Connect(function(child)
+				if child:IsA("Accessory") then
+					task.defer(hideUnderArmor, player, character)
+				end
+			end)
+		end
 		player.CharacterAdded:Connect(function(character)
+			watchAccessories(character)
 			character:WaitForChild("HumanoidRootPart", 10)
 			task.wait(0.2) -- let the rig finish assembling
 			refreshAll(player)
 		end)
 		if player.Character then
+			watchAccessories(player.Character)
 			task.defer(refreshAll, player)
 		end
 	end
