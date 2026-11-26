@@ -15,6 +15,7 @@
 	The player attribute "RewardReady" drives the "!" badge.
 ]]
 
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -247,6 +248,16 @@ function ProgressionService.RefreshReady(player)
 		end
 	end
 	player:SetAttribute("RewardReady", ready == true)
+	-- the HUD quest tracker lists the daily quests (sheet 02: ЗАДАНИЯ with
+	-- check boxes): text, progress, done
+	local list = {}
+	for _, quest in ipairs(data[SETS.Daily.Field].List) do
+		local def = defIn(SETS.Daily, quest.Id)
+		if def then
+			table.insert(list, { Text = def.Text, Progress = math.min(quest.Progress, def.Target), Target = def.Target, Done = quest.Claimed or quest.Progress >= def.Target })
+		end
+	end
+	player:SetAttribute("DailyTracker", HttpService:JSONEncode(list))
 end
 
 local function status(player)

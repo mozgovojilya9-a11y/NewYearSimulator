@@ -384,17 +384,21 @@ refreshBadges()
 -- Quest tracker (left, under the bar)
 ---------------------------------------------------------------------
 
+-- sheet 02: "ЗАДАНИЯ (2/3)" with a fold arrow; rows with a check box,
+-- the quest title and its task with the progress. The story quest first,
+-- then the daily quests (DailyTracker). A click opens Задания.
+local TW, TROW = 270, 44
 local tracker = Style.Panel(Style.Gui, {
 	Name = "QuestTracker",
 	AnchorPoint = Vector2.new(1, 0),
 	Position = UDim2.new(1, -16, 0, U.TrackerTop),
-	Size = UDim2.fromOffset(250, 96),
+	Size = UDim2.fromOffset(TW, 36 + 3 * TROW),
 	ZIndex = 5,
-	Border = C.Line,
+	Border = C.GoldDim,
 	Cut = 8,
 })
 local trackerButton = Instance.new("TextButton")
-trackerButton.Size = UDim2.fromScale(1, 1)
+trackerButton.Size = UDim2.new(1, -40, 1, 0)
 trackerButton.BackgroundTransparency = 1
 trackerButton.Text = ""
 trackerButton.ZIndex = 9
@@ -402,17 +406,46 @@ trackerButton.Parent = tracker
 trackerButton.Activated:Connect(function()
 	actions.Quests.Open()
 end)
-local qIcon = Icons.Make(tracker, "quest", 14, C.Gold, 6)
-qIcon.Position = UDim2.fromOffset(10, 9)
-Style.Label(tracker, T.Quest, 11, C.Gold, { Position = UDim2.fromOffset(28, 8), Size = UDim2.new(1, -36, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6 })
-local qTitle = Style.Label(tracker, "", 15, C.Text, { Position = UDim2.fromOffset(10, 26), Size = UDim2.new(1, -20, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 6 })
-local qText = Style.Label(tracker, "", 12, C.Muted, { Position = UDim2.fromOffset(10, 46), Size = UDim2.new(1, -20, 0, 28), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 6 })
-local qTrack, qFill = Style.Bar(tracker, { Position = UDim2.fromOffset(10, 80), Size = UDim2.new(1, -64, 0, 5), Color = C.Gold, ZIndex = 6 })
-local _ = qTrack
-local qCount = Style.Label(tracker, "", 12, C.Text, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 74), Size = UDim2.fromOffset(48, 16), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 6 })
+local trackerTitle = Style.Label(tracker, T.Quest, 14, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(12, 6), Size = UDim2.new(1, -50, 0, 22), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6 })
+local folded = false
+local foldButton = Instance.new("TextButton")
+foldButton.AnchorPoint = Vector2.new(1, 0)
+foldButton.Position = UDim2.new(1, -6, 0, 4)
+foldButton.Size = UDim2.fromOffset(28, 26)
+foldButton.BackgroundTransparency = 1
+foldButton.Text = ""
+foldButton.ZIndex = 10
+foldButton.Parent = tracker
+local foldIcon = Icons.Make(foldButton, "chevron", 18, C.Gold, 11)
+foldIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+foldIcon.Position = UDim2.fromScale(0.5, 0.5)
+Style.Rule(tracker, { Position = UDim2.fromOffset(10, 31), Size = UDim2.new(1, -20, 0, 1), ZIndex = 6 })
+local questRows = {}
+for i = 1, 3 do
+	local row = Instance.new("Frame")
+	row.Position = UDim2.fromOffset(0, 34 + (i - 1) * TROW)
+	row.Size = UDim2.new(1, 0, 0, TROW)
+	row.BackgroundTransparency = 1
+	row.ZIndex = 6
+	row.Parent = tracker
+	local box = Instance.new("Frame")
+	box.Position = UDim2.fromOffset(12, 8)
+	box.Size = UDim2.fromOffset(18, 18)
+	box.BackgroundColor3 = C.CardDark
+	box.ZIndex = 6
+	box.Parent = row
+	local boxStroke = Style.Stroke(box, 1.5, C.Muted)
+	local check = Icons.Make(box, "check", 16, C.Green, 7)
+	check.AnchorPoint = Vector2.new(0.5, 0.5)
+	check.Position = UDim2.fromScale(0.5, 0.5)
+	local title = Style.Label(row, "", 13, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(38, 4), Size = UDim2.new(1, -48, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 6 })
+	local text = Style.Label(row, "", 11, C.Muted, { Position = UDim2.fromOffset(38, 22), Size = UDim2.new(1, -48, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 6 })
+	questRows[i] = { row = row, box = box, stroke = boxStroke, check = check, title = title, text = text }
+end
 
 local lastQuest, lastReady = nil, false
 local function refreshTracker()
+	local entries = {}
 	local q = decode("Tracker")
 	if type(q) == "table" and q.Title then
 		local ST = Config.System.Texts
@@ -422,21 +455,59 @@ local function refreshTracker()
 			SystemNotice.Show(ST.QuestDone, { q.Title }, "gold")
 		end
 		lastQuest, lastReady = q.Title, q.Ready == true
-		qTitle.Text = q.Title
-		qText.Text = q.Text or "" -- sheet 02: the quest with its task line
 		local target = math.max(1, tonumber(q.Target) or 1)
 		local progress = math.clamp(tonumber(q.Progress) or 0, 0, target)
-		qFill.Size = UDim2.fromScale(progress / target, 1)
-		qCount.Text = ("%d/%d"):format(progress, target)
-		qFill.Parent.Visible = true
-	else
-		qTitle.Text = T.NoQuest
-		qText.Text = ""
-		qCount.Text = ""
-		qFill.Parent.Visible = false
+		table.insert(entries, { Title = q.Title, Text = ("%s (%d/%d)"):format(q.Text or "", progress, target), Done = q.Ready == true })
 	end
+	local daily = decode("DailyTracker")
+	local done, total = 0, 0
+	if type(daily) == "table" then
+		for _, d in ipairs(daily) do
+			total += 1
+			if d.Done then
+				done += 1
+			end
+		end
+		-- unfinished first, so the tracker shows what is left to do
+		local sorted = table.clone(daily)
+		table.sort(sorted, function(a, b)
+			return (a.Done and 1 or 0) < (b.Done and 1 or 0)
+		end)
+		for _, d in ipairs(sorted) do
+			if #entries < 3 then
+				table.insert(entries, { Title = T.Daily or "Ежедневное", Text = ("%s (%d/%d)"):format(d.Text, d.Progress or 0, d.Target or 1), Done = d.Done == true })
+			end
+		end
+	end
+	trackerTitle.Text = ("%s (%d/%d)"):format(Style.Upper(T.QuestsTitle or "Задания"), done, total)
+	local shown = if folded then 0 else #entries
+	for i, ui in ipairs(questRows) do
+		local e = entries[i]
+		ui.row.Visible = e ~= nil and not folded
+		if e then
+			ui.title.Text = e.Title
+			ui.text.Text = e.Text
+			ui.check.Visible = e.Done
+			ui.stroke.Color = if e.Done then C.Green else C.Muted
+			ui.title.TextColor3 = if e.Done then C.Muted else C.Text
+		end
+	end
+	if #entries == 0 and not folded then
+		questRows[1].row.Visible = true
+		questRows[1].title.Text = T.NoQuest
+		questRows[1].text.Text = ""
+		questRows[1].check.Visible = false
+		shown = 1
+	end
+	tracker.Size = UDim2.fromOffset(TW, 36 + shown * TROW + (if shown > 0 then 4 else 0))
+	foldIcon.Rotation = if folded then 180 else 0
 end
+foldButton.Activated:Connect(function()
+	folded = not folded
+	refreshTracker()
+end)
 player:GetAttributeChangedSignal("Tracker"):Connect(refreshTracker)
+player:GetAttributeChangedSignal("DailyTracker"):Connect(refreshTracker)
 refreshTracker()
 
 ---------------------------------------------------------------------
@@ -614,7 +685,7 @@ local AC = U.Actions
 local slotRow = Instance.new("Frame")
 slotRow.Name = "Abilities"
 slotRow.AnchorPoint = Vector2.new(1, 1)
-slotRow.Position = UDim2.new(1, -16, 1, -16)
+slotRow.Position = UDim2.new(1, -16, 1, -30) -- room for the key plates under the rings
 slotRow.Size = UDim2.fromOffset(AC.Width, AC.Height)
 slotRow.BackgroundTransparency = 1
 slotRow.Parent = Style.Gui
@@ -664,27 +735,45 @@ for order, def in ipairs(U.AbilitySlots) do
 	button.AutoButtonColor = false
 	button.ZIndex = 6
 	button.Parent = slotRow
-	local shape = Style.Chamfer(button, { Fill = C.PanelDark, Transparency = U.PanelTransparency, Border = C.Line, Cut = 8 })
-	local icon = Icons.Make(button, def.Icon or "lock", math.floor(S * 0.52), C.Line, 7)
+	-- round buttons with a gold ring (sheet 02)
+	button.BackgroundColor3 = C.PanelDark
+	button.BackgroundTransparency = 0.12
+	Style.Corner(button, UDim.new(1, 0))
+	local ring = Style.Stroke(button, 2.5, C.Line)
+	ring.LineJoinMode = Enum.LineJoinMode.Round
+	ring.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	local shape = {
+		SetBorder = function(color: Color3)
+			ring.Color = color
+		end,
+	}
+	local icon = Icons.Make(button, def.Icon or "lock", math.floor(S * 0.5), C.Line, 7)
 	icon.AnchorPoint = Vector2.new(0.5, 0.5)
 	icon.Position = UDim2.fromScale(0.5, 0.5)
 	local shade = Instance.new("Frame")
 	shade.Name = "Cooldown"
-	shade.AnchorPoint = Vector2.new(0, 1)
-	shade.Position = UDim2.new(0, 3, 1, -3)
-	shade.Size = UDim2.new(1, -6, 0, 0)
+	shade.AnchorPoint = Vector2.new(0.5, 0.5)
+	shade.Position = UDim2.fromScale(0.5, 0.5)
+	shade.Size = UDim2.fromScale(0, 0)
 	shade.BackgroundColor3 = Color3.new(0, 0, 0)
 	shade.BackgroundTransparency = 0.35
 	shade.BorderSizePixel = 0
 	shade.ZIndex = 8
 	shade.Parent = button
+	Style.Corner(shade, UDim.new(1, 0))
 	local timer = Style.Label(button, "", 18, C.Text, { Font = Style.FontTitle, Size = UDim2.fromScale(1, 1), ZIndex = 9 })
-	local keyLabel = Style.Label(button, def.Label or def.Slot, 11, C.GoldDim, {
-		Position = UDim2.fromOffset(6, 3),
-		Size = UDim2.fromOffset(S - 12, 13),
-		TextXAlignment = Enum.TextXAlignment.Left,
+	-- the key in a small dark plate at the bottom of the ring
+	local keyLabel = Style.Label(button, def.Label or def.Slot, 11, C.Gold, {
+		Font = Style.FontTitle,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 1, -1),
+		Size = UDim2.fromOffset(if #(def.Label or def.Slot) > 1 then 36 else 20, 16),
+		BackgroundTransparency = 0,
+		BackgroundColor3 = C.PanelDark,
 		ZIndex = 9,
 	})
+	Style.Corner(keyLabel, UDim.new(0, 4))
+	Style.Stroke(keyLabel, 1, C.GoldDim).ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	keyLabel.Visible = not Style.IsTouch()
 	slots[def.Slot] = { button = button, icon = icon, shade = shade, timer = timer, keyLabel = keyLabel, shape = shape, def = def }
 	button.Activated:Connect(function()
@@ -727,20 +816,24 @@ RunService.RenderStepped:Connect(function()
 		local total = math.max(0.1, player:GetAttribute("CooldownMax_" .. slot) or 1)
 		local left = readyAt - now
 		if left > 0 then
-			ui.shade.Size = UDim2.new(1, -6, math.clamp(left / total, 0, 1), -6)
+			local k = math.clamp(left / total, 0, 1)
+			ui.shade.Size = UDim2.fromScale(0.35 + 0.65 * k, 0.35 + 0.65 * k)
 			ui.timer.Text = if left >= 1 then tostring(math.ceil(left)) else string.format("%.1f", left)
 		else
-			ui.shade.Size = UDim2.new(1, -6, 0, 0)
+			ui.shade.Size = UDim2.fromScale(0, 0)
 			ui.timer.Text = ""
 		end
 	end
 end)
 
 -- HP bar
+-- sheet 02: a dark plate with "HP" on the left, the green bar after it
+local hpPlate = Style.Panel(bottom, { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 4), Size = UDim2.new(1, 12, 0, 30), Fill = C.PanelDark, Border = C.GoldDim, Cut = 8, ZIndex = 5 })
+Style.Label(hpPlate, "HP", 15, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(10, 0), Size = UDim2.fromOffset(36, 30), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6 })
 local hpTrack, hpFill, hpText = Style.Bar(bottom, {
-	AnchorPoint = Vector2.new(0.5, 1),
-	Position = UDim2.new(0.5, 0, 1, 0),
-	Size = UDim2.new(1, 0, 0, 20),
+	AnchorPoint = Vector2.new(1, 1),
+	Position = UDim2.new(1, 0, 1, -1),
+	Size = UDim2.new(1, -44, 0, 20),
 	Color = U.HealthColor, -- green like sheet 02
 	Border = C.GoldDim,
 	ZIndex = 6,

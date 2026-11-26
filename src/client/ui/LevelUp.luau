@@ -21,6 +21,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Popups = require(script.Parent.Popups)
 local Style = require(script.Parent.Style)
+local Icons = require(script.Parent.Icons)
 
 local FX = Config.LevelUpFx
 local T = FX.Texts
@@ -126,7 +127,7 @@ local banner = Instance.new("TextButton")
 banner.Name = "LevelUpWindow"
 banner.AnchorPoint = Vector2.new(0.5, 0.5)
 banner.Position = UDim2.fromScale(0.5, 0.36)
-banner.Size = UDim2.fromOffset(W, 250)
+banner.Size = UDim2.fromOffset(W, 300)
 banner.BackgroundTransparency = 1
 banner.Text = ""
 banner.AutoButtonColor = false
@@ -174,10 +175,26 @@ local system = Style.Label(panel, T.System, 15, Config.Theme.Cyan, { Font = Styl
 local title = Style.Label(panel, T.Title, 40, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 48), Size = UDim2.new(1, 0, 0, 44), ZIndex = 92 })
 local levels = Style.Label(panel, "", 26, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 96), Size = UDim2.new(1, 0, 0, 30), ZIndex = 92 })
 Style.Rule(panel, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 132), Size = UDim2.new(1, -80, 0, 1), Color = C.GoldDim, ZIndex = 92 })
-local gains = Style.Label(panel, "", 16, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 140), Size = UDim2.new(1, 0, 0, 44), TextWrapped = true, ZIndex = 92 })
+-- sheet 02: the gains in a column, each with a gold icon
+local gainRows = {}
+local LABELS = { system, title, levels }
+for i = 1, 4 do
+	local row = Instance.new("Frame")
+	row.AnchorPoint = Vector2.new(0.5, 0)
+	row.Position = UDim2.new(0.5, 0, 0, 140 + (i - 1) * 26)
+	row.Size = UDim2.fromOffset(260, 24)
+	row.BackgroundTransparency = 1
+	row.ZIndex = 92
+	row.Parent = panel
+	local icon = Icons.Make(row, "star", 18, C.Gold, 93)
+	icon.AnchorPoint = Vector2.new(0, 0.5)
+	icon.Position = UDim2.new(0, 0, 0.5, 0)
+	local label = Style.Label(row, "", 16, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(28, 0), Size = UDim2.new(1, -28, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 93 })
+	gainRows[i] = { row = row, icon = icon, label = label }
+	table.insert(LABELS, label)
+end
 local titleScale = Instance.new("UIScale")
 titleScale.Parent = title
-local LABELS = { system, title, levels, gains }
 local shownAt = 0
 
 local function setFade(t: number, seconds: number)
@@ -198,11 +215,21 @@ banner.Activated:Connect(hide)
 
 local function show(from: number, to: number, skillPoints: number)
 	levels.Text = T.Levels:format(from, to)
-	local lines = { T.Stats:format((to - from) * Config.Attributes.PointsPerLevel) }
+	local lines = { { "chevron", T.Stats:format((to - from) * Config.Attributes.PointsPerLevel) } }
 	if skillPoints > 0 then
-		table.insert(lines, T.Skills:format(skillPoints))
+		table.insert(lines, { "skills", T.Skills:format(skillPoints) })
 	end
-	gains.Text = table.concat(lines, "     ")
+	table.insert(lines, { "heart", T.Health:format(Config.Stats.HealthPerLevel * (to - from)) })
+	local damage = (Config.LevelMult(to) / Config.LevelMult(from) - 1) * 100
+	table.insert(lines, { "sword", T.Damage:format(tostring(math.floor(damage * 10 + 0.5) / 10)) })
+	for i, ui in ipairs(gainRows) do
+		local line = lines[i]
+		ui.row.Visible = line ~= nil
+		if line then
+			Icons.Set(ui.icon, line[1], C.Gold)
+			ui.label.Text = line[2]
+		end
+	end
 	local camera = Workspace.CurrentCamera
 	fit.Scale = math.min(1, (camera.ViewportSize.X - 24) / W)
 	banner.Visible = true

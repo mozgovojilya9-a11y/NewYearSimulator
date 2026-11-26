@@ -109,9 +109,9 @@ doll.CurrentCamera = dollCamera
 local pedestal = Instance.new("Frame")
 pedestal.AnchorPoint = Vector2.new(0.5, 1)
 pedestal.Position = UDim2.new(0, LEFT / 2, 0, DOLL_H - 4)
-pedestal.Size = UDim2.fromOffset(170, 20)
+pedestal.Size = UDim2.fromOffset(176, 30)
 pedestal.BackgroundColor3 = C.Gold
-pedestal.BackgroundTransparency = 0.92
+pedestal.BackgroundTransparency = 0.94
 pedestal.BorderSizePixel = 0
 pedestal.ZIndex = 32
 pedestal.Parent = content
@@ -122,11 +122,14 @@ pedestalCore.AnchorPoint = Vector2.new(0.5, 0.5)
 pedestalCore.Position = UDim2.fromScale(0.5, 0.5)
 pedestalCore.Size = UDim2.new(0.62, 0, 0.5, 0)
 pedestalCore.BackgroundColor3 = C.Gold
-pedestalCore.BackgroundTransparency = 0.8
+pedestalCore.BackgroundTransparency = 0.9
 pedestalCore.BorderSizePixel = 0
 pedestalCore.ZIndex = 32
 pedestalCore.Parent = pedestal
 Style.Corner(pedestalCore, UDim.new(1, 0))
+local coreRing = Style.Stroke(pedestalCore, 1.5, C.Gold)
+coreRing.LineJoinMode = Enum.LineJoinMode.Round
+coreRing.Transparency = 0.35
 local dollModel, dollAngle = nil, 0
 local function rebuildDoll()
 	if dollModel then
@@ -278,7 +281,31 @@ for i, def in ipairs(FILTERS) do
 		refresh()
 	end)
 end
-local sortButton = Style.Button(center, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -46, 0, 0), Size = UDim2.fromOffset(150, 38), Text = "", TextSize = 12, Color = C.Card, Icon = "sort", ZIndex = 34 })
+-- search by name (sheet 02)
+local search = ""
+local searchFrame = Style.Panel(center, { Position = UDim2.fromOffset(5 * 44 + 4, 0), Size = UDim2.new(1, -(5 * 44 + 4 + 46 + 130 + 8), 0, 38), Fill = C.CardDark, Border = C.Line, Cut = 6, ZIndex = 34 })
+local searchBox = Instance.new("TextBox")
+searchBox.Position = UDim2.fromOffset(10, 0)
+searchBox.Size = UDim2.new(1, -40, 1, 0)
+searchBox.BackgroundTransparency = 1
+searchBox.Font = Style.Font
+searchBox.TextSize = 14
+searchBox.TextColor3 = C.Text
+searchBox.PlaceholderText = "Поиск"
+searchBox.PlaceholderColor3 = C.Muted
+searchBox.Text = ""
+searchBox.ClearTextOnFocus = false
+searchBox.TextXAlignment = Enum.TextXAlignment.Left
+searchBox.ZIndex = 35
+searchBox.Parent = searchFrame
+local searchIcon = Icons.Make(searchFrame, "eye", 18, C.Muted, 35)
+searchIcon.AnchorPoint = Vector2.new(1, 0.5)
+searchIcon.Position = UDim2.new(1, -10, 0.5, 0)
+searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+	search = string.lower(searchBox.Text)
+	refresh()
+end)
+local sortButton = Style.Button(center, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -46, 0, 0), Size = UDim2.fromOffset(130, 38), Text = "", TextSize = 12, Color = C.Card, Icon = "sort", ZIndex = 34 })
 sortButton.Activated:Connect(function()
 	sortMode = sortMode % #SORTS + 1
 	refresh()
@@ -409,10 +436,11 @@ local dRarity = Style.Label(details, "", 12, C.Muted, { Position = UDim2.fromOff
 local dLevel = Style.Label(details, "", 12, C.Muted, { Position = UDim2.fromOffset(104, 68), Size = UDim2.new(1, -114, 0, 14), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
 local dClass = Style.Label(details, "", 12, C.Muted, { Position = UDim2.fromOffset(104, 84), Size = UDim2.new(1, -114, 0, 14), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
 Style.Rule(details, { Position = UDim2.fromOffset(10, 106), Size = UDim2.new(1, -20, 0, 1), ZIndex = 34 })
-local lines = {}
+-- stat rows: the name on the left, the value on the right (sheet 02)
+local lines, values = {}, {}
 for i = 1, 9 do
-	local label = Style.Label(details, "", 13, C.Text, { Position = UDim2.fromOffset(12, 112 + (i - 1) * 20), Size = UDim2.new(1, -24, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, RichText = true, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 35 })
-	lines[i] = label
+	lines[i] = Style.Label(details, "", 13, C.Text, { Position = UDim2.fromOffset(12, 112 + (i - 1) * 20), Size = UDim2.new(1, -24, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, RichText = true, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 35 })
+	values[i] = Style.Label(details, "", 13, C.Text, { Font = Style.FontTitle, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 112 + (i - 1) * 20), Size = UDim2.new(0.6, 0, 0, 18), TextXAlignment = Enum.TextXAlignment.Right, RichText = true, ZIndex = 35 })
 end
 local dCompare = Style.Label(details, "", 11, C.Muted, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -92), Size = UDim2.new(1, -24, 0, 28), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Bottom, TextWrapped = true, ZIndex = 35 })
 local equipButton, equipColor = Style.Button(details, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 12, 1, -50), Size = UDim2.new(1, -66, 0, 36), Text = "Надеть", TextSize = 15, Color = C.Gold, ZIndex = 35 })
@@ -433,6 +461,14 @@ local function lift(root: Instance)
 	end
 end
 lift(details)
+-- the item icon draws its model a moment later: lift those parts too
+iconHolder.DescendantAdded:Connect(function(d)
+	task.defer(function() -- after its own ZIndex is set
+		if d:IsA("GuiObject") and d.ZIndex < 44 then
+			d.ZIndex += 12
+		end
+	end)
+end)
 
 local scrapArmed = false
 equipButton.Activated:Connect(function()
@@ -491,8 +527,9 @@ local function showDetails()
 	for _, o in ipairs({ dName, dRarity, dLevel, dClass, dCompare, equipButton, lockButton, scrapButton, iconHolder }) do
 		o.Visible = has
 	end
-	for _, label in ipairs(lines) do
+	for i, label in ipairs(lines) do
 		label.Text = ""
+		values[i].Text = ""
 	end
 	if not view then
 		shownIcon = nil
@@ -504,7 +541,6 @@ local function showDetails()
 		shownIcon = iconKey
 		iconHolder:ClearAllChildren()
 		ItemIcon.Create(iconHolder, view.Kind, view, UDim2.fromScale(1, 1), UDim2.new())
-		lift(iconHolder)
 	end
 	dName.Text = view.BaseName or view.Name
 	dName.TextColor3 = rarity.Color
@@ -526,19 +562,20 @@ local function showDetails()
 	local isWorn = PlayerData.IsWorn(view.Uid)
 	local worn = if isWorn then nil else PlayerData.Worn(view.Slot)
 	local n = 0
-	local function line(text)
+	local function line(text, value)
 		n += 1
 		if lines[n] then
 			lines[n].Text = text
+			values[n].Text = value or ""
 		end
 	end
 	if view.Kind == "Weapon" then
-		line("Урон  <b>" .. Format.Number(view.Damage) .. "</b>" .. diff(view.Damage, worn and worn.Damage))
+		line("Урон", Format.Number(view.Damage) .. diff(view.Damage, worn and worn.Damage))
 	else
-		line("Макс. HP  <b>+" .. Format.Number(view.Health) .. "</b>" .. diff(view.Health, worn and worn.Health))
-		line("Защита  <b>" .. tostring(math.floor(view.Defense * 1000 + 0.5) / 10) .. "%</b>" .. diff(view.Defense, worn and worn.Defense, true))
+		line("Макс. HP", "+" .. Format.Number(view.Health) .. diff(view.Health, worn and worn.Health))
+		line("Защита", tostring(math.floor(view.Defense * 1000 + 0.5) / 10) .. "%" .. diff(view.Defense, worn and worn.Defense, true))
 	end
-	line("Gear Score  <b>" .. view.Score .. "</b>" .. diff(view.Score, worn and worn.Score))
+	line("Gear Score", view.Score .. diff(view.Score, worn and worn.Score))
 	for _, prop in ipairs(view.Props) do
 		line('<font color="#2EE6FF">' .. Items.PropText(prop) .. "</font>")
 	end
@@ -639,7 +676,8 @@ function refresh()
 	local total = 0
 	for _, view in pairs(items) do
 		total += 1
-		if filter == "All" or view.Slot == filter then
+		local nameOk = search == "" or string.find(string.lower(view.Name), search, 1, true) ~= nil
+		if (filter == "All" or view.Slot == filter) and nameOk then
 			table.insert(list, view)
 		end
 	end

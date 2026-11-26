@@ -106,6 +106,17 @@ function ItemIcon.Create(parent: GuiObject, category: string, item, size: UDim2,
 	local distance = radius / math.tan(math.rad(camera.FieldOfView / 2)) * 1.05
 	local view = VIEW[category] or VIEW.Material
 	camera.CFrame = view * CFrame.new(0, 0, distance)
+	-- a viewport sometimes stays empty until something changes: nudge the
+	-- camera on the next frames so it redraws (seen in Studio)
+	task.spawn(function()
+		for i, delay in ipairs({ 0.05, 0.3, 0.8, 1.6 }) do
+			task.wait(delay)
+			if not camera.Parent then
+				return
+			end
+			camera.CFrame = view * CFrame.new(0, 0, distance + (if i % 2 == 1 then 0.001 else 0))
+		end
+	end)
 	return frame
 end
 

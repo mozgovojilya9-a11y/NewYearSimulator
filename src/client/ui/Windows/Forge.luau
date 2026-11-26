@@ -22,6 +22,7 @@ local PlayerData = require(script.Parent.Parent.Parent.PlayerData)
 local Popups = require(script.Parent.Parent.Popups)
 local ItemIcon = require(script.Parent.Parent.ItemIcon)
 local Style = require(script.Parent.Parent.Style)
+local Icons = require(script.Parent.Parent.Icons)
 local Window = require(script.Parent.Window)
 
 local C = Style.Colors
@@ -33,7 +34,7 @@ local itemsRemote = ReplicatedStorage:WaitForChild("Items")
 
 local Forge = {}
 
-local window = Window.new("Кузница", nil, Vector2.new(860, 520), "hammer")
+local window = Window.new("Кузница", nil, Vector2.new(940, 540), "hammer")
 local content = window.Content
 
 local TABS = { "Enhance", "Ascend", "Reforge", "Salvage" }
@@ -48,7 +49,7 @@ local refresh
 -- Left: items
 ---------------------------------------------------------------------
 
-local LEFT = 384
+local LEFT = 316
 local left = Instance.new("Frame")
 left.Size = UDim2.new(0, LEFT, 1, 0)
 left.BackgroundTransparency = 1
@@ -138,24 +139,40 @@ for i, id in ipairs(TABS) do
 end
 
 local panel = Style.Panel(right, { Position = UDim2.fromOffset(0, 38), Size = UDim2.new(1, 0, 1, -38), Fill = C.PanelDark, Border = C.Line, Cut = 10, ZIndex = 33 })
-local iconHolder = Instance.new("Frame")
-iconHolder.Position = UDim2.fromOffset(14, 14)
-iconHolder.Size = UDim2.fromOffset(88, 88)
-iconHolder.BackgroundTransparency = 1
-iconHolder.ZIndex = 34
-iconHolder.Parent = panel
-local pName = Style.Label(panel, "", 17, C.Text, { Position = UDim2.fromOffset(112, 14), Size = UDim2.new(1, -124, 0, 40), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, ZIndex = 35 })
-local pSub = Style.Label(panel, "", 12, C.Muted, { Position = UDim2.fromOffset(112, 58), Size = UDim2.new(1, -124, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
-local pHead = Style.Label(panel, "", 20, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(112, 78), Size = UDim2.new(1, -124, 0, 24), TextXAlignment = Enum.TextXAlignment.Left, RichText = true, ZIndex = 35 })
-Style.Rule(panel, { Position = UDim2.fromOffset(12, 112), Size = UDim2.new(1, -24, 0, 1), ZIndex = 34 })
+
+-- sheet 02: the item now (+N) >>> the item after (+N+1, gold frame)
+local CARD = 96
+local function itemCard(x: number, gold: boolean)
+	local frame, shape = Style.Panel(panel, { Position = UDim2.fromOffset(x, 16), Size = UDim2.fromOffset(CARD, CARD), Fill = C.CardDark, Border = if gold then C.Gold else C.Line, Cut = 8, ZIndex = 34, Thickness = 2 })
+	local holder = Instance.new("Frame")
+	holder.Position = UDim2.fromOffset(4, 4)
+	holder.Size = UDim2.new(1, -8, 1, -8)
+	holder.BackgroundTransparency = 1
+	holder.ZIndex = 35
+	holder.Parent = frame
+	local plus = Style.Label(frame, "", 18, C.Gold, { Font = Style.FontTitle, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 4), Size = UDim2.fromOffset(50, 22), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 38 })
+	return { frame = frame, shape = shape, holder = holder, plus = plus, shown = nil }
+end
+local beforeCard = itemCard(14, false)
+local arrows = Style.Label(panel, "»»", 34, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(14 + CARD, 16), Size = UDim2.fromOffset(52, CARD), ZIndex = 35 })
+local afterCard = itemCard(14 + CARD + 52, true)
+local pName = Style.Label(panel, "", 15, C.Text, { Position = UDim2.fromOffset(14, 20 + CARD), Size = UDim2.fromOffset(2 * CARD + 52, 20), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 35 })
+local pSub = Style.Label(panel, "", 12, C.Muted, { Position = UDim2.fromOffset(14, 42 + CARD), Size = UDim2.fromOffset(2 * CARD + 52, 16), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
+
+-- the result box: "РЕЗУЛЬТАТ (+8)" and rows  name  before » after (+diff)
+local RX = 14 + 2 * CARD + 52 + 16
+local result = Style.Panel(panel, { Position = UDim2.fromOffset(RX, 16), Size = UDim2.new(1, -(RX + 14), 0, 146), Fill = C.CardDark, Border = C.GoldDim, Cut = 8, ZIndex = 34 })
+local pHead = Style.Label(result, "", 15, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(12, 8), Size = UDim2.new(1, -24, 0, 20), TextXAlignment = Enum.TextXAlignment.Left, RichText = true, ZIndex = 35 })
 local rows = {}
-for i = 1, 7 do
-	rows[i] = Style.Label(panel, "", 14, C.Text, { Position = UDim2.fromOffset(14, 120 + (i - 1) * 24), Size = UDim2.new(1, -28, 0, 22), TextXAlignment = Enum.TextXAlignment.Left, RichText = true, ZIndex = 35 })
+for i = 1, 5 do
+	local left = Style.Label(result, "", 13, C.Text, { Position = UDim2.fromOffset(12, 34 + (i - 1) * 22), Size = UDim2.new(1, -24, 0, 20), TextXAlignment = Enum.TextXAlignment.Left, RichText = true, ZIndex = 35 })
+	local right = Style.Label(result, "", 13, C.Text, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 34 + (i - 1) * 22), Size = UDim2.new(0.62, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Right, RichText = true, ZIndex = 35 })
+	rows[i] = { left = left, right = right }
 end
 -- bonus props as buttons (Reforge)
 local propButtons = {}
 for i = 1, 3 do
-	local button, setColor = Style.Button(panel, { Position = UDim2.fromOffset(14, 120 + (i - 1) * 40), Size = UDim2.new(1, -28, 0, 34), Text = "", TextSize = 14, Color = C.Card, ZIndex = 36 })
+	local button, setColor = Style.Button(result, { Position = UDim2.fromOffset(10, 34 + (i - 1) * 36), Size = UDim2.new(1, -20, 0, 32), Text = "", TextSize = 13, Color = C.Card, ZIndex = 36 })
 	button.Visible = false
 	propButtons[i] = { button = button, setColor = setColor }
 	button.Activated:Connect(function()
@@ -163,26 +180,56 @@ for i = 1, 3 do
 		refresh()
 	end)
 end
-local costLabel = Style.Label(panel, "", 14, C.Text, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 14, 1, -96), Size = UDim2.new(1, -28, 0, 20), TextXAlignment = Enum.TextXAlignment.Left, RichText = true, ZIndex = 35 })
-local noteLabel = Style.Label(panel, "", 12, C.Muted, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 14, 1, -74), Size = UDim2.new(1, -28, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, RichText = true, ZIndex = 35 })
-local track, fill = Style.Bar(panel, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 14, 1, -62), Size = UDim2.new(1, -28, 0, 6), Color = C.Gold, ZIndex = 35 })
+
+-- the success chance: a big number and a cyan bar
+local chanceTitle = Style.Label(panel, "Шанс успеха:", 16, C.Text, { Position = UDim2.fromOffset(14, 182), Size = UDim2.fromOffset(150, 30), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
+local chanceValue = Style.Label(panel, "", 26, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(150, 180), Size = UDim2.fromOffset(120, 32), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
+local chanceTrack, chanceFill = Style.Bar(panel, { Position = UDim2.fromOffset(14, 218), Size = UDim2.new(1, -28, 0, 12), Color = C.Cyan, ZIndex = 35 })
+local noteLabel = Style.Label(panel, "", 12, C.Muted, { Position = UDim2.fromOffset(14, 236), Size = UDim2.new(1, -28, 0, 32), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, RichText = true, ZIndex = 35 })
+
+-- bottom: the cost pill and the big gold action button
+local costPill = Style.Panel(panel, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 14, 1, -14), Size = UDim2.new(1, -258, 0, 50), Fill = C.CardDark, Border = C.Line, Cut = 8, ZIndex = 34 })
+Style.Label(costPill, "Цена:", 15, C.Text, { Position = UDim2.fromOffset(12, 0), Size = UDim2.fromOffset(60, 50), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
+local coinIcon = Icons.Make(costPill, "credits", 22, C.Gold, 35)
+coinIcon.AnchorPoint = Vector2.new(0, 0.5)
+coinIcon.Position = UDim2.new(0, 70, 0.5, 0)
+local creditCost = Style.Label(costPill, "", 17, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(98, 0), Size = UDim2.fromOffset(100, 50), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
+local coreIcon = Icons.Make(costPill, "core", 22, C.Cyan, 35)
+coreIcon.AnchorPoint = Vector2.new(0, 0.5)
+coreIcon.Position = UDim2.new(0, 200, 0.5, 0)
+local coreCost = Style.Label(costPill, "", 17, C.Text, { Font = Style.FontTitle, Position = UDim2.fromOffset(228, 0), Size = UDim2.fromOffset(60, 50), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 35 })
+local track, fill = Style.Bar(panel, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -14, 1, -70), Size = UDim2.fromOffset(220, 4), Color = C.Gold, ZIndex = 35 })
 track.Visible = false
-local action, actionColor = Style.Button(panel, { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 14, 1, -14), Size = UDim2.new(1, -28, 0, 42), Text = "", TextSize = 17, Color = C.Gold, ZIndex = 35 })
-local hint = Style.Label(panel, T.Pick, 15, C.Muted, { Position = UDim2.fromOffset(0, 180), Size = UDim2.new(1, 0, 0, 22), ZIndex = 35 })
+local action, actionColor = Style.Button(panel, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -14, 1, -14), Size = UDim2.fromOffset(220, 50), Text = "", TextSize = 20, Color = C.Gold, ZIndex = 35 })
+local hint = Style.Label(panel, T.Pick, 15, C.Muted, { Position = UDim2.fromOffset(0, 180), Size = UDim2.new(1, 0, 0, 22), ZIndex = 36 })
 
 local function colored(text: string, color: Color3): string
 	return ('<font color="#%02X%02X%02X">%s</font>'):format(math.floor(color.R * 255 + 0.5), math.floor(color.G * 255 + 0.5), math.floor(color.B * 255 + 0.5), text)
 end
 local GREEN, RED = Color3.fromRGB(90, 230, 110), Color3.fromRGB(255, 96, 96)
 
-local function costText(credits: number, cores: number): string
+local function setCost(credits: number, cores: number)
+	costPill.Visible = true
 	local haveCredits = (player:GetAttribute("Credits") or 0) >= credits
 	local haveCores = (player:GetAttribute("Cores") or 0) >= cores
-	local a = colored(Format.Number(credits) .. " кр.", if haveCredits then C.Text else RED)
-	if cores <= 0 then
-		return "Цена:  " .. a
+	creditCost.Text = Format.Number(credits)
+	creditCost.TextColor3 = if haveCredits then C.Text else RED
+	coreCost.Text = Format.Number(cores)
+	coreCost.TextColor3 = if haveCores then C.Text else RED
+	coreIcon.Visible = cores > 0
+	coreCost.Visible = cores > 0
+end
+
+local function setChance(share: number?)
+	local show = share ~= nil
+	chanceTitle.Visible = show
+	chanceValue.Visible = show
+	chanceTrack.Visible = show
+	if share then
+		chanceValue.Text = math.floor(share * 100 + 0.5) .. "%"
+		chanceValue.TextColor3 = if share >= 0.7 then C.Gold elseif share >= 0.4 then C.Orange else RED
+		chanceFill.Size = UDim2.fromScale(math.clamp(share, 0, 1), 1)
 	end
-	return "Цена:  " .. a .. "   •   " .. colored(Format.Number(cores) .. " ядер", if haveCores then C.Text else RED)
 end
 
 -- The spare item an ascend would consume (same rule as the server).
@@ -198,40 +245,46 @@ local function twinOf(view)
 	return best
 end
 
-local function arrowLine(name: string, before: string, after: string): string
-	return ("%s   %s  →  <b>%s</b>"):format(name, before, colored(after, GREEN))
+local function showCard(card, view)
+	local key = if view then ("%s|%s|%d"):format(view.Uid or view.Id, view.Rarity, view.Enhance) else ""
+	if card.shown ~= key then
+		card.shown = key
+		card.holder:ClearAllChildren()
+		if view then
+			ItemIcon.Create(card.holder, view.Kind, view, UDim2.fromScale(1, 1), UDim2.new())
+		end
+	end
+	card.plus.Text = if view and view.Enhance > 0 then "+" .. view.Enhance else ""
+	if view then
+		card.shape.SetBorder((Config.Rarity[view.Rarity] or Config.Rarity.Common).Color)
+	end
 end
 
-local shownIcon
 local function showPanel()
 	local view = PlayerData.Items()[selected or ""]
 	local has = view ~= nil
 	hint.Visible = not has
-	for _, o in ipairs({ iconHolder, pName, pSub, pHead, costLabel, noteLabel, action }) do
+	for _, o in ipairs({ beforeCard.frame, afterCard.frame, arrows, pName, pSub, result, noteLabel, action, costPill }) do
 		o.Visible = has
 	end
-	for _, row in ipairs(rows) do
-		row.Text = ""
+	setChance(nil)
+	for _, r in ipairs(rows) do
+		r.left.Text = ""
+		r.right.Text = ""
 	end
 	for _, p in ipairs(propButtons) do
 		p.button.Visible = false
 	end
 	if not view then
-		shownIcon = nil
 		return
 	end
 	local rarity = Config.Rarity[view.Rarity] or Config.Rarity.Common
-	local key = ("%s|%s|%d"):format(view.Uid, view.Rarity, view.Enhance)
-	if shownIcon ~= key then
-		shownIcon = key
-		iconHolder:ClearAllChildren()
-		ItemIcon.Create(iconHolder, view.Kind, view, UDim2.fromScale(1, 1), UDim2.new())
-	end
-	pName.Text = view.Name
+	showCard(beforeCard, view)
+	pName.Text = view.BaseName or view.Name
 	pName.TextColor3 = rarity.Color
 	pSub.Text = ("%s  •  %s"):format(rarity.Name, Config.Items.Texts.Level:format(view.ItemLevel))
-	costLabel.Text = ""
 	noteLabel.Text = ""
+	costPill.Visible = false
 	action.Active = true
 	action.TextTransparency = 0
 	actionColor(C.Gold)
@@ -240,13 +293,25 @@ local function showPanel()
 	local function row(text)
 		n += 1
 		if rows[n] then
-			rows[n].Text = text
+			rows[n].left.Text = text
 		end
+	end
+	local function stat(name: string, before: string, after: string, diff: string?)
+		n += 1
+		if rows[n] then
+			rows[n].left.Text = name
+			rows[n].right.Text = ("%s  »  <b>%s</b>%s"):format(before, after, if diff and diff ~= "" then "  " .. colored("(" .. diff .. ")", GREEN) else "")
+		end
+	end
+	local function pct(v: number): string
+		return tostring(math.floor(v * 1000 + 0.5) / 10) .. "%"
 	end
 
 	if tab == "Enhance" then
 		if view.Enhance >= F.MaxEnhance then
-			pHead.Text = "+" .. view.Enhance
+			afterCard.frame.Visible = false
+			arrows.Visible = false
+			pHead.Text = "РЕЗУЛЬТАТ (+" .. view.Enhance .. ")"
 			row(T.Max)
 			action.Text = T.Max
 			action.Active = false
@@ -254,34 +319,32 @@ local function showPanel()
 			actionColor(C.Card)
 			return
 		end
-		pHead.Text = ("+%d  →  %s"):format(view.Enhance, colored("+" .. (view.Enhance + 1), GREEN))
 		local nextInst = table.clone(inst)
 		nextInst.E = view.Enhance + 1
 		local after = Items.Resolve(nextInst)
+		showCard(afterCard, after)
+		pHead.Text = ("РЕЗУЛЬТАТ (+%d)"):format(view.Enhance + 1)
 		if view.Kind == "Weapon" then
-			row(arrowLine("Урон", Format.Number(view.Damage), Format.Number(after.Damage)))
+			stat("Урон", Format.Number(view.Damage), Format.Number(after.Damage), "+" .. Format.Number(after.Damage - view.Damage))
 		else
-			row(arrowLine("Макс. HP", "+" .. Format.Number(view.Health), "+" .. Format.Number(after.Health)))
-			row(arrowLine("Защита", tostring(math.floor(view.Defense * 1000 + 0.5) / 10) .. "%", tostring(math.floor(after.Defense * 1000 + 0.5) / 10) .. "%"))
+			stat("Макс. HP", Format.Number(view.Health), Format.Number(after.Health), "+" .. Format.Number(after.Health - view.Health))
+			stat("Защита", pct(view.Defense), pct(after.Defense), "+" .. pct(after.Defense - view.Defense))
 		end
-		row(arrowLine("Gear Score", tostring(view.Score), tostring(after.Score)))
+		stat("Gear Score", tostring(view.Score), tostring(after.Score), "+" .. (after.Score - view.Score))
 		if view.Enhance + 1 == F.GlowFrom then
-			row(colored("На +" .. F.GlowFrom .. " предмет начнёт светиться", Color3.fromRGB(190, 245, 255)))
+			row(colored("С +" .. F.GlowFrom .. " предмет светится", Color3.fromRGB(190, 245, 255)))
 		end
 		local credits, cores = Items.EnhanceCost(inst)
-		costLabel.Text = costText(credits, cores)
+		setCost(credits, cores)
 		local chance, pity = Items.EnhanceChance(inst)
-		if chance < 1 or pity > 0 then
-			noteLabel.Text = T.Chance:format(math.floor(chance * 100 + 0.5)) .. (if pity > 0 then "  (" .. T.PityNote:format(math.floor(pity * 100 + 0.5)) .. ")" else "") .. "  •  при неудаче предмет не ломается"
-			noteLabel.TextColor3 = if chance >= 0.7 then C.Muted else C.Orange
-		else
-			noteLabel.Text = T.Chance:format(100)
-			noteLabel.TextColor3 = C.Muted
-		end
+		setChance(chance)
+		noteLabel.Text = if pity > 0 then T.PityNote:format(math.floor(pity * 100 + 0.5)) .. "  •  при неудаче предмет не ломается" elseif chance < 1 then "При неудаче предмет не ломается" else ""
 		action.Text = Style.Upper(T.Enhance)
 	elseif tab == "Ascend" then
 		local nextId = Items.NextRarity(view.Rarity)
 		if not nextId then
+			afterCard.frame.Visible = false
+			arrows.Visible = false
 			pHead.Text = rarity.Name
 			row(T.MaxRarity)
 			action.Text = T.MaxRarity
@@ -291,22 +354,24 @@ local function showPanel()
 			return
 		end
 		local nextRarity = Config.Rarity[nextId]
-		pHead.Text = ("%s  →  %s"):format(colored(rarity.Name, rarity.Color), colored(nextRarity.Name, nextRarity.Color))
 		local nextInst = table.clone(inst)
 		nextInst.R = nextId
 		local after = Items.Resolve(nextInst)
+		showCard(afterCard, after)
+		pHead.Text = ("РЕЗУЛЬТАТ  %s"):format(colored(Style.Upper(nextRarity.Name), nextRarity.Color))
 		if view.Kind == "Weapon" then
-			row(arrowLine("Урон", Format.Number(view.Damage), Format.Number(after.Damage)))
+			stat("Урон", Format.Number(view.Damage), Format.Number(after.Damage), "+" .. Format.Number(after.Damage - view.Damage))
 		else
-			row(arrowLine("Макс. HP", "+" .. Format.Number(view.Health), "+" .. Format.Number(after.Health)))
+			stat("Макс. HP", Format.Number(view.Health), Format.Number(after.Health), "+" .. Format.Number(after.Health - view.Health))
 		end
-		row(arrowLine("Gear Score", tostring(view.Score), tostring(after.Score)))
+		stat("Gear Score", tostring(view.Score), tostring(after.Score), "+" .. (after.Score - view.Score))
 		local range = Config.Items.BonusCount[nextId]
 		if range and #view.Props < range[1] then
 			row(colored(("+%d бонусное свойство"):format(range[1] - #view.Props), C.Cyan))
 		end
 		local credits, cores = Items.AscendCost(inst)
-		costLabel.Text = costText(credits, cores)
+		setCost(credits, cores)
+		setChance(1)
 		local twin = twinOf(view)
 		if twin then
 			noteLabel.Text = T.Twin:format(twin.Name .. " (" .. (Config.Rarity[twin.Rarity] or rarity).Name .. ")")
@@ -317,10 +382,11 @@ local function showPanel()
 		end
 		action.Text = Style.Upper(T.Ascend)
 	elseif tab == "Reforge" then
-		pHead.Text = "Свойства"
+		afterCard.frame.Visible = false
+		arrows.Visible = false
+		pHead.Text = "СВОЙСТВА"
 		if #view.Props == 0 then
 			row(T.NoProps)
-			rows[1].TextWrapped = true
 			action.Text = T.Reforge
 			action.Active = false
 			action.TextTransparency = 0.5
@@ -336,18 +402,20 @@ local function showPanel()
 				p.setColor(if i == propIndex then C.Gold else C.Card)
 			end
 		end
-		costLabel.Text = costText(Items.ReforgeCost(inst), 0)
+		setCost(Items.ReforgeCost(inst), 0)
 		noteLabel.Text = "Выбранное свойство заменится случайным другим"
 		noteLabel.TextColor3 = C.Muted
 		action.Text = Style.Upper(T.Reforge)
 	else
-		pHead.Text = "Разбор"
+		afterCard.frame.Visible = false
+		arrows.Visible = false
+		pHead.Text = "РАЗБОР"
 		local can = not view.Locked and not view.Starter and not PlayerData.IsWorn(view.Uid)
 		row(T.Gain:format(Format.Number(Items.SalvageCores(inst))))
 		if view.Enhance > 0 then
-			row(colored("Вернётся половина ядер, потраченных на заточку", C.Muted))
+			row(colored("Вернётся половина ядер заточки", C.Muted))
 		end
-		action.Text = if not can then (if view.Locked then "Под замком" elseif view.Starter then "Стартовое оружие" else "Надето") elseif armed then "ТОЧНО РАЗОБРАТЬ?" else Style.Upper(T.Salvage)
+		action.Text = if not can then (if view.Locked then "Под замком" elseif view.Starter then "Стартовое оружие" else "Надето") elseif armed then "ТОЧНО?" else Style.Upper(T.Salvage)
 		action.Active = can
 		action.TextTransparency = if can then 0 else 0.5
 		actionColor(if armed then C.Red else if can then C.Gold else C.Card)
