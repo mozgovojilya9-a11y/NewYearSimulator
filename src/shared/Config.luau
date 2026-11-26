@@ -1082,7 +1082,9 @@ Config.AFK = {
 -- summed up in one window.
 Config.LevelUpFx = {
 	Gather = 0.4,
-	BannerSeconds = 3.5, -- the level-up notification fades after this
+	BannerSeconds = 3, -- the big level-up window fades after this
+	BigEvery = 10, -- the big window only when a level of 10, 20, ... is reached
+	ToastSeconds = 2, -- else a small plate at the top centre this long
 	PillarSeconds = 1.6,
 	PillarColor = Color3.fromRGB(120, 235, 255),
 	RingColor = Color3.fromRGB(255, 214, 110),
@@ -1092,6 +1094,7 @@ Config.LevelUpFx = {
 		System = "[ СИСТЕМА ]",
 		Title = "УРОВЕНЬ ПОВЫШЕН",
 		Levels = "Ур. %d   »   Ур. %d",
+		Short = "УРОВЕНЬ %d",
 		Stats = "+%d очка характеристик",
 		Skills = "+%d очко навыков",
 		Health = "Макс. HP  +%d",
@@ -2085,6 +2088,14 @@ end
 Config.Equipment = {
 	GripR6 = CFrame.new(0, -1, -0.6) * CFrame.Angles(math.rad(-90), 0, 0),
 	GripR15 = CFrame.new(0, -0.3, -0.6) * CFrame.Angles(math.rad(-90), 0, 0),
+	-- 27.11: per class, measured from the class idle stance so the weapon
+	-- looks right in the hand: the gun's barrel straight ahead, the sword up
+	-- and forward, the spear forward (hand-local CFrame of the weapon Handle)
+	GripClass = {
+		Blade = CFrame.new(0, -0.25, 0, 0.547, -0.369, 0.752, -0.547, -0.836, -0.012, 0.633, -0.405, -0.660),
+		Pulse = CFrame.new(0, -0.25, 0, 0.739, 0.614, 0.276, 0.206, -0.596, 0.776, 0.641, -0.517, -0.568),
+		Gunner = CFrame.new(0, -0.25, 0, 0.402, 0.111, -0.909, -0.455, -0.837, -0.303, -0.794, 0.536, -0.286),
+	},
 	-- Клинок's energy shield on the left forearm (rim part; X = disc axis)
 	Shield = { Size = 2.6, Color = Color3.fromRGB(46, 200, 255), Offset = CFrame.new(-0.35, 0, 0) },
 }
@@ -2232,14 +2243,14 @@ Config.Assets = {
 		Weapon_Sword_R = { Length = 4.8, Styled = true },
 		Weapon_Sword_E = { Length = 5, Styled = true },
 		Weapon_Sword_L = { Length = 5.2, Styled = true },
-		Weapon_Spear_C = { Length = 7, Styled = true },
-		Weapon_Spear_R = { Length = 7.2, Styled = true },
-		Weapon_Spear_E = { Length = 7.4, Styled = true },
-		Weapon_Spear_L = { Length = 7.6, Styled = true },
-		Weapon_Blaster_C = { Gun = true, Flip = true, Length = 3, GripAt = 0.3, Styled = true },
-		Weapon_Blaster_R = { Gun = true, Flip = true, Length = 3.2, GripAt = 0.3, Styled = true },
-		Weapon_Blaster_E = { Gun = true, Flip = true, Length = 3.4, GripAt = 0.3, Styled = true },
-		Weapon_Blaster_L = { Gun = true, Flip = true, Length = 3.6, GripAt = 0.3, Styled = true },
+		Weapon_Spear_C = { Length = 7, GripAt = 0.33, Styled = true },
+		Weapon_Spear_R = { Length = 7.2, GripAt = 0.33, Styled = true },
+		Weapon_Spear_E = { Length = 7.4, GripAt = 0.33, Styled = true },
+		Weapon_Spear_L = { Length = 7.6, GripAt = 0.33, Styled = true },
+		Weapon_Blaster_C = { Gun = true, Flip = true, Length = 2.1, GripAt = 0.3, Styled = true },
+		Weapon_Blaster_R = { Gun = true, Flip = true, Length = 2.4, GripAt = 0.3, Styled = true },
+		Weapon_Blaster_E = { Gun = true, Flip = true, Length = 2.7, GripAt = 0.3, Styled = true },
+		Weapon_Blaster_L = { Gun = true, Flip = true, Length = 3, GripAt = 0.3, Styled = true },
 		Weapon_Sword_1 = { Length = 4.6 },
 		Weapon_Sword_2 = { Length = 5 },
 		Weapon_Spear_1 = { Length = 7 },
@@ -2385,23 +2396,29 @@ Config.Lighting = {
 	BloomSize = 18,
 	BloomThreshold = 1.4, -- only the very brightest pixels may glow
 	ShadowSoftness = 0.3,
-	Clouds = { Cover = 0.62, Density = 0.6, Color = Color3.fromRGB(240, 232, 244) },
+	Clouds = { Cover = 0, Density = 0, Color = Color3.fromRGB(240, 232, 244) }, -- 27.11: open space over the hub, no clouds
+	-- the sky (Atmosphere.luau): many stars, no sun / moon (the planets are
+	-- parts, HubIsland.Scenery)
+	Sky = { StarCount = 5000, CelestialBodies = false },
 	-- Hub = the Atrium interior: the sun only through the skylight, warm
 	-- lamps do the rest; ambient a little warm, almost no haze indoors.
 	Hub = {
-		ClockTime = 16.6, Brightness = 3, ExposureCompensation = 0.35, -- golden hour (sheet 01)
-		Ambient = Color3.fromRGB(132, 118, 108), OutdoorAmbient = Color3.fromRGB(150, 136, 128),
-		EnvironmentDiffuseScale = 0.35, EnvironmentSpecularScale = 0.8,
-		Saturation = 0.04, Contrast = 0.06, Tint = Color3.fromRGB(255, 246, 234), Bloom = 0.04,
-		Atmosphere = { Density = 0.3, Offset = 0.05, Color = Color3.fromRGB(232, 198, 192), Decay = Color3.fromRGB(110, 98, 140), Glare = 0.3, Haze = 1.4 }, -- dusk haze
+		-- 27.11 owner: open space instead of the sky and clouds - night with
+		-- stars, a bright violet-white ambient so the island stays readable
+		ClockTime = 0.3, Brightness = 1.2, ExposureCompensation = 0.6,
+		Ambient = Color3.fromRGB(128, 120, 156), OutdoorAmbient = Color3.fromRGB(150, 142, 186),
+		EnvironmentDiffuseScale = 0.4, EnvironmentSpecularScale = 0.9,
+		Saturation = 0.06, Contrast = 0.08, Tint = Color3.fromRGB(240, 236, 255), Bloom = 0.05,
+		Atmosphere = { Density = 0.06, Offset = 0, Color = Color3.fromRGB(70, 56, 110), Decay = Color3.fromRGB(24, 18, 48), Glare = 0, Haze = 0 }, -- clear space
 	},
 	-- AFK zone: a calm evening above the city, warm low sun, soft haze
 	Afk = {
-		ClockTime = 17.6, Brightness = 2.2, ExposureCompensation = 0.15,
-		Ambient = Color3.fromRGB(104, 100, 108), OutdoorAmbient = Color3.fromRGB(120, 116, 124),
-		EnvironmentDiffuseScale = 0.5, EnvironmentSpecularScale = 0.8,
-		Saturation = 0.04, Contrast = 0.04, Tint = Color3.fromRGB(255, 244, 232), Bloom = 0.04,
-		Atmosphere = { Density = 0.28, Offset = 0.1, Color = Color3.fromRGB(206, 190, 184), Decay = Color3.fromRGB(104, 100, 126), Glare = 0.15, Haze = 1.2 },
+		-- the AFK island floats next to the hub: the same space, a bit softer
+		ClockTime = 0.3, Brightness = 1.2, ExposureCompensation = 0.55,
+		Ambient = Color3.fromRGB(122, 116, 150), OutdoorAmbient = Color3.fromRGB(146, 138, 180),
+		EnvironmentDiffuseScale = 0.45, EnvironmentSpecularScale = 0.8,
+		Saturation = 0.05, Contrast = 0.05, Tint = Color3.fromRGB(240, 236, 255), Bloom = 0.04,
+		Atmosphere = { Density = 0.06, Offset = 0, Color = Color3.fromRGB(70, 56, 110), Decay = Color3.fromRGB(24, 18, 48), Glare = 0, Haze = 0 },
 	},
 	Dungeon = {
 		ClockTime = 14.5, Brightness = 1.4, ExposureCompensation = 0.25,
@@ -2438,8 +2455,19 @@ Config.HubIsland = {
 	RockLayers = 8,
 	Crystals = 10,
 	RimColor = Color3.fromRGB(70, 70, 76),
-	CloudSea = { { -260, 0.35 }, { -235, 0.6 }, { -215, 0.8 } }, -- y, transparency
-	CloudColor = Color3.fromRGB(236, 214, 222),
+	-- space around the hub (27.11, instead of the sea of clouds): planets
+	-- { offset from the centre, radius, color, ring color or nil } and faint
+	-- nebula clouds { offset, radius, color }
+	Planets = {
+		{ Vector3.new(-1500, 260, -2200), 520, Color3.fromRGB(110, 82, 190), Color3.fromRGB(200, 170, 255) },
+		{ Vector3.new(1700, -120, -1200), 300, Color3.fromRGB(46, 150, 190), nil },
+		{ Vector3.new(900, 520, 1900), 180, Color3.fromRGB(214, 120, 90), Color3.fromRGB(255, 200, 150) },
+	},
+	Nebulae = {
+		{ Vector3.new(0, 300, -3200), 1400, Color3.fromRGB(170, 70, 200) },
+		{ Vector3.new(-2600, -400, 600), 1100, Color3.fromRGB(46, 120, 220) },
+		{ Vector3.new(2400, 200, 800), 900, Color3.fromRGB(255, 61, 184) },
+	},
 	RockColor = Color3.fromRGB(88, 80, 78),
 	TowerColor = Color3.fromRGB(150, 150, 160),
 	Warm = Color3.fromRGB(255, 196, 110),

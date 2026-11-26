@@ -253,6 +253,39 @@ local function show(from: number, to: number, skillPoints: number)
 	end)
 end
 
+-- 27.11 owner: early levels come fast, a full-screen window every time
+-- annoys. Usually a small plate at the top centre ("УРОВЕНЬ 8" and the
+-- points) for a moment; the big window only on every FX.BigEvery-th level.
+local toast = Style.Panel(Style.Gui, { Name = "LevelUpToast", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 64), Size = UDim2.fromOffset(300, 58), Fill = Color3.fromRGB(14, 12, 10), Transparency = 0.1, Border = C.Gold, Cut = 10, ZIndex = 80, Visible = false })
+local toastTitle = Style.Label(toast, "", 22, C.Gold, { Font = Style.FontTitle, Position = UDim2.fromOffset(0, 4), Size = UDim2.new(1, 0, 0, 28), ZIndex = 81 })
+local toastLine = Style.Label(toast, "", 13, C.Text, { Position = UDim2.fromOffset(0, 32), Size = UDim2.new(1, 0, 0, 18), ZIndex = 81 })
+local toastScale = Instance.new("UIScale")
+toastScale.Parent = toast
+local toastStamp = 0
+local function showToast(from: number, to: number, skillPoints: number)
+	toastTitle.Text = T.Short:format(to)
+	local parts = { T.Stats:format((to - from) * Config.Attributes.PointsPerLevel) }
+	if skillPoints > 0 then
+		table.insert(parts, T.Skills:format(skillPoints))
+	end
+	toastLine.Text = table.concat(parts, "  ·  ")
+	toast.Visible = true
+	toastScale.Scale = 0.6
+	Style.Tween(toastScale, 0.25, { Scale = 1 }, Enum.EasingStyle.Back)
+	local stamp = os.clock()
+	toastStamp = stamp
+	task.delay(FX.ToastSeconds or 2, function()
+		if toastStamp == stamp then
+			Style.Tween(toastScale, 0.2, { Scale = 0.01 })
+			task.delay(0.22, function()
+				if toastStamp == stamp then
+					toast.Visible = false
+				end
+			end)
+		end
+	end)
+end
+
 -- the camera leans in and back
 local function zoom()
 	local camera = Workspace.CurrentCamera
@@ -276,17 +309,24 @@ ReplicatedStorage:WaitForChild("LevelUp").OnClientEvent:Connect(function(level, 
 		return
 	end
 	pending = { from = previous, to = level, points = points }
-	Popups.Flash(Config.Theme.Cyan)
 	local id = Config.Assets.Sounds and Config.Assets.Sounds.LevelUp or ""
 	if id ~= "" then
-		Style.PlaySound(id, 1.1, 0.7)
+		Style.PlaySound(id, 1.1, 0.5)
 	end
-	zoom()
 	task.delay(FX.Gather, function()
 		local p = pending
 		pending = nil
-		if p then
+		if not p then
+			return
+		end
+		-- a milestone (10, 20, ...) inside the jump: the big window
+		local big = math.floor(p.to / FX.BigEvery) > math.floor(p.from / FX.BigEvery)
+		if big then
+			Popups.Flash(Config.Theme.Cyan)
+			zoom()
 			show(p.from, p.to, p.points)
+		else
+			showToast(p.from, p.to, p.points)
 		end
 	end)
 end)

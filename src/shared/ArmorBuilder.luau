@@ -287,6 +287,16 @@ local function specs(piece, classId: string?)
 				end
 			end
 		end
+		-- every tier: a crest on the chest (two wings + a diamond) and studs
+		-- on the shoulders, so even Common reads as crafted armor
+		local crestColor = if legendary then GOLD else T
+		for _, sd in ipairs(sides) do
+			local x = sd[2]
+			wedge("UpperTorso", "CrestWing", V(0.08, 0.22, 0.55), V(x * 0.22, 0.62, -1), crestColor, METAL, V(0, 0, -0.2), rad(0, 90, x * 70))
+			ball("UpperTorso", "Stud", V(0.16, 0.16, 0.16), V(x * 1, 0.85, 0), crestColor, METAL, V(x * 0.45, 0.45, -0.35))
+			ball("UpperTorso", "Stud", V(0.16, 0.16, 0.16), V(x * 1, 0.85, 0), crestColor, METAL, V(x * 0.45, 0.45, 0.35))
+		end
+		block("UpperTorso", "CrestGem", V(0.2, 0.2, 0.1), V(0, 0.62, -1), A, AM, V(0, 0, -0.22), rad(0, 0, 45))
 		-- Legendary: wings (Blade), energy blades (Pulse), energy fins (Gunner)
 		if legendary then
 			for _, sd in ipairs(sides) do
@@ -476,6 +486,40 @@ local function rarityFx(model: Model, piece)
 		sparks.Rate = 5
 		sparks.Parent = glowPart
 	end
+	-- the client (ArmorFx) animates Rare+ armor: pulsing lines, orbiting
+	-- energy motes (Epic+), a turning halo behind the back (Legendary+)
+	if rarity.Index >= Config.Rarity.Rare.Index then
+		model:SetAttribute("FxRank", rarity.Index)
+		model:SetAttribute("FxColor", rarity.Color)
+		model:SetAttribute("FxSlot", piece.Slot)
+		game:GetService("CollectionService"):AddTag(model, "ArmorFx")
+	end
+	-- Epic+: a glowing sheen over the main plates
+	if rarity.Index >= Config.Rarity.Epic.Index then
+		for _, part in ipairs(model:GetChildren()) do
+			if part:IsA("BasePart") and (part.Name == "Plate" or part.Name == "Shell" or part.Name == "Vest" or part.Name == "Gauntlet" or part.Name == "Greave" or part.Name == "Cuisse" or part.Name == "Shin") then
+				local sheen = part:Clone()
+				sheen.Name = "Sheen"
+				sheen:ClearAllChildren()
+				if part:FindFirstChildOfClass("SpecialMesh") then
+					part:FindFirstChildOfClass("SpecialMesh"):Clone().Parent = sheen
+				end
+				sheen.Size = part.Size * 1.025
+				sheen.CFrame = part.CFrame
+				sheen.Material = Enum.Material.Neon
+				sheen.Color = rarity.Color
+				sheen.Transparency = if rarity.Index >= Config.Rarity.Legendary.Index then 0.8 else 0.86
+				sheen.CastShadow = false
+				if not part.Anchored then
+					local weld = Instance.new("WeldConstraint")
+					weld.Part0 = part
+					weld.Part1 = sheen
+					weld.Parent = sheen
+				end
+				sheen.Parent = model
+			end
+		end
+	end
 	if not glowPart or rarity.Index < Config.Rarity.Epic.Index then
 		return
 	end
@@ -496,6 +540,20 @@ local function rarityFx(model: Model, piece)
 		emitter.SpreadAngle = Vector2.new(180, 180)
 		emitter.Rate = 6
 		emitter.Parent = glowPart
+		-- gold sparkles drifting up from the whole piece
+		local sparkle = Instance.new("ParticleEmitter")
+		sparkle.Name = "LegendSparkles"
+		sparkle.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		sparkle.Color = ColorSequence.new(rarity.Color:Lerp(Color3.new(1, 1, 1), 0.3))
+		sparkle.LightEmission = 1
+		sparkle.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
+		sparkle.Transparency = NumberSequence.new(0.1, 1)
+		sparkle.Lifetime = NumberRange.new(0.8, 1.4)
+		sparkle.Speed = NumberRange.new(0.6, 1.4)
+		sparkle.Acceleration = Vector3.new(0, 1.5, 0)
+		sparkle.SpreadAngle = Vector2.new(180, 180)
+		sparkle.Rate = 8
+		sparkle.Parent = glowPart
 	end
 end
 

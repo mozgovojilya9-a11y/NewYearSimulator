@@ -138,8 +138,29 @@ function HubIsland.Scenery(root, center: Vector3, radius: number, depth: number)
 	for _, def in ipairs(I.FarIslands) do
 		farIsland(folder, rng, { At = center + def[1], Radius = def[2], Towers = def[3] })
 	end
-	for _, c in ipairs(I.CloudSea) do
-		Panel(folder, "CloudSea", Vector3.new(4000, 2, 4000), CFrame.new(center + Vector3.new(0, c[1], 0)), I.CloudColor, M.Smooth, { Transparency = c[2], CanCollide = false, CanQuery = false, CastShadow = false })
+	-- open space: planets (one with a ring) and faint nebula clouds
+	local function far(p: BasePart)
+		p.CanCollide = false
+		p.CanQuery = false
+		p.CanTouch = false
+		p.CastShadow = false
+		return p
+	end
+	for i, def in ipairs(I.Planets) do
+		local pos = center + def[1]
+		local r = def[2]
+		far(Panel(folder, "Planet", Vector3.new(r * 2, r * 2, r * 2), CFrame.new(pos), def[3], M.Smooth, { Shape = Enum.PartType.Ball }))
+		-- a lit rim: a slightly bigger glowing shell
+		far(Panel(folder, "PlanetGlow", Vector3.new(r * 2.08, r * 2.08, r * 2.08), CFrame.new(pos), def[3]:Lerp(Color3.new(1, 1, 1), 0.3), M.Neon, { Shape = Enum.PartType.Ball, Transparency = 0.9 }))
+		if def[4] then
+			local tilt = CFrame.new(pos) * CFrame.Angles(math.rad(70 + i * 5), math.rad(i * 20), 0)
+			for k, w in ipairs({ 2.6, 3.1 }) do
+				far(Panel(folder, "PlanetRing", Vector3.new(r * 0.04, r * w, r * w), tilt * CFrame.Angles(0, 0, math.rad(90)) * CFrame.new(k * 0.01, 0, 0), def[4], M.Neon, { Shape = Enum.PartType.Cylinder, Transparency = 0.55 + k * 0.15 }))
+			end
+		end
+	end
+	for _, def in ipairs(I.Nebulae) do
+		far(Panel(folder, "Nebula", Vector3.new(def[2] * 2, def[2] * 1.2, def[2] * 2), CFrame.new(center + def[1]), def[3], M.Neon, { Shape = Enum.PartType.Ball, Transparency = 0.96 }))
 	end
 	return folder
 end

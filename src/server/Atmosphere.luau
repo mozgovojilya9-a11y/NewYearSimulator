@@ -55,10 +55,10 @@ function Atmosphere.Init()
 	Lighting.EnvironmentSpecularScale = hub.EnvironmentSpecularScale
 
 	local sky = ensure(Lighting, "Sky", "Sky")
-	sky.StarCount = 1500
+	sky.StarCount = L.Sky and L.Sky.StarCount or 1500
 	sky.SunAngularSize = 11
 	sky.MoonAngularSize = 8
-	sky.CelestialBodiesShown = true
+	sky.CelestialBodiesShown = if L.Sky then L.Sky.CelestialBodies else true
 
 	local atmosphere = ensure(Lighting, "Atmosphere", "Atmosphere")
 	atmosphere.Density = hub.Atmosphere.Density

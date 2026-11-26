@@ -97,7 +97,8 @@ local function refreshWeapon(player, character)
 	model.Name = "EquippedWeapon"
 	model:SetAttribute("WeaponId", weapon.Id)
 	model.Parent = character
-	weld(hand, model.PrimaryPart, if isR15(character) then E.GripR15 else E.GripR6)
+	local classGrip = E.GripClass and E.GripClass[player:GetAttribute("Class") or ""]
+	weld(hand, model.PrimaryPart, if isR15(character) then (classGrip or E.GripR15) else E.GripR6)
 	refreshShield(player, character)
 end
 
