@@ -66,6 +66,18 @@ local function fx(kind: string, ...)
 end
 AbilityService.Fx = fx
 
+-- The color of a player's attacks: the weapon's rarity color from Rare up
+-- (sheet 05: blue / violet / gold ...), else the class color.
+local function weaponColor(player): Color3
+	local weapon = PlayerState.Weapon(player)
+	local rarity = weapon and Config.Rarity[weapon.Rarity]
+	if rarity and rarity.Index >= Config.Rarity.Rare.Index then
+		return rarity.Color
+	end
+	local class = Config.ClassById[PlayerState.ClassOf(player) or ""]
+	return if class then class.Color else CB.FxColor
+end
+
 -- Hooks of other systems (artifacts):
 --   OnHit[i](player, model, dealt, isCrit)  after a hit landed on a mob
 --   OnIncoming[i](player, amount) -> amount  damage the player is about to take
@@ -258,7 +270,8 @@ function AbilityService.Basic(player, target, charged: boolean?): boolean
 		s.shots += 1
 		local damage, isCrit = roll(player, if isCharged then G.ChargeMult * (1 + (stats.ChargeBonus or 0)) else 1)
 		hit(player, main, damage, isCrit, isCharged)
-		fx("Beam", root.Position + Vector3.new(0, 1, 0), main:GetPivot().Position, if isCharged then Config.Theme.Gold else CB.FxColor, if isCharged then 0.8 else 0.35)
+		local shotColor = weaponColor(player)
+		fx("Shot", player.Character, main:GetPivot().Position, if isCharged then Config.Theme.Gold else shotColor, isCharged)
 		if s.shots % G.VolleyEvery == 0 then
 			local count = G.VolleyTargets + math.floor(stats.VolleyBonus or 0)
 			local n = 0
@@ -267,7 +280,7 @@ function AbilityService.Basic(player, target, charged: boolean?): boolean
 					n += 1
 					local d, c = roll(player, G.VolleyMult)
 					hit(player, e.model, d, c)
-					fx("Beam", root.Position + Vector3.new(0, 1, 0), e.model:GetPivot().Position, CB.FxColor, 0.3)
+					task.delay(0.06 * n, fx, "Shot", player.Character, e.model:GetPivot().Position, shotColor, false)
 				end
 			end
 		end
@@ -304,6 +317,9 @@ function AbilityService.Basic(player, target, charged: boolean?): boolean
 		return any
 	end
 	local main = pickTarget(player, target, def.Range)
+	if classId == "Pulse" then
+		fx("Thrust", player.Character, def.Range + 1, weaponColor(player)) -- the spear stab, hit or miss
+	end
 	if not main then
 		return false
 	end
@@ -425,7 +441,7 @@ local function execute(player, node, rank: number, aim): (boolean, string?)
 	local direction = aimDirection(player, aim)
 	local origin = root.Position
 	local power = Config.RankValue(ability.Power, rank) or 1
-	local color = (Config.ClassById[node.Class] or {}).Color or CB.FxColor
+	local color = weaponColor(player)
 
 	if kind == "Shield" then
 		local duration = Config.RankValue(ability.Duration, rank)
@@ -464,6 +480,9 @@ local function execute(player, node, rank: number, aim): (boolean, string?)
 					end
 				end
 				fx("Ring", center, radius, if kind == "Quake" then Config.Theme.Gold else color)
+				if kind == "Spin" then
+					fx("Whirl", player.Character, radius, color, 0.35)
+				end
 				if i < hits then
 					task.wait(0.35)
 				end
@@ -490,7 +509,7 @@ local function execute(player, node, rank: number, aim): (boolean, string?)
 				AbilityService.Stun(player, e.model, Config.RankValue(ability.Duration, rank))
 			end
 		end
-		fx("Ring", origin, radius, Color3.fromRGB(160, 90, 255))
+		fx("Vortex", origin, radius, color)
 		return true
 	elseif kind == "Wave" then
 		local list = enemiesInFront(player, origin, direction, ability.Range or 16, 35)
@@ -501,7 +520,7 @@ local function execute(player, node, rank: number, aim): (boolean, string?)
 				AbilityService.Slow(player, e.model, Config.RankValue(ability.Duration, rank))
 			end
 		end
-		fx("Beam", origin, origin + direction * (ability.Range or 16), color, 0.6)
+		fx("Crescent", origin + Vector3.new(0, 1, 0), direction, ability.Range or 16, color)
 		return true
 	elseif kind == "Volley" then
 		local list = enemiesInFront(player, origin, direction, ability.Range or 60, 60)
@@ -514,7 +533,7 @@ local function execute(player, node, rank: number, aim): (boolean, string?)
 		for i = 1, math.min(#list, ability.Targets or 3) do
 			local d, c = roll(player, power, true)
 			hit(player, list[i].model, d, c, true)
-			fx("Beam", origin + Vector3.new(0, 1, 0), list[i].model:GetPivot().Position, color, 0.4)
+			task.delay(0.08 * (i - 1), fx, "Shot", player.Character, list[i].model:GetPivot().Position, color, false)
 		end
 		return true
 	elseif kind == "Trap" or kind == "Barrage" then
@@ -537,8 +556,9 @@ local function execute(player, node, rank: number, aim): (boolean, string?)
 		AbilityService.Stun(player, target, Config.RankValue(ability.Duration, rank))
 	end
 	if kind == "Shot" or range > 30 then
-		fx("Beam", origin + Vector3.new(0, 1, 0), target:GetPivot().Position, color, 0.6)
+		fx("Shot", player.Character, target:GetPivot().Position, color, true) -- a heavy shot from the muzzle
 	else
+		fx("Cross", target:GetPivot().Position + Vector3.new(0, 1, 0), color, 5)
 		fx("Ring", target:GetPivot().Position, 4, color)
 	end
 	return true

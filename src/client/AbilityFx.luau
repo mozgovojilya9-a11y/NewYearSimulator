@@ -382,6 +382,236 @@ function handlers.Dash(character, seconds: number)
 	end)
 end
 
+---------------------------------------------------------------------
+-- Weapon attacks and abilities of the classes (27.11): the shot leaves
+-- the gun's muzzle, the spear stabs from its tip, every ability has its
+-- own shape. Colors come from the weapon's rarity (server).
+---------------------------------------------------------------------
+
+-- The muzzle / tip of the weapon in a character's hand: the far end of
+-- the weapon model along the character's facing (else the chest).
+local function muzzleOf(character): (Vector3, Vector3)
+	local root = rootOf(character)
+	local look = if root then root.CFrame.LookVector else Vector3.zAxis
+	local weapon = character and character:FindFirstChild("EquippedWeapon")
+	if weapon and weapon:IsA("Model") then
+		local best, bestDot
+		for _, p in ipairs(weapon:GetDescendants()) do
+			if p:IsA("BasePart") and p.Transparency < 1 then
+				for _, sx in ipairs({ -1, 1 }) do
+					for _, sy in ipairs({ -1, 1 }) do
+						for _, sz in ipairs({ -1, 1 }) do
+							local corner = (p.CFrame * CFrame.new(p.Size.X / 2 * sx, p.Size.Y / 2 * sy, p.Size.Z / 2 * sz)).Position
+							local d = corner:Dot(look)
+							if not bestDot or d > bestDot then
+								best, bestDot = corner, d
+							end
+						end
+					end
+				end
+			end
+		end
+		if best then
+			return best, look
+		end
+	end
+	local pos = if root then root.Position + Vector3.new(0, 1, 0) + look * 1.5 else Vector3.zero
+	return pos, look
+end
+
+-- a four-point star flash (two crossed thin plates) facing `look`
+local function starFlash(at: Vector3, look: Vector3, color: Color3, size: number)
+	local cf = CFrame.lookAt(at, at + look)
+	local pieces = {}
+	for _, angle in ipairs({ 0, 90, 45, 135 }) do
+		local long = if angle % 90 == 0 then size * 1.8 else size
+		local plate = part({ Size = Vector3.new(0.08, long, 0.08), CFrame = cf * CFrame.Angles(0, 0, math.rad(angle)), Color = color:Lerp(Color3.new(1, 1, 1), 0.4), Transparency = 0.05 })
+		table.insert(pieces, plate)
+		tween(plate, 0.12, { Size = Vector3.new(0.02, long * 1.6, 0.02), Transparency = 1 })
+		Debris:AddItem(plate, 0.15)
+	end
+	local ball = part({ Shape = Enum.PartType.Ball, Size = Vector3.new(size, size, size), CFrame = CFrame.new(at), Color = color, Transparency = 0.15 })
+	tween(ball, 0.12, { Size = Vector3.new(size * 1.8, size * 1.8, size * 1.8), Transparency = 1 })
+	Debris:AddItem(ball, 0.15)
+	local light = Instance.new("PointLight")
+	light.Color = color
+	light.Range = size * 10
+	light.Brightness = 3
+	light.Parent = ball
+end
+
+-- a fast tracer: a bright streak that flies from -> to and sparks on arrival
+local function tracer(from: Vector3, to: Vector3, color: Color3, width: number, speed: number, onHit)
+	local distance = (to - from).Magnitude
+	if distance < 0.2 then
+		return
+	end
+	local dir = (to - from).Unit
+	local length = math.min(distance, 3 + width * 6)
+	local core = part({ Size = Vector3.new(width * 0.45, width * 0.45, length), Color = Color3.new(1, 1, 1) })
+	local glow = part({ Size = Vector3.new(width * 1.4, width * 1.4, length * 1.15), Color = color, Transparency = 0.45 })
+	local seconds = distance / speed
+	local start = os.clock()
+	local connection
+	connection = RunService.Heartbeat:Connect(function()
+		local t = math.min(1, (os.clock() - start) / math.max(0.01, seconds))
+		local head = from:Lerp(to, t)
+		local cf = CFrame.lookAt(head - dir * length / 2, head)
+		core.CFrame = cf
+		glow.CFrame = cf
+		if t >= 1 then
+			connection:Disconnect()
+			core:Destroy()
+			glow:Destroy()
+			local flash = part({ Shape = Enum.PartType.Ball, Size = Vector3.new(width * 2, width * 2, width * 2), CFrame = CFrame.new(to), Color = color, Transparency = 0.1 })
+			tween(flash, 0.2, { Size = Vector3.new(width * 6, width * 6, width * 6), Transparency = 1 })
+			Debris:AddItem(flash, 0.25)
+			burst(to, color, math.clamp(math.floor(width * 20), 6, 26), 22, 0.18, 0.3)
+			if onHit then
+				onHit()
+			end
+		end
+	end)
+end
+
+-- Стрелок: the shot from the muzzle. charged = bigger, a shock ring at
+-- the muzzle and a stronger hit.
+function handlers.Shot(character, to: Vector3, color: Color3, charged: boolean?)
+	local from, look = muzzleOf(character)
+	local w = if charged then 0.75 else 0.32
+	starFlash(from, look, color, if charged then 1.4 else 0.7)
+	if charged then
+		local ring = part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.15, 1, 1), CFrame = CFrame.lookAt(from, from + look) * CFrame.Angles(0, math.rad(90), 0), Color = color, Transparency = 0.1 })
+		tween(ring, 0.3, { Size = Vector3.new(0.05, 6, 6), Transparency = 1 })
+		Debris:AddItem(ring, 0.35)
+	end
+	tracer(from, to, color, w, if charged then 160 else 240, function()
+		if charged then
+			handlers.Ring(to, 6, color)
+		end
+	end)
+end
+
+-- Импульс: a straight energy stab from the spear tip.
+function handlers.Thrust(character, length: number, color: Color3)
+	local from, look = muzzleOf(character)
+	local to = from + look * length
+	local cf = CFrame.lookAt((from + to) / 2, to)
+	local core = part({ Size = Vector3.new(0.18, 0.18, 0.5), CFrame = CFrame.lookAt(from, to), Color = Color3.new(1, 1, 1) })
+	local glow = part({ Size = Vector3.new(0.7, 0.7, length), CFrame = cf, Color = color, Transparency = 0.5 })
+	tween(core, 0.1, { Size = Vector3.new(0.18, 0.18, length), CFrame = cf })
+	tween(glow, 0.25, { Size = Vector3.new(0.1, 0.1, length * 1.1), Transparency = 1 })
+	Debris:AddItem(core, 0.3)
+	Debris:AddItem(glow, 0.3)
+	task.delay(0.1, function()
+		tween(core, 0.15, { Transparency = 1 })
+		starFlash(to, look, color, 1)
+	end)
+end
+
+-- a crescent (Wave): an arc of energy that runs forward along `dir`
+function handlers.Crescent(from: Vector3, dir: Vector3, range: number, color: Color3)
+	dir = Vector3.new(dir.X, 0, dir.Z)
+	if dir.Magnitude < 0.01 then
+		return
+	end
+	dir = dir.Unit
+	local count = 13
+	local radius = 3
+	local blades = {}
+	for i = 1, count do
+		blades[i] = part({ Size = Vector3.new(0.15, 1, 0.8), Color = color, Transparency = 0.1 })
+	end
+	local start = os.clock()
+	local seconds = range / 55
+	local connection
+	connection = RunService.Heartbeat:Connect(function()
+		local t = (os.clock() - start) / seconds
+		if t >= 1 then
+			connection:Disconnect()
+			for _, b in ipairs(blades) do
+				b:Destroy()
+			end
+			return
+		end
+		local center = from + dir * (range * t)
+		local base = CFrame.lookAt(center, center + dir)
+		local r = radius * (1 + t * 0.8)
+		for i, b in ipairs(blades) do
+			local k = (i - 1) / (count - 1)
+			local a = math.rad(-70 + 140 * k)
+			local thick = 0.4 + 1.2 * math.sin(k * math.pi)
+			b.Size = Vector3.new(0.12, thick, r * 0.24)
+			b.CFrame = base * CFrame.Angles(0, -a, 0) * CFrame.new(0, 0, -r) * CFrame.Angles(0, math.rad(90), 0) * CFrame.new(0, 0, 0)
+			b.Transparency = 0.1 + t * 0.8
+		end
+	end)
+	Style.PlaySound("Swing", 0.8, 0.4)
+end
+
+-- Pull: an energy vortex that shrinks into the center
+function handlers.Vortex(center: Vector3, radius: number, color: Color3)
+	local y = groundY(center) + 0.2
+	for k = 0, 2 do
+		local ring = part({ Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.2, radius * 2, radius * 2), CFrame = CFrame.new(center.X, y + k * 0.6, center.Z) * CFrame.Angles(0, 0, math.rad(90)), Color = color, Transparency = 0.25 + k * 0.15 })
+		task.delay(k * 0.08, function()
+			tween(ring, 0.45, { Size = Vector3.new(0.2, 1, 1), Transparency = 1 })
+		end)
+		Debris:AddItem(ring, 0.7)
+	end
+	local core = part({ Shape = Enum.PartType.Ball, Size = Vector3.new(1, 1, 1), CFrame = CFrame.new(center.X, y + 1.5, center.Z), Color = color, Transparency = 0.2 })
+	tween(core, 0.5, { Size = Vector3.new(4, 4, 4), Transparency = 1 })
+	Debris:AddItem(core, 0.55)
+	burst(Vector3.new(center.X, y + 1, center.Z), color, 24, 12, 0.3, 0.5)
+end
+
+-- Spin: energy blades whirling around the character
+function handlers.Whirl(character, radius: number, color: Color3, seconds: number)
+	local root = rootOf(character)
+	if not root then
+		return
+	end
+	local count = 3
+	local blades = {}
+	for i = 1, count do
+		blades[i] = part({ Size = Vector3.new(0.15, 0.9, radius * 0.9), Color = color, Transparency = 0.15 })
+	end
+	local start = os.clock()
+	local connection
+	connection = RunService.Heartbeat:Connect(function()
+		local t = os.clock() - start
+		if t >= seconds or not root.Parent then
+			connection:Disconnect()
+			for _, b in ipairs(blades) do
+				tween(b, 0.15, { Transparency = 1 })
+				Debris:AddItem(b, 0.2)
+			end
+			return
+		end
+		local spin = t * 18
+		for i, b in ipairs(blades) do
+			local a = spin + (i - 1) * math.pi * 2 / count
+			b.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, a, 0) * CFrame.new(0, 0, -radius * 0.5)
+		end
+	end)
+end
+
+-- Strike / Stun: a crossed slash on the target and sparks
+function handlers.Cross(at: Vector3, color: Color3, size: number?)
+	local s = size or 4
+	local cam = Workspace.CurrentCamera
+	local face = if cam then CFrame.lookAt(at, cam.CFrame.Position) else CFrame.new(at)
+	for _, angle in ipairs({ 45, -45 }) do
+		local slash = part({ Size = Vector3.new(0.3, 0.1, 0.1), CFrame = face * CFrame.Angles(0, 0, math.rad(angle)), Color = color:Lerp(Color3.new(1, 1, 1), 0.3) })
+		tween(slash, 0.1, { Size = Vector3.new(s, 0.3, 0.1) })
+		task.delay(0.12, function()
+			tween(slash, 0.2, { Size = Vector3.new(s * 1.2, 0.02, 0.1), Transparency = 1 })
+		end)
+		Debris:AddItem(slash, 0.4)
+	end
+	burst(at, color, 16, 20, 0.25, 0.35)
+end
+
 remote.OnClientEvent:Connect(function(kind, fxKind, ...)
 	if kind ~= "Fx" or Style.HideEffects then
 		return

@@ -2212,16 +2212,34 @@ Config.Assets = {
 	-- Weapon look by class (Config.Weapons[i].Class): the first entry whose
 	-- UpTo rarity is >= the item's rarity. A model named exactly like the
 	-- weapon id (GameAssets/Weapons/<id>) wins over this table.
+	-- 27.11, sheet 05: a model per rarity tier (made with the Studio mesh
+	-- generator): _C Common/Uncommon bare metal, _R Rare blue lines, _E Epic
+	-- violet glow, _L Legendary+ gold (+15 adds the energy rings). Entries
+	-- whose model is missing are skipped (the older models stay as fallback).
 	WeaponModels = {
-		Blade = { { Model = "Weapon_Sword_1", UpTo = "Uncommon" }, { Model = "Weapon_Sword_2" } },
-		Pulse = { { Model = "Weapon_Spear_1", UpTo = "Uncommon" }, { Model = "Weapon_Spear_2" } },
-		Gunner = { { Model = "Weapon_Blaster_1", UpTo = "Uncommon" }, { Model = "Weapon_Blaster_2", UpTo = "Epic" }, { Model = "Weapon_Blaster_3" } },
+		Blade = { { Model = "Weapon_Sword_C", UpTo = "Uncommon" }, { Model = "Weapon_Sword_R", UpTo = "Rare" }, { Model = "Weapon_Sword_E", UpTo = "Epic" }, { Model = "Weapon_Sword_L" }, { Model = "Weapon_Sword_1", UpTo = "Uncommon" }, { Model = "Weapon_Sword_2" } },
+		Pulse = { { Model = "Weapon_Spear_C", UpTo = "Uncommon" }, { Model = "Weapon_Spear_R", UpTo = "Rare" }, { Model = "Weapon_Spear_E", UpTo = "Epic" }, { Model = "Weapon_Spear_L" }, { Model = "Weapon_Spear_1", UpTo = "Uncommon" }, { Model = "Weapon_Spear_2" } },
+		Gunner = { { Model = "Weapon_Blaster_C", UpTo = "Uncommon" }, { Model = "Weapon_Blaster_R", UpTo = "Rare" }, { Model = "Weapon_Blaster_E", UpTo = "Epic" }, { Model = "Weapon_Blaster_L" }, { Model = "Weapon_Blaster_1", UpTo = "Uncommon" }, { Model = "Weapon_Blaster_2", UpTo = "Epic" }, { Model = "Weapon_Blaster_3" } },
 	},
 	-- How a weapon model is held: Length in studs; GripAt = where the hand
 	-- is, 0 = rear end .. 1 = tip (default: the Tool's Handle, else 0.12);
 	-- Flip = true when the tip and the grip end come out swapped (checked
 	-- in Studio: swords and spears are fine as they are).
 	WeaponFit = {
+		-- the tiered models are already painted by rarity: Styled = no extra
+		-- strips / gold tint, only the light, particles, trail and rings
+		Weapon_Sword_C = { Length = 4.6, Styled = true },
+		Weapon_Sword_R = { Length = 4.8, Styled = true },
+		Weapon_Sword_E = { Length = 5, Styled = true },
+		Weapon_Sword_L = { Length = 5.2, Styled = true },
+		Weapon_Spear_C = { Length = 7, Styled = true },
+		Weapon_Spear_R = { Length = 7.2, Styled = true },
+		Weapon_Spear_E = { Length = 7.4, Styled = true },
+		Weapon_Spear_L = { Length = 7.6, Styled = true },
+		Weapon_Blaster_C = { Gun = true, Flip = true, Length = 3, GripAt = 0.3, Styled = true },
+		Weapon_Blaster_R = { Gun = true, Flip = true, Length = 3.2, GripAt = 0.3, Styled = true },
+		Weapon_Blaster_E = { Gun = true, Flip = true, Length = 3.4, GripAt = 0.3, Styled = true },
+		Weapon_Blaster_L = { Gun = true, Flip = true, Length = 3.6, GripAt = 0.3, Styled = true },
 		Weapon_Sword_1 = { Length = 4.6 },
 		Weapon_Sword_2 = { Length = 5 },
 		Weapon_Spear_1 = { Length = 7 },

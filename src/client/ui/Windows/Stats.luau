@@ -25,7 +25,7 @@ local progression = ReplicatedStorage:WaitForChild("Progression")
 
 local Stats = {}
 
-local window = Window.new("Статистика", C.Gold, Vector2.new(820, 520), "trophy")
+local window = Window.new("Статистика", C.Gold, Vector2.new(860, 540), "trophy")
 local content = window.Content
 
 local function panel(x: number, w: number, h: number, title: string)
@@ -79,15 +79,22 @@ local actRows = rows(activity, { "Время в игре", "Убито робо�
 local records = panel(0, 0, 0, "Рекорды Врат")
 records.Position = UDim2.fromOffset(0, 312)
 records.Size = UDim2.new(1, 0, 1, -312)
-local recordList = Instance.new("Frame")
+-- three columns, scrolls when there are more locations than fit
+local recordList = Instance.new("ScrollingFrame")
 recordList.Position = UDim2.fromOffset(12, 30)
 recordList.Size = UDim2.new(1, -24, 1, -36)
 recordList.BackgroundTransparency = 1
+recordList.BorderSizePixel = 0
+recordList.ScrollBarThickness = 4
+recordList.ScrollBarImageColor3 = C.GoldDim
+recordList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+recordList.CanvasSize = UDim2.new()
+recordList.ClipsDescendants = true
 recordList.ZIndex = 34
 recordList.Parent = records
 local recordLayout = Instance.new("UIGridLayout")
-recordLayout.CellSize = UDim2.fromOffset(250, 30)
-recordLayout.CellPadding = UDim2.fromOffset(10, 6)
+recordLayout.CellSize = UDim2.new(1 / 3, -8, 0, 26)
+recordLayout.CellPadding = UDim2.fromOffset(8, 4)
 recordLayout.SortOrder = Enum.SortOrder.LayoutOrder
 recordLayout.Parent = recordList
 
@@ -150,10 +157,10 @@ local function render(s)
 		cell.ZIndex = 34
 		cell.Parent = recordList
 		local rankColor = Config.Gates.Colors and Config.Gates.Colors[g.Rank] or C.Gold
-		Style.Label(cell, g.Rank, 15, rankColor, { Font = Style.FontTitle, Position = UDim2.fromOffset(6, 0), Size = UDim2.fromOffset(20, 30), ZIndex = 35 })
-		Style.Label(cell, g.Name, 13, C.Text, { Position = UDim2.fromOffset(30, 0), Size = UDim2.new(1, -120, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 35 })
-		local result = if g.Grade then ("%s  ·  %s"):format(g.Grade, if g.Seconds then clock(g.Seconds) else "—") else "не пройдено"
-		Style.Label(cell, result, 13, if g.Grade then C.Gold else C.Muted, { Font = Style.FontTitle, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 0), Size = UDim2.fromOffset(90, 30), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 35 })
+		Style.Label(cell, g.Rank, 14, rankColor, { Font = Style.FontTitle, Position = UDim2.fromOffset(6, 0), Size = UDim2.fromOffset(18, 26), ZIndex = 35 })
+		Style.Label(cell, g.Name, 12, C.Text, { Position = UDim2.fromOffset(28, 0), Size = UDim2.new(1, -96, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 35 })
+		local result = if g.Grade then ("%s · %s"):format(g.Grade, if g.Seconds then clock(g.Seconds) else "—") else "—"
+		Style.Label(cell, result, 12, if g.Grade then C.Gold else C.Muted, { Font = Style.FontTitle, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, 0), Size = UDim2.fromOffset(64, 26), TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 35 })
 	end
 end
 

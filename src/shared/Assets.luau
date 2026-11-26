@@ -254,9 +254,15 @@ local function gunHold(model: Model, fit): Model?
 		return nil
 	end
 	local box, size = alignedBox(model, ref)
-	local tipDir = if fit.Flip then -ref.CFrame.LookVector else ref.CFrame.LookVector
-	local up = ref.CFrame.UpVector
-	local length = size.Z
+	-- the barrel = the longest side of the box, the height = the middle one
+	-- (generated meshes don't always have the barrel along their Z)
+	local axes = { { ref.CFrame.RightVector, size.X }, { ref.CFrame.UpVector, size.Y }, { ref.CFrame.LookVector, size.Z } }
+	table.sort(axes, function(a, b)
+		return a[2] > b[2]
+	end)
+	local tipDir = if fit.Flip then -axes[1][1] else axes[1][1]
+	local up = axes[2][1]
+	local length = axes[1][2]
 	if length < 0.1 then
 		model:Destroy()
 		return nil
@@ -265,7 +271,7 @@ local function gunHold(model: Model, fit): Model?
 		ref.Name = "Grip"
 	end
 	local rear = box.Position - tipDir * length / 2
-	local gripPoint = rear + tipDir * ((fit.GripAt or 0.3) * length) - up * (size.Y * (fit.GripDown or 0.2))
+	local gripPoint = rear + tipDir * ((fit.GripAt or 0.3) * length) - up * (axes[2][2] * (fit.GripDown or 0.2))
 	local handle = Instance.new("Part")
 	handle.Name = "Handle"
 	handle.Size = Vector3.new(0.3, 0.8, 0.3)

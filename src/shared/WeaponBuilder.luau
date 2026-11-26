@@ -538,7 +538,7 @@ local function assetNameFor(weapon): string?
 	end
 	local rank = Config.Rarity[weapon.Rarity] and Config.Rarity[weapon.Rarity].Index or 1
 	for _, entry in ipairs(list) do
-		if not entry.UpTo or rank <= Config.Rarity[entry.UpTo].Index then
+		if (not entry.UpTo or rank <= Config.Rarity[entry.UpTo].Index) and Assets.Has("Weapons", entry.Model) then
 			return entry.Model
 		end
 	end
@@ -593,9 +593,13 @@ function WeaponBuilder.ApplyRarity(model: Model, weapon, handle: BasePart, glowP
 			table.insert(neonParts, p)
 		end
 	end
+	local fit = Config.Assets.WeaponFit[model:GetAttribute("Asset") or ""]
+	local styled = fit and fit.Styled -- a model already painted for its rarity
 	if rank < R.Rare.Index then
-		for _, p in ipairs(neonParts) do
-			p.Material = METAL
+		if not styled then
+			for _, p in ipairs(neonParts) do
+				p.Material = METAL
+			end
 		end
 		return
 	end
@@ -622,11 +626,13 @@ function WeaponBuilder.ApplyRarity(model: Model, weapon, handle: BasePart, glowP
 		table.insert(neonParts, insert)
 		return insert
 	end
-	for _, z in ipairs({ -0.14, 0.14 }) do
-		strip("Insert", Vector3.new(0.12, length, 0.06), CFrame.new(0, 1.2 + length / 2, z), 0)
-	end
-	if rank >= R.Epic.Index then
-		strip("GlowShell", Vector3.new(0.6, length + 0.4, 0.5), CFrame.new(0, 1.2 + length / 2, 0), 0.75)
+	if not styled then
+		for _, z in ipairs({ -0.14, 0.14 }) do
+			strip("Insert", Vector3.new(0.12, length, 0.06), CFrame.new(0, 1.2 + length / 2, z), 0)
+		end
+		if rank >= R.Epic.Index then
+			strip("GlowShell", Vector3.new(0.6, length + 0.4, 0.5), CFrame.new(0, 1.2 + length / 2, 0), 0.75)
+		end
 	end
 	-- sheet 05: the glow is the RARITY's color (Rare blue, Epic violet,
 	-- Legendary gold ...), not the weapon's own color
@@ -654,7 +660,7 @@ function WeaponBuilder.ApplyRarity(model: Model, weapon, handle: BasePart, glowP
 	if rank >= R.Legendary.Index then
 		-- gold-plated metal and floating shards along the blade (sheet 05)
 		for _, p in ipairs(model:GetDescendants()) do
-			if p:IsA("BasePart") and p.Material ~= NEON and p.Transparency < 1 then
+			if not styled and p:IsA("BasePart") and p.Material ~= NEON and p.Transparency < 1 then
 				p.Color = p.Color:Lerp(Color3.fromRGB(226, 182, 92), 0.55)
 			end
 		end
@@ -662,10 +668,12 @@ function WeaponBuilder.ApplyRarity(model: Model, weapon, handle: BasePart, glowP
 		for k, side in ipairs({ -1, 1, -1 }) do
 			local shard = Instance.new("Part")
 			shard.Name = "FloatingShard"
-			shard.Size = Vector3.new(0.12, 0.6, 0.3)
-			shard.CFrame = handle.CFrame * CFrame.new(side * 0.55, length * (0.35 + k * 0.18), 0) * CFrame.Angles(0, 0, math.rad(side * 25))
-			shard.Color = glow
-			shard.Material = NEON
+			-- a small gold crystal diamond, not a flat plate
+			shard.Size = Vector3.new(0.18, 0.42, 0.18)
+			shard.CFrame = handle.CFrame * CFrame.new(side * 0.55, length * (0.35 + k * 0.18), 0) * CFrame.Angles(0, math.rad(45), math.rad(side * 25))
+			shard.Color = Color3.fromRGB(255, 214, 110)
+			shard.Material = Enum.Material.Glass
+			shard.Transparency = 0.15
 			shard.CanCollide = false
 			shard.CanQuery = false
 			shard.CanTouch = false
